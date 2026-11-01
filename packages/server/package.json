@@ -1,0 +1,11 @@
+{
+  "name": "@fxbot/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fxbot/sdk": "*"
+  }
+}

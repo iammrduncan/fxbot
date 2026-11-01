@@ -10,4 +10,4 @@ Simplicity wins. A smaller solution that does the job beats a rule carried over 
 - Name things for what they are. Comment only where the next reader would otherwise guess wrong.
 - Check outside input at the edge that receives it. One check is enough.
 - Test behavior that can break, against disposable data. Skip a new test harness for a one-line change.
-- Stay one package and one server process until a real limit says otherwise.
+- Stay three packages (sdk, server, ui) and one server process until a real limit says otherwise. A new package needs a second real consumer.

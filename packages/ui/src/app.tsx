@@ -1,9 +1,11 @@
-import { useEffect, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
-import { ArrowUpIcon, CheckIcon, CircleCheckIcon, CopyIcon, LoaderCircleIcon, MessageCircleDashedIcon, PlusIcon, SettingsIcon } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
+import { ArrowUpIcon, CheckIcon, CircleCheckIcon, CopyIcon, FileTextIcon, LoaderCircleIcon, MessageCircleDashedIcon, PaperclipIcon, PlusIcon, SettingsIcon, XIcon } from "lucide-react";
 import { Streamdown } from "streamdown";
+import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "@/components/ui/attachment";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
@@ -33,8 +35,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
-import { api, unreachable, type Fields, type Profile, type Settings } from "./api.ts";
-import { useTurnStream, type Turn } from "./use-turn-stream.ts";
+import { unreachable, type Fields, type Profile, type Turn, type Upload } from "@fxbot/sdk/client";
+import { client } from "./client.ts";
+import { maxFiles, readFile } from "./attachments.ts";
+import { useTurnStream } from "./use-turn-stream.ts";
 
 function go(path: string) {
   history.pushState(null, "", path);
@@ -64,7 +68,7 @@ export function App() {
   useEffect(() => {
     let stopped = false;
     const load = () =>
-      api<Profile[]>("/profiles").then(
+      client.profiles.list().then(
         (list) => {
           if (stopped) return;
           setProfiles(list);
@@ -222,8 +226,8 @@ function ProfileForm({ id, onSaved }: { id?: string; onSaved: () => void }) {
   const [defaultModel, setDefaultModel] = useState("");
   useEffect(() => {
     if (!id) return;
-    api<Settings>("/settings").then((settings) => setDefaultModel(settings.defaultModel), () => {});
-    api<Profile>(`/profiles/${id}`).then(
+    client.settings.get().then((settings) => setDefaultModel(settings.defaultModel), () => {});
+    client.profiles.get(id).then(
       ({ name, instructions, model }) => {
         setFields({ name, instructions, model });
         setLoaded(true);
@@ -237,7 +241,7 @@ function ProfileForm({ id, onSaved }: { id?: string; onSaved: () => void }) {
     setBusy(true);
     setError("");
     try {
-      const saved = await api<Profile>(id ? `/profiles/${id}` : "/profiles", id ? "PATCH" : "POST", id ? fields : { name: fields.name });
+      const saved = await (id ? client.profiles.update(id, fields) : client.profiles.create({ name: fields.name }));
       onSaved();
       go(`/profiles/${saved.id}`);
     } catch (e) {
@@ -249,7 +253,7 @@ function ProfileForm({ id, onSaved }: { id?: string; onSaved: () => void }) {
   async function remove() {
     if (!confirm(`Delete ${fields.name}? Its conversation files stay on the server.`)) return;
     try {
-      await api(`/profiles/${id}`, "DELETE");
+      await client.profiles.remove(id!);
       onSaved();
       go("/");
     } catch (e) {
@@ -302,7 +306,7 @@ function SettingsForm() {
   const [loaded, setLoaded] = useState(false);
   const [status, setStatus] = useState("");
   useEffect(() => {
-    api<Settings>("/settings").then(
+    client.settings.get().then(
       (settings) => {
         setDefaultModel(settings.defaultModel);
         setLoaded(true);
@@ -315,7 +319,7 @@ function SettingsForm() {
     event.preventDefault();
     setStatus("");
     try {
-      await api("/settings", "PATCH", { defaultModel });
+      await client.settings.update({ defaultModel });
       setStatus("Saved.");
     } catch (e) {
       setStatus((e as Error).message);
@@ -350,13 +354,24 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
+  const [attached, setAttached] = useState<Upload[]>([]);
+  const [notice, setNotice] = useState("");
+  const box = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
   const { turns, setTurns, connected } = useTurnStream(id, Boolean(profile?.sessionId));
+
+  // The box starts one line tall and grows with its text up to its max height, where it scrolls.
+  useLayoutEffect(() => {
+    if (!box.current) return;
+    box.current.style.height = "auto";
+    box.current.style.height = `${box.current.scrollHeight}px`;
+  }, [draft]);
 
   // Keeps trying, so the chat comes back on its own when the server does.
   useEffect(() => {
     let stopped = false;
     const load = () =>
-      api<Profile>(`/profiles/${id}`).then(
+      client.profiles.get(id).then(
         (loaded) => {
           if (stopped) return;
           setProfile(loaded);
@@ -380,11 +395,12 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
     if (finished) onReply();
   }, [finished]); // Only the count matters; onReply is a new function on every render.
 
-  async function send(text: string, messageId: string) {
-    const pending = { messageId, text, reply: "", done: false };
+  // An unsent turn keeps its files' data, so Retry sends them again.
+  async function send(text: string, messageId: string, files: Upload[]) {
+    const pending = { messageId, text, files, reply: "", done: false };
     setTurns((all) => (all.some((t) => t.messageId === messageId) ? all.map((t) => (t.messageId === messageId ? pending : t)) : [...all, pending]));
     try {
-      const { sessionId } = await api<{ sessionId: string }>(`/profiles/${id}/messages`, "POST", { text, messageId });
+      const { sessionId } = await client.send(id, { text, messageId, files: files.map(({ name, type, data }) => ({ name, type, data })) });
       setProfile((current) => current && { ...current, sessionId });
     } catch (e) {
       const note = `Not sent: ${(e as Error).message}`;
@@ -394,9 +410,21 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
 
   function submit(event: { preventDefault(): void }) {
     event.preventDefault();
-    if (!draft.trim() || !profile) return;
-    send(draft, newMessageId());
+    if ((!draft.trim() && !attached.length) || !profile) return;
+    send(draft, newMessageId(), attached);
     setDraft("");
+    setAttached([]);
+    setNotice("");
+  }
+
+  // From the picker, a paste, or a drop. The list is copied first, since the browser empties it after the event.
+  async function attach(files: File[]) {
+    const read = await Promise.allSettled(files.map(readFile));
+    const added = read.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+    const problems = read.flatMap((result) => (result.status === "rejected" ? [(result.reason as Error).message] : []));
+    if (attached.length + added.length > maxFiles) problems.push(`A message takes at most ${maxFiles} files.`);
+    setAttached((all) => [...all, ...added].slice(0, maxFiles));
+    setNotice(problems.join(" "));
   }
 
   const offline = error || (!connected && unreachable);
@@ -415,7 +443,15 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
       )}
       <MessageScrollerProvider autoScroll>
         {/* The composer keeps its place in the tree, so it keeps focus when the first turn arrives. */}
-        <div className={`flex min-h-0 flex-1 flex-col ${empty ? "justify-center gap-6 pb-[15dvh]" : ""}`}>
+        <div
+          className={`flex min-h-0 flex-1 flex-col ${empty ? "justify-center gap-6 pb-[15dvh]" : ""}`}
+          onDragOver={(e) => e.dataTransfer.types.includes("Files") && e.preventDefault()}
+          onDrop={(e) => {
+            if (!e.dataTransfer.files.length || !profile) return;
+            e.preventDefault();
+            attach([...e.dataTransfer.files]);
+          }}
+        >
           {empty ? (
             <h2 className="text-center text-2xl font-semibold">{profile ? `Talk to ${profile.name}` : "Loading…"}</h2>
           ) : (
@@ -423,7 +459,7 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
               <MessageScrollerViewport>
                 <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 py-4">
                   {turns.map((turn) => (
-                    <TurnView key={turn.messageId} turn={turn} retry={() => send(turn.text, turn.messageId)} />
+                    <TurnView key={turn.messageId} turn={turn} retry={() => send(turn.text, turn.messageId, turn.files ?? [])} />
                   ))}
                 </MessageScrollerContent>
               </MessageScrollerViewport>
@@ -431,18 +467,37 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
             </MessageScroller>
           )}
           <form onSubmit={submit} className="mx-auto w-full max-w-3xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <InputGroup className="rounded-3xl bg-background">
+            {notice && <p className="px-4 pb-2 text-sm text-destructive">{notice}</p>}
+            {/* Wraps so the files take the first row and the text and buttons the second; the buttons stay at the bottom as the text grows. */}
+            <InputGroup className="h-auto flex-wrap items-end rounded-3xl bg-background px-1">
+              {attached.length > 0 && (
+                <Files className="order-first w-full px-2 pt-2" files={attached} remove={(i) => setAttached((all) => all.toSpliced(i, 1))} />
+              )}
+              <InputGroupAddon align="inline-start" className="pb-1.5">
+                <input ref={picker} type="file" multiple hidden onChange={(e) => attach([...(e.target.files ?? [])]).then(() => (e.target.value = ""))} />
+                <InputGroupButton size="icon-sm" className="rounded-full" disabled={!profile} aria-label="Attach files" onClick={() => picker.current?.click()}>
+                  <PaperclipIcon />
+                </InputGroupButton>
+              </InputGroupAddon>
               <InputGroupTextarea
+                ref={box}
+                rows={1}
                 aria-label="Message"
-                className="max-h-48 min-h-12 px-4"
+                className="max-h-48 min-h-0 py-3"
                 placeholder={profile ? `Message ${profile.name}` : "Loading…"}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && submit(e)}
+                onPaste={(e) => {
+                  if (!e.clipboardData.files.length) return;
+                  // Text pasted with a picture of itself, as from a spreadsheet, keeps the text as well.
+                  if (!e.clipboardData.getData("text/plain")) e.preventDefault();
+                  attach([...e.clipboardData.files]);
+                }}
                 disabled={!profile}
               />
-              <InputGroupAddon align="block-end">
-                <InputGroupButton type="submit" variant="default" size="icon-sm" className="ml-auto rounded-full" disabled={!profile || !draft.trim()} aria-label="Send">
+              <InputGroupAddon align="inline-end" className="pb-1.5">
+                <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" disabled={!profile || (!draft.trim() && !attached.length)} aria-label="Send">
                   <ArrowUpIcon />
                 </InputGroupButton>
               </InputGroupAddon>
@@ -458,17 +513,20 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
 function TurnView({ turn, retry }: { turn: Turn; retry: () => void }) {
   return (
     <>
-      {turn.text && (
+      {turn.text || turn.files?.length ? (
         <MessageScrollerItem messageId={`${turn.messageId}-user`} scrollAnchor>
           <Message align="end">
             <MessageContent>
-              <Bubble align="end" variant="muted">
-                <BubbleContent className="whitespace-pre-wrap">{turn.text}</BubbleContent>
-              </Bubble>
+              {turn.files?.length ? <Files className="flex-wrap justify-end" files={turn.files} /> : null}
+              {turn.text && (
+                <Bubble align="end" variant="muted">
+                  <BubbleContent className="whitespace-pre-wrap">{turn.text}</BubbleContent>
+                </Bubble>
+              )}
             </MessageContent>
           </Message>
         </MessageScrollerItem>
-      )}
+      ) : null}
       <MessageScrollerItem messageId={`${turn.messageId}-reply`}>
         <Message>
           <MessageContent>
@@ -493,6 +551,43 @@ function TurnView({ turn, retry }: { turn: Turn; retry: () => void }) {
         </Message>
       </MessageScrollerItem>
     </>
+  );
+}
+
+// Files in the composer, as shadcn's Attachment chips with a remove button, or on a sent message, where images come
+// first, at a readable size, and open larger in a dialog.
+function Files({ files, remove, className = "" }: { files: Upload[]; remove?: (index: number) => void; className?: string }) {
+  const shown = remove ? files : [...files.filter((file) => file.url), ...files.filter((file) => !file.url)];
+  return (
+    <AttachmentGroup className={className}>
+      {shown.map((file, i) =>
+        !remove && file.url ? (
+          <Dialog key={i}>
+            <DialogTrigger className="flex-none cursor-zoom-in" aria-label={`Open ${file.name}`}>
+              <img src={file.url} alt={file.name} className="max-h-48 max-w-48 rounded-xl border object-cover" />
+            </DialogTrigger>
+            <DialogContent aria-describedby={undefined} className="w-fit p-2 pt-11 sm:max-w-[calc(100%-4rem)]">
+              <DialogTitle className="absolute top-4 right-12 left-3 truncate text-sm">{file.name}</DialogTitle>
+              <img src={file.url} alt={file.name} className="max-h-[calc(100dvh-8rem)] max-w-[calc(100vw-3rem)] rounded-lg" />
+            </DialogContent>
+          </Dialog>
+        ) : (
+          <Attachment key={i} size="sm">
+            <AttachmentMedia variant={file.url ? "image" : "icon"}>{file.url ? <img src={file.url} alt="" /> : <FileTextIcon />}</AttachmentMedia>
+            <AttachmentContent>
+              <AttachmentTitle>{file.name}</AttachmentTitle>
+            </AttachmentContent>
+            {remove && (
+              <AttachmentActions>
+                <AttachmentAction type="button" aria-label={`Remove ${file.name}`} onClick={() => remove(i)}>
+                  <XIcon />
+                </AttachmentAction>
+              </AttachmentActions>
+            )}
+          </Attachment>
+        ),
+      )}
+    </AttachmentGroup>
   );
 }
 
