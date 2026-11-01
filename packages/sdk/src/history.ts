@@ -1,5 +1,7 @@
 import { createFxEngine, type FxAgentTool } from "libfx";
+import type { Turn } from "./client.ts";
 import type { Sql } from "./store.ts";
+import type { Upload } from "./types.ts";
 
 // What the summary on a provider switch asks for, after fx's compaction: requests in order, the rest summed up.
 const ask =
@@ -40,6 +42,24 @@ export function createHistory(sql: Sql) {
     record: async (bot: string, sessionId: string, messageId: string, role: "user" | "assistant", text: string) =>
       void (await sql`insert into messages (profile_id, session_id, message_id, role, text)
         values (${bot}, ${sessionId}, ${messageId}, ${role}, ${text}) on conflict do nothing`),
+    // The bot's chats before `sessionId`, as finished turns, oldest first: the newest `limit` messages of them. A provider
+    // switch starts a new session, and the old one may not open again, so the chat shows these above the handoff.
+    // A message that sent files gets its saved text and files back.
+    async earlier(bot: string, sessionId: string | null, limit = 400): Promise<Turn[]> {
+      const rows = await sql<{ messageId: string; role: string; text: string; input: string | null; files: Upload[] | null }[]>`
+        select m.message_id, m.role, m.text, s.input, s.files
+        from (select * from messages where profile_id = ${bot} and session_id is distinct from ${sessionId} order by id desc limit ${limit}) m
+        left join sent s on m.role = 'user' and s.profile_id = m.profile_id and s.message_id = m.message_id
+        order by m.id`;
+      const turns = new Map<string, Turn>();
+      for (const { messageId, role, text, input, files } of rows) {
+        const turn = turns.get(messageId) ?? { messageId, text: "", reply: "", done: true };
+        if (role === "user") Object.assign(turn, { text: input ?? text, ...(files?.length ? { files } : {}) });
+        else turn.reply = text;
+        turns.set(messageId, turn);
+      }
+      return [...turns.values()];
+    },
     // A session's messages, oldest first, as many of the newest as fit `maxChars`, or the last 100.
     async transcript(bot: string, sessionId: string, maxChars: number) {
       const rows = await sql<{ role: string; text: string }[]>`

@@ -1,4 +1,4 @@
-import { createFxbot } from "@fxbot/sdk";
+import { createFxbot, type ItemKind } from "@fxbot/sdk";
 import { readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
@@ -17,8 +17,6 @@ if (!keyFile) throw new Error("FXBOT_SECRET_KEY_FILE is required: a file outside
 const fxbot = await createFxbot({
   databaseUrl,
   secretKey: readFileSync(keyFile, "utf8"),
-  baseUrl: process.env.FXBOT_BASE_URL || undefined,
-  apiKey: process.env.FXBOT_API_KEY || undefined,
   vercelClientId: process.env.FXBOT_VERCEL_CLIENT_ID || undefined,
   dataDir: process.env.FXBOT_DATA,
 });
@@ -39,6 +37,23 @@ const fail = (status: number, message: string): never => {
 };
 const json = (res: ServerResponse, status: number, body: unknown) =>
   res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
+
+// A library file goes out as data: an image under its checked type, every document as plain text, with no sniffing and
+// a sandbox that runs nothing, even opened in its own tab. `no-cache` asks again each time, so a deleted item stops
+// showing; the SHA-256 is the ETag, so an unchanged one costs a 304.
+async function file(req: IncomingMessage, res: ServerResponse, url: URL, read: (ifNoneMatch?: string) => Promise<{ name: string; kind: string; type: string; sha256: string; data: Buffer | null }>) {
+  const { name, kind, type, sha256, data } = await read(req.headers["if-none-match"]);
+  const headers: Record<string, string> = {
+    "content-type": kind === "image" ? type : "text/plain; charset=utf-8",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    "cache-control": "private, no-cache",
+    etag: `"${sha256}"`,
+  };
+  if (url.searchParams.get("download") === "1") headers["content-disposition"] = `attachment; filename*=UTF-8''${encodeURIComponent(name)}`;
+  if (!data) return res.writeHead(304, headers).end();
+  res.writeHead(200, headers).end(data);
+}
 
 // A JSON object, unchecked past that: the SDK checks each field it reads.
 async function body<T>(req: IncomingMessage, limit = 1 << 20): Promise<T> {
@@ -84,10 +99,18 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     if (id && method === "DELETE") return json(res, 200, (fxbot.signIns.cancel(id), ok));
     return fail(404, "not found");
   }
-  if (resource === "profiles" && action === "uploads" && method === "GET") {
-    const { data, type } = await fxbot.image(id, extra ?? "");
-    return res.writeHead(200, { "content-type": type, "cache-control": "private, max-age=31536000, immutable", "x-content-type-options": "nosniff" }).end(data);
+  if (resource === "library" && extra === undefined) {
+    const query = url.searchParams;
+    const optional = (key: string) => query.get(key) ?? undefined;
+    if (!id && method === "GET")
+      return json(res, 200, await fxbot.library.list({ q: optional("q"), profileId: optional("profile"), kind: optional("kind") as ItemKind | undefined, before: optional("before"), limit: query.has("limit") ? Number(query.get("limit")) : undefined }));
+    if (id && !action && method === "GET") return json(res, 200, await fxbot.library.get(id));
+    if (id && !action && method === "DELETE") return json(res, 200, (await fxbot.library.remove(id), ok));
+    if (id && action === "file" && method === "GET") return file(req, res, url, (etag) => fxbot.library.file(id, etag));
+    return action && action !== "file" ? fail(404, "not found") : fail(405, "method not allowed");
   }
+  // An image's URL from before the library, kept in older chats.
+  if (resource === "profiles" && action === "uploads" && method === "GET") return file(req, res, url, (etag) => fxbot.library.upload(id, extra ?? "", etag));
   if (resource !== "profiles" || extra !== undefined) return fail(404, "not found");
 
   if (!id) {
@@ -104,6 +127,8 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   } else if (action === "messages" && method === "POST") {
     // libfx takes at most 6 MiB of images in a message, so with base64 a message stays under 12 MiB.
     return json(res, 200, await fxbot.send(id, await body(req, 12 << 20)));
+  } else if (action === "earlier" && method === "GET") {
+    return json(res, 200, await fxbot.profiles.earlier(id));
   } else if (action === "stream" && method === "GET") {
     const lines = await fxbot.stream(id, Number(url.searchParams.get("cursor") ?? 0));
     res.writeHead(200, { "content-type": "application/x-ndjson", "cache-control": "no-store" }).flushHeaders();

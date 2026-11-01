@@ -1,13 +1,13 @@
 import type { FxResumeTurn, FxSessionPromptInput, FxTurn } from "libfx";
 import { createHistory, summarize } from "./history.ts";
-import { importFiles } from "./import.ts";
+import { createLibrary } from "./library.ts";
 import { createProviders } from "./providers.ts";
 import { readKey } from "./secrets.ts";
 import { createStore, isId, type StoredProfile } from "./store.ts";
-import { colors, maxPinned, shapes, type Fields, type Kind, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, type Upload } from "./types.ts";
+import { colors, maxPinned, shapes, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, type Upload } from "./types.ts";
 
 export type * from "./types.ts";
-export { colors, kinds, maxPinned, shapes } from "./types.ts";
+export { colors, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
 export { readKey, rotateSecrets } from "./secrets.ts";
 
 export type FxbotOptions = {
@@ -15,13 +15,9 @@ export type FxbotOptions = {
   databaseUrl: string;
   /** 32 bytes that seal the keys and tokens: a Buffer, or the base64 text of the key file. */
   secretKey: Buffer | string;
-  /** The read-only `env` provider: an OpenAI-compatible API with its `/v1` prefix, HTTPS or HTTP on localhost. */
-  baseUrl?: string;
-  /** The `env` provider's key. */
-  apiKey?: string;
   /** fxbot's Vercel OAuth app, for signing in with a Vercel account. */
   vercelClientId?: string;
-  /** libfx's sessions, and v1's files until they are imported. Default `data`. */
+  /** libfx's sessions. Default `data`. */
   dataDir?: string;
   /** For sign-ins, model lists, and key checks; replaced in checks. */
   fetch?: typeof fetch;
@@ -32,18 +28,9 @@ const fail = (status: 400 | 404 | 502, message: string): never => {
   throw Object.assign(new Error(message), { status });
 };
 
-// The image types libfx takes, by the extension each is saved under.
-const imageTypes: Record<string, string> = { png: "image/png", jpg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
-const extension = (type: string) => Object.keys(imageTypes).find((ext) => imageTypes[ext] === type);
-
-const utf8 = (bytes: Buffer) => {
-  try {
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    return text.includes("\0") ? null : text;
-  } catch {
-    return null;
-  }
-};
+// libfx's limits for one prompt's images.
+const maxImage = 3.75 * 2 ** 20;
+const maxImages = 6 * 2 ** 20;
 
 // Create needs only a name; the rest start empty, and the look a brown circle. Update takes any of them. Other keys
 // are ignored.
@@ -65,11 +52,12 @@ function fields(input: Partial<Fields>, create: boolean): Partial<Fields> {
 
 // Postgres for the records, one libfx agent per provider over a shared sessions directory, and a durable chat with
 // each bot. Turns a stopped process left open run again at once.
-export async function createFxbot({ databaseUrl, secretKey, baseUrl, apiKey, vercelClientId, dataDir = "data", fetch = globalThis.fetch }: FxbotOptions) {
+export async function createFxbot({ databaseUrl, secretKey, vercelClientId, dataDir = "data", fetch = globalThis.fetch }: FxbotOptions) {
   const key = typeof secretKey === "string" ? readKey(secretKey) : secretKey;
   const store = await createStore(databaseUrl);
   const history = createHistory(store.sql);
-  const providers = await createProviders({ store, secretKey: key, dataDir, env: baseUrl ? { baseUrl, apiKey } : undefined, vercelClientId, fetch, tools: [history.tool] });
+  const library = createLibrary(store.sql);
+  const providers = await createProviders({ store, secretKey: key, dataDir, vercelClientId, fetch, tools: [history.tool, ...library.tools] });
 
   // How many turns each bot has running in this process, for `busy`.
   const running = new Map<string, number>();
@@ -102,26 +90,27 @@ export async function createFxbot({ databaseUrl, secretKey, baseUrl, apiKey, ver
     return id;
   }
 
-  // A message's files as libfx prompt blocks: images as images, and each text file as text under its name, the way
-  // libfx hands the model a resource. libfx counts a prompt of resources alone as empty. Anything else is refused.
-  // The record is saved first, so the stream finds it when the turn starts.
-  async function attach(id: string, text: string, messageId: string, files: Upload[]): Promise<FxSessionPromptInput> {
+  // A message's files as libfx prompt blocks: images as images that name their library item, and each text file as
+  // text under its name, the way libfx hands the model a resource. libfx counts a prompt of resources alone as empty.
+  // Every file is checked against libfx's limits before any is saved; then each goes into the library, tagged for the
+  // bot and its chat. The record is saved before the prompt, so the stream finds it when the turn starts.
+  async function attach(profile: StoredProfile, text: string, messageId: string, files: Upload[]): Promise<FxSessionPromptInput> {
+    const checked = files.map(({ name, type, data }) => {
+      if (typeof name !== "string" || typeof type !== "string" || typeof data !== "string") return fail(400, "each file needs a name, a type, and base64 data");
+      const bytes = Buffer.from(data, "base64");
+      return { name, bytes, ...library.check({ name, type, bytes }) };
+    });
+    const images = checked.filter((file) => file.kind === "image");
+    if (images.some((file) => file.bytes.length > maxImage)) fail(400, "An image can be at most 3.75 MiB.");
+    if (images.reduce((sum, file) => sum + file.bytes.length, 0) > maxImages) fail(400, "A message's images can be at most 6 MiB together.");
     const blocks: Exclude<FxSessionPromptInput, string>[number][] = text.trim() ? [{ type: "text", text }] : [];
     const sent: Upload[] = [];
-    for (const { name, type, data } of files) {
-      if (typeof name !== "string" || typeof type !== "string" || typeof data !== "string" || name.length > 255)
-        return fail(400, "each file needs a name of at most 255 characters, a type, and base64 data");
-      const ext = extension(type);
-      if (ext) {
-        blocks.push({ type: "image", mimeType: type, data });
-        sent.push({ name, type, url: `/api/profiles/${id}/uploads/${await store.images.save(id, Buffer.from(data, "base64"), ext, type)}` });
-      } else {
-        const content = utf8(Buffer.from(data, "base64")) ?? fail(400, `${name} is not an image or a text file`);
-        blocks.push({ type: "text", text: `File: ${name}\n${content}` });
-        sent.push({ name, type });
-      }
+    for (const { name, type, bytes, kind, text: content } of checked) {
+      const item = await library.save({ profileId: profile.id, sessionId: profile.sessionId!, origin: "uploaded", name, type, bytes });
+      blocks.push(kind === "image" ? { type: "image", mimeType: type, data: bytes.toString("base64"), sourceRef: `library:${item.id}` } : { type: "text", text: `File: ${name}\n${content}` });
+      sent.push({ name, type, url: item.url });
     }
-    await store.sent.save(id, messageId, { input: text, files: sent });
+    await store.sent.save(profile.id, messageId, { input: text, files: sent });
     return blocks;
   }
 
@@ -190,9 +179,6 @@ export async function createFxbot({ databaseUrl, secretKey, baseUrl, apiKey, ver
     return (await store.profiles.update(profile.id, { provider: next, model, sessionId, handoff }))!;
   }
 
-  // v1's files move in once, with each chat read through the environment's provider.
-  await importFiles(store, history, dataDir, async (profile) => (profile.sessionId && providers.has(profile.provider) ? lines(profile, 0) : null));
-
   // A turn left open by a process that died waits for the session's next prompt unless resumed.
   for (const profile of await store.profiles.list()) {
     if (!profile.sessionId || !providers.has(profile.provider)) continue;
@@ -228,6 +214,11 @@ export async function createFxbot({ databaseUrl, secretKey, baseUrl, apiKey, ver
         await get(id);
         await store.profiles.remove(id);
       },
+      // The bot's chats before its current one, which a provider switch leaves behind.
+      async earlier(id: string) {
+        const profile = await get(id);
+        return history.earlier(id, profile.sessionId);
+      },
     },
 
     settings: {
@@ -262,9 +253,10 @@ export async function createFxbot({ databaseUrl, secretKey, baseUrl, apiKey, ver
       if (typeof messageId !== "string" || !/^[\w.-]{1,128}$/.test(messageId))
         fail(400, "messageId must be 1 to 128 letters, digits, '.', '_', or '-'");
       if (!(await modelFor(profile))) fail(400, "No model. Pick a default model for this bot's provider in Settings, or give the bot one.");
-      const input = files.length ? await attach(id, text, messageId, files) : text;
-      // Saved before the prompt, so a restart still finds the session. A concurrent first send keeps the id already saved.
+      // Saved before the prompt, so a restart still finds the session and every upload knows its chat. A concurrent
+      // first send keeps the id already saved.
       if (!profile.sessionId) profile = (await store.profiles.claimSession(id, await (await providers.agentFor(profile.provider, "")).newSessionId())) ?? fail(404, "profile not found");
+      const input = files.length ? await attach(profile, text, messageId, files) : text;
       try {
         // A messageId the session already accepted runs nothing new and resolves to the same ids.
         const turn = (await open(profile, profile.sessionId!)).prompt(input, { messageId });
@@ -288,10 +280,14 @@ export async function createFxbot({ databaseUrl, secretKey, baseUrl, apiKey, ver
       return (await lines(profile, cursor)).pipeThrough(new TextEncoderStream());
     },
 
-    // An image a message sent, by the name in its URL.
-    async image(id: string, name: string) {
-      const ext = /^[0-9a-f]{64}\.(png|jpg|gif|webp)$/.exec(name)?.[1];
-      return ((isId(id) && ext && (await store.images.get(id, name))) || fail(404, "not found")) as { type: string; data: Buffer };
+    // Every bot's files in one place. `file` and `upload` (an image's URL from before the library) return the bytes,
+    // or null bytes when `ifNoneMatch` already names them.
+    library: {
+      list: (query: LibraryQuery) => library.list(query),
+      get: (id: string) => library.get(id),
+      file: (id: string, ifNoneMatch?: string) => library.file(id, ifNoneMatch),
+      upload: (id: string, name: string, ifNoneMatch?: string) => (isId(id) ? library.upload(name, ifNoneMatch) : fail(404, "not found")),
+      remove: (id: string) => library.remove(id),
     },
 
     // Waits for the turns this process started, then lets Postgres go.

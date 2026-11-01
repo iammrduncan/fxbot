@@ -1,7 +1,7 @@
-import type { Fields, Kind, Message, Model, NewProvider, Profile, ProfileUpdate, Provider, ProviderUpdate, Settings, SignIn, SignInStatus, StreamLine, Team, Upload } from "./types.ts";
+import type { Fields, Kind, LibraryItem, LibraryPage, LibraryQuery, Message, Model, NewProvider, Profile, ProfileUpdate, Provider, ProviderUpdate, Settings, SignIn, SignInStatus, StreamLine, Team, Upload } from "./types.ts";
 
 export type * from "./types.ts";
-export { colors, kinds, maxPinned, shapes } from "./types.ts";
+export { colors, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
 
 export const unreachable = "Cannot reach the server.";
 
@@ -79,6 +79,8 @@ export function createClient({ baseUrl = "" }: ClientOptions = {}) {
       create: (fields: Partial<Fields> & { name: string }) => call<Profile>("/profiles", "POST", fields),
       update: (id: string, fields: ProfileUpdate) => call<Profile>(`/profiles/${id}`, "PATCH", fields),
       remove: (id: string) => call<{ ok: true }>(`/profiles/${id}`, "DELETE"),
+      // Finished turns from the bot's chats before its current one, oldest first.
+      earlier: (id: string) => call<Turn[]>(`/profiles/${id}/earlier`),
     },
     settings: {
       get: () => call<Settings>("/settings"),
@@ -98,6 +100,15 @@ export function createClient({ baseUrl = "" }: ClientOptions = {}) {
       start: (kind: Kind, provider?: string) => call<SignIn>("/sign-ins", "POST", { kind, provider }),
       get: (id: string) => call<SignInStatus>(`/sign-ins/${id}`),
       cancel: (id: string) => call<{ ok: true }>(`/sign-ins/${id}`, "DELETE"),
+    },
+    // Every bot's files, newest saved first. A file itself is read through the item's `url`.
+    library: {
+      list: ({ q, profileId, kind, before, limit }: LibraryQuery = {}) => {
+        const params = new URLSearchParams(Object.entries({ q, profile: profileId, kind, before, limit }).flatMap(([key, value]) => (value === undefined || value === "" ? [] : [[key, String(value)]])));
+        return call<LibraryPage>(`/library${params.size ? `?${params}` : ""}`);
+      },
+      get: (id: string) => call<LibraryItem>(`/library/${id}`),
+      remove: (id: string) => call<{ ok: true }>(`/library/${id}`, "DELETE"),
     },
     // Resolves once the server has stored the message; the reply arrives on the stream.
     send: (id: string, message: Message) => call<{ messageId: string; sessionId: string }>(`/profiles/${id}/messages`, "POST", message),

@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import postgres from "postgres";
 import { maxPinned, type Fields, type Profile, type Sent, type Settings } from "./types.ts";
 
@@ -18,14 +18,45 @@ create table if not exists profiles (id text primary key, name text not null, in
   created_at timestamptz not null default now());
 create table if not exists sent (profile_id text references profiles on delete cascade, message_id text,
   input text not null, files jsonb not null, primary key (profile_id, message_id));
-create table if not exists images (profile_id text references profiles on delete cascade, name text,
-  type text not null, data bytea not null, primary key (profile_id, name));
 create table if not exists messages (id bigserial primary key, profile_id text not null references profiles on delete cascade,
   session_id text not null, message_id text not null, role text not null, text text not null,
   created_at timestamptz not null default now(), tsv tsvector generated always as (to_tsvector('simple', text)) stored,
   unique (profile_id, message_id, role));
 create index if not exists messages_tsv on messages using gin (tsv);
 create index if not exists messages_profile on messages (profile_id, created_at);
+-- The library: one copy of each file by its SHA-256, and a tag for each bot and chat that saved it. A deleted bot's
+-- tags keep the item, with no bot. Names split at ASCII separators, so "report" finds quarterly-report_v2.md.
+create table if not exists library (id text primary key, sha256 text not null unique, kind text not null,
+  origin text not null, name text not null, type text not null, size int not null, data bytea not null,
+  text text not null default '', created_at timestamptz not null default now(),
+  tsv tsvector generated always as (to_tsvector('simple',
+    regexp_replace(name || ' ' || left(text, 200000), '[-_./\\\\]+', ' ', 'g'))) stored);
+create table if not exists library_tags (item_id text not null references library on delete cascade,
+  profile_id text references profiles on delete set null, session_id text,
+  created_at timestamptz not null default now(), unique (item_id, profile_id, session_id));
+create index if not exists library_tsv on library using gin (tsv);
+create index if not exists library_tags_bot on library_tags (profile_id, created_at desc);
+do $$ begin
+  -- Images sent before the library move into it once, with the name and chat their message gave them. The same
+  -- bytes held by several bots become one item, named by the earliest, with a tag for each.
+  if exists (select 1 from information_schema.tables where table_schema = current_schema() and table_name = 'images') then
+    create temp table moved on commit drop as
+      select i.profile_id, split_part(i.name, '.', 1) as sha256, coalesce(f.name, i.name) as name, i.type, i.data,
+        m.session_id, coalesce(m.created_at, now()) as created_at
+      from images i
+      left join lateral (select s.message_id, e->>'name' as name from sent s, jsonb_array_elements(s.files) e
+        where s.profile_id = i.profile_id and e->>'url' = '/api/profiles/' || i.profile_id || '/uploads/' || i.name limit 1) f on true
+      left join lateral (select session_id, created_at from messages
+        where profile_id = i.profile_id and message_id = f.message_id and role = 'user') m on true;
+    insert into library (id, sha256, kind, origin, name, type, size, data, created_at)
+      select distinct on (sha256) left(replace(gen_random_uuid()::text, '-', ''), 12), sha256, 'image', 'uploaded', name, type,
+        octet_length(data), data, created_at
+      from moved order by sha256, created_at;
+    insert into library_tags (item_id, profile_id, session_id, created_at)
+      select l.id, mv.profile_id, mv.session_id, mv.created_at from moved mv join library l using (sha256) on conflict do nothing;
+    drop table images;
+  end if;
+end $$;
 create table if not exists models_dev (id int primary key default 1 check (id = 1), etag text, data jsonb, fetched_at timestamptz);
 alter table profiles add column if not exists shape text not null default 'circle';
 alter table profiles add column if not exists color text not null default 'brown';
@@ -105,15 +136,6 @@ export async function createStore(databaseUrl: string) {
         one(await sql<Sent[]>`select input, files from sent where profile_id = ${id} and message_id = ${messageId}`),
       save: async (id: string, messageId: string, { input, files }: Sent) =>
         void (await sql`insert into sent values (${id}, ${messageId}, ${input}, ${sql.json(files)}) on conflict do nothing`),
-    },
-    images: {
-      // Named by the SHA-256 of the bytes, so each image is kept once per bot.
-      save: async (id: string, bytes: Buffer, ext: string, type: string) => {
-        const name = `${createHash("sha256").update(bytes).digest("hex")}.${ext}`;
-        await sql`insert into images values (${id}, ${name}, ${type}, ${bytes}) on conflict do nothing`;
-        return name;
-      },
-      get: async (id: string, name: string) => one(await sql<{ type: string; data: Buffer }[]>`select type, data from images where profile_id = ${id} and name = ${name}`),
     },
     close: () => sql.end({ timeout: 5 }),
   };

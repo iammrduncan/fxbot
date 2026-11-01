@@ -29,12 +29,35 @@ export const maxPinned = 3;
 // New bots start on `defaultProvider`.
 export type Settings = { defaultProvider: string };
 
-// A file sent with a message: `data` is base64 on the way in, and `url` is set for an image fxbot keeps.
+// A file sent with a message: `data` is base64 on the way in, and `url` is its library file once fxbot keeps it.
 export type Upload = { name: string; type: string; url?: string; data?: string };
 // What a message sends. The same `messageId` again reaches the same turn and runs nothing new.
 export type Message = { text: string; messageId: string; files?: Upload[] };
 // libfx's stream leaves out a prompt that is not plain text, so fxbot keeps what such a message sent.
 export type Sent = { input: string; files: Upload[] };
+
+// The library keeps one copy of each file, by the SHA-256 of its bytes, tagged with every bot and chat that saved it.
+// `uploaded` came from the person, `generated` from a bot. Later phases add more kinds.
+export const itemKinds = ["image", "document"] as const;
+export type ItemKind = (typeof itemKinds)[number];
+// `profileIds` are the bots of the tags a listing covers, null for a removed bot. `savedAt` is the newest of those
+// tags, and `preview` the start of a document's text. Dates are ISO strings to the microsecond.
+export type LibraryItem = {
+  id: string;
+  kind: ItemKind;
+  origin: "uploaded" | "generated";
+  name: string;
+  type: string;
+  size: number;
+  profileIds: (string | null)[];
+  preview: string;
+  createdAt: string;
+  savedAt: string;
+  url: string;
+};
+// Newest saved first. `profileId` narrows to one bot's tags, and `before` is a page's `next`.
+export type LibraryQuery = { q?: string; profileId?: string; kind?: ItemKind; before?: string; limit?: number };
+export type LibraryPage = { items: LibraryItem[]; next: string | null };
 
 // How each kind of provider connects: a device code sign-in, an API key at a fixed address, or a server's address.
 export const kinds = {
@@ -53,7 +76,7 @@ export const kinds = {
 export type Kind = keyof typeof kinds;
 
 // A provider as listed: never its key or tokens, only whether it holds them. `contextWindow` overrides what the
-// server reports for its models. `env` is the read-only provider from the server's environment.
+// server reports for its models.
 export type Provider = {
   id: string;
   kind: Kind;
@@ -64,7 +87,6 @@ export type Provider = {
   teamId: string | null;
   hasKey: boolean;
   signedIn: boolean;
-  env: boolean;
   error: string | null;
 };
 export type NewProvider = { kind: Kind; name?: string; baseUrl?: string; apiKey?: string; model?: string; contextWindow?: number | null };

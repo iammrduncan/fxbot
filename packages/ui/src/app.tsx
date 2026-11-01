@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
-import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CircleCheckIcon, CopyIcon, FileTextIcon, LoaderCircleIcon, MessageCircleDashedIcon, PaperclipIcon, PinIcon, PinOffIcon, PlusIcon, SettingsIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CircleCheckIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, LoaderCircleIcon, MessageCircleDashedIcon, PanelRightIcon, PaperclipIcon, PinIcon, PinOffIcon, PlusIcon, SettingsIcon, XIcon } from "lucide-react";
 import { Streamdown } from "streamdown";
-import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "@/components/ui/attachment";
+import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -37,24 +37,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
-import { maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Settings, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
+import { colors, maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Settings, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
 import { Blob, LookPicker } from "./blob.tsx";
+import { BotPanel, usePanel } from "./bot-panel.tsx";
+import { LibraryPage } from "./library.tsx";
+import { follow, go } from "./nav.ts";
 import { ModelField, Providers } from "./providers.tsx";
 import { useTurnStream } from "./use-turn-stream.ts";
-
-function go(path: string) {
-  history.pushState(null, "", path);
-  dispatchEvent(new PopStateEvent("popstate"));
-}
-
-// In-app navigation for plain links. Modified clicks keep the browser's behavior.
-function follow(event: MouseEvent<HTMLAnchorElement>) {
-  if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-  event.preventDefault();
-  go(event.currentTarget.pathname);
-}
 
 export function App() {
   const [path, setPath] = useState(location.pathname);
@@ -107,8 +98,9 @@ export function App() {
   let screen: ReactNode;
   if (path === "/") screen = <Home profiles={profiles} offline={offline} onNew={() => setCreating(true)} />;
   else if (path === "/settings") screen = <SettingsForm />;
+  else if (path === "/library") screen = <LibraryPage profiles={profiles} />;
   else if (top === "profiles" && id && sub === "edit") screen = <ProfileForm key={id} id={id} onSaved={refresh} />;
-  else if (top === "profiles" && id && sub === undefined) screen = <Chat key={id} id={id} onChange={refresh} />;
+  else if (top === "profiles" && id && sub === undefined) screen = <Chat key={id} id={id} profiles={profiles} onChange={refresh} />;
   else screen = <Header title="Not found" />;
 
   return (
@@ -254,8 +246,9 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
+      {/* One row: Settings, then the full library behind a bento button. */}
+      <SidebarFooter className="flex-row items-center gap-1">
+        <SidebarMenu className="flex-1">
           <SidebarMenuItem>
             <SidebarMenuButton asChild isActive={location.pathname === "/settings"}>
               <a href="/settings" onClick={open}>
@@ -265,12 +258,26 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <a
+              href="/library"
+              onClick={open}
+              aria-label="Library"
+              aria-current={location.pathname === "/library" ? "page" : undefined}
+              className={buttonVariants({ variant: "ghost", size: "icon", className: "shrink-0 aria-[current=page]:bg-sidebar-accent" })}
+            >
+              <LayoutDashboardIcon />
+            </a>
+          </TooltipTrigger>
+          <TooltipContent>Library</TooltipContent>
+        </Tooltip>
       </SidebarFooter>
     </Sidebar>
   );
 }
 
-function Header({ title, lead, children }: { title: string; lead?: ReactNode; children?: ReactNode }) {
+function Header({ title, lead, children }: { title: ReactNode; lead?: ReactNode; children?: ReactNode }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 px-3">
       <SidebarTrigger />
@@ -353,7 +360,7 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
   }
 
   async function remove() {
-    if (!confirm(`Delete ${fields.name}? Its conversation files stay on the server.`)) return;
+    if (!confirm(`Delete ${fields.name}? Its library items stay in the library, and its conversation files stay on the server.`)) return;
     try {
       await client.profiles.remove(id);
       onSaved();
@@ -439,7 +446,7 @@ function SettingsForm() {
 
 const newMessageId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-function Chat({ id, onChange }: { id: string; onChange: () => void }) {
+function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | null; onChange: () => void }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
@@ -448,6 +455,14 @@ function Chat({ id, onChange }: { id: string; onChange: () => void }) {
   const box = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const { turns, setTurns, connected } = useTurnStream(id, Boolean(profile?.sessionId));
+  const panel = usePanel();
+  // A provider switch starts a new chat. The earlier ones stay readable above the handoff, though the bot now sees only
+  // their summary and its chat_history search.
+  const [earlier, setEarlier] = useState<Turn[]>([]);
+  const switched = Boolean(profile?.handoff);
+  useEffect(() => {
+    if (switched) client.profiles.earlier(id).then(setEarlier, () => {});
+  }, [id, switched, profile?.sessionId]);
   // A bot with no provider cannot send: it points to Settings instead of offering the composer.
   const stuck = !profile || !profile.provider;
 
@@ -522,115 +537,143 @@ function Chat({ id, onChange }: { id: string; onChange: () => void }) {
   }
 
   const offline = error || (!connected && unreachable);
-  const empty = turns.length === 0;
+  const empty = turns.length === 0 && earlier.length === 0;
   return (
-    <>
-      <Header title={profile?.name ?? "Chat"} lead={profile && <Blob shape={profile.shape} color={profile.color} size={28} follow busy={running} />}>
-        <a href={`/profiles/${id}/edit`} onClick={follow} className={buttonVariants({ variant: "ghost" })}>
-          Edit
-        </a>
-      </Header>
-      {offline && (
-        <div className="px-4">
-          <Problem>{offline} Retrying…</Problem>
-        </div>
-      )}
-      <MessageScrollerProvider autoScroll>
-        {/* The composer keeps its place in the tree, so it keeps focus when the first turn arrives. */}
-        <div
-          className={`flex min-h-0 flex-1 flex-col ${empty ? "justify-center gap-6 pb-[15dvh]" : ""}`}
-          onDragOver={(e) => e.dataTransfer.types.includes("Files") && e.preventDefault()}
-          onDrop={(e) => {
-            if (!e.dataTransfer.files.length || stuck) return;
-            e.preventDefault();
-            attach([...e.dataTransfer.files]);
-          }}
-        >
-          {empty ? (
-            <>
-              {profile?.handoff && (
-                <div className="px-4">
-                  <Handoff text={profile.handoff} />
-                </div>
-              )}
-              {profile && !profile.provider ? (
-                <div className="grid justify-items-center gap-3 px-4 text-center">
-                  <h2 className="text-2xl font-semibold">{profile.name} has no provider</h2>
-                  <p className="text-muted-foreground">Add a provider in Settings, then pick it in the bot's settings.</p>
-                  <div className="flex gap-2">
-                    <a href="/settings" onClick={follow} className={buttonVariants()}>
-                      Settings
-                    </a>
-                    <a href={`/profiles/${id}/edit`} onClick={follow} className={buttonVariants({ variant: "outline" })}>
-                      Edit bot
-                    </a>
+    <div className="flex min-h-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* The sidebar already shows which bot this is, and whether it is busy, so the name stays only for screen readers. */}
+        <Header title={<span className="sr-only">{profile?.name ?? "Chat"}</span>}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Bot panel" aria-expanded={panel.open} onClick={() => panel.setOpen(!panel.open)}>
+                <PanelRightIcon />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Details and library</TooltipContent>
+          </Tooltip>
+        </Header>
+        {offline && (
+          <div className="px-4">
+            <Problem>{offline} Retrying…</Problem>
+          </div>
+        )}
+        <MessageScrollerProvider autoScroll>
+          {/* The composer keeps its place in the tree, so it keeps focus when the first turn arrives. */}
+          <div
+            className={`flex min-h-0 flex-1 flex-col ${empty ? "justify-center gap-6 pb-[15dvh]" : ""}`}
+            onDragOver={(e) => e.dataTransfer.types.includes("Files") && e.preventDefault()}
+            onDrop={(e) => {
+              if (!e.dataTransfer.files.length || stuck) return;
+              e.preventDefault();
+              attach([...e.dataTransfer.files]);
+            }}
+          >
+            {empty ? (
+              <>
+                {profile?.handoff && (
+                  <div className="px-4">
+                    <Handoff text={profile.handoff} />
                   </div>
-                </div>
-              ) : (
-                <div className="grid justify-items-center gap-4">
-                  {profile && <Blob shape={profile.shape} color={profile.color} size={112} follow busy={running} />}
-                  <h2 className="text-center text-2xl font-semibold">{profile ? `Talk to ${profile.name}` : "Loading…"}</h2>
-                </div>
-              )}
-            </>
-          ) : (
-            <MessageScroller className="flex-1">
-              <MessageScrollerViewport>
-                <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 py-4">
-                  {profile?.handoff && <Handoff text={profile.handoff} />}
-                  {turns.map((turn) => (
-                    <TurnView key={turn.messageId} turn={turn} retry={() => send(turn.text, turn.messageId, turn.files ?? [])} />
-                  ))}
-                </MessageScrollerContent>
-              </MessageScrollerViewport>
-              <MessageScrollerButton />
-            </MessageScroller>
-          )}
-          <form onSubmit={submit} className="mx-auto w-full max-w-3xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            {notice && <p className="px-4 pb-2 text-sm text-destructive">{notice}</p>}
-            {/* Wraps so the files take the first row and the text and buttons the second; the buttons stay at the bottom as the text grows. */}
-            <InputGroup className="h-auto flex-wrap items-end rounded-3xl bg-background px-1">
-              {attached.length > 0 && (
-                <Files className="order-first w-full px-2 pt-2" files={attached} remove={(i) => setAttached((all) => all.toSpliced(i, 1))} />
-              )}
-              <InputGroupAddon align="inline-start" className="pb-1.5">
-                <input ref={picker} type="file" multiple hidden onChange={(e) => attach([...(e.target.files ?? [])]).then(() => (e.target.value = ""))} />
-                <InputGroupButton size="icon-sm" className="rounded-full" disabled={stuck} aria-label="Attach files" onClick={() => picker.current?.click()}>
-                  <PaperclipIcon />
-                </InputGroupButton>
-              </InputGroupAddon>
-              <InputGroupTextarea
-                ref={box}
-                rows={1}
-                aria-label="Message"
-                className="max-h-48 min-h-0 py-3"
-                placeholder={profile ? (stuck ? "No provider yet" : `Message ${profile.name}`) : "Loading…"}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && submit(e)}
-                onPaste={(e) => {
-                  if (!e.clipboardData.files.length) return;
-                  // Text pasted with a picture of itself, as from a spreadsheet, keeps the text as well.
-                  if (!e.clipboardData.getData("text/plain")) e.preventDefault();
-                  attach([...e.clipboardData.files]);
-                }}
-                disabled={stuck}
-              />
-              <InputGroupAddon align="inline-end" className="pb-1.5">
-                <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" disabled={stuck || (!draft.trim() && !attached.length)} aria-label="Send">
-                  <ArrowUpIcon />
-                </InputGroupButton>
-              </InputGroupAddon>
-            </InputGroup>
-          </form>
-        </div>
-      </MessageScrollerProvider>
-    </>
+                )}
+                {profile && !profile.provider ? (
+                  <div className="grid justify-items-center gap-3 px-4 text-center">
+                    <h2 className="text-2xl font-semibold">{profile.name} has no provider</h2>
+                    <p className="text-muted-foreground">Add a provider in Settings, then pick it in the bot's settings.</p>
+                    <div className="flex gap-2">
+                      <a href="/settings" onClick={follow} className={buttonVariants()}>
+                        Settings
+                      </a>
+                      <a href={`/profiles/${id}/edit`} onClick={follow} className={buttonVariants({ variant: "outline" })}>
+                        Edit bot
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid justify-items-center gap-4">
+                    {profile && <Blob shape={profile.shape} color={profile.color} size={112} follow busy={running} />}
+                    <h2 className="text-center text-2xl font-semibold">{profile ? `Talk to ${profile.name}` : "Loading…"}</h2>
+                  </div>
+                )}
+              </>
+            ) : (
+              <MessageScroller className="flex-1">
+                <MessageScrollerViewport>
+                  <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 py-4">
+                    {earlier.map((turn) => (
+                      <TurnView key={turn.messageId} turn={turn} color={profile?.color} />
+                    ))}
+                    {profile?.handoff && <Handoff text={profile.handoff} />}
+                    {turns.map((turn) => (
+                      <TurnView key={turn.messageId} turn={turn} color={profile?.color} retry={() => send(turn.text, turn.messageId, turn.files ?? [])} />
+                    ))}
+                  </MessageScrollerContent>
+                </MessageScrollerViewport>
+                <MessageScrollerButton />
+              </MessageScroller>
+            )}
+            <form onSubmit={submit} className="mx-auto w-full max-w-3xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {notice && <p className="px-4 pb-2 text-sm text-destructive">{notice}</p>}
+              {/* Wraps so the files take the first row and the text and buttons the second; the buttons stay at the bottom as the text grows. */}
+              <InputGroup className="h-auto flex-wrap items-end rounded-3xl bg-background px-1">
+                {attached.length > 0 && (
+                  <Files className="order-first w-full px-2 pt-2" files={attached} remove={(i) => setAttached((all) => all.toSpliced(i, 1))} />
+                )}
+                <InputGroupAddon align="inline-start" className="pb-1.5">
+                  <input ref={picker} type="file" multiple hidden onChange={(e) => attach([...(e.target.files ?? [])]).then(() => (e.target.value = ""))} />
+                  <InputGroupButton size="icon-sm" className="rounded-full" disabled={stuck} aria-label="Attach files" onClick={() => picker.current?.click()}>
+                    <PaperclipIcon />
+                  </InputGroupButton>
+                </InputGroupAddon>
+                <InputGroupTextarea
+                  ref={box}
+                  rows={1}
+                  aria-label="Message"
+                  className="max-h-48 min-h-0 py-3"
+                  placeholder={profile ? (stuck ? "No provider yet" : `Message ${profile.name}`) : "Loading…"}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && submit(e)}
+                  onPaste={(e) => {
+                    if (!e.clipboardData.files.length) return;
+                    // Text pasted with a picture of itself, as from a spreadsheet, keeps the text as well.
+                    if (!e.clipboardData.getData("text/plain")) e.preventDefault();
+                    attach([...e.clipboardData.files]);
+                  }}
+                  disabled={stuck}
+                />
+                <InputGroupAddon align="inline-end" className="pb-1.5">
+                  <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" disabled={stuck || (!draft.trim() && !attached.length)} aria-label="Send">
+                    <ArrowUpIcon />
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
+            </form>
+          </div>
+        </MessageScrollerProvider>
+      </div>
+      {profile && <BotPanel profile={profile} profiles={profiles} panel={panel} version={finished} />}
+    </div>
   );
 }
 
 // One turn: the person's message as the scroll anchor, then the reply as markdown with its actions.
-function TurnView({ turn, retry }: { turn: Turn; retry: () => void }) {
+// WCAG relative luminance of a #rrggbb color.
+const luminance = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+// Text on a bot's color: white or near-black, whichever contrasts more.
+function ink(color: Color) {
+  const [light, dark] = [luminance(colors[color]), luminance("#1f1f1f")];
+  return 1.05 / (light + 0.05) >= (light + 0.05) / (dark + 0.05) ? "#ffffff" : "#1f1f1f";
+}
+
+// Messages to the bot are drawn in the bot's own color.
+function TurnView({ turn, color, retry }: { turn: Turn; color?: Color; retry?: () => void }) {
   return (
     <>
       {turn.text || turn.files?.length ? (
@@ -640,7 +683,9 @@ function TurnView({ turn, retry }: { turn: Turn; retry: () => void }) {
               {turn.files?.length ? <Files className="flex-wrap justify-end" files={turn.files} /> : null}
               {turn.text && (
                 <Bubble align="end" variant="muted">
-                  <BubbleContent className="whitespace-pre-wrap">{turn.text}</BubbleContent>
+                  <BubbleContent className="whitespace-pre-wrap" style={color && { background: colors[color], color: ink(color) }}>
+                    {turn.text}
+                  </BubbleContent>
                 </Bubble>
               )}
             </MessageContent>
@@ -655,7 +700,7 @@ function TurnView({ turn, retry }: { turn: Turn; retry: () => void }) {
             {turn.note && (
               <p className="text-sm text-destructive">
                 {turn.note}{" "}
-                {turn.unsent && (
+                {turn.unsent && retry && (
                   <Button size="xs" variant="outline" onClick={retry}>
                     Retry
                   </Button>
@@ -675,13 +720,14 @@ function TurnView({ turn, retry }: { turn: Turn; retry: () => void }) {
 }
 
 // Files in the composer, as shadcn's Attachment chips with a remove button, or on a sent message, where images come
-// first, at a readable size, and open larger in a dialog.
+// first, at a readable size, and open larger in a dialog, and a text file opens its library file.
 function Files({ files, remove, className = "" }: { files: Upload[]; remove?: (index: number) => void; className?: string }) {
-  const shown = remove ? files : [...files.filter((file) => file.url), ...files.filter((file) => !file.url)];
+  const image = (file: Upload) => Boolean(file.url) && file.type.startsWith("image/");
+  const shown = remove ? files : [...files.filter(image), ...files.filter((file) => !image(file))];
   return (
     <AttachmentGroup className={className}>
       {shown.map((file, i) =>
-        !remove && file.url ? (
+        !remove && image(file) ? (
           <Dialog key={i}>
             <DialogTrigger className="flex-none cursor-zoom-in" aria-label={`Open ${file.name}`}>
               <img src={file.url} alt={file.name} className="max-h-48 max-w-48 rounded-xl border object-cover" />
@@ -693,7 +739,12 @@ function Files({ files, remove, className = "" }: { files: Upload[]; remove?: (i
           </Dialog>
         ) : (
           <Attachment key={i} size="sm">
-            <AttachmentMedia variant={file.url ? "image" : "icon"}>{file.url ? <img src={file.url} alt="" /> : <FileTextIcon />}</AttachmentMedia>
+            {!remove && file.url && (
+              <AttachmentTrigger asChild>
+                <a href={file.url} target="_blank" rel="noreferrer" aria-label={`Open ${file.name}`} />
+              </AttachmentTrigger>
+            )}
+            <AttachmentMedia variant={image(file) ? "image" : "icon"}>{image(file) ? <img src={file.url} alt="" /> : <FileTextIcon />}</AttachmentMedia>
             <AttachmentContent>
               <AttachmentTitle>{file.name}</AttachmentTitle>
             </AttachmentContent>

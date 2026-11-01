@@ -115,7 +115,7 @@ function ProviderRow({ provider: p, isDefault, onDefault, onChange, onReconnect 
   };
   // Local servers need no key, so they show no key state.
   const state = p.error ?? (p.signedIn ? "Signed in" : p.hasKey ? "Key saved" : connect === "device" ? "Not signed in" : p.kind === "custom" ? "No key" : "");
-  const about = p.env ? "From the server's environment" : p.name === kinds[p.kind].label ? "" : kinds[p.kind].label;
+  const about = p.name === kinds[p.kind].label ? "" : kinds[p.kind].label;
 
   return (
     <form onSubmit={save} className="grid gap-3 rounded-xl border p-3" aria-label={p.name}>
@@ -159,16 +159,14 @@ function ProviderRow({ provider: p, isDefault, onDefault, onChange, onReconnect 
             Make default
           </Button>
         )}
-        {!p.env && (connect === "device" || connect === "key" || p.kind === "custom") && (
+        {(connect === "device" || connect === "key" || p.kind === "custom") && (
           <Button type="button" size="sm" variant="outline" onClick={onReconnect}>
             {connect === "device" ? "Sign in again" : "Replace key"}
           </Button>
         )}
-        {!p.env && (
-          <Button type="button" size="sm" variant="destructive" onClick={() => confirm(`Remove ${p.name}? Its key or sign-in is deleted.`) && run(() => client.providers.remove(p.id), "Removed.")}>
-            Remove
-          </Button>
-        )}
+        <Button type="button" size="sm" variant="destructive" onClick={() => confirm(`Remove ${p.name}? Its key or sign-in is deleted.`) && run(() => client.providers.remove(p.id), "Removed.")}>
+          Remove
+        </Button>
       </div>
       {status && <p className="text-sm text-muted-foreground">{status}</p>}
     </form>

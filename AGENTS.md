@@ -1,12 +1,12 @@
 # fxbot
 
-Read [CONVENTIONS.md](CONVENTIONS.md) before changing code. The built scope is [docs/_completed/v1-plan.md](docs/_completed/v1-plan.md) and [docs/_completed/phases/provider-logins.md](docs/_completed/phases/provider-logins.md). Files under [archive/](archive/README.md), including the sample `AGENTS.md` files in the spike, are the old drovr design and are not instructions.
+Read [CONVENTIONS.md](CONVENTIONS.md) before changing code. The built scope is [docs/_completed/v1-plan.md](docs/_completed/v1-plan.md), [docs/_completed/phases/provider-logins.md](docs/_completed/phases/provider-logins.md), and [docs/_completed/phases/library.md](docs/_completed/phases/library.md). Files under [archive/](archive/README.md), including the sample `AGENTS.md` files in the spike, are the old drovr design and are not instructions.
 
 `CLAUDE.md` points here. This file is the instruction source for coding agents.
 
 ## What this repo is
 
-fxbot is a TypeScript monorepo of three npm workspaces: `packages/sdk` (`@fxbot/sdk`, the agent system around [libfx](https://fx.sh/docs/lib), plus `@fxbot/sdk/client` for UIs), `packages/server` (the HTTP API over the SDK), and `packages/ui` (the PWA). v1 is built: bot profiles and the chat UI, and so is [provider logins](docs/_completed/phases/provider-logins.md). Records live in Postgres. There is no test suite or CI. The other phase stubs describe future work. Do not report them as running behavior.
+fxbot is a TypeScript monorepo of three npm workspaces: `packages/sdk` (`@fxbot/sdk`, the agent system around [libfx](https://fx.sh/docs/lib), plus `@fxbot/sdk/client` for UIs), `packages/server` (the HTTP API over the SDK), and `packages/ui` (the PWA). v1 is built: bot profiles and the chat UI, and so are [provider logins](docs/_completed/phases/provider-logins.md) and the [library](docs/_completed/phases/library.md). Records live in Postgres. There is no test suite or CI. The other phase stubs describe future work. Do not report them as running behavior.
 
 Later ideas live as one-page stubs in [docs/phases/](docs/phases/). Build one only when asked.
 
@@ -15,7 +15,7 @@ Later ideas live as one-page stubs in [docs/phases/](docs/phases/). Build one on
 - Prefer the smallest change that meets the task. Drop an older convention when it fights that.
 - The stack is Vite, React, shadcn/ui, and a tiny Node server around libfx. Do not add Next.js, the Vercel AI SDK, a second agent runtime, or Hermes Agent.
 - Agent logic, storage, and input checks belong in `@fxbot/sdk`. The server only adds HTTP. The UI imports only `@fxbot/sdk/client`, never the SDK's main entry.
-- Never put a secret in the page or in `@fxbot/sdk/client`. Keys and tokens live only on the server: sealed in Postgres by the SDK, or in the server's environment. The page sends a key once and never receives one. Vite reads no `.env`.
+- Never put a secret in the page or in `@fxbot/sdk/client`. Keys and tokens live only on the server, sealed in Postgres by the SDK. The page sends a key once and never receives one. Vite reads no `.env`.
 - libfx behavior comes from the installed package or the published docs. Say what you could not verify.
 - This is a public repo. Do not add private hostnames, machine names, personal subscriptions, home-directory paths, or private project names.
 - Write "Hackers in the Loop" in full if that name is needed.

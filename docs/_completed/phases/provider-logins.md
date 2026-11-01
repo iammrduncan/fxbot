@@ -13,6 +13,8 @@ When a bot switches provider, its chat is compacted into a handoff summary. The 
 
 Before this phase, the server took one endpoint from `FXBOT_BASE_URL` and `FXBOT_API_KEY`, and kept everything in files.
 
+Removed after this phase: those two variables, the `env` provider they made, and the import of v1's files, which moved v1's bots and chats onto that provider. Providers are added only in Settings. The sections below still describe them as built.
+
 Status: built on 2026-11-01, and checked against mock model servers and stubbed sign-in services: 195 checks, all passing (section 4). Real accounts are still to be tried by hand. Where the build differs from the plan, section 3 says so under **Built**.
 
 ## 1. Research

@@ -57,7 +57,6 @@ export type ProvidersOptions = {
   store: Store;
   secretKey: Buffer;
   dataDir: string;
-  env?: { baseUrl: string; apiKey?: string };
   vercelClientId?: string;
   fetch: Fetch;
   tools: FxAgentTool[];
@@ -65,7 +64,7 @@ export type ProvidersOptions = {
 
 // Every provider runs as its own libfx agent, because libfx gives an agent one provider and a session runs only on
 // the agent that started it. Keys and tokens live sealed in Postgres and reach libfx only through its callbacks.
-export async function createProviders({ store, secretKey, dataDir, env, vercelClientId, fetch, tools }: ProvidersOptions) {
+export async function createProviders({ store, secretKey, dataDir, vercelClientId, fetch, tools }: ProvidersOptions) {
   const secrets = createSecrets(store.sql, secretKey);
   const models = createModels(store.sql, fetch);
   const agents = new Map<string, { agent: FxAgent; models: Record<string, FxCustomProviderModel> | null }>();
@@ -95,7 +94,7 @@ export async function createProviders({ store, secretKey, dataDir, env, vercelCl
 
   const vercelFetch = (record: ProviderRecord) =>
     vercel.vercelFetch(async () => ({ credentials: await renewed<vercel.VercelCredentials>(record.id, (old) => vercel.refresh(old, vercelClientId!, fetch)), teamId: record.teamId }), fetch);
-  const keyOf = async (record: ProviderRecord) => (record.id === "env" ? env?.apiKey : (await secrets.get<{ apiKey?: string }>(record.id))?.apiKey);
+  const keyOf = async (record: ProviderRecord) => (await secrets.get<{ apiKey?: string }>(record.id))?.apiKey;
 
   // What the SDK's own requests to a provider need, outside a turn.
   async function access(record: ProviderRecord): Promise<Access> {
@@ -117,8 +116,7 @@ export async function createProviders({ store, secretKey, dataDir, env, vercelCl
     if (record.kind === "vercel") return { apiKey: "vercel-login", fetch: vercelFetch(record) };
     const apiKey = await keyOf(record);
     if (record.kind === "gateway") return { apiKey: apiKey ?? fail(400, "This provider has no key.") };
-    // The environment's provider keeps the name v1 gave it, so its saved sessions keep resuming.
-    const provider = { name: record.id === "env" ? "openai" : `p-${record.id}`, baseUrl: record.baseUrl!, models: {} };
+    const provider = { name: `p-${record.id}`, baseUrl: record.baseUrl!, models: {} };
     if (record.kind !== "opencode" && record.kind !== "opencode-go") return { provider, ...(apiKey ? { credentials: async () => ({ apiKey }) } : {}) };
     // OpenCode routes each conversation by its `x-opencode-session` header, which Go requires. Only credentials() learns
     // a request's session, so the key handed to libfx carries it, and opencodeFetch moves it into the header.
@@ -132,11 +130,10 @@ export async function createProviders({ store, secretKey, dataDir, env, vercelCl
   async function start(record: ProviderRecord) {
     errors.delete(record.id);
     try {
-      if (record.id === "env" && !env) fail(400, "Set FXBOT_BASE_URL to use this provider again.");
       const provider = await options(record);
       const agent = createFxAgent({
         // Sessions run only on an agent with the name that started them. Never rename one.
-        name: record.id === "env" ? "fxbot" : `p-${record.id}`,
+        name: `p-${record.id}`,
         // A durable session's checkpoint opens with the agent's own options, and a custom provider needs a model
         // there. Sessions always pass their own, so this one never reaches a request.
         model: "fxbot-unset",
@@ -163,10 +160,6 @@ export async function createProviders({ store, secretKey, dataDir, env, vercelCl
     return (await store.providers.get(id)) ?? fail(404, "provider not found");
   }
 
-  // The environment's provider is kept as a record, so bots can point at it; its address and key stay in the environment.
-  const envRecord = await store.providers.get("env");
-  if (env)
-    await store.providers.save({ model: "", contextWindow: null, teamId: null, ...envRecord, id: "env", kind: "custom", name: envRecord?.name ?? "Server environment", baseUrl: checkBaseUrl(env.baseUrl) });
   for (const each of await store.providers.list()) await start(each);
 
   async function list(): Promise<Provider[]> {
@@ -176,9 +169,8 @@ export async function createProviders({ store, secretKey, dataDir, env, vercelCl
       return {
         ...r,
         kind: r.kind as Kind,
-        hasKey: !device && (held.has(r.id) || (r.id === "env" && Boolean(env?.apiKey))),
+        hasKey: !device && held.has(r.id),
         signedIn: device && held.has(r.id),
-        env: r.id === "env",
         error: errors.get(r.id) ?? null,
       };
     });
@@ -263,7 +255,6 @@ export async function createProviders({ store, secretKey, dataDir, env, vercelCl
       const current = await record(id);
       const preset = kinds[current.kind as Kind];
       if (!input || typeof input !== "object") fail(400, "body must be a JSON object");
-      if (id === "env" && (input.baseUrl !== undefined || input.apiKey !== undefined)) fail(400, "The server's environment sets this provider's address and key.");
       if (input.apiKey !== undefined && preset.connect === "device") fail(400, "Sign in again to replace this provider's tokens.");
       if (input.baseUrl !== undefined && preset.connect !== "url") fail(400, "This provider's address is fixed.");
       const next: ProviderRecord = {
@@ -288,7 +279,6 @@ export async function createProviders({ store, secretKey, dataDir, env, vercelCl
 
     async remove(id: string) {
       await record(id);
-      if (id === "env") fail(400, "This provider comes from the server's environment. Unset FXBOT_BASE_URL to remove it.");
       const bots = await store.profiles.usingProvider(id);
       if (bots) fail(400, `${bots} bot${bots === 1 ? " uses" : "s use"} this provider. Move ${bots === 1 ? "it" : "them"} to another first.`);
       await stop(id);
