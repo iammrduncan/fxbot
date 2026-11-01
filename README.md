@@ -68,3 +68,7 @@ Both servers listen on loopback only. To reach them from another device, run `ta
 ## Status
 
 v1 is built: bot profiles drawn as animated blobs, a streaming chat that survives reloads and server restarts, image and text file attachments, and an installable shell that opens offline. [Provider logins](docs/_completed/phases/provider-logins.md) is built too: device code sign-in, API keys and local servers, model discovery, sealed secrets in Postgres, and provider switches that carry a summary over. Both were checked against mock servers and stubbed sign-in services, not real accounts. The [v1 plan](docs/_completed/v1-plan.md) and the provider logins page record what was checked.
+
+## License
+
+[Apache License 2.0](LICENSE). The vendored `show-me` skill in `.agents/skills/` keeps its own MIT license.
