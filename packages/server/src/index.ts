@@ -7,12 +7,21 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
 
 // Loopback only. Other devices reach it through `tailscale serve`; the page never holds a secret.
-const port = 8787;
+// FXBOT_PORT lets a check run beside a running server.
+const port = Number(process.env.FXBOT_PORT ?? 8787);
 const host = "127.0.0.1";
-const baseUrl = process.env.FXBOT_BASE_URL;
-if (!baseUrl) throw new Error("FXBOT_BASE_URL is required");
+const { FXBOT_DATABASE_URL: databaseUrl, FXBOT_SECRET_KEY_FILE: keyFile } = process.env;
+if (!databaseUrl) throw new Error("FXBOT_DATABASE_URL is required: fxbot keeps its records in Postgres (see the README)");
+if (!keyFile) throw new Error("FXBOT_SECRET_KEY_FILE is required: a file outside the repo with 32 random bytes in base64 (see the README)");
 
-const fxbot = createFxbot({ baseUrl, apiKey: process.env.FXBOT_API_KEY, dataDir: process.env.FXBOT_DATA });
+const fxbot = await createFxbot({
+  databaseUrl,
+  secretKey: readFileSync(keyFile, "utf8"),
+  baseUrl: process.env.FXBOT_BASE_URL || undefined,
+  apiKey: process.env.FXBOT_API_KEY || undefined,
+  vercelClientId: process.env.FXBOT_VERCEL_CLIENT_ID || undefined,
+  dataDir: process.env.FXBOT_DATA,
+});
 
 // The ui package's build, served beside the API.
 const dist = join(import.meta.dirname, "..", "..", "ui", "dist");
@@ -53,37 +62,50 @@ async function body<T>(req: IncomingMessage, limit = 1 << 20): Promise<T> {
 async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   const [, , resource, id, action, extra] = url.pathname.split("/");
   const method = req.method;
-  if (resource === "health" && !id && method === "GET") return json(res, 200, { ok: true });
+  const ok = { ok: true };
+  if (resource === "health" && !id && method === "GET") return json(res, 200, ok);
   if (resource === "settings" && !id) {
-    if (method === "GET") return json(res, 200, fxbot.settings.get());
-    if (method === "PATCH") return json(res, 200, fxbot.settings.update(await body(req)));
+    if (method === "GET") return json(res, 200, await fxbot.settings.get());
+    if (method === "PATCH") return json(res, 200, await fxbot.settings.update(await body(req)));
     return fail(405, "method not allowed");
   }
+  if (resource === "providers" && extra === undefined) {
+    if (!id && method === "GET") return json(res, 200, await fxbot.providers.list());
+    if (!id && method === "POST") return json(res, 201, await fxbot.providers.add(await body(req)));
+    if (id && !action && method === "PATCH") return json(res, 200, await fxbot.providers.update(id, await body(req)));
+    if (id && !action && method === "DELETE") return json(res, 200, (await fxbot.providers.remove(id), ok));
+    if (id && action === "models" && method === "GET") return json(res, 200, await fxbot.providers.models(id));
+    if (id && action === "teams" && method === "GET") return json(res, 200, await fxbot.providers.teams(id));
+    return fail(404, "not found");
+  }
+  if (resource === "sign-ins" && !action) {
+    if (!id && method === "POST") return json(res, 201, await fxbot.signIns.start(await body(req)));
+    if (id && method === "GET") return json(res, 200, fxbot.signIns.get(id));
+    if (id && method === "DELETE") return json(res, 200, (fxbot.signIns.cancel(id), ok));
+    return fail(404, "not found");
+  }
   if (resource === "profiles" && action === "uploads" && method === "GET") {
-    const { data, type } = fxbot.image(id, extra ?? "");
+    const { data, type } = await fxbot.image(id, extra ?? "");
     return res.writeHead(200, { "content-type": type, "cache-control": "private, max-age=31536000, immutable", "x-content-type-options": "nosniff" }).end(data);
   }
   if (resource !== "profiles" || extra !== undefined) return fail(404, "not found");
 
   if (!id) {
-    if (method === "GET") return json(res, 200, fxbot.profiles.list());
-    if (method === "POST") return json(res, 201, fxbot.profiles.create(await body(req)));
+    if (method === "GET") return json(res, 200, await fxbot.profiles.list());
+    if (method === "POST") return json(res, 201, await fxbot.profiles.create(await body(req)));
     return fail(405, "method not allowed");
   }
-  const profile = fxbot.profiles.get(id);
+  const profile = await fxbot.profiles.get(id);
 
   if (!action) {
     if (method === "GET") return json(res, 200, profile);
-    if (method === "PATCH") return json(res, 200, fxbot.profiles.update(id, await body(req)));
-    if (method === "DELETE") {
-      fxbot.profiles.remove(id);
-      return json(res, 200, { ok: true });
-    }
+    if (method === "PATCH") return json(res, 200, await fxbot.profiles.update(id, await body(req)));
+    if (method === "DELETE") return json(res, 200, (await fxbot.profiles.remove(id), ok));
   } else if (action === "messages" && method === "POST") {
     // libfx takes at most 6 MiB of images in a message, so with base64 a message stays under 12 MiB.
     return json(res, 200, await fxbot.send(id, await body(req, 12 << 20)));
   } else if (action === "stream" && method === "GET") {
-    const lines = fxbot.stream(id, Number(url.searchParams.get("cursor") ?? 0));
+    const lines = await fxbot.stream(id, Number(url.searchParams.get("cursor") ?? 0));
     res.writeHead(200, { "content-type": "application/x-ndjson", "cache-control": "no-store" }).flushHeaders();
     // Replays from the cursor, then stays open. A closed response cancels the stream.
     return pipeline(Readable.fromWeb(lines as ReadableStream<Uint8Array>), res).catch(() => {});

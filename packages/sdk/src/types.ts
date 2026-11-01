@@ -1,10 +1,33 @@
 // What the agent side and the client share. No imports, so a browser bundle can take them.
 
-export type Fields = { name: string; instructions: string; model: string };
-// `preview` is the start of the latest reply, for a list of bots.
-export type Profile = Fields & { id: string; sessionId: string | null; preview?: string };
-// A bot with no model of its own uses `defaultModel`.
-export type Settings = { defaultModel: string };
+// A bot's look: one of these shapes, in one of these colors. A UI draws them; the names are the contract.
+export const shapes = ["circle", "cloud", "squircle", "star", "clover", "heart", "flower", "egg", "bean", "triangle", "diamond", "sparkle", "hexagon", "pumpkin"] as const;
+export type Shape = (typeof shapes)[number];
+export const colors = {
+  black: "#1f1f1f",
+  brown: "#9b6a3f",
+  red: "#e5484d",
+  orange: "#f06b2b",
+  amber: "#ec9a2e",
+  green: "#56bf73",
+  teal: "#4fb3a2",
+  blue: "#3b82f6",
+  purple: "#8b5cf6",
+  pink: "#e64ba0",
+  gray: "#9a9a9a",
+} as const;
+export type Color = keyof typeof colors;
+
+// `provider` is a provider id, or empty for none. An empty model follows the provider's default model.
+export type Fields = { name: string; instructions: string; model: string; provider: string; shape: Shape; color: Color };
+// `preview` is the start of the latest reply, for a list of bots. `handoff` is the summary a provider switch carried
+// over, which the current chat starts from. `busy` is true while a turn runs. Pinned bots head the list.
+export type Profile = Fields & { id: string; sessionId: string | null; preview: string | null; handoff: string | null; busy: boolean; pinned: boolean };
+// An update takes any field, and `pinned`. The first bot starts pinned, and at most `maxPinned` are.
+export type ProfileUpdate = Partial<Fields> & { pinned?: boolean };
+export const maxPinned = 3;
+// New bots start on `defaultProvider`.
+export type Settings = { defaultProvider: string };
 
 // A file sent with a message: `data` is base64 on the way in, and `url` is set for an image fxbot keeps.
 export type Upload = { name: string; type: string; url?: string; data?: string };
@@ -12,6 +35,48 @@ export type Upload = { name: string; type: string; url?: string; data?: string }
 export type Message = { text: string; messageId: string; files?: Upload[] };
 // libfx's stream leaves out a prompt that is not plain text, so fxbot keeps what such a message sent.
 export type Sent = { input: string; files: Upload[] };
+
+// How each kind of provider connects: a device code sign-in, an API key at a fixed address, or a server's address.
+export const kinds = {
+  chatgpt: { label: "ChatGPT plan", connect: "device" },
+  grok: { label: "Grok plan", connect: "device" },
+  vercel: { label: "Vercel account", connect: "device" },
+  gateway: { label: "AI Gateway key", connect: "key" },
+  openai: { label: "OpenAI key", connect: "key", baseUrl: "https://api.openai.com/v1" },
+  opencode: { label: "OpenCode Zen key", connect: "key", baseUrl: "https://opencode.ai/inference/openai/v1" },
+  "opencode-go": { label: "OpenCode Go key", connect: "key", baseUrl: "https://opencode.ai/inference/go/openai/v1" },
+  openrouter: { label: "OpenRouter key", connect: "key", baseUrl: "https://openrouter.ai/api/v1" },
+  ollama: { label: "Ollama", connect: "url", baseUrl: "http://localhost:11434/v1" },
+  lmstudio: { label: "LM Studio", connect: "url", baseUrl: "http://localhost:1234/v1" },
+  custom: { label: "Other server", connect: "url" },
+} as const satisfies Record<string, { label: string; connect: "device" | "key" | "url"; baseUrl?: string }>;
+export type Kind = keyof typeof kinds;
+
+// A provider as listed: never its key or tokens, only whether it holds them. `contextWindow` overrides what the
+// server reports for its models. `env` is the read-only provider from the server's environment.
+export type Provider = {
+  id: string;
+  kind: Kind;
+  name: string;
+  baseUrl: string | null;
+  model: string;
+  contextWindow: number | null;
+  teamId: string | null;
+  hasKey: boolean;
+  signedIn: boolean;
+  env: boolean;
+  error: string | null;
+};
+export type NewProvider = { kind: Kind; name?: string; baseUrl?: string; apiKey?: string; model?: string; contextWindow?: number | null };
+export type ProviderUpdate = { name?: string; baseUrl?: string; apiKey?: string; model?: string; contextWindow?: number | null; teamId?: string };
+
+// What fxbot knows about a model. A field the provider does not report stays unset.
+export type Model = { id: string; name?: string; contextWindow?: number; maxOutputTokens?: number; supportsToolUse?: boolean; supportsVision?: boolean };
+export type Team = { id: string; name: string };
+
+// A device code sign-in as the page sees it: where to go and the code to enter, never what claims the tokens.
+export type SignIn = { id: string; verificationUrl: string; userCode: string; expiresAt: number };
+export type SignInStatus = { status: "waiting" | "done" | "failed"; provider?: string; error?: string };
 
 // One line of a bot's NDJSON stream, as far as fxbot reads it. libfx writes more types and fields.
 export type StreamLine = {

@@ -11,9 +11,9 @@ Agents may run on this machine, so every fxbot record moves into Postgres. Keys 
 
 When a bot switches provider, its chat is compacted into a handoff summary. The new session starts from that summary, and the bot can search the earlier messages with a `chat_history` tool.
 
-Today the server takes one endpoint from `FXBOT_BASE_URL` and `FXBOT_API_KEY`, and keeps everything in files.
+Before this phase, the server took one endpoint from `FXBOT_BASE_URL` and `FXBOT_API_KEY`, and kept everything in files.
 
-Status: designed, not built. The decisions are recorded in section 5, so `/goal Complete docs/phases/provider-logins.md` can run from this page.
+Status: built on 2026-11-01, and checked against mock model servers and stubbed sign-in services: 195 checks, all passing (section 4). Real accounts are still to be tried by hand. Where the build differs from the plan, section 3 says so under **Built**.
 
 ## 1. Research
 
@@ -87,8 +87,12 @@ These are read from source and docs, as of November 2026. Each path is relative 
 - **models.dev:**
   - `opencode` (Zen) is at `https://opencode.ai/inference/openai/v1` and `opencode-go` is at `https://opencode.ai/inference/go/openai/v1`. Go's `/openai/v1/models` returns 404.
   - Its per-model fields map onto libfx's custom-provider metadata.
+- **OpenCode** ([Go docs](https://opencode.ai/v2/docs/console/go/), and requests with a fake key):
+  - Go refuses a chat request without a per-conversation `x-opencode-session` header: `400 MissingSessionID`. Zen does not require it.
+  - OpenCode asks clients to name themselves in the user agent.
+  - The key-checked model lists are `https://opencode.ai/inference/v1/models` (Zen) and `https://opencode.ai/inference/go/v1/models` (Go). They answer a fake key with 401; the lists under `/openai/v1` return 404 for any key.
 - **Debian 13** ships Postgres 17 and `postgresql-17-pgvector` 0.8.0.
-- **The `postgres` npm client** (Postgres.js 4.0.0) has no dependencies and connects over a unix socket `path`.
+- **The `postgres` npm client** (Postgres.js) has no dependencies and connects over a unix socket. The build pins 3.4.9 (see **Built**).
 
 ## 2. Key takeaways
 
@@ -119,7 +123,7 @@ One `kind` picks the sign-in, the libfx provider, and the model source. The tabl
 | --- | --- | --- | --- |
 | `chatgpt` | Device code (`libfx/chatgpt`) | `"codex"` | Codex list: `slug`, `context_window`, `input_modalities`, where `visibility == "list"` and `supported_in_api` |
 | `grok` | Device code (`libfx/grok`) | `"grok"` | Grok list: `model`, `context_window`, `max_completion_tokens`, where `api_backend == "responses"` |
-| `vercel` | Device code (fxbot's Vercel OAuth app), then a team | AI Gateway; the agent's `fetch` adds the token and team | `coding-agent/v1/models?teamId=` |
+| `vercel` | Device code (fxbot's Vercel OAuth app), then a team | AI Gateway; the agent's `fetch` adds the token and team | libfx `listModels` through the account's `fetch` |
 | `gateway` | Key | AI Gateway, `apiKey` | libfx `listModels({ apiKey })` |
 | `openai` | Key | Custom, `https://api.openai.com/v1` | models.dev `openai` |
 | `opencode` | Key (Zen) | Custom, `https://opencode.ai/inference/openai/v1` | models.dev `opencode`, Chat Completions models only |
@@ -141,7 +145,7 @@ One `kind` picks the sign-in, the libfx provider, and the model source. The tabl
 - **models.dev** (`https://models.dev/api.json`, about 600 KB gzipped):
   - It is fetched at most once a day with `If-None-Match`, trimmed to the hosted kinds, and kept in Postgres.
   - It maps `limit.context`, `limit.output`, `tool_call`, and `modalities.input` containing `"image"`.
-- **Before a turn on a custom kind,** `send` sets `provider.models[id]` from the list, with the provider's context field taking precedence. A known `contextWindow` lets libfx compact long chats ([context management](context-management.md)). Vision stays `true` when unknown.
+- **Before a turn on a custom kind,** the SDK sets `provider.models[id]` from the list, with the provider's context field taking precedence. A known `contextWindow` lets libfx compact long chats ([context management](../../phases/context-management.md)). Vision stays `true` when unknown.
 
 ### Sign-in
 
@@ -166,7 +170,8 @@ One `kind` picks the sign-in, the libfx provider, and the model source. The tabl
 - A key goes to the server once, in a password field, and is never sent back. Listings say only `hasKey` or `signedIn`. To replace a key, `PATCH` a new one.
 - On add, the SDK checks the base URL against libfx's rule. It then checks the key with `GET {baseUrl}/models`, or with `listModels` for `gateway`:
   - A 401 or 403 refuses the provider with "The provider rejected this key".
-  - A 404 is accepted; OpenCode Go has no `/models` on its chat path.
+  - OpenCode keys are checked at OpenCode's own lists, which reject a bad key.
+  - Elsewhere, a 404 is accepted, since some servers serve no list at `/models`.
   - Any other failure refuses it with the status.
   - The key is masked in every message.
 - Local kinds are checked by their own probe.
@@ -197,8 +202,8 @@ models_dev (id int primary key default 1 check (id = 1), etag text, data jsonb, 
 
 - **Indexes.** `messages` has a GIN index on `tsv` and an index on `(profile_id, created_at)`.
 - **Consistency.** A provider and its secret are written in one transaction, so no write-order rules are needed.
-- **The store.** `store.ts` moves to Postgres, so the SDK's calls become async and the server awaits them. Each change is one statement or one transaction. That replaces today's "sync calls on purpose" rule.
-- **Import from files.** On first start with an empty `profiles` table, the SDK imports `data/profiles/`, `settings.json`, and `uploads/`. It replays each session's stream through `applyLine` to fill `messages`. Then it moves the old files to `data/imported/`.
+- **The store.** `store.ts` moves to Postgres, so the SDK's calls become async and the server awaits them. Each change is one statement or one transaction. That replaces v1's "sync calls on purpose" rule.
+- **Import from files.** While v1's files are in the data directory, the SDK imports `data/profiles/`, `settings.json`, and `uploads/` at start. Every insert skips what is already stored. It replays each session's stream through `applyLine` to fill `messages`. Then it moves the old files to `data/imported/`.
 - **`FXBOT_DATABASE_URL` is required.** The server refuses to start without it.
 
 ### Sealed secrets (`packages/sdk/src/secrets.ts`)
@@ -219,7 +224,7 @@ models_dev (id int primary key default 1 check (id = 1), etag text, data jsonb, 
 
 | Variable | Holds |
 | --- | --- |
-| `FXBOT_DATABASE_URL` | Postgres for fxbot's own role, with no password: peer auth over the local socket |
+| `FXBOT_DATABASE_URL` | Postgres for fxbot's own role, with no password: peer auth over the local socket, as `postgres:///fxbot` with `PGHOST=/var/run/postgresql` |
 | `FXBOT_SECRET_KEY_FILE` | The path to a file outside the repo, holding 32 random bytes in base64 |
 | `FXBOT_VERCEL_CLIENT_ID` | The id of fxbot's Vercel OAuth app, which the owner registers; needed only for `vercel` |
 
@@ -253,12 +258,12 @@ The server runs as `fxbot` and owns `data/` with mode 700. Agents run as another
      - the bot's instructions
      - "Earlier conversation, summarized when this bot moved from <old> to <new>:" followed by the handoff
      - "Search earlier messages with chat_history."
-  4. **The UI** shows "Continued from <old>" with the summary, collapsed, at the top of the new chat. The old session stays on disk for [past sessions](past-sessions.md).
+  4. **The UI** shows "Continued from <old>" with the summary, collapsed, at the top of the new chat. The old session stays on disk for [past sessions](../../phases/past-sessions.md).
 - **The `chat_history` tool** goes on every agent:
   - Its definition is `{ name: "chat_history", description, inputSchema: { query: string, limit?: 1–20 }, idempotent: true }`.
   - The bot comes from the session's `context` (`agent.session(id, { context: { bot } })`), never from the model's input. A bot searches only its own messages, across all of its sessions.
   - Its query is `where profile_id = $bot and tsv @@ websearch_to_tsquery('simple', $q)`, ordered by `ts_rank_cd`, then newest. It returns the date, role, and a `ts_headline` snippet.
-  - Vector search arrives with [memories](memories.md).
+  - Vector search arrives with [memories](../../phases/memories.md).
 
 ### API, SDK, and client
 
@@ -283,12 +288,13 @@ The server runs as `fxbot` and owns `data/` with mode 700. Agents run as another
 ### Where the code goes
 
 - **`packages/sdk`:**
-  - `store.ts`: the Postgres tables and queries, plus the import from files.
-  - `secrets.ts`: `seal`, `unseal`, `rotateSecrets`.
+  - `store.ts`: the Postgres schema, and the queries for profiles, settings, providers, sent records, and images.
+  - `import.ts`: the one-time import of v1's files.
+  - `secrets.ts`: `seal`, `unseal`, `rotateSecrets`, and the secrets table.
   - `providers.ts`: records, one agent per provider, ChatGPT and Grok sign-ins, the refresh lock.
   - `vercel.ts`: device code, refresh, teams, and the request `fetch`.
-  - `models.ts`: one source per kind, and the caches.
-  - `history.ts`: messages, `chat_history`, and the handoff.
+  - `models.ts`: one source per kind, the caches, and the models.dev copy.
+  - `history.ts`: the messages table, `chat_history`, and the handoff summary.
   - `index.ts`: picks a bot's agent and passes metadata and instructions.
 - **`packages/server`:** the routes, `await` on every SDK call, and the `rotate-key` script.
 - **`packages/ui`:**
@@ -299,6 +305,30 @@ The server runs as `fxbot` and owns `data/` with mode 700. Agents run as another
   - The "Continued from" note.
   - With no provider, an empty chat that points to Settings.
   - Components come from shadcn only.
+
+### Built
+
+What the build found or changed, checked against libfx 0.0.16 and the mocks:
+
+- **Postgres.js.** Postgres.js 3.4.9 is pinned; 4.0.0 was three days old.
+  - Its URL ignores libpq's `?host=` and sends it to the server as a parameter, which Postgres rejects.
+  - The socket form is therefore `FXBOT_DATABASE_URL=postgres:///fxbot` with `PGHOST=/var/run/postgresql`. A check confirmed the server's connections have no client address.
+- **Agent placeholder model.** Every agent gets the placeholder model `fxbot-unset`.
+  - A durable session's `checkpoint()` opens an engine with the agent's own options, and a custom provider refuses one without a model.
+  - Sessions always pass their own model, so the placeholder never reaches a request.
+- **Checkpoint restore.** A checkpoint restores into `createFxEngine({ checkpoint })` on the same provider, and also on another custom provider. The original session carries on unchanged.
+- **Tools and `supportsToolUse`.** libfx still offers tools to a model marked `supportsToolUse: false`. A server that rejects tools would fail that turn.
+- **Images and `supportsVision`.** libfx refuses an image for a model marked `supportsVision: false` when the turn opens, not at send. The turn ends with "Image prompts are unavailable for the selected model", and nothing reaches the server.
+- **The Vercel model list** goes through libfx's `listModels` with the account's `fetch`, instead of a direct call with `?teamId=`. Until a team is picked, it says so.
+- **`chat_history`** leaves out the message that started the turn: that message is the search itself.
+- **Engine turns** report only a stop reason; a failed request rejects instead.
+- **`FXBOT_PORT`** lets a check run a server beside a running one.
+- **OpenCode requests.** libfx's custom providers send no session id, and only `credentials()` learns a request's session.
+  - For the OpenCode kinds, the key fxbot hands libfx carries the session id. The agent's `fetch` moves it into `x-opencode-session`, sets `user-agent: fxbot`, and masks the plain key in error bodies, since libfx would mask only the combined value.
+  - Checked through libfx against a stubbed `opencode.ai`: the header is the bot's libfx session, the same across one conversation and different per bot.
+- **A rejected key** shows in the chat as libfx's "host managed authentication failed · HTTP 401", and the key is in neither the stream nor the session files.
+- **The import** runs whenever v1's files are present, and every insert skips what is already stored, so an import that stopped partway runs again without duplicates.
+- **The import** has no end-of-replay marker from libfx, so it reads each session's stream until half a second passes with no new line.
 
 ### Security
 
@@ -320,20 +350,21 @@ The server runs as `fxbot` and owns `data/` with mode 700. Agents run as another
 
 ### Size
 
-About 800 lines, against a core at 1,264 lines that is already past its ~1,000-line stop line ([v1 plan](../_completed/v1-plan.md)). It adds one dependency, `postgres`, and one process, Postgres. The decisions in section 5 grew the first estimate of 520 lines.
+Built: about 1,410 lines, against the estimate of 800. The core went from 1,264 lines to 2,678. The first estimate was 520 lines, and the decisions in section 5 grew it to 800; the code then came out larger than that. It adds one dependency, `postgres`, and one process, Postgres.
 
-| Part | Lines |
-| --- | --- |
-| `store.ts` on Postgres, and the import | about 140 (replaces 69) |
-| `providers.ts` | about 130 |
-| `models.ts` | about 90 |
-| `history.ts` | about 90 |
-| `vercel.ts` | about 60 |
-| `secrets.ts` | about 50 |
-| Rest of the SDK | about 40 |
-| Server | about 55 |
-| Client | about 30 |
-| UI | about 200 |
+| Part | Estimate | Built |
+| --- | --- | --- |
+| `providers.ts` | 130 | 354 |
+| `models.ts` | 90 | 177 |
+| `store.ts`, plus `import.ts` | 140 | 102 + 68 |
+| `history.ts` | 90 | 77 |
+| `vercel.ts` | 60 | 87 |
+| `secrets.ts` | 50 | 80 |
+| Rest of the SDK (`index.ts`, `types.ts`, `client.ts`) | +40 | 290 + 71 + 135 (from 358) |
+| Server | +55 | 152 + 15 (from 130) |
+| UI (`app.tsx`, `providers.tsx`) | +200 | 666 + 326 (from 629) |
+
+The biggest places to trim are the provider rows and dialogs in `providers.tsx`, and the per-kind branches in `providers.ts`.
 
 ## 4. Checklist
 
@@ -346,56 +377,61 @@ Build in this order. Done means every box is ticked, with its check run. The che
 
 They never use a real account or key.
 
-**M1. Postgres store**
-- [ ] The tables exist, and every v1 route still behaves the same against Postgres: profiles, settings, messages with files, images, the stream, previews.
-- [ ] On a copy of v1 data, the import moves profiles, settings, sent records, and images. It fills `messages` from each session's stream, moves the files to `data/imported/`, and an open turn resumes after a restart.
-- [ ] The server refuses to start without `FXBOT_DATABASE_URL`. It connects over the socket with peer auth and no password. The exact URL form goes in the README.
+**M1. Postgres store** (44 checks passed)
+- [x] The tables exist, and every v1 route still behaves the same against Postgres: profiles, settings, messages with files, images, the stream, previews.
+- [x] On a copy of v1 data, the import moves profiles, settings, sent records, and images. It fills `messages` from each session's stream, moves the files to `data/imported/`, and an open turn resumes after a restart.
+- [x] The server refuses to start without `FXBOT_DATABASE_URL`. It connects over the socket with peer auth and no password. The exact URL form goes in the README.
+- [x] An import that runs again, with the files put back, adds no duplicates and sets the files aside again.
 
-**M2. Secrets**
-- [ ] Add a provider with a key, then grep `data/`, a `pg_dump`, every API response, and the built page for the key. It appears in none of them.
-- [ ] A row copied onto another provider's id fails to open. A wrong key marks that provider, and the server keeps running.
-- [ ] `npm run rotate-key` seals every row again, and the server opens them with the new key.
+**M2. Secrets** (20 checks passed)
+- [x] Add a provider with a key, then grep `data/`, a `pg_dump`, every API response, and the built page for the key. It appears in none of them.
+- [x] A row copied onto another provider's id fails to open. A wrong key marks that provider, and the server keeps running.
+- [x] `npm run rotate-key` seals every row again, and the server opens them with the new key.
 
-**M3. Providers and models**
-- [ ] The kinds table and types exist. The `env` provider works, and the bots from v1 get it.
-- [ ] Two mock servers, as two providers with a bot on each, both reply. Removing a provider in use is refused.
-- [ ] Each kind returns the right ids and fields from stubbed responses:
+**M3. Providers and models** (28 API checks, 20 model-source checks, and 10 OpenCode checks passed)
+- [x] The kinds table and types exist. The `env` provider works, and the bots from v1 get it.
+- [x] Two mock servers, as two providers with a bot on each, both reply. Removing a provider in use is refused.
+- [x] Each kind returns the right ids and fields from stubbed responses:
   - Codex: hidden entries are dropped.
   - Grok: only `responses`-backend models are kept.
   - OpenCode: Anthropic- and Google-API models are dropped.
   - Ollama: only `completion` models are kept.
-- [ ] The context field overrides the probe. The 5-minute cache works, and a failed list returns its reason.
-- [ ] Known metadata reaches `provider.models` before a turn.
-- [ ] Key check: a 401 refuses the provider, a 404 is accepted, and a non-loopback `http:` URL is refused before any fetch. The key is masked in every error.
+- [x] The context field overrides the probe. The 5-minute cache works, and a failed list returns its reason.
+- [x] Known metadata reaches `provider.models` before a turn.
+- [x] Key check: a 401 refuses the provider, a 404 is accepted, and a non-loopback `http:` URL is refused before any fetch. The key is masked in every error.
+- [x] OpenCode, through libfx against a stubbed `opencode.ai`:
+  - Keys are checked at OpenCode's own lists.
+  - Every Go request carries the conversation's `x-opencode-session` and `user-agent: fxbot`, with the plain key.
+  - A rejected key stays out of the stream and the session files.
 
-**M4. Sign-in**
-- [ ] ChatGPT and Grok, against stubbed `auth.openai.com` and `auth.x.ai`:
+**M4. Sign-in** (28 checks passed)
+- [x] ChatGPT and Grok, against stubbed `auth.openai.com` and `auth.x.ai`:
   - `POST /api/sign-ins` returns exactly `id`, `verificationUrl`, `userCode`, and `expiresAt`.
   - The status goes from `waiting` to `done`, and writes the provider and its sealed secret.
   - An expired code gives `failed` with libfx's message.
   - Cancel and a second start both work.
   - Signing in again keeps the bots' sessions.
-- [ ] Vercel, against stubbed `api.vercel.com`:
+- [x] Vercel, against stubbed `api.vercel.com`:
   - It handles `authorization_pending` and `slow_down`, and refuses a verification URL not on `vercel.com`.
   - A single team is picked automatically, and several teams need a choice.
   - Each request carries the bearer and team headers, and a token quoted in an error body is masked.
-- [ ] Refresh: the tokens libfx refreshes are saved. The SDK's own refreshes, for plan model calls and Vercel, run under the shared lock, so two refreshes at once spend one refresh token.
+- [x] Refresh: the tokens libfx refreshes are saved. The SDK's own refreshes, for plan model calls and Vercel, run under the shared lock, so two refreshes at once spend one refresh token.
 
-**M5. History and provider switches**
-- [ ] Messages are recorded at send and at turn end.
-- [ ] `chat_history` finds a word in an older session of the same bot, and nothing from another bot, even when the model asks for one.
-- [ ] Switching a bot from mock A to mock B: the summary comes from A, by checkpoint restore. With A stopped, it comes from B, from the transcript. The new session's instructions carry it, and a second switch carries the first summary forward.
+**M5. History and provider switches** (19 checks passed)
+- [x] Messages are recorded at send and at turn end.
+- [x] `chat_history` finds a word in an older session of the same bot, and nothing from another bot, even when the model asks for one.
+- [x] Switching a bot from mock A to mock B: the summary comes from A, by checkpoint restore. With A stopped, it comes from B, from the transcript. The new session's instructions carry it, and a second switch carries the first summary forward.
 
-**M6. UI** (Playwright against the mocks)
-- [ ] Add a local provider, with a context field, pick a model, and get a reply.
-- [ ] The sign-in dialog shows the stubbed code and closes on `done`. The Vercel team select appears when there are several teams.
-- [ ] The key field is empty after saving, and the row says the key is saved.
-- [ ] Switching a bot's provider shows "Continued from" with the summary.
-- [ ] With no provider, the chat points to Settings.
+**M6. UI** (Playwright against the mocks; 26 checks passed)
+- [x] Add a local provider, with a context field, pick a model, and get a reply.
+- [x] The sign-in dialog shows the stubbed code and closes on `done`. The Vercel team select appears when there are several teams.
+- [x] The key field is empty after saving, and the row says the key is saved.
+- [x] Switching a bot's provider shows "Continued from" with the summary.
+- [x] With no provider, the chat points to Settings.
 
-**M7. Docs and checks**
-- [ ] Update the README (setup, the env table, providers), `packages/sdk/README.md`, CONVENTIONS.md (one fxbot process plus Postgres; store calls are async), and this page's line counts.
-- [ ] `npm run typecheck`, `npm run build`, and `git diff --check` pass, and new files get a look.
+**M7. Docs and checks** (done)
+- [x] Update the README (setup, the env table, providers), `packages/sdk/README.md`, CONVENTIONS.md (one fxbot process plus Postgres; store calls are async), and this page's line counts. Also updated: `AGENTS.md` and `packages/AGENTS.md`.
+- [x] `npm run typecheck`, `npm run build`, and `git diff --check` pass, and new files get a look.
 
 **The human runs these**
 - Register fxbot's Vercel OAuth app with the device code grant, and set `FXBOT_VERCEL_CLIENT_ID`.
@@ -423,7 +459,7 @@ Answered on 2026-11-01.
 
 | Question | Decision |
 | --- | --- |
-| Line budget | Build as planned. The decisions here bring it to about 800 lines. |
+| Line budget | Build as planned. The decisions here bring it to about 800 lines. Built, it came to about 1,410 (see **Size**). |
 | Provider switch | Compact and carry the summary over. The messages stay in Postgres, searchable with `chat_history`. |
 | Who writes the summary | The old provider, falling back to the new one |
 | What lives in Postgres | Everything fxbot owns. libfx sessions stay files. |
@@ -435,10 +471,13 @@ Answered on 2026-11-01.
 | Search | Postgres full-text now. Hybrid search (pgvector plus full-text, fused with reciprocal rank fusion) arrives with memories, with the embedding model picked in Settings from any provider that serves `/embeddings`. |
 | Key rotation | A `rotate-key` command |
 
-Still to confirm when building:
+Answered by the build:
+- A durable session's `checkpoint()` restores into `createFxEngine`, on the same custom provider and on another. It needs a model on the agent (see **Built**).
+- libfx still offers tools to a model with `supportsToolUse: false`.
+
+Still to confirm, with real accounts:
 - Whether Vercel allows device code for a third-party OAuth app without a client secret. OIDC lists auth method `none`. If a secret is required, it is stored like the key file.
-- Whether a durable session's `checkpoint()` restores into `createFxEngine`. If it does not, the summary always comes from the transcript.
-- How libfx treats tools for a model with `supportsToolUse: false`.
 - Whether Codex accepts the model call without `originator`.
+- Whether a ChatGPT or Grok session's checkpoint restores for the switch summary. If it does not, the summary comes from the transcript.
 - Whether images reach a plan model.
 - Device code sign-in against real accounts.

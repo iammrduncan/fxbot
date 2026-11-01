@@ -1,6 +1,7 @@
-import type { Fields, Message, Profile, Settings, StreamLine, Upload } from "./types.ts";
+import type { Fields, Kind, Message, Model, NewProvider, Profile, ProfileUpdate, Provider, ProviderUpdate, Settings, SignIn, SignInStatus, StreamLine, Team, Upload } from "./types.ts";
 
 export type * from "./types.ts";
+export { colors, kinds, maxPinned, shapes } from "./types.ts";
 
 export const unreachable = "Cannot reach the server.";
 
@@ -76,12 +77,27 @@ export function createClient({ baseUrl = "" }: ClientOptions = {}) {
       list: () => call<Profile[]>("/profiles"),
       get: (id: string) => call<Profile>(`/profiles/${id}`),
       create: (fields: Partial<Fields> & { name: string }) => call<Profile>("/profiles", "POST", fields),
-      update: (id: string, fields: Partial<Fields>) => call<Profile>(`/profiles/${id}`, "PATCH", fields),
+      update: (id: string, fields: ProfileUpdate) => call<Profile>(`/profiles/${id}`, "PATCH", fields),
       remove: (id: string) => call<{ ok: true }>(`/profiles/${id}`, "DELETE"),
     },
     settings: {
       get: () => call<Settings>("/settings"),
       update: (settings: Settings) => call<Settings>("/settings", "PATCH", settings),
+    },
+    // A key goes to the server once and never comes back: a listed provider says only whether it holds one.
+    providers: {
+      list: () => call<Provider[]>("/providers"),
+      add: (provider: NewProvider) => call<Provider>("/providers", "POST", provider),
+      update: (id: string, fields: ProviderUpdate) => call<Provider>(`/providers/${id}`, "PATCH", fields),
+      remove: (id: string) => call<{ ok: true }>(`/providers/${id}`, "DELETE"),
+      models: (id: string) => call<Model[]>(`/providers/${id}/models`),
+      teams: (id: string) => call<Team[]>(`/providers/${id}/teams`),
+    },
+    // A device code sign-in: show the code and link, then poll until it is done or failed.
+    signIns: {
+      start: (kind: Kind, provider?: string) => call<SignIn>("/sign-ins", "POST", { kind, provider }),
+      get: (id: string) => call<SignInStatus>(`/sign-ins/${id}`),
+      cancel: (id: string) => call<{ ok: true }>(`/sign-ins/${id}`, "DELETE"),
     },
     // Resolves once the server has stored the message; the reply arrives on the stream.
     send: (id: string, message: Message) => call<{ messageId: string; sessionId: string }>(`/profiles/${id}/messages`, "POST", message),

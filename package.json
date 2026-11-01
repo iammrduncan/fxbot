@@ -14,7 +14,8 @@
     "dev": "npm run dev -w @fxbot/ui",
     "server": "node --env-file-if-exists=.env packages/server/src/index.ts",
     "build": "npm run build -w @fxbot/ui",
-    "typecheck": "npm run typecheck --workspaces"
+    "typecheck": "npm run typecheck --workspaces",
+    "rotate-key": "node --env-file-if-exists=.env packages/server/src/rotate-key.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

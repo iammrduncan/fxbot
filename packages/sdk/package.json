@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "libfx": "0.0.16"
+    "libfx": "0.0.16",
+    "postgres": "3.4.9"
   }
 }

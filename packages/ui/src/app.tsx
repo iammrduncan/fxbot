@@ -1,15 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
-import { ArrowUpIcon, CheckIcon, CircleCheckIcon, CopyIcon, FileTextIcon, LoaderCircleIcon, MessageCircleDashedIcon, PaperclipIcon, PlusIcon, SettingsIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CircleCheckIcon, CopyIcon, FileTextIcon, LoaderCircleIcon, MessageCircleDashedIcon, PaperclipIcon, PinIcon, PinOffIcon, PlusIcon, SettingsIcon, XIcon } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "@/components/ui/attachment";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { Message, MessageContent, MessageFooter } from "@/components/ui/message";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -26,6 +27,7 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
@@ -35,9 +37,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
-import { unreachable, type Fields, type Profile, type Turn, type Upload } from "@fxbot/sdk/client";
+import { maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Settings, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
+import { Blob, LookPicker } from "./blob.tsx";
+import { ModelField, Providers } from "./providers.tsx";
 import { useTurnStream } from "./use-turn-stream.ts";
 
 function go(path: string) {
@@ -85,64 +89,168 @@ export function App() {
       stopped = true;
     };
   }, [version]);
+  // A busy bot hops in the sidebar until its turn ends, so the list is read again while any is busy.
+  useEffect(() => {
+    if (!profiles?.some((p) => p.busy)) return;
+    const again = setTimeout(refresh, 2000);
+    return () => clearTimeout(again);
+  }, [profiles]);
+
+  const [creating, setCreating] = useState(false);
+  const created = (profile: Profile) => {
+    setCreating(false);
+    refresh();
+    go(`/profiles/${profile.id}`);
+  };
 
   const [, top, id, sub] = path.split("/");
   let screen: ReactNode;
-  if (path === "/") screen = <Home profiles={profiles} offline={offline} />;
+  if (path === "/") screen = <Home profiles={profiles} offline={offline} onNew={() => setCreating(true)} />;
   else if (path === "/settings") screen = <SettingsForm />;
-  else if (top === "profiles" && id === "new" && sub === undefined) screen = <ProfileForm key="new" onSaved={refresh} />;
   else if (top === "profiles" && id && sub === "edit") screen = <ProfileForm key={id} id={id} onSaved={refresh} />;
-  else if (top === "profiles" && id && sub === undefined) screen = <Chat key={id} id={id} onReply={refresh} />;
+  else if (top === "profiles" && id && sub === undefined) screen = <Chat key={id} id={id} onChange={refresh} />;
   else screen = <Header title="Not found" />;
 
   return (
     <TooltipProvider>
       <SidebarProvider>
-        <BotSidebar profiles={profiles} offline={offline} active={id} />
+        <BotSidebar profiles={profiles} offline={offline} active={id} onNew={() => setCreating(true)} onChange={refresh} />
         <SidebarInset className="h-dvh overflow-hidden">{screen}</SidebarInset>
+        <NewBot open={creating} onOpenChange={setCreating} onCreated={created} />
       </SidebarProvider>
     </TooltipProvider>
   );
 }
 
-function BotSidebar({ profiles, offline, active }: { profiles: Profile[] | null; offline: boolean; active?: string }) {
+// The create dialog: a name and a look, with the new bot watching as you choose.
+function NewBot({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: (profile: Profile) => void }) {
+  const [name, setName] = useState("");
+  const [shape, setShape] = useState<Shape>("circle");
+  const [color, setColor] = useState<Color>("brown");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function create(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const profile = await client.profiles.create({ name, shape, color });
+      setName("");
+      onCreated(profile);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setBusy(false);
+  }
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent aria-describedby={undefined} className="gap-0 p-0 sm:max-w-md">
+        <DialogHeader className="border-b px-6 py-4">
+          <DialogTitle className="text-lg">Create New Bot</DialogTitle>
+        </DialogHeader>
+        <form id="new-bot" onSubmit={create} className="grid max-h-[70dvh] gap-6 overflow-y-auto px-6 py-6">
+          <Blob shape={shape} color={color} size={112} follow className="mx-auto" />
+          <Input aria-label="Name" required maxLength={200} value={name} onChange={(e) => setName(e.target.value)} placeholder="Name your Bot" className="h-12 rounded-xl text-center text-base" />
+          <LookPicker shape={shape} color={color} onShape={setShape} onColor={setColor} />
+          {error && <Problem>{error}</Problem>}
+        </form>
+        <DialogFooter className="mx-0 mb-0 px-6 py-4">
+          <DialogClose asChild>
+            <Button variant="outline" className="rounded-full">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button type="submit" form="new-bot" className="rounded-full" disabled={busy || !name.trim()}>
+            Create
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: Profile[] | null; offline: boolean; active?: string; onNew: () => void; onChange: () => void }) {
   const { setOpenMobile } = useSidebar();
+  // The open bot's eyes follow the pointer, and so do the eyes of the bot under it.
+  const [hovered, setHovered] = useState<string | null>(null);
+  const [problem, setProblem] = useState("");
   const open = (event: MouseEvent<HTMLAnchorElement>) => {
     follow(event);
     setOpenMobile(false);
   };
+  const watch = (id: string) => ({ onPointerEnter: () => setHovered(id), onPointerLeave: () => setHovered(null) });
+  const blob = (profile: Profile, size: number, className = "") => (
+    <Blob shape={profile.shape} color={profile.color} size={size} follow={profile.id === active || profile.id === hovered} busy={profile.busy} className={className} />
+  );
+  const pin = (profile: Profile, pinned: boolean) => client.profiles.update(profile.id, { pinned }).then(() => (setProblem(""), onChange()), (e: Error) => setProblem(e.message));
+  // Pinned bots sit on top, large and centered; the rest are the list.
+  const pinned = profiles?.filter((p) => p.pinned) ?? [];
+  const full = pinned.length >= maxPinned;
   return (
     <Sidebar>
-      <SidebarHeader className="flex-row items-center justify-between">
-        <a href="/" onClick={open} className="px-2 text-lg font-semibold">
-          fxbot
-        </a>
+      <SidebarHeader className="flex-row items-center justify-end">
         <Tooltip>
           <TooltipTrigger asChild>
-            <a href="/profiles/new" onClick={open} aria-label="New bot" className={buttonVariants({ variant: "ghost", size: "icon" })}>
+            <Button variant="outline" size="icon" aria-label="New bot" className="size-10 rounded-full bg-background shadow-sm" onClick={() => (onNew(), setOpenMobile(false))}>
               <PlusIcon />
-            </a>
+            </Button>
           </TooltipTrigger>
           <TooltipContent>New bot</TooltipContent>
         </Tooltip>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          {offline && <p className="px-2 text-sm text-destructive">{unreachable}</p>}
-          <SidebarMenu>
-            {profiles?.map((profile) => (
-              <SidebarMenuItem key={profile.id}>
-                <SidebarMenuButton asChild size="lg" isActive={profile.id === active} className="h-auto gap-3 py-2">
-                  <a href={`/profiles/${profile.id}`} onClick={open}>
-                    <BotAvatar profile={profile} />
-                    <span className="grid min-w-0 gap-0.5 leading-tight">
-                      <span className="truncate text-base">{profile.name}</span>
-                      <span className="truncate text-muted-foreground">{profile.preview ?? "No messages yet"}</span>
-                    </span>
+        {offline && <p className="px-4 text-sm text-destructive">{unreachable}</p>}
+        {pinned.length > 0 && (
+          <SidebarGroup aria-label="Pinned">
+            <div className="flex justify-center gap-1">
+              {pinned.map((profile) => (
+                <div key={profile.id} className="group/pin relative w-24 min-w-0">
+                  <a
+                    href={`/profiles/${profile.id}`}
+                    onClick={open}
+                    {...watch(profile.id)}
+                    data-active={profile.id === active || undefined}
+                    className="grid justify-items-center gap-1.5 rounded-2xl px-1 pt-3 pb-2 hover:bg-sidebar-accent data-active:bg-sidebar-accent"
+                  >
+                    {/* Bigger than the list's 40, and three still fit across. */}
+                    {blob(profile, 64)}
+                    <span className="w-full truncate text-center text-sm">{profile.name}</span>
                   </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+                  <button
+                    type="button"
+                    aria-label={`Unpin ${profile.name}`}
+                    onClick={() => pin(profile, false)}
+                    className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-background text-muted-foreground shadow-sm transition-opacity group-hover/pin:opacity-100 hover:text-foreground focus-visible:opacity-100 md:opacity-0"
+                  >
+                    <PinOffIcon className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </SidebarGroup>
+        )}
+        {problem && <p className="px-4 text-xs text-destructive">{problem}</p>}
+        <SidebarGroup>
+          <SidebarMenu>
+            {profiles
+              ?.filter((p) => !p.pinned)
+              .map((profile) => (
+                <SidebarMenuItem key={profile.id}>
+                  <SidebarMenuButton asChild size="lg" isActive={profile.id === active} className="h-auto gap-3 py-2 pr-9">
+                    <a href={`/profiles/${profile.id}`} onClick={open} {...watch(profile.id)}>
+                      {/* size-10!: the sidebar button sizes every svg in it as an icon. */}
+                      {blob(profile, 40, "size-10!")}
+                      <span className="grid min-w-0 gap-0.5 leading-tight">
+                        <span className="truncate text-base">{profile.name}</span>
+                        <span className="truncate text-muted-foreground">{profile.preview ?? "No messages yet"}</span>
+                      </span>
+                    </a>
+                  </SidebarMenuButton>
+                  <SidebarMenuAction showOnHover aria-label={`Pin ${profile.name}`} title={full ? `Up to ${maxPinned} bots can be pinned` : undefined} disabled={full} onClick={() => pin(profile, true)} className="top-1/2! -translate-y-1/2 disabled:opacity-0">
+                    <PinIcon />
+                  </SidebarMenuAction>
+                </SidebarMenuItem>
+              ))}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
@@ -162,20 +270,11 @@ function BotSidebar({ profiles, offline, active }: { profiles: Profile[] | null;
   );
 }
 
-// A colored initial, picked from the id so a bot keeps its color.
-const avatarColors = ["bg-orange-500", "bg-pink-500", "bg-blue-500", "bg-emerald-500", "bg-violet-500", "bg-amber-500", "bg-teal-500", "bg-rose-500"];
-const BotAvatar = ({ profile }: { profile: Profile }) => (
-  <Avatar className="size-10">
-    <AvatarFallback className={`${avatarColors[parseInt(profile.id.slice(0, 2), 16) % avatarColors.length]} font-semibold text-white`}>
-      {profile.name.slice(0, 1).toUpperCase()}
-    </AvatarFallback>
-  </Avatar>
-);
-
-function Header({ title, children }: { title: string; children?: ReactNode }) {
+function Header({ title, lead, children }: { title: string; lead?: ReactNode; children?: ReactNode }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 px-3">
       <SidebarTrigger />
+      {lead}
       <h1 className="min-w-0 flex-1 truncate font-medium">{title}</h1>
       {children}
     </header>
@@ -190,7 +289,7 @@ const Problem = ({ children }: { children: ReactNode }) => (
   </p>
 );
 
-function Home({ profiles, offline }: { profiles: Profile[] | null; offline: boolean }) {
+function Home({ profiles, offline, onNew }: { profiles: Profile[] | null; offline: boolean; onNew: () => void }) {
   const some = Boolean(profiles?.length);
   return (
     <>
@@ -209,39 +308,42 @@ function Home({ profiles, offline }: { profiles: Profile[] | null; offline: bool
           <EmptyDescription>{some ? "Choose one from the list, or make another." : "Make a bot to start a conversation."}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <a href="/profiles/new" onClick={follow} className={buttonVariants()}>
-            New bot
-          </a>
+          <Button onClick={onNew}>New bot</Button>
         </EmptyContent>
       </Empty>
     </>
   );
 }
 
-function ProfileForm({ id, onSaved }: { id?: string; onSaved: () => void }) {
-  const [fields, setFields] = useState<Fields>({ name: "", instructions: "", model: "" });
-  const [loaded, setLoaded] = useState(!id);
+function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
+  const [fields, setFields] = useState<Fields>({ name: "", instructions: "", model: "", provider: "", shape: "circle", color: "brown" });
+  const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [defaultModel, setDefaultModel] = useState("");
+  const [providers, setProviders] = useState<Provider[]>([]);
+  // Where the bot's chat lives now, so a move to another provider can warn first.
+  const [chat, setChat] = useState<{ provider: string; sessionId: string | null }>({ provider: "", sessionId: null });
   useEffect(() => {
-    if (!id) return;
-    client.settings.get().then((settings) => setDefaultModel(settings.defaultModel), () => {});
+    client.providers.list().then(setProviders, () => {});
     client.profiles.get(id).then(
-      ({ name, instructions, model }) => {
-        setFields({ name, instructions, model });
+      ({ name, instructions, model, provider, shape, color, sessionId }) => {
+        setFields({ name, instructions, model, provider, shape, color });
+        setChat({ provider, sessionId });
         setLoaded(true);
       },
       (e: Error) => setError(e.message),
     );
   }, [id]);
 
+  const nameOf = (provider: string) => providers.find((p) => p.id === provider)?.name ?? "another provider";
+  const moving = Boolean(chat.sessionId && fields.provider !== chat.provider);
   async function save(event: FormEvent) {
     event.preventDefault();
+    if (moving && !confirm(`Moving ${fields.name} to ${nameOf(fields.provider)} starts a new chat. The current one is summarized and carried over, and ${fields.name} can search it.`)) return;
     setBusy(true);
     setError("");
     try {
-      const saved = await (id ? client.profiles.update(id, fields) : client.profiles.create({ name: fields.name }));
+      const saved = await client.profiles.update(id, fields);
       onSaved();
       go(`/profiles/${saved.id}`);
     } catch (e) {
@@ -253,7 +355,7 @@ function ProfileForm({ id, onSaved }: { id?: string; onSaved: () => void }) {
   async function remove() {
     if (!confirm(`Delete ${fields.name}? Its conversation files stay on the server.`)) return;
     try {
-      await client.profiles.remove(id!);
+      await client.profiles.remove(id);
       onSaved();
       go("/");
     } catch (e) {
@@ -262,38 +364,50 @@ function ProfileForm({ id, onSaved }: { id?: string; onSaved: () => void }) {
   }
 
   const set = (key: keyof Fields) => (event: { target: { value: string } }) => setFields({ ...fields, [key]: event.target.value });
+  const providerModel = providers.find((p) => p.id === fields.provider)?.model;
   return (
     <>
-      <Header title={id ? `Edit ${fields.name || "bot"}` : "New bot"} />
+      <Header title={`Edit ${fields.name || "bot"}`} />
       <main className="flex-1 overflow-y-auto px-4 py-6">
         <form onSubmit={save} className="mx-auto grid max-w-xl gap-5">
+          {loaded && (
+            <div className="grid gap-5">
+              <Blob shape={fields.shape} color={fields.color} size={96} follow className="mx-auto" />
+              <LookPicker shape={fields.shape} color={fields.color} onShape={(shape) => setFields({ ...fields, shape })} onColor={(color) => setFields({ ...fields, color })} />
+            </div>
+          )}
           <label className={label}>
             Name
             <Input required maxLength={200} value={fields.name} onChange={set("name")} disabled={!loaded} />
           </label>
-          {/* A new bot is just a name. Its model and instructions are set here later, if at all. */}
-          {id && (
-            <>
-              <label className={label}>
-                Model
-                <Input maxLength={200} value={fields.model} onChange={set("model")} disabled={!loaded} placeholder={`Default: ${defaultModel || "none set in Settings"}`} />
-              </label>
-              <label className={label}>
-                Instructions
-                <Textarea rows={8} className="max-h-[50dvh]" value={fields.instructions} onChange={set("instructions")} disabled={!loaded} />
-              </label>
-            </>
-          )}
+          <label className={label}>
+            Provider
+            <NativeSelect className="w-full" value={fields.provider} onChange={(e) => setFields({ ...fields, provider: e.target.value, model: "" })} disabled={!loaded}>
+              {(!fields.provider || !chat.sessionId) && <NativeSelectOption value="">None</NativeSelectOption>}
+              {providers.map((p) => (
+                <NativeSelectOption key={p.id} value={p.id}>
+                  {p.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            {moving && <span className="font-normal text-muted-foreground">Moving starts a new chat that carries a summary of this one.</span>}
+          </label>
+          <label className={label}>
+            Model
+            <ModelField id="bot" provider={fields.provider} value={fields.model} onChange={(model) => setFields({ ...fields, model })} placeholder={`Default: ${providerModel || "none set in Settings"}`} />
+          </label>
+          <label className={label}>
+            Instructions
+            <Textarea rows={8} className="max-h-[50dvh]" value={fields.instructions} onChange={set("instructions")} disabled={!loaded} />
+          </label>
           {error && <Problem>{error}</Problem>}
           <div className="flex gap-2">
             <Button type="submit" disabled={busy || !loaded}>
-              Save
+              {busy && moving ? "Summarizing the chat…" : "Save"}
             </Button>
-            {id && (
-              <Button type="button" variant="destructive" onClick={remove} disabled={!loaded}>
-                Delete
-              </Button>
-            )}
+            <Button type="button" variant="destructive" onClick={remove} disabled={!loaded}>
+              Delete
+            </Button>
           </div>
         </form>
       </main>
@@ -302,47 +416,22 @@ function ProfileForm({ id, onSaved }: { id?: string; onSaved: () => void }) {
 }
 
 function SettingsForm() {
-  const [defaultModel, setDefaultModel] = useState("");
-  const [loaded, setLoaded] = useState(false);
-  const [status, setStatus] = useState("");
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [error, setError] = useState("");
   useEffect(() => {
-    client.settings.get().then(
-      (settings) => {
-        setDefaultModel(settings.defaultModel);
-        setLoaded(true);
-      },
-      (e: Error) => setStatus(e.message),
-    );
+    client.settings.get().then(setSettings, (e: Error) => setError(e.message));
   }, []);
-
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    setStatus("");
-    try {
-      await client.settings.update({ defaultModel });
-      setStatus("Saved.");
-    } catch (e) {
-      setStatus((e as Error).message);
-    }
-  }
+  const makeDefault = (defaultProvider: string) => client.settings.update({ defaultProvider }).then(setSettings, (e: Error) => setError(e.message));
 
   return (
     <>
       <Header title="Settings" />
       <main className="flex-1 overflow-y-auto px-4 py-6">
-        <form onSubmit={save} className="mx-auto grid max-w-xl gap-5">
-          <label className={label}>
-            Default model
-            <Input maxLength={200} value={defaultModel} onChange={(e) => setDefaultModel(e.target.value)} disabled={!loaded} placeholder="A model id your endpoint serves" />
-            <span className="font-normal text-muted-foreground">Bots without a model of their own use this one.</span>
-          </label>
-          {status && <p className="text-sm text-muted-foreground">{status}</p>}
-          <div>
-            <Button type="submit" disabled={!loaded}>
-              Save
-            </Button>
-          </div>
-        </form>
+        <div className="mx-auto grid max-w-xl gap-5">
+          {error && <Problem>{error}</Problem>}
+          {settings && <Providers defaultProvider={settings.defaultProvider} onDefault={makeDefault} />}
+          <p className="text-sm text-muted-foreground">New bots start on the default provider, with its default model.</p>
+        </div>
       </main>
     </>
   );
@@ -350,7 +439,7 @@ function SettingsForm() {
 
 const newMessageId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-function Chat({ id, onReply }: { id: string; onReply: () => void }) {
+function Chat({ id, onChange }: { id: string; onChange: () => void }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
@@ -359,6 +448,8 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
   const box = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const { turns, setTurns, connected } = useTurnStream(id, Boolean(profile?.sessionId));
+  // A bot with no provider cannot send: it points to Settings instead of offering the composer.
+  const stuck = !profile || !profile.provider;
 
   // The box starts one line tall and grows with its text up to its max height, where it scrolls.
   useLayoutEffect(() => {
@@ -389,11 +480,13 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
     };
   }, [id]);
 
-  // The server saves each reply's preview for the sidebar, so reload the list as replies finish.
+  // The sidebar shows each bot's latest reply and whether it is busy, so the list is read again once the server has
+  // taken a message, and as replies finish.
   const finished = turns.filter((turn) => turn.done).length;
+  const running = turns.some((turn) => !turn.done);
   useEffect(() => {
-    if (finished) onReply();
-  }, [finished]); // Only the count matters; onReply is a new function on every render.
+    if (finished) onChange();
+  }, [finished]); // Only the count matters; onChange is a new function on every render.
 
   // An unsent turn keeps its files' data, so Retry sends them again.
   async function send(text: string, messageId: string, files: Upload[]) {
@@ -402,6 +495,7 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
     try {
       const { sessionId } = await client.send(id, { text, messageId, files: files.map(({ name, type, data }) => ({ name, type, data })) });
       setProfile((current) => current && { ...current, sessionId });
+      onChange();
     } catch (e) {
       const note = `Not sent: ${(e as Error).message}`;
       setTurns((all) => all.map((t) => (t.messageId === messageId && !t.done ? { ...t, done: true, note, unsent: true } : t)));
@@ -410,7 +504,7 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
 
   function submit(event: { preventDefault(): void }) {
     event.preventDefault();
-    if ((!draft.trim() && !attached.length) || !profile) return;
+    if ((!draft.trim() && !attached.length) || stuck) return;
     send(draft, newMessageId(), attached);
     setDraft("");
     setAttached([]);
@@ -431,7 +525,7 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
   const empty = turns.length === 0;
   return (
     <>
-      <Header title={profile?.name ?? "Chat"}>
+      <Header title={profile?.name ?? "Chat"} lead={profile && <Blob shape={profile.shape} color={profile.color} size={28} follow busy={running} />}>
         <a href={`/profiles/${id}/edit`} onClick={follow} className={buttonVariants({ variant: "ghost" })}>
           Edit
         </a>
@@ -447,17 +541,43 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
           className={`flex min-h-0 flex-1 flex-col ${empty ? "justify-center gap-6 pb-[15dvh]" : ""}`}
           onDragOver={(e) => e.dataTransfer.types.includes("Files") && e.preventDefault()}
           onDrop={(e) => {
-            if (!e.dataTransfer.files.length || !profile) return;
+            if (!e.dataTransfer.files.length || stuck) return;
             e.preventDefault();
             attach([...e.dataTransfer.files]);
           }}
         >
           {empty ? (
-            <h2 className="text-center text-2xl font-semibold">{profile ? `Talk to ${profile.name}` : "Loading…"}</h2>
+            <>
+              {profile?.handoff && (
+                <div className="px-4">
+                  <Handoff text={profile.handoff} />
+                </div>
+              )}
+              {profile && !profile.provider ? (
+                <div className="grid justify-items-center gap-3 px-4 text-center">
+                  <h2 className="text-2xl font-semibold">{profile.name} has no provider</h2>
+                  <p className="text-muted-foreground">Add a provider in Settings, then pick it in the bot's settings.</p>
+                  <div className="flex gap-2">
+                    <a href="/settings" onClick={follow} className={buttonVariants()}>
+                      Settings
+                    </a>
+                    <a href={`/profiles/${id}/edit`} onClick={follow} className={buttonVariants({ variant: "outline" })}>
+                      Edit bot
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid justify-items-center gap-4">
+                  {profile && <Blob shape={profile.shape} color={profile.color} size={112} follow busy={running} />}
+                  <h2 className="text-center text-2xl font-semibold">{profile ? `Talk to ${profile.name}` : "Loading…"}</h2>
+                </div>
+              )}
+            </>
           ) : (
             <MessageScroller className="flex-1">
               <MessageScrollerViewport>
                 <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 py-4">
+                  {profile?.handoff && <Handoff text={profile.handoff} />}
                   {turns.map((turn) => (
                     <TurnView key={turn.messageId} turn={turn} retry={() => send(turn.text, turn.messageId, turn.files ?? [])} />
                   ))}
@@ -475,7 +595,7 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
               )}
               <InputGroupAddon align="inline-start" className="pb-1.5">
                 <input ref={picker} type="file" multiple hidden onChange={(e) => attach([...(e.target.files ?? [])]).then(() => (e.target.value = ""))} />
-                <InputGroupButton size="icon-sm" className="rounded-full" disabled={!profile} aria-label="Attach files" onClick={() => picker.current?.click()}>
+                <InputGroupButton size="icon-sm" className="rounded-full" disabled={stuck} aria-label="Attach files" onClick={() => picker.current?.click()}>
                   <PaperclipIcon />
                 </InputGroupButton>
               </InputGroupAddon>
@@ -484,7 +604,7 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
                 rows={1}
                 aria-label="Message"
                 className="max-h-48 min-h-0 py-3"
-                placeholder={profile ? `Message ${profile.name}` : "Loading…"}
+                placeholder={profile ? (stuck ? "No provider yet" : `Message ${profile.name}`) : "Loading…"}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && submit(e)}
@@ -494,10 +614,10 @@ function Chat({ id, onReply }: { id: string; onReply: () => void }) {
                   if (!e.clipboardData.getData("text/plain")) e.preventDefault();
                   attach([...e.clipboardData.files]);
                 }}
-                disabled={!profile}
+                disabled={stuck}
               />
               <InputGroupAddon align="inline-end" className="pb-1.5">
-                <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" disabled={!profile || (!draft.trim() && !attached.length)} aria-label="Send">
+                <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" disabled={stuck || (!draft.trim() && !attached.length)} aria-label="Send">
                   <ArrowUpIcon />
                 </InputGroupButton>
               </InputGroupAddon>
@@ -588,6 +708,21 @@ function Files({ files, remove, className = "" }: { files: Upload[]; remove?: (i
         ),
       )}
     </AttachmentGroup>
+  );
+}
+
+// The summary a provider switch carried over, folded at the top of the chat it started.
+function Handoff({ text }: { text: string }) {
+  const [first, ...summary] = text.split("\n\n");
+  const from = /moved from (.+) to .+:$/.exec(first)?.[1];
+  return (
+    <Collapsible className="mx-auto w-full max-w-3xl rounded-xl border px-3 py-2 text-sm">
+      <CollapsibleTrigger className="group flex w-full items-center gap-2 font-medium">
+        <ChevronRightIcon className="size-4 transition-transform group-data-[state=open]:rotate-90" />
+        Continued from {from ?? "an earlier chat"}
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-2 whitespace-pre-wrap text-muted-foreground">{summary.join("\n\n")}</CollapsibleContent>
+    </Collapsible>
   );
 }
 
