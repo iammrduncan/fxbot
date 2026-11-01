@@ -3,7 +3,9 @@
 One place for everything the bots' chats hold.
 - **One copy of each file in the whole system,** keyed by the SHA-256 of its bytes. The name plays no part: two different photos named `photo.jpg` are two items.
 - **Tagged with every bot and chat it came from.** When a bot saves bytes the library already holds, from another chat or another bot, the existing item gains a tag for that bot and chat. There is never a second copy.
-- **One screen for all of it.** A Library button next to Settings lists and searches items across every bot. Filters narrow it to one bot or one chat.
+- **Two views of it.**
+  - **The bot's own library** shows in a right panel beside its chat, under the panel's Library tab.
+  - **The full Library page** opens from a bento button next to Settings, ChatGPT style. It lists and searches items across every bot, and a filter narrows it to one.
 
 | Item | Origin | Arrives with |
 | --- | --- | --- |
@@ -129,6 +131,15 @@ These are read from source and docs, as of November 2026. Each path is relative 
   - An item opens the chat that made it.
 - **Claude:** an Artifacts space in the sidebar lists your artifacts ([support page](https://support.claude.com/en/articles/9487310)).
 
+**The owner's target design** (a screenshot of the layout to match)
+- **Left sidebar.**
+  - It holds the bots, as today.
+  - Its bottom row pairs the account with a bento icon button, which opens the full library.
+- **Right panel** beside the chat. Its header is the bot's large blob and name, with a close button.
+  - **Tabs:** Details, Library, and Computer.
+  - **The Library tab** lists the bot's items in two cards, "This week" and "Older". Each row is a small icon or thumbnail and a one-line title, and each card ends in "Show more".
+- **Chat.** A page the bot made shows as a card in its chat, which is [pages](pages.md) work.
+
 **Checked here**
 - **Postgres 17.11, in disposable databases.**
   - **Slices are fast under the default storage.**
@@ -153,6 +164,10 @@ These are read from source and docs, as of November 2026. Each path is relative 
       - Deleting a bot keeps the item, and its tags lose their bot. Deleting a second bot does not collide with the first.
       - Deleting the item deletes its tags.
     - **Search.** "repo" finds `quarterly-report_v2.final.md`, and "q3" finds a document whose text holds `https://example.com/q3-report.pdf`.
+    - **Order.** Listing by each item's newest matching tag works.
+      - Across all bots, an item another bot saved yesterday comes first.
+      - Filtered to one bot, the same item sits at that bot's own save date.
+      - Keyset paging on that date and the id goes on from there.
 - **Safari:** "HTTP servers hosting media files for iOS must support byte-range requests" ([Apple](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/CreatingVideoforSafarioniPhone/CreatingVideoforSafarioniPhone.html)). Video and audio need `Range`; images do not.
 - **GitHub's raw files** (`raw.githubusercontent.com`) are served with:
   - `content-security-policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`, `x-content-type-options: nosniff`, and `x-frame-options: deny`
@@ -167,6 +182,8 @@ These are read from source and docs, as of November 2026. Each path is relative 
   - **Deleting a bot** says "Its conversation files stay on the server": libfx's session files stay, and the Postgres rows cascade.
   - **Names.** `kinds` is already the provider kinds' name in `types.ts`.
   - **The bento icon.** lucide's `LayoutDashboardIcon` is four tiles of uneven height, a bento box.
+  - **The chat header** holds the bot's blob, its name, and an Edit link to `/profiles/:id/edit`.
+  - **Already installed:** shadcn's `sheet` and the `use-mobile` hook, for a right panel on phones.
 
 ## 2. Key takeaways
 
@@ -184,6 +201,9 @@ These are read from source and docs, as of November 2026. Each path is relative 
    - Every item can lead back to its chats, the provenance OpenDuet and OpenDots lose. A list covers every bot unless a filter narrows it.
    - An item outlives its bots: deleting a bot keeps its items, marked as from a removed bot.
    - One SDK call saves and tags, whoever makes the item. Uploads and `library_save` use it now; media generation, voice memos, and pages use it later.
+   - **Two views read one list call:** a bot's panel, with that bot's tags, and the full page, with every bot's.
+     - Both order items by when they were last saved, over the tags the view covers.
+     - So a bot's "This week" means that bot saved the item this week.
 5. **Bots reach the library only through host tools, and only items tagged for their bot,** as `chat_history` keeps to its bot. Items go by reference: the tools return ids and summaries, as fx0's and OpenDuet's do. A bot is tagged onto an item only by saving its exact bytes, so no content crosses from one bot to another.
 6. **Every image block names its item, `sourceRef: "library:<id>"`.** That is the use libfx documents. When libfx cannot send an image, the model gets the reference, and `library_read` returns the copy.
 7. **Search with Postgres full text.**
@@ -237,8 +257,7 @@ create table if not exists library_tags (item_id text not null references librar
   profile_id text references profiles on delete set null, session_id text,
   created_at timestamptz not null default now(), unique (item_id, profile_id, session_id));
 create index if not exists library_tsv on library using gin (tsv);
-create index if not exists library_newest on library (created_at desc, id desc);
-create index if not exists library_tags_bot on library_tags (profile_id, session_id);
+create index if not exists library_tags_bot on library_tags (profile_id, created_at desc);
 ```
 
 - **The unique tag key** has no `nulls not distinct`. Every save has a bot and a session, so a repeat always conflicts. Nulls come only from the move and from deleted bots, where two tags without a bot must not collide.
@@ -282,11 +301,13 @@ select … from item;
 
 `createLibrary(sql)` returns:
 - **`save({ profileId, sessionId, origin, name, type, bytes })`**: checks the item as above, then saves and tags it in one statement. A document's text comes from its bytes. Returns the `LibraryItem`, new or already there. Every maker of items calls this.
-- **`list({ q?, profileId?, sessionId?, kind?, before? })`**: returns `{ items, next }`, 60 items at a time, newest first.
-  - The bot and chat filters are `exists` over `library_tags`. Each listed item carries the bots of its tags, with null for a removed bot.
+- **`list({ q?, profileId?, kind?, before?, limit? })`**: returns `{ items, next }`, 60 items at a time by default, newest saved first. Both views call it: the bot panel with `profileId`, the full page with or without it.
+  - It joins `library_tags`, with the bot filter on the tags, groups by item, and orders by `max(t.created_at)`. That date is the item's `savedAt`: the last time any bot saved it, or with `profileId`, the last time that bot did. The query is the one checked in section 1.
+  - Each item carries the bots of its matching tags, with null for a removed bot.
   - `q` becomes its letters and digits (`/[\p{L}\p{N}]+/gu`, at most 8 words), each as `word:*`, joined with `&`, for `to_tsquery('simple', …)`. Words of letters and digits need no escaping.
-  - `before` is the last item's `createdAt` and `id`, for keyset paging that new items cannot shift.
+  - `before` is the last item's `savedAt` and `id`, compared in `having`, for keyset paging that new items cannot shift.
   - Listings never select `data`. They carry `preview`, the first 200 characters of `text`.
+  - The tags keep their session, though no view filters by it yet. [Past sessions](past-sessions.md) can show one chat's items.
 - **`get(id)`, `file(id)`, `remove(id)`**, plus `upload(name)` for the old URLs. `remove` deletes the one copy and every tag on it.
   - `file` returns the bytes with the item, and serves an `If-None-Match` from the stored hash without reading the bytes.
 
@@ -312,7 +333,7 @@ select … from item;
 
 | Route | SDK call |
 | --- | --- |
-| `GET /api/library?q=&profile=&session=&kind=&before=` | `library.list` |
+| `GET /api/library?q=&profile=&kind=&before=&limit=` | `library.list` |
 | `GET /api/library/:id` | `library.get` |
 | `GET /api/library/:id/file` | `library.file` |
 | `DELETE /api/library/:id` | `library.remove` |
@@ -328,36 +349,55 @@ Both file routes, the new one and the old upload URL, send:
 
 - `types.ts` gains:
   - `itemKinds`
-  - `LibraryItem`: `{ id, kind, origin, name, type, size, profileIds, preview, createdAt, url }`, where `profileIds` lists the bots of its tags, with null for a removed bot
+  - `LibraryItem`: `{ id, kind, origin, name, type, size, profileIds, preview, createdAt, savedAt, url }`, where `profileIds` lists the bots of its matching tags, with null for a removed bot
   - `LibraryQuery`
   - `LibraryPage`: `{ items, next }`
 - `@fxbot/sdk/client` gains `library.list(query)`, `library.get(id)`, and `library.remove(id)`. A file is read through the item's `url`.
 
-### UI (`packages/ui/src/library.tsx`)
+### UI
 
-- **The way in.**
-  - The sidebar footer gets a Library item with `LayoutDashboardIcon`, beside Settings, active on `/library`.
-  - The [herdr button](herdr-screen.md) will join them later.
-- **The screen.**
-  - The header holds `Library`, a search field (250 ms debounce), kind buttons (All, Images, Documents), and a bot select (All bots, then each bot).
-  - With `session` in the address, a "This chat" chip shows, and removes the filter when cleared.
-  - The filters live in the query string, so a chat can link to its own items and Back keeps them.
+**The footer.**
+- The sidebar footer becomes one row: Settings, then at its right a bento icon button (`LayoutDashboardIcon`, labelled "Library").
+- The button opens `/library`, and shows as active there.
+- The [herdr button](herdr-screen.md) joins the row later.
+
+**The bot panel** (`packages/ui/src/bot-panel.tsx`) is a right panel beside a bot's chat.
+- **Opening it.**
+  - The chat header's Edit link becomes a panel button (`PanelRightIcon`).
+  - From `md` up, the panel is a 360-pixel column beside the chat, and the chat narrows. On a phone, it is a `Sheet` from the right.
+  - Whether it is open, and its tab, are kept per browser in `localStorage`.
+- **The header:** the bot's blob at 80 pixels, following the pointer, then its name and a close button.
+- **Tabs:** Details and Library. The design's Computer tab is left out of this phase.
+  - **Details** shows the bot's provider and model, the first lines of its instructions, and Edit, which opens `/profiles/:id/edit`.
+  - **Library** shows this bot's items, from `library.list({ profileId })`.
+    - They sit in two cards: "This week" (saved in the last 7 days) and "Older".
+    - Each row is a 28-pixel thumbnail (the image itself, or the kind's icon), then the name on one line.
+    - A card shows 5 rows. Its "Show more" shows 20 more, loading the next page when the loaded ones run out.
+    - A row opens the preview below.
+    - The list loads again when the bot's turn ends, so a document it saved appears.
+    - With nothing saved, it says: "Nothing saved yet. Files you send <bot>, and documents it saves, show up here."
+
+**The full page** (`packages/ui/src/library.tsx`, at `/library`):
+- **The header.**
+  - It holds `Library`, a search field (250 ms debounce), kind buttons (All, Images, Documents), and a bot select (All bots, then each bot).
+  - The filters live in the query string, so Back keeps them.
 - **The grid.**
   - Even square tiles: `grid-cols-2`, 3 columns from `sm`, 4 from `lg`.
   - An image tile is the image itself, `loading="lazy"` and `object-cover`. A document tile shows `FileTextIcon`, the name, and four lines of its preview.
   - Every tile carries the date and its bots' blobs at 20 pixels: up to three, then "+N". A removed bot shows as a gray circle.
   - A Load more button follows `next`.
-- **The preview.** A tile opens a dialog:
+- **Empty states.** "Nothing in the library yet. Images and files you send, and documents bots save, show up here." A search with no match says so.
+
+**The preview** lives in `library.tsx`, and both views use it. A tile or a row opens a dialog:
   - **The item:** the image, or the document's text (Markdown through Streamdown, other text in `<pre>`).
   - **Where it came from:** "Sent by you" or "Made by a bot", with the date and size, then each bot it is tagged with, linking to its chat (`/profiles/<bot>`). A removed bot shows as "Removed bot", with no link.
   - **Download.**
   - **Delete,** after "Remove <name> from the library, for every bot? The chats it came from keep what the bots saw."
-- **The chat.**
-  - The chat header gets a library link to `/library?profile=<id>&session=<sessionId>`.
-  - A text file in a message opens its item's file.
-  - The bot delete dialog says its library items stay in the library.
-- **Empty states.** "Nothing in the library yet. Images and files you send, and documents bots save, show up here." A search with no match says so.
-- **Components** come from shadcn only.
+**The chat.**
+- A text file in a message opens its item's file.
+- The bot delete dialog says its library items stay in the library.
+
+**Components** come from shadcn only: `sheet`, which is installed, and `tabs`, added with `npx shadcn@latest add tabs`.
 
 ### Where the code goes
 
@@ -367,7 +407,10 @@ Both file routes, the new one and the old upload URL, send:
   - `index.ts`: `send` order, `attach`, the tools on every agent, and `fxbot.library`.
   - `types.ts`, `client.ts`.
 - **`packages/server`:** the four routes and the file headers. The old upload route now reads the library.
-- **`packages/ui`:** `library.tsx`, and in `app.tsx` the route, the footer item, the chat's library link, and text attachment links.
+- **`packages/ui`:**
+  - `library.tsx`: the full page and the preview.
+  - `bot-panel.tsx`: the right panel, with its Details and Library tabs.
+  - `app.tsx`: the route, the footer row, the panel button and its place beside the chat, and text attachment links.
 
 ### Later phases plug in here
 
@@ -398,7 +441,7 @@ Both file routes, the new one and the old upload URL, send:
 
 ### Size
 
-Estimated at about 555 lines. Provider logins was built at 1.75 times its estimate, so expect more.
+Estimated at about 700 lines. Provider logins was built at 1.75 times its estimate, so expect more.
 
 | Part | Estimate |
 | --- | --- |
@@ -407,8 +450,10 @@ Estimated at about 555 lines. Provider logins was built at 1.75 times its estima
 | `index.ts` (`send` order, `attach`, API) | +25 |
 | `types.ts`, `client.ts` | +30 |
 | Server (four routes, file headers, 304) | +35 |
-| `library.tsx` | 230 |
-| `app.tsx` (route, footer, chat links) | +20 |
+| `library.tsx` (full page, preview) | 220 |
+| `bot-panel.tsx` (panel, Details, Library tab) | 140 |
+| `app.tsx` (route, footer row, panel beside the chat) | +30 |
+| `components/ui/tabs.tsx` | added by shadcn, not counted |
 
 ## 4. Checklist
 
@@ -438,7 +483,8 @@ They never use a real account or key.
 **M3. Search and listing**
 - [ ] "repo" finds `quarterly-report_v2.final.md`, and "café" finds `café-crème.md`.
 - [ ] A word in a document's text finds the document, and a word in an image's name finds the image.
-- [ ] With no filter the list covers every bot, newest first, each item once. `profile`, `session`, and `kind` narrow it, and an item tagged for two bots shows under both.
+- [ ] With no filter the list covers every bot, each item once, newest saved first. `profile` and `kind` narrow it, and an item tagged for two bots shows under both.
+- [ ] Filtered to one bot, items order by that bot's own saves: an old item the bot saves again today comes first in its list.
 - [ ] Paging with `before` neither repeats nor skips an item while new ones arrive.
 - [ ] A 2 MB document of distinct words saves, and its first 200,000 characters are searchable.
 - [ ] No listing response holds file bytes.
@@ -459,9 +505,14 @@ They never use a real account or key.
 - [ ] A deleted item is 404 on both routes, and leaves an open chat's image on reload.
 
 **M6. UI** (Playwright against the mocks)
-- [ ] Library sits next to Settings with the bento icon, and opens `/library`.
+- [ ] The bento button sits beside Settings in the footer row, and opens `/library`.
 - [ ] The grid shows images and documents from two bots. Search, kind, and bot narrow it, and Load more pages on.
-- [ ] A chat's library link opens the library narrowed to that chat.
+- [ ] The bot panel:
+  - The chat's panel button opens it beside the chat on a desktop width, and as a sheet at 390 pixels. It stays open across reloads.
+  - Details shows the provider and model, and Edit opens the bot's settings.
+  - Library lists only this bot's items, in "This week" and "Older", and Show more reveals more.
+  - A document the bot saves during a turn appears once the turn ends.
+  - A row opens the same preview as the full page.
 - [ ] A tile's preview offers Download, a link to each of its bots' chats, and Delete, and Delete removes the tile.
 - [ ] An item tagged for two bots shows both blobs, and its preview links to both chats. A deleted bot's tag shows as "Removed bot", with no link.
 - [ ] At 390 pixels wide the grid is two columns, with no sideways scroll.
@@ -485,7 +536,8 @@ They never use a real account or key.
 - Server-made thumbnails.
 - Search by meaning.
 - Cards in the chat for items a bot saves.
-- Opening an item's own older session.
+- Opening an item's own older session, and a filter for one chat's items.
+- The design's Computer tab, and its share button in the panel.
 
 ## 5. Decisions
 
@@ -499,6 +551,8 @@ Answered on 2026-11-01.
 | What is one item? | One file, by the SHA-256 of its bytes, across the whole system. The same bytes saved again, from any chat or bot, under any name, tag the existing item. |
 | What does the grid look like? | Even square tiles |
 | Tags? | The bot and its chat, set by saves. Nothing more this phase. |
+| Where does one bot's library show? | In a right panel beside its chat, on the panel's Library tab. The bento button next to Settings opens the full page across every bot, ChatGPT style. |
 
 Still open:
 - Whether a later save's name should be kept beside the first one, so each bot sees the name its own chat gave the file. The plan keeps only the first name.
+- What else belongs on the panel's Details tab. The plan shows the provider, the model, and the start of the instructions, with Edit opening today's settings page, and does not move that form into the panel.
