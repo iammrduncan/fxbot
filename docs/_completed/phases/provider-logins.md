@@ -323,6 +323,7 @@ What the build found or changed, checked against libfx 0.0.16 and the mocks:
 - **Images and `supportsVision`.** libfx refuses an image for a model marked `supportsVision: false` when the turn opens, not at send. The turn ends with "Image prompts are unavailable for the selected model", and nothing reaches the server.
 - **The Vercel model list** goes through libfx's `listModels` with the account's `fetch`, instead of a direct call with `?teamId=`. Until a team is picked, it says so.
 - **`chat_history`** leaves out the message that started the turn: that message is the search itself.
+- **Earlier chats stay readable.** After a switch the stream holds only the new session, and the old one may not open again: its provider can be gone. Fixed after the build: `profiles.earlier(id)` (`GET /api/profiles/:id/earlier`) reads the bot's other sessions from `messages`, with the files their messages sent, and the chat shows them above the handoff. The bot still sees only the summary and `chat_history`.
 - **Engine turns** report only a stop reason; a failed request rejects instead.
 - **`FXBOT_PORT`** lets a check run a server beside a running one.
 - **OpenCode requests.** libfx's custom providers send no session id, and only `credentials()` learns a request's session.
