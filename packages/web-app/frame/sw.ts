@@ -65,6 +65,9 @@ async function inlineSandboxed(html: string, base: URL, l: Line, outer: string |
 
 async function handle(request: Request): Promise<Response> {
   const url = new URL(request.url);
+  // A page of fxbot's only ever loads by GET. Another site that knew this frame's name could send the browser here
+  // with a form, and its POST would reach fxbot through the open connection; so a page load that isn't a GET stops here.
+  if (request.mode === "navigate" && request.method !== "GET" && request.method !== "HEAD") return new Response("Not here.", { status: 405 });
   const asset = request.method === "GET" && url.pathname.startsWith("/assets/");
   if (asset) {
     const kept = await caches.match(request);
@@ -97,6 +100,12 @@ async function handle(request: Request): Promise<Response> {
       }
       body = text;
       headers.delete("content-length");
+    }
+    if (type.startsWith("text/html")) {
+      // Only the app, and the frame itself, may frame fxbot's pages, and a link out doesn't tell the site this frame's name.
+      const policy = headers.get("content-security-policy");
+      if (!policy || !/frame-ancestors/.test(policy)) headers.set("content-security-policy", [policy, `frame-ancestors 'self' ${SHELL}`].filter(Boolean).join("; "));
+      headers.set("referrer-policy", "same-origin");
     }
     res = new Response(body, { status: res.status, statusText: res.statusText, headers });
   }
