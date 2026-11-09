@@ -1,13 +1,13 @@
 ---
 title: "Your first fxbot"
-description: "In this tutorial you install fxbot on a Debian or Ubuntu machine, open it on your phone, and chat with a bot you made."
+description: "In this tutorial you install fxbot on a Linux machine, open it on your phone, and chat with a bot you made."
 ---
 
-In this tutorial you install fxbot on a Debian or Ubuntu machine, open it on your phone, and chat with a bot you made.
+In this tutorial you install fxbot on a Linux machine, open it on your phone, and chat with a bot you made.
 
 You need:
 
-- a Debian or Ubuntu machine, or one on a distro built on them, with systemd, where you can use `sudo`
+- a Linux machine with systemd, where you can use `sudo`: Debian 12 or 13, Ubuntu 22.04 or 24.04, Fedora, AlmaLinux 9 or 10, openSUSE Tumbleweed or Leap 16, Arch, or a distro built on one of them. It needs an x86_64 or arm64 CPU, 3 GB free in `/var/lib`, and 1 GB of memory free, more for each bot's computer. On a Mac or on Windows, use a Linux machine, or a Linux VM.
 - [Tailscale](https://tailscale.com/download) on that machine and on your phone, in the same tailnet, with [HTTPS turned on](https://tailscale.com/kb/1153/enabling-https). This tutorial uses it to reach fxbot from your phone, the recommended way; fxbot itself doesn't need it.
 - an account to sign in with, such as a ChatGPT plan or OpenRouter, or a key from a provider such as OpenAI or Groq
 
@@ -19,12 +19,14 @@ On the machine, run:
 curl -fsSL https://fxbot.sh/setup.sh | sudo bash
 ```
 
-The script names each step in bold as it goes: the container engine, the fxbot user and its key, the release, and the services. fxbot runs as three containers: the app, its database, and the local embedder for memory search. The script uses podman, or docker when only docker is installed. With neither, it installs podman, or docker where the distro's podman is too old. Downloading the three images can take a few minutes, and the embedder downloads its model, 310 MB, on its first start. It ends with:
+The script checks the machine first, and stops with what to do if it can't install there ([Fix an install that stopped](/docs/how-to/fix-an-install/)). Then it names each step in bold as it goes: the container engine, Compose, the fxbot user and its key, the release, the images, and the services. fxbot runs as three containers: the app, its database, and the local embedder for memory search. The script uses the engine that's there, a Docker that's running or podman, and with neither, it installs podman, or Docker's own `docker-ce` where the distro's podman is too old. Downloading the three images can take a few minutes, with their progress shown, and the embedder downloads its model, 310 MB, on its first start. It ends with:
 
 ```
 fxbot <version> runs on http://127.0.0.1:8787
-Open it there. From your other devices, Tailscale is the simplest way in:  tailscale serve --bg 8787
-Settings shows each new release, with an Update button. Or: sudo fxbot update
+Open it there, or reach it:
+  from your computer, over SSH:  ssh -N -L 8787:127.0.0.1:8787 <you>@<this machine>
+  from your phone, with Tailscale:  sudo tailscale serve --bg 8787
+Settings shows each new release, with an Update button. To uninstall: sudo fxbot uninstall
 ```
 
 Ask it whether it is up:

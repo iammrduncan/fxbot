@@ -51,6 +51,24 @@ You need Node 22.18 or newer, and podman or docker for the checkout's database a
 
 An app installed from the development address is the development page: every change shows up as it lands, but it can't open while `npm run dev` is down. `npm run prod` and `npm run server` default to port 8787, so give them another with `FXBOT_PORT`.
 
+## Take the checkout away
+
+The release stays as it is. In the checkout:
+
+```sh
+podman compose -f deploy/compose.dev.yaml --env-file .env down --volumes    # its database and the embedder's model
+sudo rm -rf /etc/fxbot-dev
+rm .env
+```
+
+If you set up the computer for the checkout, take it away too, with the script that set it up:
+
+```sh
+sudo bash plugins/computer/host/setup.sh --user "$USER" --remove
+```
+
+It removes the release's computer as well when they share the user `fxbot-computer`, so name the checkout's own with `--name` if you gave it one.
+
 ## A checkout from before 0.3
 
 Before 0.3, a checkout's `fxbot_dev` database was on the machine's own Postgres. To move it into the container:

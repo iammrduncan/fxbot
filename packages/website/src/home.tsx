@@ -73,7 +73,7 @@ const features: { shape: string; color: string; title: string; link: string; bod
 ];
 
 const steps: { title: string; command?: string; body: ReactNode }[] = [
-  { title: "Install it", command: installCommand, body: <>On Debian or Ubuntu. It runs fxbot and its database as containers, with podman or docker, as a service on 127.0.0.1:8787.</> },
+  { title: "Install it", command: installCommand, body: <>On Linux: Debian, Ubuntu, Fedora, AlmaLinux, openSUSE, or Arch. It runs fxbot and its database as containers, with podman or docker, as a service on 127.0.0.1:8787.</> },
   {
     title: "Open it",
     command: "sudo tailscale serve --bg 8787",
@@ -166,7 +166,7 @@ export function Home() {
                 {" · "}
               </>
             )}
-            Debian and Ubuntu · Apache-2.0
+            Linux · Apache-2.0
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <a href={href("/docs/")} className={cn(buttonVariants({ size: "lg" }), "px-4")}>
@@ -236,8 +236,8 @@ export function Home() {
           </div>
           <dl className="grid content-start gap-px overflow-hidden rounded-xl border bg-border text-sm">
             {[
-              ["Machine", "Debian or Ubuntu, with systemd"],
-              ["Runtime", "podman or docker, which setup.sh installs (podman) when neither is there"],
+              ["Machine", "Debian, Ubuntu, Fedora, AlmaLinux, openSUSE, or Arch, with systemd"],
+              ["Runtime", "podman or docker, which setup.sh installs when neither is there"],
               ["Records", "Postgres with pgvector, in a container, with every key and token sealed"],
               ["Agents", "libfx, one agent per provider"],
               ["Network", "127.0.0.1:8787; from other devices, Tailscale (recommended) or a proxy of your own"],

@@ -26,20 +26,21 @@ before you run it, and stop to ask the person when a step needs their choice or 
 
 fxbot needs:
 
-- Debian, Ubuntu, or a distro built on them, with systemd, on x86_64 or arm64. It doesn't run on
-  macOS or Windows. If that is what you are on, ask the person which Linux machine to use, such as
-  a home server or a small VPS, and how you can reach it.
+- Linux with systemd, on x86_64 or arm64, with apt, dnf, zypper, or pacman: Debian, Ubuntu,
+  Fedora, AlmaLinux and the other RHEL rebuilds, openSUSE, Arch, or a distro built on one of them.
+  It doesn't run on macOS or Windows. If that is what you are on, ask the person which Linux
+  machine to use, such as a home server or a small VPS, and how you can reach it.
 - curl, an internet connection, and sudo. In a root shell with no sudo, leave `sudo` out below.
-- About 1 GB of available memory (the `available` column of `free -h`) and 5 GB of free disk. Its
-  images and a model take about 2 GB.
-- Port 8787 free.
+- About 1 GB of available memory (the `available` column of `free -h`) and 3 GB free in /var/lib.
+  Its images and a model take about 2 GB.
+- Port 8787 free, or another one for it: `setup.sh` takes `FXBOT_PORT`.
 
 ```sh
 cat /etc/os-release
 uname -m
 ps -p 1 -o comm=
 free -h
-df -h /
+df -h /var/lib
 ss -ltn 'sport = :8787'
 command -v sudo curl
 command -v fxbot
@@ -48,16 +49,20 @@ command -v fxbot
 `ps` prints `systemd`. `ss` prints only its header when the port is free. If `command -v fxbot`
 prints a path, fxbot is installed already: tell the person, and go to step 4.
 
-If something is missing, tell the person what, and stop.
+If something is missing, tell the person what, and stop. `setup.sh` checks these too, and stops
+before it changes anything.
 
 ## 2. Tell the person what will change
 
 Read the script: https://fxbot.sh/setup.sh. Then tell the person that it:
 
-- uses podman 4 or newer, or docker, if the machine has one. With neither, it installs podman, or
-  docker where the distro's podman is older than 4. It also installs a Compose new enough, if the
-  machine's isn't.
-- on podman, installs netavark, aardvark-dns, and nftables, and turns on `podman.socket`.
+- uses the engine the machine has: a Docker that's running, or podman 4 or newer, or a Docker
+  that's installed. With neither, it installs podman from the distro, or Docker's own docker-ce,
+  from Docker's repository, where the distro's podman is older than 4.9. It also installs a
+  Compose new enough, if the machine's isn't. It lists each package it installs in
+  /etc/fxbot/packages.
+- on podman, installs netavark, aardvark-dns, and nftables, and turns on `podman.socket`. With ufw
+  active, it lets DNS in on podman's network, and with firewalld, turns on netavark's reload unit.
 - adds an `fxbot` user, and a key in /etc/fxbot that only that user reads.
 - puts fxbot in /opt/fxbot and its data in /var/lib/fxbot, and adds the `fxbot` command.
 - adds `fxbot.service`, which runs fxbot as three containers, from boot, on 127.0.0.1:8787, and
@@ -77,8 +82,9 @@ carry on when it's done.
 It names each step as it goes, and can take several minutes while it downloads, so let it finish.
 Near its end it prints `fxbot <version> runs on http://127.0.0.1:8787`.
 
-If it stops, it says why, after `fxbot setup stopped:`. Fix what it names, asking first if the fix
-changes the machine, then run the command again. Running it again finishes an install that
+If it stops, it says why, after `fxbot setup stopped:`. Each line and its fix are in
+https://fxbot.sh/docs/how-to/fix-an-install/. Fix what it names, asking first if the fix changes
+the machine, then run the command again. Running it again finishes an install that
 stopped, and leaves a working one alone.
 
 ## 4. Check that it runs
@@ -97,10 +103,10 @@ until it answers, so it needn't be ready for you to go on.
 If fxbot doesn't answer, read its log, and tell the person what it says:
 
 ```sh
-sudo fxbot compose logs --tail 50 fxbot
+sudo fxbot logs fxbot
 ```
 
-`sudo fxbot logs` follows the log and doesn't exit, so don't use it here.
+Piped or run without a terminal, it prints the last 100 lines and ends.
 
 ## 5. Ask how the person will reach it
 
@@ -139,4 +145,18 @@ Then tell them what you did: the version, the address, and what the machine now 
 - **Updates:** Settings shows each new release, with an Update button. Or `sudo fxbot update`.
 - **Plugins:** https://fxbot.sh/plugins/
 - **Commands:** https://fxbot.sh/docs/reference/commands/
+- **Backups:** `sudo fxbot backup`, and https://fxbot.sh/docs/how-to/back-up/
 - **Help:** the Hackers in the Loop community on Discord, https://discord.gg/3Qs2uejUf9
+
+## Uninstall
+
+Only when the person asks for it. Tell them what it removes and keeps, from
+https://fxbot.sh/docs/how-to/uninstall/, and ask for their yes. Then:
+
+```sh
+sudo fxbot uninstall --yes
+```
+
+It keeps a backup, the key, and the `fxbot` user, so fxbot can be installed again on them. With
+`--purge`, it keeps nothing: ask for a second, clear yes before you add it. It names the packages
+`setup.sh` installed, and leaves them: removing them is the person's choice.

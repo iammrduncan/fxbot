@@ -13,7 +13,7 @@ fxbot as one download per OS that brings everything it needs. The owner doesn't 
   - **The app is the install the site offers first,** for fxbot on the owner's own computer. The desktop app takes its place once it's built.
   - **The container release is for hosting:** an fxbot that's always on, reached from the owner's other devices, and not tied to a laptop or a desktop.
 
-Status: planned on 2026-11-08, for a release after 0.8.0, not built. It builds on 0.8.0's [operations](operations.md): the computer on every engine, `fxbot backup`, and `fxbot uninstall`. The owner's decisions on the plan are under **What the owner asked**. Its Mac part comes first, as [Mac support](mac-support.md) (2026-11-09), which pins Lima 2.2.1 and finds the Intel Mac's floor, below. Researched the same day:
+Status: planned on 2026-11-08, for a release after 0.8.0, not built. It builds on 0.8.0's [operations](../_completed/phases/operations.md): the computer on every engine, `fxbot backup`, and `fxbot uninstall`. The owner's decisions on the plan are under **What the owner asked**. Its Mac part comes first, as [Mac support](mac-support.md) (2026-11-09), which pins Lima 2.2.1 and finds the Intel Mac's floor, below. Researched the same day:
 - against the research directive's references
 - against desktop apps that bring their own database, embedder, or VM: OpenBot's desktop app, Jan, Open WebUI Desktop, Docker Desktop, Podman Desktop, Rancher Desktop, and Claude Desktop
 - against the docs, releases, and source of PGlite, embedded-postgres, the theseus-rs Postgres builds, Node's single executables, Bun, Electron, Lima, vfkit, libkrun, WSL, and llama.cpp

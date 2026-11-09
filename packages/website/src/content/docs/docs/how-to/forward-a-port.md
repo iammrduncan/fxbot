@@ -40,7 +40,13 @@ services:
     ports: [ "8790-8799:8790-8799/udp" ]
 ```
 
-If the file is there already, the computer plugin wrote it, and its first line says so. Add the `ports` line under `fxbot:` in it: setting the computer up again writes the file again, so add it again after that. Then run `sudo fxbot up`, which starts the app again with the ports published.
+The file is yours: nothing else writes over it. The computer keeps its own lines in `compose.computer.yaml`. Then run `sudo fxbot up`, which starts the app again with the ports published.
+
+With ufw active, let the range through to the container too, since ufw drops what the machine forwards:
+
+```sh
+sudo ufw route allow proto udp to any port 8790:8799
+```
 
 Then forward the same ports on the router, by hand: fxbot can't find the router from inside its container.
 

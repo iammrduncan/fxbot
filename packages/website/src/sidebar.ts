@@ -48,6 +48,8 @@ export const topics: Topic[] = [
           { slug: "how-to/update", label: "Update to a new release" },
           { slug: "how-to/go-back", label: "Go back to an earlier release" },
           { slug: "how-to/back-up", label: "Back up fxbot" },
+          { slug: "how-to/fix-an-install", label: "Fix an install that stopped" },
+          { slug: "how-to/uninstall", label: "Uninstall fxbot" },
           { slug: "how-to/checkout-beside-release", label: "Run a checkout beside a release" },
           { slug: "how-to/cut-a-release", label: "Cut a release" },
         ],
