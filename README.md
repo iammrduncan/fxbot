@@ -69,6 +69,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Web search](docs/phases/web-search.md) (plugin): bots search and read the web, and cite it
 - [ ] [Vault](docs/phases/vault.md) (plugin): saved secrets and details bots use when allowed
 - [ ] [1Password](docs/phases/1password.md) (plugin): bots use stored logins and items from 1Password
+- [ ] [Local access](docs/phases/plugin-local-access.md) (plugin): bots reach folders the owner picks on the machine itself, off until the owner turns it on
 - [ ] [Image and video generation](docs/phases/media-generation.md) (plugin): bots create images and video
 - [ ] [Voice memos](docs/phases/voice-memos.md) (plugin): send a bot a recorded voice memo
 - [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): talk with a bot by voice, in the app or over a phone line

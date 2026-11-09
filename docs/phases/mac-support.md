@@ -45,7 +45,7 @@ Read from the code on 2026-11-09:
 - **Lima forwards a socket:** a guest's Unix socket to a path on the Mac (`portForwards: guestSocket/hostSocket`), as Distribution's VM uses.
 - **What fxbot on the Mac saves:** with no computer, there's no VM at all, and the app, its database, and its embedder hold about 500 MB. With fxbot in a VM, the VM runs whenever fxbot does, at up to 4 GiB, and macOS doesn't get back the memory a VM frees until it stops (Distribution). Memory search runs on Metal on Apple silicon, and web pairing sees the Mac's own network, as it does on a checkout.
 - **What it costs:** a second kind of release, the one Distribution plans, with an archive for each CPU, a launcher, a LaunchAgent, and updates of its own. fxbot in a VM is the Linux release as it is.
-- **Where plugins run:** on the Mac, the app and each plugin's server code run as the owner, with what the owner's account can reach. In a VM, they run inside the VM and the app's container.
+- **Bots never act on the Mac itself.** By design ([Bots and the owner's machine](../../CONVENTIONS.md#bots-and-the-owners-machine)), a bot's tools work on fxbot's own data, and files and commands happen on the computer, in the VM. The Mac's own folders are a bot's only through the [local access](plugin-local-access.md) plugin, which the owner adds and turns on. Read from the code on 2026-11-09, this holds already: libfx turns on none of fx's own shell or file tools (its README's security notes); core's tools work on the library, memories, history, and skills in fxbot's database; MCP servers are reached over HTTP, and this machine's and private addresses are refused unless the owner allows them (`packages/sdk/src/mcp.ts:79-105`); and fxbot's own plugins read no file and run no command for a bot. A plugin's own code runs in fxbot's process: on a Mac, as the owner's account; on Linux, in the app's container.
 
 ### Linux on a Mac
 
@@ -103,7 +103,7 @@ What this phase found that Distribution's Mac part needs:
 
 1. **Only the computer needs Linux.** fxbot runs on macOS, and what ties the release to Linux is its packaging.
 2. **One socket is all the computer's VM shares with the Mac,** so an fxbot on the Mac uses it as one on Linux uses a rootless engine.
-3. **So fxbot runs on the Mac, and the VM is the computer's alone:** nothing to run until the computer is added, memory search on Metal, web pairing on the Mac's own network, and the plan Distribution made for every OS. It's the owner's own reading too.
+3. **So fxbot runs on the Mac, and the VM is the computer's alone:** nothing to run until the computer is added, memory search on Metal, web pairing on the Mac's own network, and the plan Distribution made for every OS. It's the owner's own reading too. And since bots never act on the machine, a bot reaches nothing of the Mac's but through the computer's VM, or the local access plugin, when the owner turns it on.
 4. **Building fxbot-in-a-VM first would build the Mac twice:** a VM install now, Distribution's later, and a move between them. It stays [the other way](#the-other-way-fxbot-in-a-vm), for a Mac sooner, with no new release to build.
 5. **The Mac first:** the `darwin` archives, the launcher's Mac parts, and the computer's VM, ahead of Linux's and Windows' archives, as a release of their own.
 6. **Lima 2.2.1, from its own archive, as the owner, with nothing of the Mac's mounted.**

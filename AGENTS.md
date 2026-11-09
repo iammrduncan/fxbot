@@ -22,6 +22,7 @@ Later ideas live as one-page stubs in [docs/phases/](docs/phases/). Build one on
 - A schema change is a new numbered file in `packages/sdk/src/migrations/`. Never edit or remove one that has shipped in a release. Note it under `## Unreleased` in `CHANGELOG.md`, for the release's Before upgrading list.
 - The stack is Vite, React, shadcn/ui, and a tiny Node server around libfx. Do not add Next.js, the Vercel AI SDK, a second agent runtime, or Hermes Agent.
 - Agent logic, storage, and input checks belong in `@fxbot/sdk`. The server only adds HTTP. The UI imports only `@fxbot/sdk/client`, never the SDK's main entry.
+- A bot's tools never act on the owner's machine: no file outside fxbot's own data, and no command there. Files and commands go through the computer plugin, and the machine's own folders only through the local access plugin, off by default ([Bots and the owner's machine](CONVENTIONS.md#bots-and-the-owners-machine)).
 - Never put a secret in the page or in `@fxbot/sdk/client`. Keys and tokens live only on the server, sealed in Postgres by the SDK. The page sends a key once and never receives one. Vite reads no `.env`.
 - libfx behavior comes from the installed package or the published docs. Say what you could not verify.
 - This is a public repo. Do not add private hostnames, machine names, personal subscriptions, home-directory paths, or private project names.

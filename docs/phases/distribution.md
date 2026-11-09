@@ -3,7 +3,7 @@
 fxbot as one download per OS that brings everything it needs. The owner doesn't install Docker, podman, Postgres, or Node first:
 - **One download for each OS and CPU:** Linux, macOS, and Windows, on x64 and arm64. Each holds Node, fxbot, Postgres 17 with pgvector, and llama.cpp's embedder, in one folder. It runs as the owner, from the owner's own folders, with no admin rights.
 - **A small `fxbot` command starts and stops the parts.** It also carries out what the app asks of the machine, as `deploy/fxbot` does for a release install today: updates with a backup and a way back, the embedder, and the computer. It speaks the same control folder, so the app hardly changes.
-- **Plugins run as they do today,** inside fxbot's own process, from their folders. Nothing about them changes.
+- **Plugins run as they do today,** inside fxbot's own process, from their folders. Nothing about them changes. Bots never act on the machine itself: their files and commands are the computer's, and the machine's own folders only the [local access](plugin-local-access.md) plugin's, off by default ([Bots and the owner's machine](../../CONVENTIONS.md#bots-and-the-owners-machine)).
 - **The computer brings its own Linux machine:**
   - On a Mac, a VM that the app starts, with no admin prompt.
   - On Windows, a WSL2 distro of its own, with one admin prompt and a restart, only when WSL is off.
