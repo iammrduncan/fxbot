@@ -60,6 +60,7 @@ export const topics: Topic[] = [
           { slug: "providers/chatgpt", label: "ChatGPT and Codex plans" },
           { slug: "providers/grok", label: "Grok plans" },
           { slug: "providers/openrouter", label: "OpenRouter" },
+          { slug: "providers/anyrouter", label: "AnyRouter" },
           { slug: "providers/huggingface", label: "Hugging Face" },
           { slug: "providers/orcarouter", label: "OrcaRouter" },
           { slug: "providers/nous", label: "Nous Portal" },

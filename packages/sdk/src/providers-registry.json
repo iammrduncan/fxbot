@@ -123,6 +123,19 @@
       "docs": "/docs/providers/openrouter/"
     },
     {
+      "id": "anyrouter",
+      "name": "AnyRouter",
+      "about": "Models from many providers through one OpenAI-compatible API",
+      "group": "key",
+      "order": 65,
+      "connect": "key",
+      "baseUrl": "https://anyrouter.dev/api/v1",
+      "keyPage": "https://anyrouter.dev/dashboard/keys",
+      "steps": ["Create an inference API key and copy it. The key starts with sk-ar-v1-."],
+      "keyCheck": "https://anyrouter.dev/api/v1/auth/key",
+      "docs": "/docs/providers/anyrouter/"
+    },
+    {
       "id": "zai",
       "name": "Z.ai",
       "about": "GLM models, from Z.ai's own API",

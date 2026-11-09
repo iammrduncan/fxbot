@@ -6,6 +6,7 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 **Before upgrading.** Migration `0014_provider_fields` adds `fields` and `model_ids` columns to `providers`, for a provider's region or account and the models you type for it. Every provider you have carries on as it is.
 
+- **AnyRouter.** Add an inference key to use its models, with key validation and a setup guide. Model lists omit entries that declare non-text output, such as embeddings.
 - **A new page for adding a provider.** **Add provider**, in **Settings** › **Providers**, opens a page of providers, each with its logo, sign-ins first, then keys, clouds, and servers on your own machine, with a search over about 200 providers. First-run setup shows the same page, sign-ins first.
 - **Sign in to OpenRouter and OrcaRouter, with nothing to paste.** OpenRouter's sign-in comes back to fxbot's own page, or shows a code to paste where it can't. OrcaRouter's is a device code. Each makes a key on your account, which fxbot keeps sealed. Hugging Face signs in by device code too, through fxbot's own app there.
 - **A device code shows a QR of its link,** and buttons to copy the code and the link, for an account that lives on your phone.
