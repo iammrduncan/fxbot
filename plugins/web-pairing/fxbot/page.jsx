@@ -105,7 +105,7 @@ function Devices({ state, refresh }) {
             <span className="grid min-w-0 flex-1 gap-0.5">
               <span className="truncate font-medium">{d.name}</span>
               <span className="text-xs text-muted-foreground">
-                {[d.platform, `paired ${ago(d.pairedAt)} by ${d.how}, approved on ${d.pairedBy}`, `seen ${ago(d.lastSeen)}`].filter(Boolean).join(" · ")}
+                {[d.platform, d.connected && (d.route ? `connected ${d.route}` : "connected"), `paired ${ago(d.pairedAt)} by ${d.how}, approved on ${d.pairedBy}`, `seen ${ago(d.lastSeen)}`].filter(Boolean).join(" · ")}
               </span>
             </span>
             <Button size="sm" variant="ghost" onClick={() => { const name = prompt("Name this device", d.name); if (name) act(call(`devices/${d.id}`, { method: "PATCH", body: { name } })); }}>Rename</Button>

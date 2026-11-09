@@ -2736,6 +2736,7 @@ function Devices({ state, refresh }) {
 							className: "text-xs text-muted-foreground",
 							children: [
 								d.platform,
+								d.connected && (d.route ? `connected ${d.route}` : "connected"),
 								`paired ${ago(d.pairedAt)} by ${d.how}, approved on ${d.pairedBy}`,
 								`seen ${ago(d.lastSeen)}`
 							].filter(Boolean).join(" · ")

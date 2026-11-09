@@ -44,13 +44,29 @@ type Ticket = {
   call?: Call;
   timer: ReturnType<typeof setTimeout>;
 };
-type Conn = { pc: RTCPeerConnection; device: string; control?: RTCDataChannel; ready: boolean; connected: boolean };
+type Conn = { pc: RTCPeerConnection; device: string; control?: RTCDataChannel; ready: boolean; connected: boolean; route?: string; since?: number };
 
 const TICKET_MS = 10 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const refused = (text: string, status = 400) => Response.json({ error: text }, { status });
+const tailnet = (ip: string) => /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip) || /^fd7a:115c:a1e0:/i.test(ip);
+// Which way a connection went, from the candidate pair werift chose.
+function routeOf(pc: RTCPeerConnection) {
+  try {
+    const pair = (pc.iceTransports[0] as any)?.connection?.nominated;
+    if (!pair) return "";
+    const [local, remote] = [pair.localCandidate, pair.remoteCandidate];
+    if (local.type === "relay" || remote.type === "relay") return "through a TURN server";
+    if (tailnet(local.host) && tailnet(remote.host)) return "over Tailscale";
+    if (local.type === "host" && remote.type === "host" && !/\.local$/.test(remote.host)) return "on the same network";
+    return "directly, across the internet";
+  } catch {
+    return "";
+  }
+}
+const lasted = (ms: number) => (ms < 90_000 ? `${Math.round(ms / 1000)} seconds` : ms < 5_400_000 ? `${Math.round(ms / 60_000)} minutes` : `${(ms / 3_600_000).toFixed(1)} hours`);
 
 export default async function webPairing(fx: PluginApi) {
   // --- Keys, made once and sealed: I, the Noise static key, and L, for listening at the relay.
@@ -441,21 +457,38 @@ export default async function webPairing(fx: PluginApi) {
     conns.add(conn);
     const hash = hs.hash;
     const waiting: RTCDataChannel[] = [];
+    const started = Date.now();
     // The device gives up at 15 seconds; an attempt that never connects ends soon after.
-    let dropTimer = setTimeout(() => pc.close(), 20_000);
+    let dropTimer = setTimeout(() => {
+      if (!conn.connected) fx.log(`${device.name} found no path to this fxbot in 20 seconds.`);
+      pc.close();
+    }, 20_000);
+    let ended = false;
     pc.connectionStateChange.subscribe((state) => {
       if (state === "connected") {
-        conn.connected = true;
         clearTimeout(dropTimer);
         end(c, 1000);
+        const back = conn.connected;
+        conn.connected = true;
+        conn.route = routeOf(pc);
+        if (back) fx.log(`${device.name}'s connection came back.`);
+        else {
+          conn.since = Date.now();
+          fx.log(`${device.name} connected${conn.route ? ` ${conn.route}` : ""}, in ${((Date.now() - started) / 1000).toFixed(1)} seconds.`);
+        }
       }
       if (state === "failed" || state === "closed") {
         clearTimeout(dropTimer);
         conns.delete(conn);
         end(c);
         if (state === "failed") pc.close();
+        if (conn.since && !ended) fx.log(`${device.name} disconnected after ${lasted(Date.now() - conn.since)}${state === "failed" ? ": its path stopped answering" : ""}.`);
+        ended = true;
       }
-      if (state === "disconnected") dropTimer = setTimeout(() => pc.close(), 30_000);
+      if (state === "disconnected") {
+        if (conn.connected) fx.log(`${device.name}'s connection went quiet; it has 30 seconds to come back.`);
+        dropTimer = setTimeout(() => pc.close(), 30_000);
+      }
     });
     // The control channel, which fxbot makes, so the browser answers and is the DTLS client: the order werift works
     // with on every browser. Each side's first message on it proves it's the end of this handshake.
@@ -562,7 +595,7 @@ export default async function webPairing(fx: PluginApi) {
     if (m.op === "cancel") return (failTicket(t, "Cancelled."), view(t));
     throw new Error("Not something a device can ask.");
   }
-  const listed = (d: Device, you: string | null) => ({ id: d.id, name: d.name, platform: d.platform, pairedAt: d.paired_at, pairedBy: d.paired_by, how: d.how, lastSeen: d.last_seen, you: d.id === you, connected: [...conns].some((c) => c.device === d.id && c.ready) });
+  const listed = (d: Device, you: string | null) => ({ id: d.id, name: d.name, platform: d.platform, pairedAt: d.paired_at, pairedBy: d.paired_by, how: d.how, lastSeen: d.last_seen, you: d.id === you, connected: [...conns].some((c) => c.device === d.id && c.ready), route: [...conns].find((c) => c.device === d.id && c.ready)?.route ?? null });
   // Tells every connected device something, such as that a device was added.
   const tell = (event: unknown) => {
     for (const c of conns) if (c.ready && c.control?.readyState === "open") c.control.send(JSON.stringify(event));

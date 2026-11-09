@@ -215,6 +215,7 @@ export class Link {
             if (!checked) {
               if (msg.check !== fxbotCheck) return reject(new Error("The channel didn't prove it's your fxbot's."));
               checked = true;
+              dc.onclose = () => this.control === dc && this.lost("The connection to your fxbot dropped.");
               return resolve(dc);
             }
             if (msg.id !== undefined && this.calls.has(msg.id)) return this.calls.get(msg.id)!(msg);
@@ -255,8 +256,20 @@ export class Link {
     this.pc?.close();
     this.pc = null;
     this.control = null;
+    for (const answer of this.calls.values()) answer({ error: why });
+    this.calls.clear();
     this.set("failed", why);
     this.timer = setTimeout(() => void this.connect(), 500);
+  }
+  // A connection that looks fine may have died while the page was frozen, as iOS does to an app in the background. A
+  // ping with no answer in 3 seconds means connect again. One at a time, however many ask.
+  private probing: Promise<void> | null = null;
+  probe() {
+    if (this.status !== "connected") return this.status === "connecting" ? Promise.resolve() : this.connect();
+    return (this.probing ??= (async () => {
+      const answered = await Promise.race([this.ask("ping").then(() => true, () => false), new Promise<boolean>((r) => setTimeout(() => r(false), 3000))]);
+      if (!answered && this.status === "connected") this.lost("Your fxbot didn't answer, so the app is connecting again.");
+    })().finally(() => (this.probing = null)));
   }
   private async removed() {
     this.drop();
@@ -271,32 +284,46 @@ export class Link {
       this.control!.send(JSON.stringify({ id, op, ...args }));
     });
   }
-  // One request from the frame, on a channel of its own.
+  // One request from the frame, on a channel of its own. A read whose channel closes before its answer starts is a sign
+  // the connection died: the app checks it, connects again if it must, and sends the read once more.
   request(head: wire.HttpHead, body: ArrayBuffer | null, on: { head(h: wire.AnswerHead): void; chunk(b: ArrayBuffer): void; end(): void; error(e: string): void }) {
+    const again = head.method === "GET" || head.method === "HEAD";
     let dc: RTCDataChannel | null = null;
     let done = false;
     const finish = () => ((done = true), dc?.close());
-    void this.ready().then(() => {
-      if (done) return;
-      dc = this.pc!.createDataChannel("http");
-      dc.binaryType = "arraybuffer";
-      let answered = false;
-      dc.onopen = async () => {
-        dc!.send(JSON.stringify(head));
-        if (body) for (let at = 0; at < body.byteLength; at += wire.CHUNK) {
-          while (dc!.bufferedAmount > 1 << 20) await new Promise((r) => setTimeout(r, 5));
-          if (dc!.readyState !== "open") return;
-          dc!.send(body.slice(at, at + wire.CHUNK));
+    const fail = (why: string) => !done && ((done = true), on.error(why));
+    const attempt = (retry: boolean) =>
+      void this.ready().then(() => {
+        if (done) return;
+        let channel: RTCDataChannel;
+        try {
+          channel = dc = this.pc!.createDataChannel("http");
+        } catch {
+          return retry ? void this.probe().then(() => attempt(false)) : fail("The connection to your fxbot closed.");
         }
-        dc!.send(wire.end);
-      };
-      dc.onmessage = (e) => {
-        if (!answered) return void ((answered = true), on.head(JSON.parse(String(e.data))));
-        if (typeof e.data === "string") return e.data === wire.end && (on.end(), finish());
-        on.chunk(e.data);
-      };
-      dc.onclose = () => !done && ((done = true), on.error("The connection to your fxbot closed."));
-    }, (error) => !done && ((done = true), on.error(error.message)));
+        channel.binaryType = "arraybuffer";
+        let answered = false;
+        channel.onopen = async () => {
+          channel.send(JSON.stringify(head));
+          if (body) for (let at = 0; at < body.byteLength; at += wire.CHUNK) {
+            while (channel.bufferedAmount > 1 << 20) await new Promise((r) => setTimeout(r, 5));
+            if (channel.readyState !== "open") return;
+            channel.send(body.slice(at, at + wire.CHUNK));
+          }
+          channel.send(wire.end);
+        };
+        channel.onmessage = (e) => {
+          if (!answered) return void ((answered = true), on.head(JSON.parse(String(e.data))));
+          if (typeof e.data === "string") return e.data === wire.end && (on.end(), finish());
+          on.chunk(e.data);
+        };
+        channel.onclose = () => {
+          if (done || dc !== channel) return;
+          if (!answered && retry && again) return void this.probe().then(() => attempt(false));
+          fail("The connection to your fxbot closed.");
+        };
+      }, (error) => fail(error.message));
+    attempt(true);
     return { abort: finish };
   }
   // One WebSocket from the frame, on a channel of its own.
@@ -766,8 +793,9 @@ if (location.pathname === "/pair" && location.hash.length > 1) {
   void pairByLink(fragment);
 } else if (location.pathname === "/pair") view = { name: "pair" };
 render();
+// Coming back to the app, or to a network: each open fxbot checks its connection, and connects again if it must.
 const revive = () => {
-  for (const l of links.values()) if (l.iframe && l.status !== "connected" && l.status !== "connecting") void l.connect();
+  for (const l of links.values()) if (l.iframe) void l.probe();
 };
 document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && revive());
 addEventListener("online", revive);
