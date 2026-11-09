@@ -39,7 +39,7 @@ The [docs](https://fxbot.sh/docs/explanation/web-pairing/) explain it in full. I
 
 ## Building it
 
-`fxbot/server.js` is `fxbot/server.ts` bundled with [rolldown](https://rolldown.rs), with [werift](https://github.com/shinyoshiaki/werift-webrtc) for WebRTC, [@achingbrain/nat-port-mapper](https://github.com/achingbrain/nat-port-mapper), [@noble/curves](https://github.com/paulmillr/noble-curves), and the protocol in `packages/web-app/protocol/`. `page.js` is `page.jsx` bundled with qrcode-generator. Their licenses are in `server-licenses.txt` and `page-licenses.txt`. Run these in this folder, in a checkout of fxbot, after changing anything under `fxbot/` or the protocol:
+`fxbot/server.js` is `fxbot/server.ts` bundled with [rolldown](https://rolldown.rs), with [werift](https://github.com/shinyoshiaki/werift-webrtc) for WebRTC, [@achingbrain/nat-port-mapper](https://github.com/achingbrain/nat-port-mapper), [@noble/curves](https://github.com/paulmillr/noble-curves), and the protocol in `packages/web-app/protocol/`. The build applies `werift-patches.mjs` to werift: fixes to its SCTP that a lossy link needs, each an exact replacement that fails the build if it no longer matches. `page.js` is `page.jsx` bundled with qrcode-generator. Their licenses are in `server-licenses.txt` and `page-licenses.txt`. Run these in this folder, in a checkout of fxbot, after changing anything under `fxbot/` or the protocol:
 
 ```sh
 npm ci && npm ci --prefix ../../packages/web-app

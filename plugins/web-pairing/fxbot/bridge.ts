@@ -1,6 +1,11 @@
-// The bridge: each data channel a device opens carries one request, or one WebSocket, to fxbot's own API at
-// fx.localUrl. A request goes without the device's Host, Origin, or Cookie, and with a header that marks it as bridged,
-// which the plugin's own device routes refuse, so code in the device's frame can't pair or remove a device.
+// The bridge: each data channel a device opens carries requests, or WebSockets, to fxbot's own API at fx.localUrl, one
+// after another. A request goes without the device's Host, Origin, or Cookie, and with a header that marks it as
+// bridged, which the plugin's own device routes refuse, so code in the device's frame can't pair or remove a device.
+//
+// A device that says `reuse` in its head keeps the channel when an exchange ends: closing one makes both ends reset its
+// stream, and under packet loss werift's reset could land on the next channel to take that stream's number. So a
+// request it gives up on says `{"abort":true}`, and a WebSocket closes with `{"close":true}`, answered `{"closed":…}`.
+// A device that doesn't say it closes the channel, as before.
 import type { RTCDataChannel } from "werift";
 import type { Bytes } from "../../../packages/web-app/protocol/bytes.ts";
 import { CHUNK, end, joiner, pieces, type AnswerHead, type HttpHead, type WsHead } from "../../../packages/web-app/protocol/wire.ts";
@@ -28,97 +33,133 @@ function target(localUrl: string, path: unknown) {
   return url.origin === new URL(localUrl).origin ? url : null;
 }
 
+type Exchange =
+  | { kind: "http"; head: HttpHead & { reuse?: boolean }; body: Buffer[]; size: number; abort: AbortController; started: boolean }
+  | { kind: "ws"; head: WsHead & { reuse?: boolean }; ws: WebSocket | null; queued: (string | Bytes)[]; join: ReturnType<typeof joiner>; out: Promise<void>; over: boolean };
+
 export function serve(dc: RTCDataChannel, ctx: { localUrl: string; device: string; log: (...parts: unknown[]) => void }) {
-  let head: HttpHead | WsHead | null = null;
-  const body: Buffer[] = [];
-  let size = 0;
-  const abort = new AbortController();
-  let ws: WebSocket | null = null;
-  const queued: (string | Bytes)[] = [];
-  const join = joiner();
-  let out = Promise.resolve();
-  const fail = (status: number, error: string) =>
-    send(dc, JSON.stringify({ status, headers: [], error } satisfies AnswerHead)).then(() => send(dc, end)).catch(() => {});
+  let now: Exchange | null = null;
 
   dc.stateChanged.subscribe((state) => {
-    if (state !== "closed") return;
-    abort.abort();
-    ws?.close();
+    if (state !== "closed" || !now) return;
+    if (now.kind === "http") now.abort.abort();
+    else now.ws?.close();
   });
   dc.onMessage.subscribe((m: string | Buffer) => {
-    if (!head) {
+    if (!now) {
+      if (typeof m !== "string") return;
+      let head: (HttpHead | WsHead) & { reuse?: boolean };
       try {
-        head = JSON.parse(String(m));
+        head = JSON.parse(m);
       } catch {
         return void dc.close();
       }
-      if (head?.kind === "ws") openSocket(head);
-      else if (head?.kind !== "http") dc.close();
+      if (head?.kind === "http") now = { kind: "http", head, body: [], size: 0, abort: new AbortController(), started: false };
+      else if (head?.kind === "ws") openSocket((now = { kind: "ws", head, ws: null, queued: [], join: joiner(), out: Promise.resolve(), over: false }));
+      else dc.close();
       return;
     }
-    if (head.kind === "http") {
+    const x = now;
+    if (x.kind === "http") {
       if (typeof m === "string") {
-        if (m === end) void request(head);
+        if (m === end) {
+          if (!x.started) ((x.started = true), void request(x));
+        } else if (/"abort"/.test(m)) x.abort.abort();
         return;
       }
-      size += m.length;
+      x.size += m.length;
       // What one request may carry, well past the library's own limit.
-      if (size > 256 * MiB) return void (fail(413, "That's too big to send.").then(() => dc.close()));
-      body.push(m);
-    } else {
-      if (typeof m === "string") return;
-      const whole = join(new Uint8Array(m));
-      if (whole === undefined) return;
-      if (ws?.readyState === WebSocket.OPEN) ws.send(whole);
-      else queued.push(whole);
+      if (x.size > 256 * MiB) return void (x.abort.abort(), finish(x, 413, "That's too big to send."));
+      x.body.push(m);
+      return;
     }
+    if (typeof m === "string") {
+      if (/"close"/.test(m)) x.ws ? x.ws.close() : socketOver(x, 1000, "");
+      return;
+    }
+    const whole = x.join(new Uint8Array(m));
+    if (whole === undefined) return;
+    if (x.ws?.readyState === WebSocket.OPEN) x.ws.send(whole);
+    else x.queued.push(whole);
   });
 
-  async function request(h: HttpHead) {
+  // Ends an exchange: its end, and the channel is ready for the next head.
+  const done = (x: Exchange) => {
+    if (now === x) now = null;
+  };
+  // An answer that never got going: its head with the reason, then its end.
+  const finish = async (x: Exchange, status: number, error: string) => {
+    try {
+      await send(dc, JSON.stringify({ status, headers: [], error } satisfies AnswerHead));
+      await send(dc, end);
+    } catch {}
+    done(x);
+  };
+
+  async function request(x: Extract<Exchange, { kind: "http" }>) {
+    const h = x.head;
     const url = target(ctx.localUrl, h.path);
-    if (!url || typeof h.method !== "string" || !/^[A-Z]{3,7}$/.test(h.method)) return fail(400, "Not a path on this fxbot.");
+    if (!url || typeof h.method !== "string" || !/^[A-Z]{3,7}$/.test(h.method)) return finish(x, 400, "Not a path on this fxbot.");
     const headers = new Headers();
     for (const [k, v] of Array.isArray(h.headers) ? h.headers : []) if (typeof k === "string" && typeof v === "string" && !dropped.has(k.toLowerCase())) headers.append(k, v);
     headers.set(bridged, ctx.device);
     let res: Response;
     try {
-      res = await fetch(url, { method: h.method, headers, body: h.method === "GET" || h.method === "HEAD" ? undefined : Buffer.concat(body), signal: abort.signal, redirect: "manual" });
+      res = await fetch(url, { method: h.method, headers, body: h.method === "GET" || h.method === "HEAD" ? undefined : Buffer.concat(x.body), signal: x.abort.signal, redirect: "manual" });
     } catch (error) {
-      if (!abort.signal.aborted) await fail(502, `fxbot didn't answer: ${error instanceof Error ? error.message : error}`);
-      return;
+      return finish(x, x.abort.signal.aborted ? 499 : 502, x.abort.signal.aborted ? "Cancelled." : `fxbot didn't answer: ${error instanceof Error ? error.message : error}`);
     }
     try {
       await send(dc, JSON.stringify({ status: res.status, headers: [...res.headers].filter(([k]) => !droppedBack.has(k)) } satisfies AnswerHead));
       if (res.body) for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) for (let at = 0; at < chunk.length; at += CHUNK) await send(dc, chunk.subarray(at, at + CHUNK));
-      await send(dc, end);
     } catch {
-      abort.abort();
+      // Cancelled by the device, or the channel closed: what was sent stands, and the end follows.
+      x.abort.abort();
     }
+    try {
+      await send(dc, end);
+    } catch {}
+    done(x);
   }
 
-  function openSocket(h: WsHead) {
-    const url = target(ctx.localUrl, h.path);
-    if (!url) return void fail(400, "Not a path on this fxbot.");
+  // A WebSocket's end: the device hears `closed`, with its code, and the channel is free; a device that doesn't reuse
+  // channels has it closed instead.
+  function socketOver(x: Extract<Exchange, { kind: "ws" }>, code: number, reason: string) {
+    if (x.over) return;
+    x.over = true;
+    x.out = x.out.then(async () => {
+      if (x.head.reuse) await send(dc, JSON.stringify({ closed: true, code, reason })).catch(() => {});
+      else dc.close();
+      done(x);
+    });
+  }
+
+  function openSocket(x: Extract<Exchange, { kind: "ws" }>) {
+    const url = target(ctx.localUrl, x.head.path);
+    if (!url) {
+      x.out = x.out.then(() => send(dc, JSON.stringify({ status: 400, headers: [], error: "Not a path on this fxbot." } satisfies AnswerHead))).catch(() => {});
+      return socketOver(x, 1008, "");
+    }
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    const protocols = Array.isArray(h.protocols) ? h.protocols.filter((p) => typeof p === "string") : [];
+    const protocols = Array.isArray(x.head.protocols) ? x.head.protocols.filter((p) => typeof p === "string") : [];
     // Node's WebSocket takes headers as undici's own option.
-    ws = new (WebSocket as any)(url, { protocols, headers: { [bridged]: ctx.device } }) as WebSocket;
+    const ws = (x.ws = new (WebSocket as any)(url, { protocols, headers: { [bridged]: ctx.device } }) as WebSocket);
     ws.binaryType = "arraybuffer";
     let opened = false;
     ws.onopen = () => {
       opened = true;
-      out = out.then(() => send(dc, JSON.stringify({ status: 101, headers: [], protocol: ws!.protocol } satisfies AnswerHead))).catch(() => ws?.close());
-      for (const m of queued.splice(0)) ws!.send(m);
+      x.out = x.out.then(() => send(dc, JSON.stringify({ status: 101, headers: [], protocol: ws.protocol } satisfies AnswerHead))).catch(() => ws.close());
+      for (const m of x.queued.splice(0)) ws.send(m);
     };
     ws.onmessage = (e) => {
       const data = typeof e.data === "string" ? e.data : new Uint8Array(e.data as ArrayBuffer);
-      out = out.then(async () => {
+      x.out = x.out.then(async () => {
         for (const piece of pieces(data)) await send(dc, piece);
-      }).catch(() => ws?.close());
+      }).catch(() => ws.close());
     };
-    ws.onclose = () => {
-      if (!opened) void fail(502, "fxbot refused the WebSocket.").then(() => dc.close());
-      else void out.then(() => dc.close());
+    ws.onclose = (e) => {
+      if (!opened) x.out = x.out.then(() => send(dc, JSON.stringify({ status: 502, headers: [], error: "fxbot refused the WebSocket." } satisfies AnswerHead))).catch(() => {});
+      socketOver(x, e.code, e.reason);
     };
   }
 }

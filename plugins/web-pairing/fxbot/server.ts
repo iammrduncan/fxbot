@@ -7,7 +7,7 @@ import { Cipher, Handshake, generateKeyPair, keyPairFromPrivate, privateBytes, t
 import * as wire from "../../../packages/web-app/protocol/wire.ts";
 import { bridged, serve } from "./bridge.ts";
 import { checkAssertion, checkNew } from "./passkey.ts";
-import { Mapper, check, checkEntry, cloudflareStun, forWerift, freePort, globalV6, iceServers, shown, type IceEntry } from "./reach.ts";
+import { Mapper, check, checkEntry, cloudflareStun, forWerift, freePort, globalV6, hostAddresses, iceServers, shown, type IceEntry } from "./reach.ts";
 
 // Web pairing: the owner's fxbot from their phone or any computer, over a WebRTC data channel, with nothing exposed.
 // fxbot.sh's relay passes the sealed handshake and stores nothing; this plugin holds fxbot's keys and its devices, and
@@ -28,6 +28,7 @@ type Call = {
   hash?: Bytes;
   ticket?: Ticket;
   pc?: RTCPeerConnection;
+  conn?: Conn;
 };
 type Ticket = {
   tid: Bytes;
@@ -44,7 +45,7 @@ type Ticket = {
   call?: Call;
   timer: ReturnType<typeof setTimeout>;
 };
-type Conn = { pc: RTCPeerConnection; device: string; control?: RTCDataChannel; ready: boolean; connected: boolean; route?: string; since?: number };
+type Conn = { pc: RTCPeerConnection; device: string; control?: RTCDataChannel; ready: boolean; connected: boolean; route?: string; since?: number; answered?: number; found?: number };
 
 const TICKET_MS = 10 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
@@ -257,8 +258,13 @@ export default async function webPairing(fx: PluginApi) {
         return;
       }
       if (c.stage === "rtc" && c.pc) {
-        if (typeof m?.answer === "string") await c.pc.setRemoteDescription({ type: "answer", sdp: m.answer });
-        else if (m?.candidate) await c.pc.addIceCandidate(m.candidate).catch(() => {});
+        if (typeof m?.answer === "string") {
+          await c.pc.setRemoteDescription({ type: "answer", sdp: m.answer });
+          if (c.conn) c.conn.answered = Date.now();
+        }
+        // Not awaited: werift waits up to 10 seconds to resolve a `.local` name, which a phone's first candidate often
+        // is, and nobody here can answer for a phone elsewhere. Its usable candidates go in meanwhile.
+        else if (m?.candidate) void c.pc.addIceCandidate(m.candidate).catch(() => {});
         return;
       }
       return;
@@ -445,15 +451,18 @@ export default async function webPairing(fx: PluginApi) {
     if (conns.size >= 20) return stop(c, "busy");
     const servers = await iceServers(config.ice, fetch, fx.log);
     if (!reach || Date.now() - reachAt > SIX_HOURS) await checkNow().catch(() => null);
-    send(c, wire.envelope("k2", await hs.write(utf8(JSON.stringify({ iceServers: servers, reach, device: device.id, name })))));
+    // `reuse`: this fxbot takes one request after another on a channel, which the app then keeps (see bridge.ts).
+    send(c, wire.envelope("k2", await hs.write(utf8(JSON.stringify({ iceServers: servers, reach, device: device.id, name, reuse: true })))));
     const { send: tx, recv: rx } = await hs.split();
     Object.assign(c, { tx, rx, hash: hs.hash, stage: "rtc" });
     // The ICE ports, so a forwarded or mapped port holds; any port when every one is taken, as the log says.
     const inRange = await freePort(config.ports);
     if (!inRange) fx.log(`Every ICE port, ${config.ports.join("–")}, is in use, so this connection uses another, which a forwarded port doesn't cover.`);
-    const pc = new RTCPeerConnection({ iceServers: forWerift(servers), icePortRange: inRange ? config.ports : undefined, iceUseIpv6: globalV6() });
+    const pc = new RTCPeerConnection({ iceServers: forWerift(servers), icePortRange: inRange ? config.ports : undefined, iceUseIpv6: globalV6(), iceInterfaceAddresses: hostAddresses() as any });
     c.pc = pc;
     const conn: Conn = { pc, device: device.id, ready: false, connected: false };
+    c.conn = conn;
+    pc.iceConnectionStateChange.subscribe((state) => state === "connected" && !conn.found && (conn.found = Date.now()));
     conns.add(conn);
     const hash = hs.hash;
     const waiting: RTCDataChannel[] = [];
@@ -474,7 +483,8 @@ export default async function webPairing(fx: PluginApi) {
         if (back) fx.log(`${device.name}'s connection came back.`);
         else {
           conn.since = Date.now();
-          fx.log(`${device.name} connected${conn.route ? ` ${conn.route}` : ""}, in ${((Date.now() - started) / 1000).toFixed(1)} seconds.`);
+          const at = (t?: number) => (t ? ((t - started) / 1000).toFixed(1) : "?");
+          fx.log(`${device.name} connected${conn.route ? ` ${conn.route}` : ""}, in ${at(Date.now())} seconds: its answer at ${at(conn.answered)}, a path at ${at(conn.found)}.`);
         }
       }
       if (state === "failed" || state === "closed") {

@@ -140,6 +140,16 @@ const isPrivate = (ip: string) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|1
 export const globalV6 = () => Object.values(networkInterfaces()).flat().some((i) => i && i.family === "IPv6" && !i.internal && /^[23]/.test(i.address));
 const publicV4 = () => Object.values(networkInterfaces()).flat().filter((i) => i && i.family === "IPv4" && !i.internal && !isPrivate(i.address)).map((i) => i!.address);
 
+// The machine's addresses a device might reach, less containers' bridges and the like: none of those leads anywhere
+// from outside, and each would take a port and a round of ICE checks. werift keeps the addresses it's given by name.
+const virtual = /^(podman|docker|br-|cni|virbr|veth|lxc|lxd|flannel|cali|weave|vnet|kube|cilium|vmnet)/;
+export function hostAddresses() {
+  const keep = Object.entries(networkInterfaces())
+    .filter(([name]) => !virtual.test(name))
+    .flatMap(([, list]) => (list ?? []).filter((i) => !i.internal && !/^(fe80:|169\.254\.)/i.test(i.address)).map((i) => i.address));
+  return Object.fromEntries(keep.map((address, i) => [`host${i}`, address]));
+}
+
 // Whether a UDP port in the range is free, as werift will look for one.
 export async function freePort([min, max]: [number, number]) {
   for (let port = min; port <= max; port++) {

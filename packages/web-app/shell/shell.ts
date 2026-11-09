@@ -184,8 +184,10 @@ export class Link {
       const hs = await new Handshake({ pattern: "IK", initiator: true, prologue: wire.connectPrologue(this.p.rid), s: this.p.key, rs: fromB64u(this.p.I) }).init();
       via.send(wire.envelope("k1", await hs.write(utf8(JSON.stringify({ seq, v: wire.VERSION })))));
       const k2 = await via.next(15_000);
-      const info = JSON.parse(dec.decode(await hs.read(k2.bytes))) as { iceServers: wire.IceServer[]; reach: wire.Reach | null; name: string };
+      const info = JSON.parse(dec.decode(await hs.read(k2.bytes))) as { iceServers: wire.IceServer[]; reach: wire.Reach | null; name: string; reuse?: boolean };
       this.reach = info.reach;
+      this.reuse = info.reuse === true;
+      this.idle = [];
       if (info.name && info.name !== this.p.name) await savePairing({ ...this.p, name: (this.p.name = info.name) });
       const { send: tx, recv: rx } = await hs.split();
       const hash = hs.hash;
@@ -284,80 +286,139 @@ export class Link {
       this.control!.send(JSON.stringify({ id, op, ...args }));
     });
   }
-  // One request from the frame, on a channel of its own. A read whose channel closes before its answer starts is a sign
-  // the connection died: the app checks it, connects again if it must, and sends the read once more.
+  // Channels are kept once open and used for one exchange after another, when fxbot says it can (`reuse`): closing a
+  // channel makes both ends reset its stream, and under packet loss werift's reset could land on the next channel to
+  // take that stream's number, whose answer then never came. A new connection starts with none.
+  private reuse = false;
+  private idle: RTCDataChannel[] = [];
+  private channel(label: string) {
+    while (this.idle.length) {
+      const dc = this.idle.pop()!;
+      if (dc.readyState === "open") return dc;
+    }
+    const dc = this.pc!.createDataChannel(label);
+    dc.binaryType = "arraybuffer";
+    return dc;
+  }
+  private release(dc: RTCDataChannel, pc: RTCPeerConnection | null) {
+    dc.onmessage = dc.onclose = dc.onopen = null;
+    if (this.reuse && pc === this.pc && dc.readyState === "open") this.idle.push(dc);
+    else dc.close();
+  }
+  private whenOpen(dc: RTCDataChannel, go: () => void) {
+    if (dc.readyState === "open") go();
+    else dc.onopen = go;
+  }
+  // One request from the frame, on a channel of its own while it lasts. A read whose channel closes before its answer
+  // starts is a sign the connection died: the app checks it, connects again if it must, and sends the read once more.
+  // Giving up on a request says so on the channel, and its end still comes, after which the channel is free.
   request(head: wire.HttpHead, body: ArrayBuffer | null, on: { head(h: wire.AnswerHead): void; chunk(b: ArrayBuffer): void; end(): void; error(e: string): void }) {
     const again = head.method === "GET" || head.method === "HEAD";
     let dc: RTCDataChannel | null = null;
     let done = false;
-    const finish = () => ((done = true), dc?.close());
+    let cancel = () => {};
     const fail = (why: string) => !done && ((done = true), on.error(why));
     const attempt = (retry: boolean) =>
       void this.ready().then(() => {
         if (done) return;
+        const pc = this.pc;
         let channel: RTCDataChannel;
         try {
-          channel = dc = this.pc!.createDataChannel("http");
+          channel = dc = this.channel("http");
         } catch {
           return retry ? void this.probe().then(() => attempt(false)) : fail("The connection to your fxbot closed.");
         }
-        channel.binaryType = "arraybuffer";
         let answered = false;
-        channel.onopen = async () => {
-          channel.send(JSON.stringify(head));
+        let ended = false;
+        cancel = () => {
+          if (ended) return;
+          if (this.reuse && channel.readyState === "open") channel.send(JSON.stringify({ abort: true }));
+          else ((ended = true), channel.close());
+        };
+        this.whenOpen(channel, async () => {
+          channel.send(JSON.stringify({ ...head, reuse: this.reuse }));
           if (body) for (let at = 0; at < body.byteLength; at += wire.CHUNK) {
             while (channel.bufferedAmount > 1 << 20) await new Promise((r) => setTimeout(r, 5));
             if (channel.readyState !== "open") return;
             channel.send(body.slice(at, at + wire.CHUNK));
           }
           channel.send(wire.end);
-        };
+        });
         channel.onmessage = (e) => {
-          if (!answered) return void ((answered = true), on.head(JSON.parse(String(e.data))));
-          if (typeof e.data === "string") return e.data === wire.end && (on.end(), finish());
-          on.chunk(e.data);
+          if (typeof e.data === "string") {
+            if (e.data === wire.end) {
+              ended = true;
+              if (!done) ((done = true), on.end());
+              return this.release(channel, pc);
+            }
+            if (!answered) return void ((answered = true), !done && on.head(JSON.parse(e.data)));
+            return;
+          }
+          if (!done) on.chunk(e.data);
         };
         channel.onclose = () => {
-          if (done || dc !== channel) return;
-          if (!answered && retry && again) return void this.probe().then(() => attempt(false));
+          if (ended || dc !== channel) return;
+          ended = true;
+          if (!done && !answered && retry && again) return void this.probe().then(() => attempt(false));
           fail("The connection to your fxbot closed.");
         };
       }, (error) => fail(error.message));
     attempt(true);
-    return { abort: finish };
+    return { abort: () => ((done = true), cancel()) };
   }
-  // One WebSocket from the frame, on a channel of its own.
+  // One WebSocket from the frame, on a channel of its own while it's open. Closing it says so on the channel, and fxbot
+  // answers `closed`, after which the channel is free.
   socket(head: wire.WsHead, on: { open(protocol: string): void; message(d: string | ArrayBuffer): void; close(code: number, reason: string): void }) {
     let dc: RTCDataChannel | null = null;
     const queued: (string | ArrayBuffer)[] = [];
     let closed = false;
+    let opened = false;
     const join = wire.joiner();
     const send = (data: string | ArrayBuffer) => {
       for (const piece of wire.pieces(typeof data === "string" ? data : new Uint8Array(data))) dc!.send(piece as Uint8Array<ArrayBuffer>);
     };
+    const over = (code: number, reason: string) => !closed && ((closed = true), on.close(code, reason));
     void this.ready().then(() => {
       if (closed) return;
-      dc = this.pc!.createDataChannel("ws");
-      dc.binaryType = "arraybuffer";
+      const pc = this.pc;
+      const channel = (dc = this.channel("ws"));
+      const reuse = this.reuse;
       let answered = false;
-      dc.onopen = () => dc!.send(JSON.stringify(head));
-      dc.onmessage = (e) => {
-        if (!answered) {
-          answered = true;
-          const h = JSON.parse(String(e.data)) as wire.AnswerHead;
-          if (h.status !== 101) return void ((closed = true), on.close(1006, h.error ?? "refused"), dc!.close());
-          for (const m of queued.splice(0)) send(m);
-          return on.open(h.protocol ?? "");
+      this.whenOpen(channel, () => channel.send(JSON.stringify({ ...head, reuse })));
+      channel.onmessage = (e) => {
+        if (typeof e.data === "string") {
+          const m = JSON.parse(e.data);
+          if (!answered) {
+            answered = true;
+            if (m.status !== 101) {
+              over(1006, m.error ?? "refused");
+              if (!reuse) channel.close();
+              return;
+            }
+            opened = true;
+            for (const q of queued.splice(0)) send(q);
+            return on.open(m.protocol ?? "");
+          }
+          if (m.closed) {
+            over(m.code ?? 1000, m.reason ?? "");
+            return this.release(channel, pc);
+          }
+          return;
         }
-        if (typeof e.data === "string") return;
         const whole = join(new Uint8Array(e.data));
         if (whole !== undefined) on.message(typeof whole === "string" ? whole : whole.buffer);
       };
-      dc.onclose = () => !closed && ((closed = true), on.close(1000, ""));
-    }, () => !closed && ((closed = true), on.close(1006, "not connected")));
+      channel.onclose = () => over(1006, "");
+    }, () => over(1006, "not connected"));
     return {
-      send: (data: string | ArrayBuffer) => (dc?.readyState === "open" ? send(data) : queued.push(data)),
-      close: () => ((closed = true), dc?.close()),
+      send: (data: string | ArrayBuffer) => (opened && dc?.readyState === "open" ? send(data) : queued.push(data)),
+      close: () => {
+        if (closed) return;
+        closed = true;
+        if (!dc) return;
+        if (this.reuse && dc.readyState === "open" && opened) dc.send(JSON.stringify({ close: true }));
+        else dc.close();
+      },
     };
   }
 }
