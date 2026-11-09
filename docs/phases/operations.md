@@ -9,7 +9,7 @@ Getting fxbot onto a machine, keeping it running, and taking it off again, with 
 - **A Mac runs it in a Linux VM.** `setup.sh` on macOS says so, with the commands, and a page walks through it: Lima with Debian 13, the distro fxbot and its computer were checked on, reached at `http://127.0.0.1:8787` on the Mac through a port the VM is made with.
 - **The docs say how:** a page to uninstall, a page for a Mac, and a page with the fix for each way an install stops.
 
-Status: planned on 2026-11-07, for 0.8.0, not built. Researched the same day against the research directive's references, nine other installers' scripts, Debian's and Ubuntu's package indexes, and the docs and source of Lima, OrbStack, and Multipass for a Mac. Widened on 2026-11-09 to Arch, after reviewing [PR #11](#arch-and-pr-11), and to the other popular distros: each put to its own package manager in a throwaway container, with how the directive's references and other installers handle distros and a Mac read from their code, and the Mac's tools read again. Where this plan says *likely*, the checklist checks it before the build relies on it. The owner's questions are answered in [fxbot today](#fxbot-today-the-owners-questions).
+Status: planned on 2026-11-07, for 0.8.0, not built. Researched the same day against the research directive's references, nine other installers' scripts, Debian's and Ubuntu's package indexes, and the docs and source of Lima, OrbStack, and Multipass for a Mac. Widened on 2026-11-09 to Arch, after reviewing [PR #11](#arch-and-pr-11), and to the other popular distros: each put to its own package manager in a throwaway container, with how the directive's references and other installers handle distros and a Mac read from their code, and the Mac's tools read again. Re-reviewed later on 2026-11-09 against `release/0.8.0`, with web pairing built: web pairing from the release's containers, the images an update leaves, SELinux's two other mounts, uninstall's order and its offline computer script, a move to a new machine with paired devices, and the computer's override shared with the owner's ports were added, and the line numbers read again. Where this plan says *likely*, the checklist checks it before the build relies on it. The owner's questions are answered in [fxbot today](#fxbot-today-the-owners-questions).
 
 ## What the owner asked
 
@@ -72,6 +72,14 @@ If the owner's user meant fxbot itself on a rootless Docker, with no root engine
 - **A database without its `.env`.** An owner who removes `/opt/fxbot` by hand and runs `setup.sh` again gets a new random database password (`setup.sh:169`). The `fxbot_pgdata` volume keeps the old one, since Postgres's image sets the password only on an empty volume, so the app can't sign in and the start fails.
 - **A truncated download.** `curl | sudo bash` runs what arrives. A script cut off mid-line runs half. Tailscale wraps its installer in `main()` for this.
 - **For agents.** `fxbot logs` follows (`deploy/fxbot:331`), so an agent's call never returns. `agent-setup.txt` works around it with `fxbot compose logs --tail 50`.
+- **Old images.** Nothing in `setup.sh` or `deploy/fxbot` removes an image. An update pulls the new release's images and leaves the old ones, and the GPU's trial run (`deploy/fxbot:225-232`) pulls llama.cpp's CUDA image, 4.38 GB, and keeps it when the trial fails. Root's podman on this machine holds `pgvector:0.8.7-pg17` (451 MB) beside the `-trixie` tag in use, and the CUDA image.
+- **Web pairing in the containers.** Web pairing is in **Essentials** from 0.8.0, and the owner's checks of it ran on a checkout, outside any container. In the release, the app runs on the engine's bridge (`deploy/compose.yaml` has no `network_mode`), so, read from the plugin and werift:
+  - werift's host candidates hold only the container's bridge address, not the machine's LAN or tailnet address.
+  - Port mapping is off there, by the plugin's own check, and UDP 8790–8799 isn't published.
+  - A phone's own host candidates are `.local` names, which browsers use in place of addresses, and mDNS doesn't cross the bridge.
+
+  So a phone *likely* connects only by the server-reflexive path: on the machine's own Wi-Fi only where the router hairpins, and elsewhere by hole punching through the machine's NAT and then the router's. Unchecked: web pairing's checklist leaves "Reachability… in the release's containers" to a human. werift's `iceAdditionalHostAddresses` advertises more host addresses on the same ports, so a published range, and the machine's addresses passed in, would give a phone on the LAN or the tailnet a direct path ([open question 15](#5-open-questions)).
+- **The computer's override is the owner's too.** [Forward or map a port](https://fxbot.sh/docs/how-to/forward-a-port/) has the owner add web pairing's UDP range to `/opt/fxbot/compose.override.yaml`, the file the computer's script writes. Setting the computer up again writes over it (`plugins/computer/host/setup.sh:238`), and `fxbot computer off` deletes it (`:63-64`), with the owner's lines in it.
 
 **5. Uninstall today.** There is no command and no page. The owner would have to know [What setup.sh creates](https://fxbot.sh/docs/reference/install-layout/), and remove each part by hand:
 
@@ -273,12 +281,14 @@ if [ -z "$engine" ]; then
 fi
 ```
 
-This replaces lines 72-76, which read `FXBOT_ENGINE` from the release's `.env`, and preferred podman only when it was installed. `podman_at_least` reads the installed version, or the package manager's candidate (`candidate`, under [Package managers](#package-managers)). `docker_rootless_package` names the package from step 4 for the Docker that's installed, or nothing.
+This replaces lines 72-76, which read `FXBOT_ENGINE` from the release's `.env`, and preferred podman only when it was installed. Line 29, which stops anything without apt ("it needs systemd and apt: Debian 13 or Ubuntu 24.04") before even `--remove`, asks for systemd and one of the four package managers instead. `podman_at_least` reads the installed version, or the package manager's candidate (`candidate`, under [Package managers](#package-managers)). `docker_rootless_package` names the package from step 4 for the Docker that's installed, or nothing.
 - **Packages,** through `setup.sh`'s `install_packages`, by the names under [Package managers](#package-managers): for podman, `podman passt slirp4netns`, since podman 4.9 needs `slirp4netns` and only recommends it; for Docker, step 4's package and `slirp4netns`; and on apt, `uidmap` and `dbus-user-session` too. Always `nftables` and `curl`.
 - **Two checks, before anything changes:** cgroups v2 (`stat -fc %T /sys/fs/cgroup` is `cgroup2fs`), without which the computers' limits silently do nothing, as on RHEL 8; and user namespaces a user may make (`kernel.unprivileged_userns_clone` isn't 0, as Arch's `linux-hardened` sets it, and `user.max_user_namespaces` isn't 0).
 - **Too old, with no Docker to fall back on:** Debian 12 on its podman gets "podman 4.3.1 is older than the 4.9 the computer needs. Docker's own docker-ce runs rootless here: https://fxbot.sh/docs/how-to/fix-an-install/#podman". `setup.sh` no longer leaves a new install there ([its engine](#setupsh)).
 - **The docker branch now does real work,** on Debian 12 and Ubuntu 22.04, where podman is too old, as well as for a user already on it and for `--engine docker`. [Open question 2](#5-open-questions) keeps it.
-- **SELinux:** the computers' homes are named volumes (`plugins/computer/fxbot/server.ts:508`), which the engine labels itself. But `fxbot-computer` is a system user with no login shell, so SELinux's rules for home folders skip it (libsemanage's `genhomedircon.c:575-577`), and its podman's storage, `/var/lib/fxbot-computer/.local/share/containers`, keeps `/var/lib`'s label, not the one container-selinux gives podman's storage (`container.fc:103-113`). podman's troubleshooting guide names this case. So where `selinuxenabled` answers, the script gives that folder `/var/lib/containers`'s labels: `semanage fcontext -a -e /var/lib/containers "$home/.local/share/containers"`, then `restorecon -R`, with `policycoreutils-python-utils` for `semanage` (dnf's and zypper's name alike). *Likely*: read from source, and checked on a Fedora VM before the docs say so.
+- **SELinux:** the computers' homes are named volumes (`plugins/computer/fxbot/server.ts:508`), which the engine labels itself. But `fxbot-computer` is a system user with no login shell, so SELinux's rules for home folders skip it (libsemanage's `genhomedircon.c:575-577`), and its podman's storage, `/var/lib/fxbot-computer/.local/share/containers`, keeps `/var/lib`'s label, not the one container-selinux gives podman's storage (`container.fc:103-113`). podman's troubleshooting guide names this case. So where `selinuxenabled` answers, the script gives that folder `/var/lib/containers`'s labels: `semanage fcontext -a -e /var/lib/containers "$home/.local/share/containers"`, then `restorecon -R`, with `policycoreutils-python-utils` for `semanage` (dnf's and zypper's name alike). `--remove` deletes the rule with `semanage fcontext -d`. *Likely*: read from source, and checked on a Fedora VM before the docs say so.
+- **SELinux and the socket:** the app reaches the computer's engine through its socket, in `/var/lib/fxbot-computer/run`, mounted into the app's container by the override. A confined container can't connect to an engine's socket on SELinux, which is why images that drive an engine say to run them with `label=disable`. So where `selinuxenabled` answers, the override gives the `fxbot` service `security_opt: [ label=disable ]`, as `compose.gpu.podman.yaml` does for the GPU. That container holds the engine's socket anyway, and with it the engine. *Likely*, and checked on the Fedora VM.
+- **Its own override file:** the script writes `compose.computer.yaml`, not `compose.override.yaml`, and `compose()` in `deploy/fxbot` adds it when it's there. `compose.override.yaml` is then the owner's alone, for web pairing's ports or anything else, and nothing writes over it or deletes it. When the script finds the old file with its marker, it takes its own three lines out of it (the marker, the volume, and `group_add`), and deletes the file when only `services:` and `fxbot:` are left, so an owner's ports stay. [Open question 16](#5-open-questions).
 - **The plugin's code doesn't change:** it reads the engine through the Docker API's `/info` and `/version`, which podman answers (`plugins/computer/fxbot/server.ts:977-983`).
 - **Its docs:** the computer's `README.md`, [Give bots a computer](https://fxbot.sh/docs/how-to/give-bots-a-computer/), and [The computer](https://fxbot.sh/docs/reference/computer/) say the computers run on rootless podman where the distro has 4.9 or newer, whatever fxbot runs on, and on the installed Docker, run rootless, where it doesn't, with each package manager's packages, and drop Ubuntu's `docker.io`. The computer goes to 0.3.2 for its README.
 
@@ -295,7 +305,7 @@ The script comes from the release's tag (`deploy/fxbot:302`), so the fix reaches
 | Packages can be installed: no `/run/ostree-booted` and no `transactional-update` | Stops: "this system installs software as a whole image (Fedora Silverblue or CoreOS, openSUSE MicroOS), so setup.sh can't add packages to it." |
 | systemd | Stops: "fxbot needs systemd, to start at boot and to update from Settings." On WSL, it adds how to turn systemd on. See [open question 3](#5-open-questions) |
 | The CPU is x86_64 or aarch64 | Stops: "fxbot's images are for x86_64 and arm64, and this machine is armv7l." |
-| The port is free, unless fxbot holds it | Stops: "another program listens on port 8787. Run this again with FXBOT_PORT set to a free one, such as: curl -fsSL https://fxbot.sh/setup.sh \| sudo FXBOT_PORT=8790 bash" |
+| The port is free, unless fxbot holds it | Stops: "another program listens on port 8787. Run this again with FXBOT_PORT set to a free one, such as: curl -fsSL https://fxbot.sh/setup.sh \| sudo FXBOT_PORT=8780 bash". The example stays clear of 8790–8799, web pairing's UDP range |
 | `docker` isn't a snap: `readlink -f "$(command -v docker)"` under `/snap/` | Stops, unless `FXBOT_ENGINE=podman`: "Docker here is a snap, which can't reach fxbot's folders. Remove it (sudo snap remove docker) and run this again, or run it with FXBOT_ENGINE=podman." |
 | 3 GB free where the engine keeps images: `/var/lib` | Stops, with what's free. The computer's image needs 1.2 GB more, later |
 | 1 GB of memory available | Warns, and carries on: fxbot, its database, and the embedder hold about 500 MB, and a computer about 120 MB at idle |
@@ -306,7 +316,7 @@ The port check is today's (`setup.sh:237`), moved up: it stops when something an
 
 **Two inputs,** beside `FXBOT_FILES` and the others:
 - `FXBOT_ENGINE`: `podman` or `docker`, for a fresh install. An install keeps the engine it has.
-- `FXBOT_PORT`: written to `/opt/fxbot/.env`, and used by the port check, the health check, and the last lines. Compose publishes it today (`deploy/compose.yaml:25`), but the app inside still listens on 8787, and an MCP sign-in reached over `http://127.0.0.1` comes back to `http://127.0.0.1:<the app's port>/callback` (`packages/server/src/index.ts:31`, `packages/sdk/src/mcp.ts:523`). So compose passes `FXBOT_PORT` to the app too and publishes it as the same port on both sides, and `deploy/health` checks `${FXBOT_PORT:-8787}`.
+- `FXBOT_PORT`: written to `/opt/fxbot/.env`, and used by the port check, the health check, and the last lines. Compose publishes it today (`deploy/compose.yaml:25`), but the app inside still listens on 8787, and an MCP sign-in reached over `http://127.0.0.1` comes back to `http://127.0.0.1:<the app's port>/callback` (`packages/server/src/index.ts:32`, `packages/sdk/src/mcp.ts:523`). So compose passes `FXBOT_PORT` to the app too and publishes it as the same port on both sides, and `deploy/health` checks `${FXBOT_PORT:-8787}`. Web pairing's bridge reaches the app at the same `localUrl`, so it follows.
 
 **The engine,** for a fresh install:
 1. `FXBOT_ENGINE`, when set.
@@ -326,10 +336,12 @@ Step 2 is new: on a machine with a running Docker and an installed podman, a new
 ```bash
 # ufw's default deny drops the containers' DNS to aardvark-dns on the bridge, so each start lets port 53 in on it.
 iface=$(podman network inspect "${COMPOSE_PROJECT_NAME:-fxbot}_default" --format '{{.NetworkInterface}}' 2>/dev/null) &&
-  ufw allow in on "$iface" to any port 53 comment fxbot >/dev/null
+  ufw allow in on "$iface" to any port 53 comment fxbot >/dev/null || true
 ```
 
 ufw skips a rule it has. `fxbot down` removes the network, so the next start may get another bridge, and adds its rule; uninstall removes every rule marked `fxbot`. It is in `start()`, not `setup.sh`, so `fxbot update` brings it to the installs that need it, such as the owner's from 2026-11-07, and so does a ufw turned on later. [Open question 4](#5-open-questions).
+
+Web pairing's UDP range, when the owner publishes it, comes in through the machine's forwarding, which ufw's own policy drops (`DEFAULT_FORWARD_POLICY="DROP"`). Docker's rules accept it ahead of ufw's, as Docker's own docs warn. netavark's *likely* depend on its driver: on iptables they share ufw's chain, and on nftables they sit in a table of their own, where ufw's drop still applies. Unchecked. M2 checks it, and if it's dropped, [Forward or map a port](https://fxbot.sh/docs/how-to/forward-a-port/) gains ufw's line for the range: `sudo ufw route allow proto udp to any port 8790:8799`.
 
 **firewalld,** on by default on Fedora, RHEL and its rebuilds, and openSUSE, lets podman's DNS in by itself, until it reloads. Read from netavark's source (2.1.0, and 1.17.2 for RHEL 9) and firewalld's docs on 2026-11-09:
 - netavark puts each network's subnet in firewalld's `trusted` zone (`src/firewall/firewalld.rs:984-998`), whichever of its drivers the distro builds: nftables on Fedora, RHEL 10, and Tumbleweed, iptables on RHEL 9.
@@ -351,7 +363,7 @@ Uninstall leaves it on, since podman's other networks need it too. [Open questio
 - Compose's file `secrets:` can't take it: Compose mounts them through the Mount API, which has no SELinux option (`pkg/compose/create.go:1335-1343`). fxbot's key comes in that way (`deploy/compose.yaml:60-61`).
 - Docker's own `docker-ce` leaves SELinux off for its containers (`--selinux-enabled` is false by default), so they read any folder. Fedora's `moby-engine` and openSUSE's `docker` turn it on.
 
-So `deploy/compose.yaml` adds `:z` to its three folders, and brings the key in as a read-only bind at the same `/run/secrets/fxbot_key`, in place of `secrets:`:
+So `deploy/compose.yaml` adds `:z` to its three folders, and brings the key in as a read-only bind at the same `/run/secrets/fxbot_key`, in place of `secrets:`. `fxbot rotate-key` mounts one more file, the new key, from `/etc/fxbot` (`deploy/fxbot:149`), so its `-v` takes `:ro,z` too, or a rotation on SELinux can't read the key it seals with:
 
 ```yaml
     volumes:
@@ -376,13 +388,14 @@ The owner's bots, chats, and providers come back, with the key that `setup.sh` l
 
 **The end** names the real address, with the port, and each way in:
 ```
-fxbot 0.7.0 runs on http://127.0.0.1:8787
+fxbot 0.8.0 runs on http://127.0.0.1:8787
 Open it there, or reach it:
   from your computer, over SSH:  ssh -N -L 8787:127.0.0.1:8787 <you>@<this machine>
   from your phone, with Tailscale:  sudo tailscale serve --bg 8787
+  from your phone, anywhere:  add Essentials, then Settings › Web pairing, and open web.fxbot.sh
 Settings shows each new release, with an Update button. To uninstall: sudo fxbot uninstall
 ```
-The Tailscale line names `tailscale` as installed or not, with its download page when not.
+The Tailscale line names `tailscale` as installed or not, with its download page when not. The web pairing line stays only if [open question 15](#5-open-questions) is settled with a phone on the machine's own Wi-Fi reaching it; until then, Tailscale is the way in that's known to work from the release.
 
 **The guard:** the script's body becomes a `main` function, called on its last line, so a download cut off midway runs nothing.
 
@@ -433,7 +446,7 @@ When `brew` isn't installed, the first line is Lima's own install page instead. 
 2. **Install fxbot in it:** `curl -fsSL https://fxbot.sh/setup.sh | sudo bash`, in `limactl shell fxbot`, as on any Linux machine. Lima's user has `sudo` without a password.
 3. **Open it on the Mac:** `http://127.0.0.1:8787`, which Lima forwards from the VM by the static rule it was made with, since podman doesn't listen on the port itself: *likely*, and the Mac check below confirms it before the page says so. With another `FXBOT_PORT`, the rule names that port. Everything works there, installing the app included, as on the machine itself.
 4. **Start it with the Mac:** `limactl start-at-login fxbot`. Inside the VM, `fxbot.service` starts fxbot.
-5. **From a phone:** Tailscale in the VM, as [Reach it from other devices](https://fxbot.sh/docs/how-to/reach-it/) says, so the VM has a tailnet name of its own. Not while the Mac sleeps: a Mac that stays on, such as a Mac mini, keeps fxbot reachable and its routines on time.
+5. **From a phone:** Tailscale in the VM, as [Reach it from other devices](https://fxbot.sh/docs/how-to/reach-it/) says, so the VM has a tailnet name of its own. Web pairing from the VM goes through two NATs, the containers' and Lima's own network, and how a phone fares there is unchecked, so the page names Tailscale first and the human's Mac check reads **Reachability** in the VM. Not while the Mac sleeps: a Mac that stays on, such as a Mac mini, keeps fxbot reachable and its routines on time.
 6. **Commands:** every `sudo fxbot …` runs in the VM: `limactl shell fxbot sudo fxbot status`.
 7. **Back up off the VM:** `limactl shell fxbot sudo fxbot backup`, then copy its folder and the key out through the shell, as `sudo tar -C /var/lib/fxbot/backups -cf - <folder>` and `sudo cat /etc/fxbot/secret.key`, each redirected into a file on the Mac. Lima's mount of the Mac's home is read-only.
 8. **Remove it:** `sudo fxbot uninstall` in the VM keeps the VM. `limactl delete --force fxbot` deletes the VM with fxbot and everything in it, then `brew uninstall lima`.
@@ -452,8 +465,12 @@ When `brew` isn't installed, the first line is Lima's own install page instead. 
 | `fxbot uninstall [--purge] [--yes]` | Below |
 | `fxbot status` | Adds whether fxbot answers: "fxbot answers at http://127.0.0.1:8787", or "fxbot doesn't answer. See: sudo fxbot logs fxbot" |
 | `fxbot logs` | Follows only on a terminal. Piped, as an agent runs it, it prints the last 100 lines and exits |
+| `fxbot update` | Once the new release runs, removes the images the old compose files named and the new ones don't, each by its name. A failed update keeps them, since going back needs them |
+| `fxbot embedder gpu` | When the trial run finds no GPU, removes the CUDA image it pulled for it |
 
 `backup` is about 15 lines, the steps in [Back up fxbot](https://fxbot.sh/docs/how-to/back-up/), which then uses it.
+
+**Move to a new machine,** in that page, says what moves beside the backup and the key: `/etc/fxbot/fxbot.env`, the app's settings, and the choices in `/opt/fxbot/.env` that aren't the machine's (`FXBOT_PORT`, `FXBOT_EMBEDDER`), given to `setup.sh` again, and `/opt/fxbot/compose.override.yaml` when the owner wrote one. And it says to stop the old fxbot first, with `sudo fxbot down`, or uninstall it: web pairing's keys come back with the database and the key, so devices paired at web.fxbot.sh reach the new machine with nothing done, but two fxbots on the same keys replace each other at the relay, which closes the older listener (`packages/web-app/relay/worker.ts:119-120`), and each reconnects within about a second and a half (`plugins/web-pairing/fxbot/server.ts:180-189`), so devices would land on either.
 
 ### Uninstall
 
@@ -476,7 +493,8 @@ Uninstall fxbot? [y/N]
 | --- | --- | --- |
 | A backup first, with `fxbot backup` | yes | no |
 | The containers, `fxbot_default`, and the volumes `pgdata` and `models` | removed: `compose down --volumes` | removed |
-| The images in this install's compose files | removed: `compose down --rmi all`, by name, never a prune | removed |
+| The images in this install's compose files, every tag of fxbot's own, and llama.cpp's CUDA image from the GPU's trial | removed: `compose down --rmi all`, then each by name, never a prune | removed |
+| Older tags of pgvector's and llama.cpp's, from releases before `fxbot update` removed them | listed: another project may use those images | listed |
 | The computer, when its override or its user is there | removed: `fxbot computer off` | removed |
 | ufw's rules marked `fxbot` | removed | removed |
 | The units, `/usr/local/bin/fxbot`, and `/opt/fxbot` | removed | removed |
@@ -487,10 +505,10 @@ Uninstall fxbot? [y/N]
 | Docker's repository, when `setup.sh` added it | listed, with its two files | listed |
 | podman, Docker, and their other containers | left alone | left alone |
 
-- **The order:** ask; back up; remove the computer's override, then `fxbot computer off`, so its script doesn't start fxbot again; disable and stop the units; `compose down --volumes --rmi all`; the ufw rules; the files; with `--purge`, the user. Each step that fails says so and the rest go on, so a second run finishes what the first left.
-- **The computer's script** is the copy in `/opt/fxbot/computer-setup.sh`, which `fxbot computer on` saved, so uninstall works with no network. It downloads it only when there's no copy.
+- **The order:** ask; stop `fxbot-control.path`, so the app can't ask for the computer, an update, or the embedder midway; back up, leaving the app stopped; remove the computer's compose file, then the computer, so its script doesn't start fxbot again; disable and stop the other units; `compose down --volumes --rmi all`, and the other images; the ufw rules; read `/etc/fxbot/packages` into memory; the files; with `--purge`, the user. Each step that fails says so and the rest go on, so a second run finishes what the first left.
+- **The computer's script** is the copy in `/opt/fxbot/computer-setup.sh`, which uninstall runs itself with `--remove`, so it works with no network. `fxbot computer off` can't stand in: it always downloads the release's script first, and stops when it can't (`deploy/fxbot:302-305`). The copy is the script that last set the computer up, the right one to take it down. Uninstall downloads it only when there's no copy.
 - **`--yes`** skips the question, for an agent or a script. With no terminal and no `--yes`, it stops: "add --yes to uninstall without a question".
-- **What it prints last:** what it kept and how to restore it (`curl -fsSL https://fxbot.sh/setup.sh | sudo bash`, then `sudo fxbot restore /var/lib/fxbot/backups/<date>-uninstall`); the packages from `/etc/fxbot/packages`, with the package manager's command (`sudo apt-get purge <them>`, `sudo dnf remove`, `sudo zypper remove --clean-deps`, or `sudo pacman -Rns`) "if nothing else here uses them", and Docker's repository's two files when `setup.sh` added them; `sudo tailscale serve reset` when `tailscale serve status` shows port 8787; and, for the owner's devices, that the installed app goes from the home screen like any other, and that keys made for fxbot at providers are revoked there.
+- **What it prints last:** what it kept and how to restore it (`curl -fsSL https://fxbot.sh/setup.sh | sudo bash`, then `sudo fxbot restore /var/lib/fxbot/backups/<date>-uninstall`); the packages from `/etc/fxbot/packages`, with the package manager's command (`sudo apt-get purge <them>`, `sudo dnf remove`, `sudo zypper remove --clean-deps`, or `sudo pacman -Rns`) "if nothing else here uses them", and Docker's repository's two files when `setup.sh` added them; `sudo tailscale serve reset` when `tailscale serve status` shows port 8787; and, for the owner's devices, that the installed app goes from the home screen like any other, and that keys made for fxbot at providers are revoked there. With `--purge`, web pairing's keys go with the database, so each device paired at web.fxbot.sh gets **Forget on this device**, under its devices in the app, and a passkey made for it is deleted from the phone's passwords. Without it, a restore brings the keys back, and the devices reach fxbot again.
 - **Running from `/opt/fxbot`:** bash has the script open, so removing the folder doesn't stop it, and the last lines print from memory.
 - **A 0.2 install that moved** also has `/opt/fxbot/{repo,releases,current}`, which go with `/opt/fxbot`, and the machine's Postgres database, which uninstall names with its `dropdb` line, as `fxbot status` does.
 
@@ -505,8 +523,9 @@ Docs only, in [Run a checkout beside a release](https://fxbot.sh/docs/how-to/che
 - **New:** [Uninstall fxbot](https://fxbot.sh/docs/how-to/uninstall/), a how-to: the command, `--purge`, what's left and how to remove it, installing again on a backup, and the steps by hand.
 - **New:** **Fix an install that stopped**, a how-to: each line `setup.sh` prints after `fxbot setup stopped:`, and its fix, with ufw's `EAI_AGAIN db` and Docker's snap. And the computer's: Ubuntu 22.04's `docker.io` (`#docker-io`), switched to `docker-ce` by `sudo fxbot down`, `sudo apt-get remove docker.io`, which keeps `/var/lib/docker`, Docker's repository and `docker-ce` as [Docker's docs](https://docs.docker.com/engine/install/ubuntu/) give them, and `sudo fxbot up`; and a podman too old for the computer (`#podman`). And pacman's old package lists (`#pacman`).
 - **New:** **Run fxbot on a Mac**, the how-to above.
-- **Changed:** [Back up fxbot](https://fxbot.sh/docs/how-to/back-up/) uses `fxbot backup`, and gains **Move to a new machine**. [Commands](https://fxbot.sh/docs/reference/commands/): `backup`, `uninstall`, `FXBOT_ENGINE`, `FXBOT_PORT`, and the checks. [What setup.sh creates](https://fxbot.sh/docs/reference/install-layout/): `/etc/fxbot/packages`, ufw's rule, and what uninstall removes. [Your first fxbot](https://fxbot.sh/docs/tutorials/first-fxbot/): the CPU, memory, and disk under **You need**, the distros, and, for a Mac, a link to its page. The home page's install step and its **Machine** line (`src/home.tsx:77`, `src/home.tsx:191`) name the distros, as [open question 12](#5-open-questions) has them, and add "or a Mac, in a Linux VM". [Commands](https://fxbot.sh/docs/reference/commands/) gains a table of the distros, the package manager each uses, and the engines fxbot and the computer get on each. The computer's pages, as above, with the packages on each package manager, in place of PR #11's line. `agent-setup.txt`'s first check names the distros too.
+- **Changed:** [Back up fxbot](https://fxbot.sh/docs/how-to/back-up/) uses `fxbot backup`, and gains **Move to a new machine**. [Commands](https://fxbot.sh/docs/reference/commands/): `backup`, `uninstall`, `FXBOT_ENGINE`, `FXBOT_PORT`, and the checks. [What setup.sh creates](https://fxbot.sh/docs/reference/install-layout/): `/etc/fxbot/packages`, ufw's rule, and what uninstall removes. [Your first fxbot](https://fxbot.sh/docs/tutorials/first-fxbot/): the CPU, memory, and disk under **You need**, the distros, and, for a Mac, a link to its page. The home page's install step, its footer, and its **Machine** line (`src/home.tsx:76`, `:169`, `:239`) name the distros, as [open question 12](#5-open-questions) has them, and add "or a Mac, in a Linux VM". [Commands](https://fxbot.sh/docs/reference/commands/) gains a table of the distros, the package manager each uses, and the engines fxbot and the computer get on each. The computer's pages, as above, with the packages on each package manager, in place of PR #11's line. `agent-setup.txt`'s first check names the distros too.
 - **`agent-setup.txt`:** its checks say `setup.sh` checks too, and a last section says how to uninstall, with the owner's yes first and `--yes` in the command.
+- **Web pairing's pages:** [Forward or map a port](https://fxbot.sh/docs/how-to/forward-a-port/) loses its caveat about the computer's file, since `compose.override.yaml` is the owner's alone, and gains ufw's line if M2 finds it needed. The uninstall page says what `--purge` means for paired devices and passkeys. [The computer](https://fxbot.sh/docs/reference/computer/) names `compose.computer.yaml` in place of the override.
 - **README:** a row each for `backup` and `uninstall` in the commands table, and a line each under Install on a Mac and on how to uninstall. `src/sidebar.ts` lists the three pages.
 - **`CHANGELOG.md`,** under `## Unreleased`: the computer on Ubuntu's `docker.io`, the other distros, with Arch's line thanking Olen Thompson for [PR #11](https://github.com/iammrduncan/fxbot/pull/11), the checks, `fxbot backup`, and `fxbot uninstall`. No migration, and nothing in the plugin API.
 
@@ -538,14 +557,14 @@ Docs only, in [Run a checkout beside a release](https://fxbot.sh/docs/how-to/che
 
 | Part | Change | Lines |
 | --- | --- | --- |
-| `plugins/computer/host/setup.sh` | the engine's order, the packages on four package managers, the cgroups and user namespace checks, the messages, `/etc/fxbot/packages` | about 40, and about 10 removed |
+| `plugins/computer/host/setup.sh` | the engine's order, the packages on four package managers, the cgroups and user namespace checks, the messages, `/etc/fxbot/packages`, SELinux's storage rule and its `label=disable`, its own compose file | about 48, and about 10 removed |
 | `plugins/computer/README.md`, `plugin.json` | the engine on each distro, and 0.3.2 | about 8 |
 | `setup.sh` | the checks, the system's with the Mac's commands, two inputs, the engine, Docker's repository, the four package managers, SELinux's labels, the pull, the old database, the packages, the end, `main` | about 140, and about 15 removed |
-| `deploy/fxbot` | `backup`, `uninstall`, ufw's and firewalld's rules, `status`, `logs`, the usage | about 100 |
+| `deploy/fxbot` | `backup`, `uninstall`, ufw's and firewalld's rules, `status`, `logs`, the usage, the images an update and a failed GPU trial leave, the computer's compose file, rotate-key's `:z` | about 108 |
 | `deploy/compose.yaml`, `deploy/health` | `FXBOT_PORT` inside the app's container too; `:z` on the three folders, and the key as a bind in place of `secrets:` | about 9 |
 | Website, `README.md`, `CHANGELOG.md`, `agent-setup.txt` | three new pages, the Mac in `agent-setup.txt` and on the home page, and the others above | about 300 |
 
-Size: about 285 lines of shell, and about 350 of docs.
+Size: about 300 lines of shell, and about 360 of docs.
 
 ## 4. Checklist
 
@@ -556,7 +575,7 @@ Print each check's setup, and match exact fields.
 **The bound:**
 - **Size:** at most 310 lines of shell.
 - **Out of scope:** [Not in this phase](#not-in-this-phase).
-- **If it must be cut,** the end's address lines go first, then ufw's rule, then the old database, then zypper, leaving openSUSE for later. The computer's engine, the checks, apt, dnf, and pacman, `backup`, `uninstall`, and their docs stay.
+- **If it must be cut,** the end's address lines go first, then ufw's rule, then the old database, then removing the images an update leaves, then zypper, leaving openSUSE for later. The computer's engine, the checks, apt, dnf, and pacman, `backup`, `uninstall`, and their docs stay.
 
 **M1. The computer on every engine** (a fix: it can be built and released first)
 - [ ] Before the change, on Ubuntu 24.04 with `docker.io`: the computer's setup stops with "dockerd-rootless.sh isn't installed". On Ubuntu 24.04 with podman from `setup.sh`: a computer's first start, as it is today, and what it says. Record both in `computer.md`.
@@ -568,12 +587,13 @@ Print each check's setup, and match exact fields.
 - [ ] Debian 12 on podman 4.3 stops with `#podman`'s message, Ubuntu 22.04 on `docker.io` with `#docker-io`'s, and both change nothing. Amazon Linux 2023 stops too.
 - [ ] The cgroups v2 and user namespace checks are read in the diff, with a stubbed `stat` and `/proc/sys` values run through each.
 - [ ] `--remove` takes it all away, and the packages stay.
+- [ ] The script writes `compose.computer.yaml`, and the app reaches the engine through it. An old `compose.override.yaml` with the marker and an owner's `ports` line loses only the computer's three lines, and one with nothing else is deleted. `--remove` leaves the owner's file alone.
 - [ ] The computer's docs and README, 0.3.2, `CHANGELOG.md`, and `computer.md`'s **What the build changed** say so.
 
 **M2. `setup.sh`**
 - [ ] Each stop comes before apt changes anything, checked with `dpkg -l` before and after: port 8787 held by another program, a `docker` under `/snap/` (a stub file stands in), and no systemd (a machine run without `--systemd`). The CPU and disk checks are read in the diff, with a stubbed `uname` and `df` run through each.
 - [ ] Memory under 1 GB warns and carries on.
-- [ ] `FXBOT_PORT=8790` installs on 8790: `.env` has it, the app listens on it inside its container, the health check and the end use it, and `fxbot update` keeps it. An MCP server's OAuth sign-in from `http://127.0.0.1:8790`, against a mock authorization server, comes back to 8790 and finishes.
+- [ ] `FXBOT_PORT=8780` installs on 8780: `.env` has it, the app listens on it inside its container, the health check and the end use it, and `fxbot update` keeps it. An MCP server's OAuth sign-in from `http://127.0.0.1:8780`, against a mock authorization server, comes back to 8780 and finishes.
 - [ ] With Docker running and podman installed, it picks docker. With `FXBOT_ENGINE=podman` on the same machine, podman. On Fedora with `podman-docker` and no Docker, podman.
 - [ ] A fresh Debian 12 and a fresh Ubuntu 22.04 get `docker-ce` from Docker's repository, and neither gets `docker.io`. With the key file changed on the mirror, it stops before apt runs.
 - [ ] A fresh Fedora 45, Alma 9 and 10, Tumbleweed, Leap 16, and Arch get podman from their package manager. On Alma, Compose is the download; on the rest, the package.
@@ -581,8 +601,8 @@ Print each check's setup, and match exact fields.
 - [ ] With `/run/ostree-booted` there, it stops before anything changes.
 - [ ] The pull shows its progress in a terminal.
 - [ ] On Fedora 45 with firewalld running in the machine: fxbot answers, `firewall-cmd --reload` runs, and fxbot still reaches its database, with `netavark-firewalld-reload` enabled. Before the change, the same reload's `EAI_AGAIN db` is recorded.
-- [ ] The compose file's `:z` and the key's bind: the lifecycle passes on Debian 13 and Ubuntu 24.04, where SELinux is off, and on both engines. On a Fedora 45 VM with SELinux enforcing (this machine has `/dev/kvm`; qemu is a new package, so with the owner's go-ahead), an install answers, a restore and an update pass, the computer's podman runs with its storage labelled, and `ausearch -m avc` shows nothing of fxbot's. Without the VM, the human's Fedora check stands in.
-- [ ] With ufw active and denying incoming, an install on podman answers, and `ufw status` shows the rule marked `fxbot`. After `fxbot down` and `up`, it still answers.
+- [ ] The compose file's `:z` and the key's bind: the lifecycle passes on Debian 13 and Ubuntu 24.04, where SELinux is off, and on both engines. On a Fedora 45 VM with SELinux enforcing (this machine has `/dev/kvm`; qemu is a new package, so with the owner's go-ahead), an install answers, the lifecycle passes, `rotate-key` included, the computer's podman runs with its storage labelled, the app reaches the computer's socket (the plugin says it's ready), and `ausearch -m avc` shows nothing of fxbot's. Without the VM, the human's Fedora check stands in.
+- [ ] With ufw active and denying incoming, an install on podman answers, and `ufw status` shows the rule marked `fxbot`. After `fxbot down` and `up`, it still answers. With web pairing's UDP range published by an override, a UDP packet from another machine on the network reaches the app's container, on podman's nftables driver and on Docker; if it doesn't, the forward-a-port page gets ufw's line.
 - [ ] With `/opt/fxbot` removed by hand, `setup.sh` comes back on the same bots and chats, and a provider's key still opens.
 - [ ] `/etc/fxbot/packages` names the package manager and lists exactly what it installed, on Debian 13, Ubuntu 22.04 (with Docker's repository's two files), Fedora 45, Tumbleweed, and Arch.
 - [ ] An install that apt would answer by removing a package stops before it, and changes nothing. A held package that conflicts stands in for one.
@@ -593,16 +613,19 @@ Print each check's setup, and match exact fields.
 - [ ] `fxbot backup` writes a folder with `database.dump` and `data.tar.gz`, and the app answers again after. On a fresh machine, `setup.sh`, the key, and `fxbot restore` of that folder bring back the same bots, chats, and library, and a provider's key opens.
 - [ ] `fxbot status` says whether fxbot answers, both ways.
 - [ ] `fxbot logs | head` exits, and `fxbot logs` in a terminal follows.
+- [ ] After an update from the last release, only the new release's images of fxbot's three are left. After a failed update, the old ones are still there. After `fxbot embedder gpu` on a machine with no GPU, the CUDA image is gone.
+- [ ] With web pairing's keys in the database, a restore on another machine listens at the relay under the same address, and the move's page says to stop the old one first: two listeners on one address are seen to replace each other at a local relay (`npm run dev --prefix packages/web-app`).
 
 **M4. Uninstall**
 - [ ] `fxbot uninstall` shows what it removes and keeps, and **N**, or no answer, changes nothing.
-- [ ] **y** leaves no container, volume, image, unit, or ufw rule of fxbot's, no `/opt/fxbot`, and no `fxbot` command. `/var/lib/fxbot`, `/etc/fxbot`, and the user stay, with the new backup.
+- [ ] **y**, on an install updated once and with a failed GPU trial, leaves no container, volume, image, unit, or ufw rule of fxbot's, no `/opt/fxbot`, and no `fxbot` command. `/var/lib/fxbot`, `/etc/fxbot`, and the user stay, with the new backup.
 - [ ] Another compose project's containers, volumes, and images on the same engine are all still there.
 - [ ] `setup.sh`, then `fxbot restore` of the uninstall's backup, brings back the same bots, chats, and providers.
 - [ ] `--purge` leaves nothing of fxbot's: the paths in [What setup.sh creates](https://fxbot.sh/docs/reference/install-layout/), the user, the volumes, the images, the units, the rules, and the computer's user and firewall table.
 - [ ] With the computer set up, its user, computers, firewall, and units are gone, with the network off.
 - [ ] With no terminal, it stops without `--yes`, and runs with it.
 - [ ] A second run after one stopped partway finishes.
+- [ ] `fxbot-control.path` stops before the backup, read in the diff, and a request dropped into `control/requests/` during an uninstall is never carried out.
 - [ ] The packages it lists are those in `/etc/fxbot/packages`, and the Tailscale line shows only when `tailscale serve` serves 8787.
 
 **M5. On a Mac**
@@ -622,7 +645,9 @@ Print each check's setup, and match exact fields.
 - **A fresh VPS on Ubuntu 22.04,** the same, on the `docker-ce` it gets.
 - **An Arch machine, and a Fedora machine with SELinux enforcing and firewalld on:** install, **Essentials** with the computer, a bot's computer, an update from Settings, and a reboot.
 - **The owner's machine with ufw:** the update that brings ufw's rule, with nothing done by hand.
-- **On a Mac, Apple silicon or Intel:** `curl … | sudo bash` gives the Mac's message. Then the page's steps: Lima, Debian 13, `setup.sh` in the VM, `http://127.0.0.1:8787` in the Mac's browser through the static rule, and, once, without it, to see whether Lima's own forwarding finds podman's port (the part this plan can't check here), a bot that answers, **Essentials** with a computer that can't reach the Mac, a restart of the Mac with `start-at-login`, and `limactl delete`. And once, an agent on the Mac following `agent-setup.txt`.
+- **Web pairing from an install `setup.sh` made:** **Essentials**, then a phone paired on the machine's own Wi-Fi, and the same phone on cellular with Wi-Fi off, with what **Reachability** says in the container. This settles [open question 15](#5-open-questions): the owner's own checks ran on a checkout, outside any container.
+- **Move to a new machine** with a paired phone: backup, the old one stopped, restore on the new one, and the phone reaches it with nothing done on the phone.
+- **On a Mac, Apple silicon or Intel:** `curl … | sudo bash` gives the Mac's message. Then the page's steps: Lima, Debian 13, `setup.sh` in the VM, `http://127.0.0.1:8787` in the Mac's browser through the static rule, and, once, without it, to see whether Lima's own forwarding finds podman's port (the part this plan can't check here), a bot that answers, **Essentials** with a computer that can't reach the Mac, a restart of the Mac with `start-at-login`, **Reachability** under **Settings** › **Web pairing** in the VM, and `limactl delete`. And once, an agent on the Mac following `agent-setup.txt`.
 - **The words:** do the stops and the uninstall's question tell a newcomer what to do?
 
 ## 5. Open questions
@@ -632,7 +657,7 @@ Each has a default the build follows unless the owner changes it.
 1. **The computer's engine.** *Default:* rootless podman where the distro has 4.9 or newer, beside whichever engine fxbot runs on, and the installed Docker, run rootless, where podman is older (Debian 12 and Ubuntu 22.04). On 2026-11-03 the owner made it the machine's own engine, podman or docker; that is what fails on Ubuntu 24.04's and 22.04's `docker.io`. The other way keeps it: the machine's own Docker first, rootless, wherever its packages can (`docker-ce`, Debian's `docker.io`, Fedora's `moby-engine`, openSUSE's `docker`), and podman only where they can't (Ubuntu's `docker.io`, Arch's, Amazon Linux's). Rootless Docker's daemon holds 183 MB all the time.
 2. **The computer's Docker branch.** *Default:* it stays. It runs the computer on Debian 12 and Ubuntu 22.04, where podman is too old, and for a user already set up on it. Removing it saves about 45 lines, leaves those two distros without a computer, and moves a user on it to podman, with their computers made again and their homes lost.
 3. **No systemd.** *Default:* `setup.sh` stops, since such an install never starts at boot or updates from Settings. The other way keeps today's install, and says what doesn't work.
-4. **ufw's rule.** *Default:* `fxbot up` adds it on podman, marked `fxbot`, and uninstall takes it away. Offered for 0.7.0 on 2026-11-07, not yet agreed. The other way: a check that prints the command.
+4. **ufw's rule.** *Default:* `fxbot up` adds it on podman, marked `fxbot`, and uninstall takes it away. Offered for 0.7.0 on 2026-11-07, not yet agreed, and 0.7.0 shipped without it. The other way: a check that prints the command.
 5. **What uninstall keeps.** *Default:* a backup, the key, and the user, as apt's `remove` keeps settings, with `--purge` for everything. The other way removes everything unless told `--keep`.
 6. **Packages.** *Default:* listed, with the command, never removed. podman or Docker may now run other things.
 7. **A running Docker wins.** *Default:* on a machine with a running Docker and an installed podman, a new install uses docker. Installs already made keep their engine.
@@ -643,3 +668,6 @@ Each has a default the build follows unless the owner changes it.
 12. **Which distros the docs name.** *Default:* those whose install and lifecycle pass in the checklist, by name, with "and the distros built on them". The rest of [Other distros](#other-distros) stay out of the docs until checked.
 13. **SELinux.** *Default:* `:z` in the compose file, and the key as a bind that can take it. The other way: `setup.sh` labels `/var/lib/fxbot` and the key with `semanage fcontext` and `restorecon`, falling back to `chcon`, and the compose file keeps `secrets:`.
 14. **firewalld.** *Default:* `fxbot up` turns on `netavark-firewalld-reload.service` on podman with firewalld running, and uninstall leaves it on. The other way: a check that prints the command, as open question 4's other way does for ufw.
+15. **Web pairing from the release's containers.** *Default:* the human's check above comes first. If a phone on the machine's own Wi-Fi connects, nothing changes, and the end of `setup.sh` names web pairing. If it doesn't, the compose file publishes 8790–8799/udp, and `fxbot up` passes the machine's addresses (its LAN's and its tailnet's, from `ip -o addr`) to the app in one variable, which the plugin gives werift as `iceAdditionalHostAddresses`. That's about 8 lines across the compose file, `deploy/fxbot`, and the plugin, and it opens those UDP ports on every interface. The other way: leave it to the forward-a-port override, as built, and the end names Tailscale only.
+16. **The computer's own compose file.** *Default:* the computer writes `compose.computer.yaml`, and `compose.override.yaml` is the owner's alone, in about 5 lines. Today the owner's web pairing ports go in the computer's file, which `fxbot computer off` deletes. The other way: one file, and the forward-a-port page's caveat stays.
+17. **Two fxbots on the same keys.** *Default:* the move's page says to stop the old one first. The other way adds a fix to web pairing, recorded in its build notes: a listener the relay replaced (code 4000) stops listening, and its tab says another fxbot holds this address, with **Remote access** off and on to take it back, in about 4 lines. Only a live listener hears that code, since one the plugin gave up on is closed already, so the newer fxbot keeps the devices.
