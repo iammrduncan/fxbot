@@ -1,6 +1,16 @@
-// werift 0.25.2's SCTP fixes, applied to its bundle by rolldown.config.mjs, each an exact replacement that must match once.
-// Found by loading fxbot's page over a channel with 3 to 5% packet loss, which stalled it within a minute.
+// werift 0.25.2's fixes, applied to its bundle by rolldown.config.mjs, each an exact replacement that must match once.
+// The SCTP ones were found by loading fxbot's page over a channel with 3 to 5% packet loss, which stalled it within a
+// minute, and the consent one by a phone on cellular, whose connection dropped 30 seconds into loading a page.
 export const patches = [
+  // Consent to send: each check waits out the whole 30-second window for its answer, and the next check doesn't cancel
+  // it. werift waited twice the last round trip, at least half a second, and gave up on a check when it sent the next,
+  // so on a busy cellular link, whose round trips grow past a second while a page loads, every answer came too late,
+  // and it called a working path dead after 30 seconds. Browsers take an answer for up to a minute.
+  ["const responseTimeout = consentResponseTimeoutMs(nominated.rtt);", "const responseTimeout = CONSENT_TIMEOUT * 1e3;"],
+  [
+    "          this.consentRequestAbort?.abort();\n          const requestAbort = new AbortController();\n          this.consentRequestAbort = requestAbort;",
+    "          const requestAbort = new AbortController();\n          this.consentRequestAbort = requestAbort;",
+  ],
   // Ordered delivery: after handing up a message, the next one starts fresh, with its own sequence check. werift kept the
   // last message's start, so a message already waiting was compared with the wrong TSN and left behind until another
   // chunk arrived on its stream, which, for a request waiting on its answer, is never.
