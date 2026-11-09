@@ -134,10 +134,10 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
 
   // A host's own list, with what it says itself of each model: OpenRouter's shape, Groq's, vLLM's, and Hugging Face's
   // router, which lists each provider behind a model.
-  function ownList(body: any): Model[] {
+  function ownList(body: any, textOnly = false): Model[] {
     return (Array.isArray(body?.data) ? body.data : []).flatMap((m: any) => {
       if (typeof m?.id !== "string") return [];
-      if (Array.isArray(m.architecture?.output_modalities) && !m.architecture.output_modalities.includes("text")) return [];
+      if (textOnly && Array.isArray(m.architecture?.output_modalities) && !m.architecture.output_modalities.includes("text")) return [];
       const behind: any[] = Array.isArray(m.providers) ? m.providers : [];
       const context = m.context_length ?? m.context_window ?? m.max_model_len ?? (behind.length ? Math.max(0, ...behind.map((p) => Number(p.context_length) || 0)) || undefined : undefined);
       const tools = behind.length ? behind.some((p) => p.supports_tools) : Array.isArray(m.supported_parameters) ? m.supported_parameters.includes("tools") : undefined;
@@ -157,7 +157,7 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
     else if (entry.models === "catalog") list = fromCatalog();
     else
       try {
-        list = ownList(await getJson(access.fetch ?? fetch, `${record.baseUrl}/models`, { headers: bearer(access.apiKey) }, "The model list")).filter((m) => !md.other.has(m.id));
+        list = ownList(await getJson(access.fetch ?? fetch, `${record.baseUrl}/models`, { headers: bearer(access.apiKey) }, "The model list"), record.kind === "anyrouter").filter((m) => !md.other.has(m.id));
       } catch (error) {
         // A server with no list there: the catalog's, or the ids typed for it.
         const upstream = (error as { upstream?: number }).upstream;

@@ -20,7 +20,7 @@ fxbot fills in the API address, `https://anyrouter.dev/api/v1`. The key is sent 
 
 ## Models and access
 
-fxbot reads AnyRouter's model list and shows models that return text. Use the model's full ID, including its provider prefix. The list includes models that may require a paid plan, credits, or a connected provider key. A model appearing in the list does not guarantee your account can run it. Check its access requirements in the [model catalog](https://anyrouter.dev/models).
+fxbot reads AnyRouter's model list and omits models that declare non-text output. Choose a chat model and use its full ID, including its provider prefix. Models may require a paid plan, credits, or a connected provider key. A model appearing in the list does not guarantee your account can run it. Check its access requirements in the [model catalog](https://anyrouter.dev/models).
 
 ## When it fails
 
