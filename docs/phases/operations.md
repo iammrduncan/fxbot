@@ -6,10 +6,10 @@ Getting fxbot onto a machine, keeping it running, and taking it off again, with 
 - **`setup.sh` checks before it changes anything,** and stops with what to do: a port in use, a Docker from snap, a CPU with no image, too little disk. It picks the engine that's already running, takes the engine and the port from the owner when asked, and shows its downloads as they go.
 - **One command takes fxbot off the machine:** `sudo fxbot uninstall`, which keeps a backup and the key unless told `--purge`, and says what's left and how to remove it.
 - **One command backs it up:** `sudo fxbot backup`, for moving to a new machine, and before an uninstall.
-- **A Mac installs with the same one line.** `setup.sh` on macOS asks once, yes by default, then makes a Linux VM with Lima and Debian 13, the distro fxbot and its computer were checked on, installs fxbot in it, starts it at login, gives the Mac an `fxbot` command, and opens the app at `http://127.0.0.1:8787`. No Homebrew and no password.
-- **The docs say how:** a page to uninstall, a page for a Mac, and a page with the fix for each way an install stops.
+- **A Mac or Windows gets a clear stop,** before anything changes: fxbot runs on Linux. A Mac's own install is a phase of its own, [Mac support](mac-support.md).
+- **The docs say how:** a page to uninstall, and a page with the fix for each way an install stops.
 
-Status: planned on 2026-11-07, for 0.8.0, not built. Researched the same day against the research directive's references, nine other installers' scripts, Debian's and Ubuntu's package indexes, and the docs and source of Lima, OrbStack, and Multipass for a Mac. Widened on 2026-11-09 to Arch, after reviewing [PR #11](#arch-and-pr-11), and to the other popular distros: each put to its own package manager in a throwaway container, with how the directive's references and other installers handle distros and a Mac read from their code, and the Mac's tools read again. Re-reviewed later on 2026-11-09 against `release/0.8.0`, with web pairing built: web pairing from the release's containers, the images an update leaves, SELinux's two other mounts, uninstall's order and its offline computer script, a move to a new machine with paired devices, and the computer's override shared with the owner's ports were added, and the line numbers read again. Then, at the owner's word, the Mac's install became the whole install, from the same one line, on Lima 2.2.1 read from its release and source, with [a handoff](#the-mac-handoff) for a session on the owner's Mac to check it. Where this plan says *likely*, the checklist checks it before the build relies on it. The owner's questions are answered in [fxbot today](#fxbot-today-the-owners-questions).
+Status: planned on 2026-11-07, for 0.8.0, not built. Researched the same day against the research directive's references, nine other installers' scripts, Debian's and Ubuntu's package indexes, and the docs and source of Lima, OrbStack, and Multipass for a Mac. Widened on 2026-11-09 to Arch, after reviewing [PR #11](#arch-and-pr-11), and to the other popular distros: each put to its own package manager in a throwaway container, with how the directive's references and other installers handle distros and a Mac read from their code, and the Mac's tools read again. Re-reviewed later on 2026-11-09 against `release/0.8.0`, with web pairing built: web pairing from the release's containers, the images an update leaves, SELinux's two other mounts, uninstall's order and its offline computer script, a move to a new machine with paired devices, and the computer's override shared with the owner's ports were added, and the line numbers read again. Then the Mac's install, widened at the owner's word to the whole install, moved to a phase of its own, [Mac support](mac-support.md), with its research and a handoff for a session on the owner's Mac, once the owner asked whether fxbot needs the VM at all, or only its computer does. Where this plan says *likely*, the checklist checks it before the build relies on it. The owner's questions are answered in [fxbot today](#fxbot-today-the-owners-questions).
 
 ## What the owner asked
 
@@ -25,7 +25,7 @@ Status: planned on 2026-11-07, for 0.8.0, not built. Researched the same day aga
 
 Then: "also what if user is on macos?"
 
-Later on 2026-11-09, on `setup.sh` printing a Mac's steps rather than running them: "yeah lets do that, but default to [Y/n] on use lima .. But I really want a fully baked mac install... tons of mac users in ths persona ... they need one line install and then access their agent. That sets up the application and the get robust going. When we are ready for mac section I can clone repo to my mac and open claude there and have it pick up a handoff from you so it can do automated testing etc..."
+Later on 2026-11-09, after the Mac's install grew to the whole install: "Is it possible to only use lima vm for the "computer" portion of fxbot and just have normal fxbot installed natively on the mac? … Ok this feels bigger. I want you to cut this scope from this phase and move it to a phases/mac-support.md". So it moved, to [Mac support](mac-support.md).
 
 On 2026-11-09, after [PR #11](https://github.com/iammrduncan/fxbot/pull/11), "Add support for Arch Linux": "Lets credit them on our arch implementation from their PR. but lets do arch the right way and support it on our install. Also double check our install for mac and other popular linux distro's if needed. make sure install deals with the whole docker.io vs docker-ce rootless stuff." Then: "just do planning updates only."
 
@@ -96,16 +96,7 @@ If the owner's user meant fxbot itself on a rootless Docker, with no root engine
 | podman, netavark, aardvark-dns, nftables, Compose, or `docker.io`, whichever `setup.sh` installed | `apt-get purge`, if nothing else uses them. Nothing records which it installed. |
 | `tailscale serve --bg 8787`, if the owner ran it | `tailscale serve reset`. Left alone, the address answers 502. |
 
-**6. On a Mac.** `curl -fsSL https://fxbot.sh/setup.sh | sudo bash` runs in macOS's own bash 3.2 and stops at line 29, changing nothing: "this script is for Debian and Ubuntu. Elsewhere, follow the README's steps." Without `sudo`, it first says to run it as root. Neither says what a Mac owner can do. [Your first fxbot](https://fxbot.sh/docs/tutorials/first-fxbot/) and the home page ask for "a Debian or Ubuntu machine", and `agent-setup.txt` says fxbot "doesn't run on macOS or Windows", and has the agent ask which Linux machine to use.
-
-A release install can't run on macOS itself:
-- `setup.sh` and the `fxbot` command need apt and systemd: `fxbot.service` starts it at boot, and `fxbot-control.path` carries out Settings' updates.
-- Compose bind-mounts `/var/lib/fxbot` and `/etc/fxbot/secret.key`, owned by a system user, `fxbot`, whose ids the app runs as.
-- The computer needs a Linux kernel: a rootless engine for a user of its own, with cpu, memory, and pids delegated by systemd, and an nftables firewall that matches that user's uid.
-
-Docker Desktop, OrbStack's Docker, and Podman Desktop run their containers in a Linux VM of their own already, but none is a Linux machine where `setup.sh` runs: podman's machine is Fedora CoreOS, with no apt, and Docker Desktop's VM has no shell for the owner. A checkout may run on the Mac itself, since libfx publishes `darwin-arm64` and `darwin-x64` builds (`package-lock.json`), with the database from `deploy/compose.dev.yaml` in any of those engines: unchecked, and for contributors, not owners.
-
-So a Mac runs fxbot in a Linux VM. fxbot's images are for arm64 and amd64, so a VM on Apple silicon or on an Intel Mac runs them natively. Its catch is the Mac's own sleep: while the Mac sleeps, so does fxbot, so a routine waits, and a phone can't reach it. A Mac that stays on, such as a Mac mini, is a fine home for it.
+**6. On a Mac.** `curl -fsSL https://fxbot.sh/setup.sh | sudo bash` runs in macOS's own bash 3.2 and stops at line 29, changing nothing: "this script is for Debian and Ubuntu. Elsewhere, follow the README's steps." Without `sudo`, it first says to run it as root. Neither says what a Mac owner can do. A Mac's own install is a phase of its own now, [Mac support](mac-support.md), with this part of the research.
 
 ### The directive's references
 
@@ -216,40 +207,6 @@ What the rest have in common, and where they differ:
 - **firewalld** is on by default on Fedora, RHEL and their rebuilds, and openSUSE. Ubuntu ships ufw, off until the owner turns it on, as the owner's own machine had. Debian and Arch have none.
 - **cgroups v2,** which the computer's limits need, is the default on every distro above. RHEL 8 and its rebuilds still boot cgroups v1.
 
-### Linux on a Mac
-
-Read from each tool's docs and source on 2026-11-07:
-
-| Tool | What it is | Reaching fxbot from the Mac | Starts with the Mac | Cost |
-| --- | --- | --- | --- | --- |
-| [Lima](https://github.com/lima-vm/lima) 2.3.0 | A real VM, on Apple's Virtualization framework on macOS 13.5 and later. `brew install lima`, then `limactl start --name fxbot template:debian-13`, with templates for Debian 12 and 13 and Ubuntu 22.04 to 26.04. By default up to 4 CPUs, up to 4 GiB of memory (half the Mac's, if less), and a 100 GiB disk. | Its built-in last rule forwards every TCP port the guest listens on at 127.0.0.1 to the Mac's 127.0.0.1 (`templates/default.yaml`). podman doesn't listen on fxbot's port (below), so a rule of its own forwards it | `limactl start-at-login fxbot`, through launchd (`cmd/limactl/start-at-login.go`) | Free and open source |
-| [OrbStack](https://docs.orbstack.dev/machines/) | Linux "machines" with systemd, on one shared Linux kernel. `orb create debian fxbot`, then `orb -m fxbot`. | "Any servers that you run in Linux machines are accessible from Mac" at `localhost`. A server on `0.0.0.0` or `::` reaches the network too; fxbot listens on 127.0.0.1 | With OrbStack | Free for personal use; $8 a month for work |
-| [Multipass](https://documentation.ubuntu.com/multipass/) | Ubuntu VMs from Canonical | No forwarding: SSH, or Tailscale in the VM | No | Free |
-| UTM | A VM with a window, set up by hand | By hand | No | Free |
-
-- **Lima's VM is a whole Linux machine,** with its own kernel, systemd, and apt, so `setup.sh` and the computer run in it as on any other. Its user has `sudo` without a password on a Linux guest, by default (`passwordlessSudo`). Its Debian 13 template is the distro fxbot and its computer were checked on, with podman 5.4.2.
-- **The computer in a VM:** Lima's address for the Mac, `host.lima.internal`, is 192.168.5.2, inside `192.168.0.0/16`, which the computer's firewall refuses, so a bot's computer *likely* can't reach the Mac. OrbStack's machines share one kernel, which its docs say "isn't a substitute for a full VM against actively malicious code" ([architecture](https://docs.orbstack.dev/architecture)), and a rootless engine nested in one, with its nftables table, is unchecked.
-- **Multipass's defaults** are 1 CPU, 1 GB of memory, and a 5 GB disk (`include/multipass/constants.h`), too small for fxbot, its database, and its embedder: it needs `--memory 4G --disk 20G`.
-- **Removing it all:** `limactl delete --force fxbot` deletes the VM and everything in it, then `brew uninstall lima`. `orb delete fxbot` does the same on OrbStack.
-
-Read again on 2026-11-09:
-- **Lima 2.3.0** (2026-11-06) still has `templates/debian-13.yaml` and `limactl start-at-login`, and runs on Apple's Virtualization framework (`vz`) from macOS 13.5.
-- **Lima forwards only a port something listens on** (`pkg/guestagent/guestagent_linux.go:152-160`), and rootful podman, which `setup.sh` picks on Debian 13, doesn't listen on the ports it publishes: it forwards them through the firewall, and calls `listen()` only with `force_port_listen` set, which is off by default (containers.conf's docs). So `http://127.0.0.1:8787` on the Mac *likely* gets nothing on podman, where Docker's `docker-proxy` does listen. A rule with `static: true` forwards a port from the VM's start, over SSH, whether anything listens yet or not (`pkg/hostagent/hostagent.go:729-730, 918-933`).
-- **Colima** 0.10.3 is a Lima VM of Ubuntu 24.04 with Docker running, and `colima ssh` opens a shell in it, so `setup.sh` *likely* runs there and takes its Docker, and the computer takes podman 4.9.3.
-- **Apple's `container`** 1.7.1 (2026-11-06) now makes long-lived machines that run an image's own init, systemd included (`docs/container-machine.md`), on Apple silicon with macOS 26 only. A later way, unchecked.
-- **podman machine** is Fedora CoreOS, which installs as a whole image, so `setup.sh` stops there.
-- **OrbStack** is free for personal use only: $8 a person a month for any work, freelancers' included.
-- **Homebrew** 7.0.12 still refuses to run as root (`Library/Homebrew/brew.sh:168-201`), so `setup.sh`, run with `sudo`, can't install Lima.
-
-Read once more on 2026-11-09, for an install that does it all, from Lima's release and its source at `v2.2.1`:
-- **Which Lima.** 2.3.0 came out on 2026-11-06, inside the two weeks fxbot waits before taking a version. 2.2.1 (2026-10-03) is the newest before it. Its release has `lima-2.2.1-Darwin-arm64.tar.gz` (50 MB) and `lima-2.2.1-Darwin-x86_64.tar.gz` (38 MB), with SHA-256s in `SHA256SUMS`: `9e9eacce88f37e185c346bad73aa6136f738d8cdf8c3bb23cd42b071824bc66e` and `6b776e4bc41f358e6ee01fefcc78e2eb26f11635a0fcff632234af77a566c6c4`. Lima's install docs give that archive as the way without Homebrew (`curl … | tar Cxzvm /usr/local`).
-- **What's in it,** unpacked here (arm64): `bin/limactl`, which carries `com.apple.security.virtualization`, the entitlement Apple's framework needs; the guest agent for a VM of the Mac's CPU (`share/lima/lima-guestagent.Linux-aarch64.gz`); and `templates/debian-13.yaml`, whose images are Debian's of 2026-10-01, pinned by SHA-512. Other CPUs' guest agents are in a separate archive, which fxbot doesn't need.
-- **What 2.2.1 has:** static port forwards (`pkg/limatype/lima_yaml.go:313`, `pkg/hostagent/hostagent.go:854-856`) and `limactl start-at-login`.
-- **Root:** `limactl` refuses it, with "limactl: must not run as the root user" (`cmd/limactl/main.go:35-38`). So `setup.sh`, under `sudo`, runs Lima as `$SUDO_USER`.
-- **The Mac's files:** every VM mounts the Mac's home folder by default, read-only (`templates/_default/mounts.yaml`).
-- **macOS:** Apple's framework needs macOS 13 (`pkg/driver/vz/vz_driver_darwin.go:268-270`), and on an Intel Mac, macOS 15.5 for Linux 6.12 or newer, Debian 13's kernel, with qemu as the other way (:271-275), which Lima's archive doesn't carry.
-- **bash 3.2 here:** Docker Hub's official `bash:3.2` image (updated 2026-11-05) runs macOS's version of bash on Linux, so the Mac's part can be parsed and run here, with stubs for the Mac's commands, before a Mac sees it.
-
 ## 2. Key takeaways
 
 1. **The computer's engine is rootless podman where the distro has 4.9 or newer, and the machine's own Docker, run rootless, where it doesn't.** podman 4.9 or newer is in every distro's packages but Debian 12's, Ubuntu 22.04's, and Amazon Linux 2023's. It sits beside either Docker, doesn't depend on whose `docker.io` this is, costs nothing between calls, and leaves one engine to set up and check. Where podman is older, the installed Docker runs rootless from its own packages: `docker-ce-rootless-extras`, Debian's `contrib/`, Fedora's `moby-engine-rootless-extras`, or openSUSE's `docker-rootless-extras`. Only Ubuntu's `docker.io` (22.04 and 24.04), Arch's `docker`, and Amazon Linux's have no way to, and carrying moby's script for them isn't needed: on 24.04 and Arch podman takes the computer, and on 22.04 `docker-ce` does. A computer already set up keeps its engine.
@@ -260,7 +217,7 @@ Read once more on 2026-11-09, for an install that does it all, from Lima's relea
 6. **Record what `setup.sh` installed, and say it at uninstall.** Pi-hole and k3s remove only what they added. fxbot lists it with the command to remove it, since the owner may now use podman or Docker for other things. Before it installs, apt's own simulation shows whether anything would be removed, and `setup.sh` stops if so, as agent-browser does.
 7. **A backup command.** Uninstall, moving to a new machine, and [Back up fxbot](https://fxbot.sh/docs/how-to/back-up/) all need the same four steps, so they become one.
 8. **Every stop has its fix on one page,** under the words `setup.sh` prints.
-9. **On a Mac, the same one line, and a Linux VM it makes itself.** Lima with Debian 13: free, a whole machine, the distro fxbot and its computer were checked on, forwarded to the Mac's own `127.0.0.1` by a static rule, since podman doesn't listen on its ports, started at login by launchd, and gone with one `limactl delete`. Lima's own archive, pinned and checked as Compose's is, needs no Homebrew, and Lima runs as the owner, so nothing asks a password, and an agent on the Mac can run the line too. It asks once, yes by default, as Pi's installer asks before it installs Node. A native macOS install would mean launchd units, a second `fxbot` command, and no computer, for the same Linux VM that any engine on a Mac runs anyway.
+9. **A Mac is its own phase,** [Mac support](mac-support.md). Here, `setup.sh` on macOS only stops, before anything else, and says what to do.
 10. **Find the package manager by its binary,** as OpenBot and agent-browser do. Every package fxbot needs has one name per package manager, so apt, dnf, zypper, and pacman cover Mint, Pop!_OS, Raspberry Pi OS, Rocky, Alma, Oracle, Manjaro, EndeavourOS, and CachyOS with no list to keep, where Tailscale, Coolify, and Docker each keep one by hand. os-release is read only for Docker's repository and for the words of a stop.
 11. **Never install `docker.io`.** Where a machine has no engine and its distro's podman is older than 4.9 (Debian 12, Ubuntu 22.04, and Mint 21, Pop!_OS 22.04, and Raspberry Pi OS 12), `setup.sh` installs Docker's own `docker-ce`, from Docker's repository with its key pinned, as Docker's docs and get.docker.com do, and Coolify does on Rocky. It runs fxbot, and runs rootless for the computer.
 12. **Only apt removes packages unasked.** dnf, zypper, and pacman each refused a conflict without a question, checked by installing `podman-docker` over their Docker. So the simulate step stays apt's, as agent-browser keeps it.
@@ -311,7 +268,7 @@ The script comes from the release's tag (`deploy/fxbot:302`), so the fix reaches
 
 | Check | When it fails |
 | --- | --- |
-| `uname -s` is Linux | On macOS, the Mac's install, [below](#on-a-mac). On Windows' own shells (`MINGW`, `MSYS`, `CYGWIN`), stops: "fxbot runs on Linux. On Windows, run this in WSL 2's Ubuntu, with systemd on." Anything else: "fxbot runs on Linux, and this is <system>." |
+| `uname -s` is Linux | On macOS, stops: "fxbot runs on Linux, and this is macOS. Run this on a Linux machine, or in a Linux VM on this Mac." On Windows' own shells (`MINGW`, `MSYS`, `CYGWIN`), stops: "fxbot runs on Linux. On Windows, run this in WSL 2's Ubuntu, with systemd on." Anything else: "fxbot runs on Linux, and this is <system>." |
 | A package manager it knows: the first of `apt-get`, `zypper`, `dnf`, and `pacman` (zypper before dnf, since openSUSE can carry dnf too) | Stops: "setup.sh installs through apt, dnf, zypper, or pacman: on Debian, Ubuntu, Fedora, RHEL and its rebuilds, openSUSE, Arch, and the distros built on them. This is <PRETTY_NAME from os-release>." With a link to the commands reference, in place of the README |
 | Packages can be installed: no `/run/ostree-booted` and no `transactional-update` | Stops: "this system installs software as a whole image (Fedora Silverblue or CoreOS, openSUSE MicroOS), so setup.sh can't add packages to it." |
 | systemd | Stops: "fxbot needs systemd, to start at boot and to update from Settings." On WSL, it adds how to turn systemd on. See [open question 3](#5-open-questions) |
@@ -321,13 +278,12 @@ The script comes from the release's tag (`deploy/fxbot:302`), so the fix reaches
 | 3 GB free where the engine keeps images: `/var/lib` | Stops, with what's free. The computer's image needs 1.2 GB more, later |
 | 1 GB of memory available | Warns, and carries on: fxbot, its database, and the embedder hold about 500 MB, and a computer about 120 MB at idle |
 
-The system check comes before root, so `curl … | bash` on a Mac, without `sudo`, goes to the Mac's install, not to "run it as root". It also comes before `main`'s definition (below), as the script's first command: bash runs each top-level command as it reads it, so on a Mac, bash 3.2 reads the Mac's part, a function defined and called before anything else, which ends in `exit`, and never parses the Linux part.
+The system check comes before root, so `curl … | bash` on a Mac, without `sudo`, gets the Mac's answer, not "run it as root". It also comes before `main`'s definition (below), as the script's first command: bash runs each top-level command as it reads it, so on a Mac, bash 3.2 reads only that check, and never parses the rest.
 
 The port check is today's (`setup.sh:237`), moved up: it stops when something answers on the port and `fxbot.service` isn't running.
 
-**Three inputs,** beside `FXBOT_FILES` and the others:
+**Two inputs,** beside `FXBOT_FILES` and the others:
 - `FXBOT_ENGINE`: `podman` or `docker`, for a fresh install. An install keeps the engine it has.
-- `FXBOT_VM`, on a Mac: the VM's name, `fxbot` by default. fxbot's folder on the Mac, `~/.fxbot`, takes the same name, so a check's VM, `fxbot-check`, keeps clear of an owner's own. With Lima's own `LIMA_HOME` and zsh's `ZDOTDIR`, a check changes nothing in the owner's home.
 - `FXBOT_PORT`: written to `/opt/fxbot/.env`, and used by the port check, the health check, and the last lines. Compose publishes it today (`deploy/compose.yaml:25`), but the app inside still listens on 8787, and an MCP sign-in reached over `http://127.0.0.1` comes back to `http://127.0.0.1:<the app's port>/callback` (`packages/server/src/index.ts:32`, `packages/sdk/src/mcp.ts:523`). So compose passes `FXBOT_PORT` to the app too and publishes it as the same port on both sides, and `deploy/health` checks `${FXBOT_PORT:-8787}`. Web pairing's bridge reaches the app at the same `localUrl`, so it follows.
 
 **The engine,** for a fresh install:
@@ -441,69 +397,7 @@ Where no package has Compose 2.26 or newer (RHEL and its rebuilds, Amazon Linux 
 
 ### On a Mac
 
-The same line installs it, `curl -fsSL https://fxbot.sh/setup.sh | sudo bash`, or without `sudo`, which a Mac doesn't need. `setup.sh` makes a Linux VM with Lima, installs fxbot in it as on any Linux machine, starts it with the Mac, and opens the app in the browser. The owner's next step is the app's own first run: **Essentials**, a provider, and a first bot. No Homebrew, and no password: Lima runs as the owner, and the VM's `sudo` asks none.
-
-**It asks once,** with yes as the default, reading the answer from `/dev/tty`, since the script itself comes in on standard input:
-
-```
-fxbot runs on Linux, so on a Mac it runs in a Linux VM, made with Lima.
-This downloads Lima 2.2.1 (50 MB) and Debian 13 (about 400 MB), and gives the VM up to
-4 CPUs, 4 GB of memory, and a disk that grows as it's used.
-Set fxbot up in a VM on this Mac? [Y/n]
-```
-
-**n** prints the steps by hand (below), with the page, and changes nothing. With no terminal, as an agent runs it, it takes the default and says so: the agent asked the person first, as `agent-setup.txt` says (below).
-
-**The checks, first,** changing nothing:
-
-| Check | When it fails |
-| --- | --- |
-| macOS 13.5 or newer (`sw_vers -productVersion`), on Apple silicon or Intel | Stops: "fxbot's VM needs macOS 13.5 or newer. Update macOS, then run this again." |
-| On an Intel Mac, macOS 15.5 or newer | Stops: "on an Intel Mac, Debian 13's kernel needs macOS 15.5 or newer." Lima warns of the same, and its other way, qemu, isn't in its archive |
-| 15 GB free in the home folder (`df -k ~`) | Stops, with what's free |
-| A user to run as: the one running it, or `$SUDO_USER` under `sudo` | Stops when root has no `SUDO_USER`: "run it as yourself, without sudo." Lima refuses root, so under `sudo` every step runs as `$SUDO_USER`, through `sudo -u`, and nothing runs as root |
-| The port is free on the Mac | Stops, with `FXBOT_PORT`, as on Linux |
-
-**The steps,** each said as it starts:
-1. **Lima.** A `limactl` on `PATH`, 2.2 or newer, is used as it is: the owner's own, from Homebrew or elsewhere. Otherwise fxbot's own copy, Lima 2.2.1, from Lima's release, checked against its SHA-256 for the Mac's CPU, as Compose's download is, and unpacked into `~/.fxbot/lima`. The archive carries `limactl`, signed with the entitlement Apple's framework needs, the guest agent for the VM's CPU, and the templates. A download by curl gets no quarantine flag, so Gatekeeper *likely* lets it run: checked on the Mac.
-2. **The VM.** `limactl start --name fxbot --tty=false --set '.mounts = [] | .portForwards += [{"guestPort": 8787, "hostPort": 8787, "static": true}]' template:debian-13`.
-   - `.mounts = []`: Lima mounts the Mac's home folder in every VM by default, read-only. fxbot needs nothing of the Mac's, and with no mount, the computer's user, in the same VM, can read none of it.
-   - The static rule forwards the port from the VM's start, since podman doesn't listen on it ([Linux on a Mac](#linux-on-a-mac)). With `FXBOT_PORT`, both ports are that one.
-   - Otherwise Lima's defaults: up to 4 CPUs, up to 4 GiB of memory (half the Mac's, when that's less), and a 100 GiB disk that fills as it's used.
-   - When the VM is there already, it's started if it's stopped, and reused.
-3. **fxbot in it.** `limactl shell fxbot -- bash -c 'curl -fsSL https://fxbot.sh/setup.sh | sudo FXBOT_PORT=… bash'`: the same script as on any Linux machine, with `FXBOT_FILES`, `FXBOT_IMAGE`, and `FXBOT_RELEASES_URL` passed on for checks. Its output goes to the Mac's terminal as it runs.
-4. **With the Mac.** `limactl start-at-login fxbot`, a launchd agent that starts the VM at login. In it, `fxbot.service` starts fxbot.
-5. **The Mac's `fxbot` command.** `~/.fxbot/bin/fxbot`, from the release's `deploy/fxbot-mac`, as Linux gets `deploy/fxbot`. One line in `${ZDOTDIR:-$HOME}/.zprofile`, zsh being macOS's shell, marked as fxbot's and written once, puts `~/.fxbot/bin` on `PATH`, as rustup's and Bun's installers do for theirs.
-6. **The app.** `open http://127.0.0.1:8787`, as the owner.
-
-**The end:**
-```
-fxbot 0.8.0 runs in a VM on this Mac, at http://127.0.0.1:8787, open in your browser.
-It starts when you log in. While the Mac sleeps, so does fxbot.
-In a new terminal:  fxbot status | logs | update | backup | uninstall
-From your phone:  https://fxbot.sh/docs/how-to/run-on-a-mac/#from-a-phone
-```
-
-**The Mac's `fxbot` command** (`deploy/fxbot-mac`, bash 3.2) runs without `sudo`: where the docs say `sudo fxbot …`, a Mac says `fxbot …`. `sudo fxbot` on a Mac finds no command, since `sudo`'s `PATH` leaves out the home folder, so the Mac's page says so once, and the command, run as root by some other way, runs itself again as `$SUDO_USER`, as `setup.sh` does.
-
-| Command | What it does |
-| --- | --- |
-| `fxbot open` | Opens `http://127.0.0.1:<port>` |
-| `fxbot start`, `fxbot stop` | Starts or stops the VM |
-| `fxbot backup` | `sudo fxbot backup` in the VM, then copies the folder out to `~/fxbot-backups/<date>`, with the key beside it as `secret.key`, which only the owner can read, through `limactl shell … sudo tar -cf -`, since the VM has no mount of the Mac's. It says to keep the key apart from the rest when the folder goes anywhere else |
-| `fxbot restore <folder>` | Copies the folder in, puts its `secret.key` in `/etc/fxbot` when it has one, then `sudo fxbot restore` and `sudo fxbot up` |
-| `fxbot uninstall [--purge] [--yes]` | Below |
-| Anything else | `limactl shell fxbot sudo fxbot <it>`: `status`, `logs`, `update`, `computer`, and the rest |
-
-**Run again,** the line leaves a working install alone: it starts the VM if it's stopped, runs `setup.sh` in it, which changes nothing on a working install, writes the Mac's `fxbot` command again, and replaces fxbot's own Lima when the release pins a newer one. A run that stopped partway goes on from where it stopped, and a failed step prints its last lines and `limactl delete --force fxbot`, to start over.
-
-**Uninstall on a Mac**, `fxbot uninstall`: it asks once, `[y/N]`, then backs up, as `fxbot backup` does, into `~/fxbot-backups/<date>-uninstall` unless `--purge`; turns off the start at login; deletes the VM, `limactl delete --force fxbot`; removes `~/.fxbot`, leaving the owner's own Lima when that's what ran it; and takes its line out of `.zprofile`. Last, it says what it kept and how to install again and restore it (the one line, then `fxbot restore`), and names Lima's download cache, `~/Library/Caches/lima`, with Debian's image in it, about 400 MB, to remove "if you don't use Lima for anything else". With no terminal and no `--yes`, it stops, as on Linux.
-
-**By hand,** for an owner who'd rather: the page lists the same steps as commands (Lima from Homebrew or its archive, `limactl start` as above, `setup.sh` in `limactl shell fxbot`, then `limactl start-at-login fxbot`). With OrbStack, `orb create debian fxbot`, then `orb -m fxbot`, and `setup.sh` in it, reached at `localhost` through OrbStack's own forwarding: free for personal use, paid for work. With Colima, `colima ssh` and `setup.sh` in its Ubuntu 24.04 and its Docker: *likely*, unchecked, so the page names it as untried.
-
-**From a phone:** Tailscale in the VM, `limactl shell fxbot`, then Tailscale's Linux install and `sudo tailscale serve --bg 8787`, so the VM has a tailnet name of its own. Web pairing from the VM goes through two NATs, the containers' and Lima's own network, and is unchecked: the Mac's checks read **Reachability** there. [Open question 15](#5-open-questions)'s addresses would be Lima's, not the Mac's, so on a Mac it wouldn't help. Not while the Mac sleeps: a Mac that stays on, such as a Mac mini, keeps fxbot reachable and its routines on time.
-
-**`agent-setup.txt`:** on a Mac, the agent no longer stops at step 1. It asks whether to set fxbot up in a VM on this Mac, says what that downloads and the memory it takes, and with a yes runs the one line itself, without `sudo`: nothing on a Mac asks a password. Asking which Linux machine to use stays as the other choice.
+`setup.sh` on macOS stops, changing nothing, in its first command (above): "fxbot runs on Linux, and this is macOS. Run this on a Linux machine, or in a Linux VM on this Mac." A Mac's own install is [Mac support](mac-support.md)'s, split from this phase on 2026-11-09.
 
 ### The `fxbot` command (`deploy/fxbot`)
 
@@ -568,13 +462,12 @@ Docs only, in [Run a checkout beside a release](https://fxbot.sh/docs/how-to/che
 
 ### The docs
 
-- **New:** [Uninstall fxbot](https://fxbot.sh/docs/how-to/uninstall/), a how-to: the command, `--purge`, what's left and how to remove it, installing again on a backup, the steps by hand, and a section for a Mac.
+- **New:** [Uninstall fxbot](https://fxbot.sh/docs/how-to/uninstall/), a how-to: the command, `--purge`, what's left and how to remove it, installing again on a backup, and the steps by hand.
 - **New:** **Fix an install that stopped**, a how-to: each line `setup.sh` prints after `fxbot setup stopped:`, and its fix, with ufw's `EAI_AGAIN db` and Docker's snap. And the computer's: Ubuntu 22.04's `docker.io` (`#docker-io`), switched to `docker-ce` by `sudo fxbot down`, `sudo apt-get remove docker.io`, which keeps `/var/lib/docker`, Docker's repository and `docker-ce` as [Docker's docs](https://docs.docker.com/engine/install/ubuntu/) give them, and `sudo fxbot up`; and a podman too old for the computer (`#podman`). And pacman's old package lists (`#pacman`).
-- **New:** **Run fxbot on a Mac**, a how-to: the one line, what it asks and downloads, the Mac's `fxbot` command, from a phone, sleep, backup and uninstall, and the steps by hand, with OrbStack and Colima.
-- **Changed:** [Back up fxbot](https://fxbot.sh/docs/how-to/back-up/) uses `fxbot backup`, and gains **Move to a new machine**. [Commands](https://fxbot.sh/docs/reference/commands/): `backup`, `uninstall`, `FXBOT_ENGINE`, `FXBOT_PORT`, and the checks. [What setup.sh creates](https://fxbot.sh/docs/reference/install-layout/): `/etc/fxbot/packages`, ufw's rule, and what uninstall removes. [Your first fxbot](https://fxbot.sh/docs/tutorials/first-fxbot/): the CPU, memory, and disk under **You need**, the distros, and, for a Mac, a link to its page. The home page's install step, its footer, and its **Machine** line (`src/home.tsx:76`, `:169`, `:239`) name the distros, as [open question 12](#5-open-questions) has them, and add "or a Mac, in a Linux VM". [Commands](https://fxbot.sh/docs/reference/commands/) gains a table of the distros, the package manager each uses, and the engines fxbot and the computer get on each. The computer's pages, as above, with the packages on each package manager, in place of PR #11's line. `agent-setup.txt`'s first check names the distros too.
+- **Changed:** [Back up fxbot](https://fxbot.sh/docs/how-to/back-up/) uses `fxbot backup`, and gains **Move to a new machine**. [Commands](https://fxbot.sh/docs/reference/commands/): `backup`, `uninstall`, `FXBOT_ENGINE`, `FXBOT_PORT`, and the checks. [What setup.sh creates](https://fxbot.sh/docs/reference/install-layout/): `/etc/fxbot/packages`, ufw's rule, and what uninstall removes. [Your first fxbot](https://fxbot.sh/docs/tutorials/first-fxbot/): the CPU, memory, and disk under **You need**, and the distros. The home page's install step, its footer, and its **Machine** line (`src/home.tsx:76`, `:169`, `:239`) name the distros, as [open question 12](#5-open-questions) has them. [Commands](https://fxbot.sh/docs/reference/commands/) gains a table of the distros, the package manager each uses, and the engines fxbot and the computer get on each. The computer's pages, as above, with the packages on each package manager, in place of PR #11's line. `agent-setup.txt`'s first check names the distros too.
 - **`agent-setup.txt`:** its checks say `setup.sh` checks too, and a last section says how to uninstall, with the owner's yes first and `--yes` in the command.
 - **Web pairing's pages:** [Forward or map a port](https://fxbot.sh/docs/how-to/forward-a-port/) loses its caveat about the computer's file, since `compose.override.yaml` is the owner's alone, and gains ufw's line if M2 finds it needed. The uninstall page says what `--purge` means for paired devices and passkeys. [The computer](https://fxbot.sh/docs/reference/computer/) names `compose.computer.yaml` in place of the override.
-- **README:** a row each for `backup` and `uninstall` in the commands table, and a line each under Install on a Mac and on how to uninstall. `src/sidebar.ts` lists the three pages.
+- **README:** a row each for `backup` and `uninstall` in the commands table, and a line on how to uninstall. `src/sidebar.ts` lists the two pages.
 - **`CHANGELOG.md`,** under `## Unreleased`: the computer on Ubuntu's `docker.io`, the other distros, with Arch's line thanking Olen Thompson for [PR #11](https://github.com/iammrduncan/fxbot/pull/11), the checks, `fxbot backup`, and `fxbot uninstall`. No migration, and nothing in the plugin API.
 
 ### Cost
@@ -584,7 +477,6 @@ Docs only, in [Run a checkout beside a release](https://fxbot.sh/docs/how-to/che
 - **Each start:** one `ufw status`, when ufw is installed and the engine is podman.
 - **A machine whose fxbot runs on Docker,** once the computer is added: about 45 MB of podman packages on disk (Ubuntu 24.04's podman is 42.6 MB installed), and nothing running between calls, where rootless Docker held 183 MB.
 - **On Debian 12 and Ubuntu 22.04,** where the computer runs on rootless Docker: its daemon's 183 MB, all the time, once the computer is added.
-- **On a Mac:** the VM's memory, up to 4 GiB, while it runs, and its disk, which grows as it's used; about 50 MB for fxbot's Lima, and about 400 MB for Debian's image in Lima's cache.
 
 ### Not in this phase
 
@@ -594,8 +486,7 @@ Docs only, in [Run a checkout beside a release](https://fxbot.sh/docs/how-to/che
 - **RHEL 8 and its rebuilds,** whose cgroups v1 the computer refuses. fxbot itself isn't checked there.
 - **The computer on Amazon Linux 2023,** which has no podman and no Docker that runs rootless. fxbot itself installs once `dnf install docker` has run.
 - **SLES,** whose packages weren't put to zypper here, and **Gentoo, Void, and Slackware,** with other package managers.
-- **fxbot on macOS itself,** without a VM: launchd units in place of systemd's, another `fxbot` command, and no computer, which needs a Linux kernel. Every engine on a Mac runs a Linux VM anyway.
-- **An Intel Mac before macOS 15.5,** whose VM can't run Debian 13's kernel on Apple's framework, and **Lima's qemu**, which its archive doesn't carry.
+- **A Mac's own install:** [Mac support](mac-support.md).
 - **Windows.** WSL 2's Ubuntu with systemd may run `setup.sh` as it is: unchecked. The system check names it.
 - **Proxmox's LXC containers,** which need nesting turned on for an engine to run inside.
 - **Removing packages** on uninstall.
@@ -611,11 +502,9 @@ Docs only, in [Run a checkout beside a release](https://fxbot.sh/docs/how-to/che
 | `setup.sh` | the checks, two inputs, the engine, Docker's repository, the four package managers, SELinux's labels, the pull, the old database, the packages, the end, `main` | about 140, and about 15 removed |
 | `deploy/fxbot` | `backup`, `uninstall`, ufw's and firewalld's rules, `status`, `logs`, the usage, the images an update and a failed GPU trial leave, the computer's compose file, rotate-key's `:z` | about 108 |
 | `deploy/compose.yaml`, `deploy/health` | `FXBOT_PORT` inside the app's container too; `:z` on the three folders, and the key as a bind in place of `secrets:` | about 9 |
-| `setup.sh`'s Mac part, before `main` | the Mac's checks, the question, Lima, the VM, `setup.sh` in it, start at login, the `PATH` line, `FXBOT_VM`, bash 3.2 only | about 60 |
-| `deploy/fxbot-mac` | the Mac's `fxbot` command: `open`, `start`, `stop`, `backup`, `restore`, `uninstall`, and the rest passed to the VM | about 40 |
-| Website, `README.md`, `CHANGELOG.md`, `agent-setup.txt` | three new pages, the Mac in `agent-setup.txt` and on the home page, and the others above | about 300 |
+| Website, `README.md`, `CHANGELOG.md`, `agent-setup.txt` | two new pages, and the others above | about 300 |
 
-Size: about 300 lines of shell for Linux, about 100 more for a Mac, and about 380 of docs.
+Size: about 300 lines of shell, and about 330 of docs.
 
 ## 4. Checklist
 
@@ -624,9 +513,9 @@ Checks run on machines made as the installer checks of 2026-11-05 made them: `po
 Print each check's setup, and match exact fields.
 
 **The bound:**
-- **Size:** at most 310 lines of shell for Linux, and 110 for a Mac.
+- **Size:** at most 310 lines of shell.
 - **Out of scope:** [Not in this phase](#not-in-this-phase).
-- **If it must be cut,** the end's address lines go first, then ufw's rule, then the old database, then removing the images an update leaves, then zypper, leaving openSUSE for later. On a Mac, the `fxbot` command's `backup` and `restore` go first, leaving them to the VM's own. The computer's engine, the checks, apt, dnf, and pacman, `backup`, `uninstall`, the Mac's install and its uninstall, and their docs stay.
+- **If it must be cut,** the end's address lines go first, then ufw's rule, then the old database, then removing the images an update leaves, then zypper, leaving openSUSE for later. The computer's engine, the checks, apt, dnf, and pacman, `backup`, `uninstall`, and their docs stay.
 
 **M1. The computer on every engine** (a fix: it can be built and released first)
 - [ ] Before the change, on Ubuntu 24.04 with `docker.io`: the computer's setup stops with "dockerd-rootless.sh isn't installed". On Ubuntu 24.04 with podman from `setup.sh`: a computer's first start, as it is today, and what it says. Record both in `computer.md`.
@@ -679,16 +568,12 @@ Print each check's setup, and match exact fields.
 - [ ] `fxbot-control.path` stops before the backup, read in the diff, and a request dropped into `control/requests/` during an uninstall is never carried out.
 - [ ] The packages it lists are those in `/etc/fxbot/packages`, and the Tailscale line shows only when `tailscale serve` serves 8787.
 
-**M5. On a Mac** (here, as far as Linux reaches; then on a Mac, from [the handoff](#the-mac-handoff))
-- [ ] The Mac's part of `setup.sh` and `deploy/fxbot-mac` parse under bash 3.2: `bash -n` in Docker Hub's `bash:3.2` image, pinned by its digest, run rootless as the `agent` user.
-- [ ] In that image, with stubs first on `PATH` for `uname` (`Darwin`, with `arm64` and `x86_64`), `sw_vers`, `df`, `limactl`, `curl`, `shasum`, and `open`: each check stops as its table says, and changes nothing; **n** changes nothing; no terminal takes yes; the stubbed `limactl` gets exactly the arguments above; a changed SHA-256 stops before anything's unpacked; a second run reuses the VM; and under a stubbed root with `SUDO_USER`, every `limactl` runs through `sudo -u`.
-- [ ] The system check is the script's first command, so a Mac never parses the Linux part: under bash 3.2, with something only bash 4 has put in the Linux part on purpose, the Mac's part still runs. With `MINGW64_NT-10.0` from the stub, the Windows line.
-- [ ] **Run fxbot on a Mac**, `agent-setup.txt`'s Mac steps, the tutorial's link, and the home page's lines are written, and `npm run build-site` checks their links.
-- [ ] The handoff below names what's built and how to check it, and the owner has pushed the branch.
-- [ ] On the owner's Mac, the handoff's checks, run by Claude Code there, with what it found and fixed committed on the release branch.
+**M5. Elsewhere**
+- [ ] With a stub `uname` first on `PATH`: `Darwin` stops with the Mac's line, as root and not, and changes nothing. `MINGW64_NT-10.0` gives the Windows line.
+- [ ] The system check is the script's first command, and uses nothing bash 3.2 lacks: `bash -n`, and a run with the `Darwin` stub, in Docker Hub's `bash:3.2` image, pinned by its digest, run rootless as the `agent` user.
 
 **M6. Docs and checks**
-- [ ] The three new pages, the changed ones, `agent-setup.txt`, the README, the sidebar, and `CHANGELOG.md`, as above.
+- [ ] The two new pages, the changed ones, `agent-setup.txt`, the README, the sidebar, and `CHANGELOG.md`, as above.
 - [ ] `npm run typecheck`, `npm run build-site`, `bash -n setup.sh deploy/fxbot plugins/computer/host/setup.sh`, and `git diff --check` pass. New files are checked for whitespace too.
 - [ ] The shell's lines are within the bound.
 - [ ] This doc's Status says built, with what the build changed. It moves to `docs/_completed/phases/`, and `AGENTS.md` and the README list it.
@@ -701,43 +586,8 @@ Print each check's setup, and match exact fields.
 - **The owner's machine with ufw:** the update that brings ufw's rule, with nothing done by hand.
 - **Web pairing from an install `setup.sh` made:** **Essentials**, then a phone paired on the machine's own Wi-Fi, and the same phone on cellular with Wi-Fi off, with what **Reachability** says in the container. This settles [open question 15](#5-open-questions): the owner's own checks ran on a checkout, outside any container.
 - **Move to a new machine** with a paired phone: backup, the old one stopped, restore on the new one, and the phone reaches it with nothing done on the phone.
-- **On a Mac:** the handoff's logout and login, and its sleep. An Intel Mac, if the owner has one. And the first minute as a newcomer sees it: the one line, the question, the waits, and the app in the browser.
+- **On a Mac:** `curl … | sudo bash` stops with the Mac's line.
 - **The words:** do the stops and the uninstall's question tell a newcomer what to do?
-
-### The Mac handoff
-
-For a Claude Code session on the owner's Mac, once M1 to M4 pass, M5's checks here pass, and the owner has pushed the release branch. The owner clones the repository on the Mac, opens Claude Code in it, and says: "Pick up the Mac handoff in docs/phases/operations.md."
-
-**Read first:** `AGENTS.md` and `CONVENTIONS.md`, this plan's [On a Mac](#on-a-mac), and the Mac's code: `setup.sh`'s part before `main`, and `deploy/fxbot-mac`. The repository's rules hold there too: commit on the release branch, by topic, and push only when the owner says; nothing private in what's committed (no hostnames, home paths, or personal details); and report only what ran.
-
-**Keep the owner's Mac as it was:**
-- Run every check as `FXBOT_VM=fxbot-check`, never as `fxbot`, which may be the owner's own install, with `LIMA_HOME` and `ZDOTDIR` set to folders of the check's own under `$TMPDIR`, so neither the owner's VMs nor their `.zprofile` change. Whether `start-at-login`'s launchd agent carries `LIMA_HOME` is itself a check, below.
-- Leave alone the owner's own Lima, VMs, Homebrew, shell files, and anything in `~/Library` that isn't the check's. If a check would change one of them, ask the owner first.
-- When done, `fxbot uninstall --purge --yes` for the check's VM, then show that nothing's left: `limactl list`, `launchctl list | grep fxbot-check`, the check's folders, and Lima's cache only if the check made it.
-
-**0.8.0 before it's released.** The checks here run the branch's files and an image built from it, through `FXBOT_FILES`, `FXBOT_IMAGE`, and `FXBOT_RELEASES_URL`. On the Mac:
-- **The files:** `git archive HEAD` unpacked into a folder `v0.8.0/`, under a folder served with `python3 -m http.server` on a free port, beside a `latest` file that names `v0.8.0`, in the shape of GitHub's releases answer. The Mac runs `setup.sh` from there, and the VM reaches the same folder at `http://host.lima.internal:<port>`.
-- **The image:** built in the check's VM from the same files, `podman build -t localhost/fxbot:0.8.0 .`, with `FXBOT_IMAGE=localhost/fxbot`; the pull skips an image that's there. Or, if the owner has pushed an image for the branch, that one.
-- **A model:** a small OpenAI-compatible mock of its own on the Mac, reached from the VM at `host.lima.internal`, added as a provider in the app's first run. No real keys.
-
-**The checks,** each with its setup printed and exact fields matched, as here:
-1. **The one line,** fresh, with no `limactl` on `PATH`: the question, **Enter** for yes, Lima downloaded and checked (and with one byte of the archive changed, a stop before anything's unpacked), the VM made with no mounts (`limactl list --json`, and nothing of the Mac's in the VM), `setup.sh` run inside, the browser open, and `curl -fsS http://127.0.0.1:<port>/api/health` answering on the Mac.
-2. **The static rule:** the Mac's port answers; then, once, with the rule taken out, whether Lima's own forwarding finds podman's port, recorded either way.
-3. **The question:** **n** changes nothing. With no terminal (`</dev/null`, and run from a non-interactive shell), it takes yes and says so. Under `sudo`, every Lima step runs as the owner: `ps -o user=` on `limactl`, and the check's Lima folders owned by them.
-4. **The stops:** a `sw_vers` stub first on `PATH` for macOS 13.4, and for 15.4 on an Intel answer from a `uname -m` stub; a `df` stub for a full disk; and the port held by `nc -l`. Each stops with its words and changes nothing.
-5. **An existing Lima:** with the owner's own `limactl` 2.2 or newer on `PATH`, it's used, and nothing of fxbot's Lima is unpacked; with one older, fxbot's own is.
-6. **The Mac's `fxbot`:** `status`, `logs | head` exits, `stop` then `start`, `open`, and `backup`: a folder on the Mac with `database.dump`, `data.tar.gz`, and `secret.key` at mode 600. Then `restore` of it into a second check VM (`FXBOT_VM=fxbot-check2`) brings back the same bots and chats, and a provider's key opens.
-7. **Running for real:** the app's first run through **Essentials**, with the computer, against the mock. A bot's computer starts, runs a command, reaches the internet, and is refused the Mac, at `192.168.5.2`.
-8. **With the Mac:** `limactl stop`, then the launchd agent started as at login (`launchctl kickstart gui/$(id -u)/<its label>`), and fxbot answers again with nothing else done. A real logout and login, once, by the owner.
-9. **Sleep:** the owner puts the Mac to sleep for 10 minutes. After it wakes, fxbot answers, and the VM's clock is within 2 seconds of the Mac's (`date +%s` on both).
-10. **Run again:** the line on a working install reuses the VM and changes nothing. On a VM whose `setup.sh` was killed partway, it finishes.
-11. **Update:** a check VM installed from 0.7.0, the published release, then **Update** in Settings to the branch's 0.8.0, through `FXBOT_RELEASES_URL`.
-12. **Uninstall:** **N** changes nothing. **y** leaves the backup on the Mac and nothing else: no VM, no launchd agent, no fxbot folder, and no `PATH` line. `--purge` leaves no backup either. The owner's own Lima, when it ran the check, stays.
-13. **Web pairing in the VM:** what **Reachability** says there, recorded for [open question 15](#5-open-questions), and a phone on the Mac's Wi-Fi and on cellular if the owner pairs one.
-14. **An agent:** a fresh Claude Code session, given only `https://fxbot.sh/agent-setup.txt` (served from the branch's copy) and "set up fxbot on this Mac", installs it with the person's one yes, as `FXBOT_VM=fxbot-check`.
-15. **Intel:** if the owner has an Intel Mac, 1, 7, and 12 there. If not, it stays a human check.
-
-**Report back** in the session, and in this checklist: each check passed, failed (with its output), or not run (with why). Fixes are committed on the release branch, the Mac's code apart from the docs, and the plan's **What the build changed** says what the Mac taught. The owner pushes.
 
 ## 5. Open questions
 
@@ -750,8 +600,8 @@ Each has a default the build follows unless the owner changes it.
 5. **What uninstall keeps.** *Default:* a backup, the key, and the user, as apt's `remove` keeps settings, with `--purge` for everything. The other way removes everything unless told `--keep`.
 6. **Packages.** *Default:* listed, with the command, never removed. podman or Docker may now run other things.
 7. **A running Docker wins.** *Default:* on a machine with a running Docker and an installed podman, a new install uses docker. Installs already made keep their engine.
-8. **A Mac in one command.** *Decided* by the owner on 2026-11-09: the one line does the whole install on a Mac, asking `[Y/n]` once, and a session on the owner's Mac checks it from [the handoff](#the-mac-handoff). It was: print Lima's commands and stop.
-9. **Which VM on a Mac.** *Default:* Lima with Debian 13, free for any use, a whole VM, and the distro fxbot and its computer were checked on. OrbStack is quicker and lighter, and the page names it for owners who have it, but it's paid for work, and its machines share one kernel, where the computer is unchecked.
+8. **A Mac.** Moved on 2026-11-09, with the question of which VM, to [Mac support](mac-support.md).
+9. **Which VM on a Mac.** Moved to [Mac support](mac-support.md).
 10. **`docker-ce` on Debian 12 and Ubuntu 22.04.** *Default:* a fresh install there, with no engine, gets Docker's own `docker-ce` from Docker's repository, so the computer runs too. The other way keeps today's: podman 4.3 on Debian 12, `docker.io` on Ubuntu 22.04, and the computer stopping on both with the fix.
 11. **pacman's package lists.** *Default:* `setup.sh` never refreshes them, and an old one stops with `sudo pacman -Syu` to run first. The other way runs `pacman -Syu --needed` itself, as Coolify does for Docker, which upgrades the owner's whole system.
 12. **Which distros the docs name.** *Default:* those whose install and lifecycle pass in the checklist, by name, with "and the distros built on them". The rest of [Other distros](#other-distros) stay out of the docs until checked.

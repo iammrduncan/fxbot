@@ -13,7 +13,7 @@ fxbot as one download per OS that brings everything it needs. The owner doesn't 
   - **The app is the install the site offers first,** for fxbot on the owner's own computer. The desktop app takes its place once it's built.
   - **The container release is for hosting:** an fxbot that's always on, reached from the owner's other devices, and not tied to a laptop or a desktop.
 
-Status: planned on 2026-11-08, for a release after 0.8.0, not built. It builds on 0.8.0's [operations](operations.md): the computer on every engine, `fxbot backup`, and `fxbot uninstall`. The owner's decisions on the plan are under **What the owner asked**. Researched the same day:
+Status: planned on 2026-11-08, for a release after 0.8.0, not built. It builds on 0.8.0's [operations](operations.md): the computer on every engine, `fxbot backup`, and `fxbot uninstall`. The owner's decisions on the plan are under **What the owner asked**. Its Mac part comes first, as [Mac support](mac-support.md) (2026-11-09), which pins Lima 2.2.1 and finds the Intel Mac's floor, below. Researched the same day:
 - against the research directive's references
 - against desktop apps that bring their own database, embedder, or VM: OpenBot's desktop app, Jan, Open WebUI Desktop, Docker Desktop, Podman Desktop, Rancher Desktop, and Claude Desktop
 - against the docs, releases, and source of PGlite, embedded-postgres, the theseus-rs Postgres builds, Node's single executables, Bun, Electron, Lima, vfkit, libkrun, WSL, and llama.cpp
@@ -468,7 +468,7 @@ The launcher answers `computer.json` by OS. Each way ends with the same three th
 It downloads the computer's script from the release, as `deploy/fxbot:302` does now.
 
 **A Mac: a Lima VM.**
-1. **Download `limactl` and its guest agents,** for the Mac's CPU (Lima 2.3.0's release, pinned to a checksum, 38–50 MB), into `computer/lima/`. `LIMA_HOME` keeps Lima's state there too.
+1. **Download `limactl`,** for the Mac's CPU (Lima 2.2.1's release, pinned to a checksum, 38–50 MB), into `computer/lima/`. Its main archive carries the guest agent for a VM of the Mac's own CPU, so the separate guest agents aren't needed ([Mac support](mac-support.md)). `LIMA_HOME` keeps Lima's state there too.
 2. **Start a VM named `fxbot`:**
    ```yaml
    vmType: vz
@@ -496,6 +496,7 @@ It downloads the computer's script from the release, as `deploy/fxbot:302` does 
 3. **The socket is `computer/lima/fxbot/sock/engine.sock`.** The VM starts and stops with fxbot.
 4. **This needs no admin prompt.**
    - **Code signing:** an unsigned `limactl` from a download *likely* starts the VM, since Lima's own release isn't notarized. The Electron shell signs it with the virtualization entitlement.
+   - **An Intel Mac needs macOS 15.5** for Debian 13's kernel on Apple's framework (Lima's `pkg/driver/vz/vz_driver_darwin.go:271-275` @v2.2.1). Below that, fxbot runs, and the computer's section says why it can't.
    - **Memory:** the VM stays at its peak until it stops. The computer already stops idle computers, so the launcher stops the VM after 30 minutes with none running, and starts it again on the next call.
 
 **Windows: a WSL2 distro.**
