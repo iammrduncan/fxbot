@@ -7,10 +7,12 @@
 #   fxbot compose <args>       Compose itself, on this install's files
 #   fxbot update [version]     to the newest release, or the one named
 #   fxbot apply                the app's requests
+#   fxbot backup [folder]      the database and the plugins' files, into a folder restore takes
 #   fxbot restore <folder>     a backup: its database.dump, and its data.tar.gz when there is one
 #   fxbot rotate-key           every stored secret sealed again under a new key
 #   fxbot embedder cpu|gpu|off  the local embedder for memory search, on the CPU, on a GPU, or not at all
 #   fxbot computer on|off      the computer plugin's engine: a user of its own, rootless, with a firewall
+#   fxbot uninstall [--purge] [--yes]  fxbot off this machine, keeping a backup and the key unless --purge
 set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "fxbot: run it as root, such as: sudo fxbot ${1:-status}" >&2; exit 1; }
@@ -35,12 +37,13 @@ quick_checks() {
     [ "$(printf '1.44\n%s\n' "$(docker version --format '{{.Server.APIVersion}}' 2>/dev/null)" | sort -V | head -n 1)" = 1.44 ]
 }
 # The compose files and profile: the embedder's profile unless FXBOT_EMBEDDER is off, the GPU file for this engine when
-# it's gpu, and compose.override.yaml when a plugin wrote one. FXBOT_COMPOSE names a Compose binary, when setup.sh found
+# it's gpu, the computer's file when its setup wrote one, and compose.override.yaml, the owner's own, last. FXBOT_COMPOSE names a Compose binary, when setup.sh found
 # that `podman compose` or `docker compose` would run one too old.
 compose() {
   local files=compose.yaml
   ! quick_checks || files+=":compose.docker.yaml"
   [ "${FXBOT_EMBEDDER:-cpu}" != gpu ] || files+=":compose.gpu.${FXBOT_ENGINE:-podman}.yaml"
+  [ ! -f compose.computer.yaml ] || files+=":compose.computer.yaml"
   [ ! -f compose.override.yaml ] || files+=":compose.override.yaml"
   local profiles=embed
   [ "${FXBOT_EMBEDDER:-cpu}" != off ] || profiles=""
@@ -68,10 +71,25 @@ checked() {
   wait "$checks" 2>/dev/null || true
   return "$code"
 }
+# podman's containers ask aardvark-dns on their bridge for names. ufw's default deny drops those asks, so each start lets
+# port 53 in on the bridge, marked fxbot. firewalld lets them in until it reloads, and netavark's unit puts them back.
+# Docker answers names inside each container, and keeps its own firewalld zone.
+firewall() {
+  [ "${FXBOT_ENGINE:-podman}" = podman ] || return 0
+  local iface
+  if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q '^Status: active' &&
+    iface=$(podman network inspect "${COMPOSE_PROJECT_NAME:-fxbot}_default" --format '{{.NetworkInterface}}' 2>/dev/null) && [ -n "$iface" ]; then
+    ufw allow in on "$iface" to any port 53 comment fxbot >/dev/null 2>&1 || true
+  fi
+  if command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1; then
+    systemctl enable --now netavark-firewalld-reload.service >/dev/null 2>&1 || true
+  fi
+}
 # Every container started, then a wait for the app alone: the embedder may still be downloading its model.
 start() {
   local said
   said=$(checked compose up -d --remove-orphans 2>&1) || { printf '%s\n' "$said" >&2; return 1; }
+  firewall
   checked compose up -d --wait --wait-timeout "$wait" fxbot
 }
 die() {
@@ -138,6 +156,32 @@ restore() {
   fi
 }
 
+# The database, from pg_dump, and the plugins' files, into a folder of their own, as the app's own backups are, so
+# restore takes it as it is. The app stops for it, and starts again if it was running, unless the second argument says
+# to leave it stopped.
+backup() {
+  local folder=${1:-$var/backups/$(date -u +%Y-%m-%dT%H-%M-%S-%3NZ)-by-hand} stay=${2:-} running=""
+  [[ $folder == /* ]] || folder=$from_here/$folder
+  [ ! -e "$folder/database.dump" ] || die "$folder has a backup in it already"
+  [ -z "$(compose ps -q --status running fxbot 2>/dev/null)" ] || running=1
+  compose stop fxbot >/dev/null 2>&1 || true
+  checked compose up -d --wait db >/dev/null 2>&1 || die "the database didn't start. See: fxbot logs db"
+  install -d -m 700 "$folder"
+  if ! compose exec -T db pg_dump -U fxbot -Fc fxbot </dev/null >"$folder/database.dump" || ! tar -czf "$folder/data.tar.gz" -C "$var/data" .; then
+    rm -f "$folder/database.dump" "$folder/data.tar.gz"
+    [ -z "$running" ] || [ -n "$stay" ] || checked compose up -d --wait fxbot >/dev/null 2>&1 || true
+    die "the backup into $folder failed"
+  fi
+  # One in the app's own folder is the app's to keep, with its own; one elsewhere is for whoever ran sudo.
+  if [[ $folder == "$var/backups/"* ]]; then chown -R "$FXBOT_UID:$FXBOT_GID" "$folder"; elif [ -n "${SUDO_USER:-}" ]; then chown -R "$SUDO_USER:" "$folder"; fi
+  [ -z "$running" ] || [ -n "$stay" ] || checked compose up -d --wait fxbot >/dev/null 2>&1 || die "the backup is in $folder, but fxbot didn't start again. See: fxbot logs fxbot"
+  # Uninstall says where its own went.
+  [ -z "$stay" ] || return 0
+  echo "Backed up into $folder: database.dump, and data.tar.gz with the plugins' files."
+  echo "It opens only with the key, ${FXBOT_ROOT:-}/etc/fxbot/secret.key: keep a copy of that apart from it."
+  [[ $folder != "$var/backups/"* ]] || echo "fxbot keeps only the five newest folders in $var/backups, so copy this one elsewhere to keep it."
+}
+
 # Every stored key and token sealed again under a new key, in one transaction, with the app stopped. The new key
 # replaces /etc/fxbot/secret.key, and the old one stays beside it as secret.key.old until you remove it.
 rotate_key() {
@@ -146,7 +190,7 @@ rotate_key() {
   (umask 377 && head -c 32 /dev/urandom | base64 >"$new")
   chown "$FXBOT_UID:$FXBOT_GID" "$new"
   compose stop fxbot >/dev/null 2>&1 || true
-  if ! compose run --rm --no-deps -v "$new:/run/fxbot/new.key:ro" fxbot node packages/server/src/rotate-key.ts /run/fxbot/new.key >/dev/null; then
+  if ! compose run --rm --no-deps -v "$new:/run/fxbot/new.key:ro,z" fxbot node packages/server/src/rotate-key.ts /run/fxbot/new.key >/dev/null; then
     rm -f "$new"
     checked compose up -d --wait fxbot >/dev/null 2>&1 || true
     die "nothing was sealed again, and the old key still works"
@@ -185,6 +229,8 @@ update() {
   FXBOT_VERSION=$to compose -f "$next/compose.yaml" pull --policy missing -q >/dev/null 2>&1 || fail "Couldn't download $to's images."
 
   before=$(migrations)
+  local old
+  old=$(compose config --images 2>/dev/null | sort -u)
   cp -p .env .env.back && cp -p compose.yaml compose.yaml.back && cp -p fxbot fxbot.back
   cp -p "compose.gpu.${FXBOT_ENGINE:-podman}.yaml" compose.gpu.back 2>/dev/null || true
   sed -i "s/^FXBOT_VERSION=.*/FXBOT_VERSION=$to/" .env
@@ -195,6 +241,9 @@ update() {
   step "Starting $to"
   if FXBOT_VERSION=$to start >/dev/null 2>&1; then
     rm -f .env.back compose.yaml.back fxbot.back compose.gpu.back
+    # The old release's images, by name, now that nothing goes back to them.
+    comm -23 <(printf '%s\n' "$old") <(FXBOT_VERSION=$to compose config --images 2>/dev/null | sort -u) |
+      while read -r image; do [ -z "$image" ] || "${FXBOT_ENGINE:-podman}" rmi "$image" >/dev/null 2>&1 || true; done
     step "Running $to"
     status done
     return
@@ -222,8 +271,9 @@ embedder_status() {
   printf '{"state":%s,"embedder":%s%s%s}\n' "$(quote "$1")" "$(quote "$2")" "${3:+,\"to\":$(quote "$3")}" "${4:+,\"error\":$(quote "$4")}" >"$control/.embedder-status.json"
   mv "$control/.embedder-status.json" "$control/embedder-status.json"
 }
+cuda=ghcr.io/ggml-org/llama.cpp:server-cuda-b12033
 gpu_works() {
-  local image=ghcr.io/ggml-org/llama.cpp:server-cuda-b12033
+  local image=$cuda
   if [ "${FXBOT_ENGINE:-podman}" = docker ]; then
     docker run --rm --gpus all --entrypoint nvidia-smi "$image" -L
   else
@@ -237,7 +287,11 @@ embedder() {
   local to=${1:-} from=${FXBOT_EMBEDDER:-cpu}
   case $to in cpu | gpu | off) ;; *) die "name cpu, gpu, or off" ;; esac
   embedder_status working "$from" "$to"
+  local had=""
+  "${FXBOT_ENGINE:-podman}" image inspect "$cuda" >/dev/null 2>&1 && had=1
   if [ "$to" = gpu ] && ! gpu_works; then
+    # The image the trial pulled, 4 GB, unless it was here before.
+    [ -n "$had" ] || "${FXBOT_ENGINE:-podman}" rmi "$cuda" >/dev/null 2>&1 || true
     embedder_status failed "$from" "$to" "No GPU answered a trial run. A GPU needs NVIDIA's driver and container toolkit on the machine."
     die "no GPU answered a trial run"
   fi
@@ -292,7 +346,7 @@ computer_status() {
 }
 
 # The computer plugin's engine, set up or taken away by the plugin's own setup script, from this release's files: never
-# from the plugin's folder, which the app can write. The script writes compose.override.yaml, which gives the app the
+# from the plugin's folder, which the app can write. The script writes compose.computer.yaml, which gives the app the
 # engine's socket, and starts fxbot again. FXBOT_COMPUTER_NAME names its user, for checks beside a real install.
 computer() {
   local to=${1:-} script=$here/computer-setup.sh log remove=()
@@ -313,11 +367,122 @@ computer() {
   printf '%s\n' "$log" | tail -n 3
 }
 
+# fxbot off the machine. Unless --purge, a backup, the key, and the fxbot user stay, for an install and a restore later;
+# the packages setup.sh installed are named, not removed. Each step that fails says so and the rest go on, so a second
+# run finishes what a first one left; only a failed backup stops it, before anything is removed.
+uninstall() {
+  local purge="" yes="" arg folder="" name=${FXBOT_COMPUTER_NAME:-fxbot-computer} engine=${FXBOT_ENGINE:-podman}
+  local port=${FXBOT_PORT:-8787} etc=${FXBOT_ROOT:-}/etc/fxbot moved="" images
+  for arg in "$@"; do
+    case $arg in --purge) purge=1 ;; --yes) yes=1 ;; *) die "uninstall takes --purge and --yes, not $arg" ;; esac
+  done
+  echo "fxbot uninstall removes fxbot from this machine:"
+  echo "  its containers, its database and model volumes, and its images"
+  echo "  the computer: the user $name, its computers and their homes, and its firewall"
+  echo "  fxbot.service and fxbot-control, the fxbot command, and $here"
+  if [ -z "$purge" ]; then
+    echo "It keeps, so you can install again and restore:"
+    echo "  a backup of the database and plugins' files, in $var/backups"
+    echo "  the key that opens its stored keys and tokens, $etc/secret.key"
+    echo "  the user fxbot, which owns them"
+    echo "To remove those too: sudo fxbot uninstall --purge"
+  else
+    echo "  $var and $etc: every backup, the key, and the app's settings, and the user fxbot"
+  fi
+  if [ -z "$yes" ]; then
+    [ -t 0 ] || die "add --yes to uninstall without a question"
+    read -r -p "Uninstall fxbot? [y/N] " arg
+    case $arg in y | Y | yes) ;; *) echo "Nothing was changed." && return 0 ;; esac
+  fi
+
+  systemctl disable --now fxbot-control.path >/dev/null 2>&1 || true
+  systemctl stop fxbot-control.service >/dev/null 2>&1 || true
+  if [ -z "$purge" ]; then
+    if "$engine" volume inspect "${COMPOSE_PROJECT_NAME:-fxbot}_pgdata" >/dev/null 2>&1; then
+      folder=$var/backups/$(date -u +%Y-%m-%dT%H-%M-%S-%3NZ)-uninstall
+      if ! (backup "$folder" stay); then
+        systemctl enable --now fxbot-control.path >/dev/null 2>&1 || true
+        start >/dev/null 2>&1 || true
+        die "the backup failed, so nothing was removed, and fxbot runs again"
+      fi
+    else
+      echo "There's no database left to back up."
+    fi
+  fi
+  # The computer's compose file first, so its script doesn't start fxbot again. Its saved copy takes it away with no
+  # network: it's the one that last set the computer up.
+  rm -f compose.computer.yaml
+  if [ -f compose.override.yaml ] && grep -q '^# Written by the computer plugin' compose.override.yaml; then rm -f compose.override.yaml; fi
+  if id "$name" >/dev/null 2>&1 || [ -f "${FXBOT_ROOT:-}/etc/fxbot/$name.nft" ]; then
+    [ -f computer-setup.sh ] || curl -fsSL "$files/v$FXBOT_VERSION/plugins/computer/host/setup.sh" -o computer-setup.sh || true
+    if [ -f computer-setup.sh ]; then
+      bash computer-setup.sh --install "$here" --name "$name" --remove >/dev/null || echo "The computer's setup couldn't take everything away: see $here/computer-setup.sh --remove"
+    else
+      echo "The computer's setup script isn't here, and couldn't be downloaded, so its user $name stays."
+    fi
+  fi
+  systemctl disable --now fxbot >/dev/null 2>&1 || true
+  images=$(compose config --images 2>/dev/null)
+  compose down --volumes --rmi all --remove-orphans >/dev/null 2>&1 || echo "Compose couldn't take everything down: see fxbot compose ps -a"
+  # fxbot's own images at every version, and the GPU trial's, by name; never a prune.
+  images+=$'\n'$("$engine" images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${FXBOT_IMAGE:-ghcr.io/iammrduncan/fxbot}:" || true)$'\n'$cuda
+  for arg in $(printf '%s\n' "$images" | sort -u); do "$engine" rmi "$arg" >/dev/null 2>&1 || true; done
+  if command -v ufw >/dev/null; then
+    for arg in $(ufw status numbered 2>/dev/null | sed -n 's/^\[ *\([0-9]*\)\].*# fxbot$/\1/p' | sort -rn); do ufw --force delete "$arg" >/dev/null 2>&1 || true; done
+  fi
+  local recorded=()
+  [ ! -f "$etc/packages" ] || mapfile -t recorded <"$etc/packages"
+  [ ! -L "$here/current" ] || moved=1
+  rm -f /etc/systemd/system/fxbot.service /etc/systemd/system/fxbot-control.path /etc/systemd/system/fxbot-control.service
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  [ "$(readlink -f /usr/local/bin/fxbot 2>/dev/null)" != "$here/fxbot" ] || rm -f /usr/local/bin/fxbot
+  # This script stays open in bash, so it carries on once its folder is gone.
+  rm -rf "$here"
+  if [ -n "$purge" ]; then
+    rm -rf "$var" "$etc"
+    userdel fxbot >/dev/null 2>&1 || true
+    groupdel fxbot >/dev/null 2>&1 || true
+  fi
+
+  echo
+  echo "fxbot is uninstalled."
+  if [ -n "$folder" ]; then
+    echo "Its backup is in $folder, and its key in $etc/secret.key. To install again on them:"
+    echo "  curl -fsSL https://fxbot.sh/setup.sh | sudo bash"
+    echo "  sudo fxbot restore $folder && sudo fxbot up"
+  fi
+  local packages=() files=() line
+  for line in "${recorded[@]:1}"; do if [[ $line == /* ]]; then files+=("$line"); else packages+=("$line"); fi; done
+  if [ ${#packages[@]} -gt 0 ]; then
+    echo "setup.sh installed these, which stay. If nothing else here uses them:"
+    case ${recorded[0]} in
+      apt) echo "  sudo apt-get purge ${packages[*]}" ;;
+      dnf) echo "  sudo dnf remove ${packages[*]}" ;;
+      zypper) echo "  sudo zypper remove --clean-deps ${packages[*]}" ;;
+      pacman) echo "  sudo pacman -Rns ${packages[*]}" ;;
+    esac
+  fi
+  [ ${#files[@]} -eq 0 ] || echo "It added Docker's package repository too, in: ${files[*]}"
+  images=$("$engine" images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E '^(docker\.io/pgvector/pgvector|ghcr\.io/ggml-org/llama\.cpp):' || true)
+  [ -z "$images" ] || echo "Older releases' images stay, since another project may use them: sudo $engine rmi" $images
+  if command -v tailscale >/dev/null && tailscale serve status 2>/dev/null | grep -q ":$port\b"; then
+    echo "Tailscale still serves port $port: sudo tailscale serve reset"
+  fi
+  [ -z "$moved" ] || echo "The 0.2 install's database is still in the machine's Postgres: sudo -u postgres dropdb fxbot"
+  echo "On your devices, the installed app goes from the home screen like any other, and keys made for fxbot are revoked"
+  echo "at each provider.${purge:+ Each device paired at web.fxbot.sh can Forget it, under its devices there.}"
+}
+
 case ${1:-} in
   up) start ;;
   down) compose down ;;
   status)
     echo "fxbot $FXBOT_VERSION, on $FXBOT_ENGINE, with the local embedder ${FXBOT_EMBEDDER:-cpu}"
+    if curl -fs -o /dev/null --max-time 5 "http://127.0.0.1:${FXBOT_PORT:-8787}/api/health"; then
+      echo "fxbot answers at http://127.0.0.1:${FXBOT_PORT:-8787}"
+    else
+      echo "fxbot doesn't answer. See: sudo fxbot logs fxbot"
+    fi
     compose ps
     if [ -L "$here/current" ]; then
       echo
@@ -328,16 +493,19 @@ case ${1:-} in
       echo "$here/fxbot-0.2.service as /etc/systemd/system/fxbot.service, and: systemctl daemon-reload && systemctl start fxbot"
     fi
     ;;
-  logs) compose logs -f --tail 100 "${@:2}" ;;
+  # It follows only on a terminal: piped, as an agent runs it, it ends.
+  logs) if [ -t 1 ]; then compose logs -f --tail 100 "${@:2}"; else compose logs --tail 100 "${@:2}"; fi ;;
   compose) compose "${@:2}" ;;
   update) update "${2:-}" ;;
   apply) apply ;;
+  backup) backup "${2:-}" ;;
   restore) restore "${2:-}" ;;
   rotate-key) rotate_key ;;
   embedder) embedder "${2:-}" ;;
   computer) computer "${2:-}" ;;
+  uninstall) uninstall "${@:2}" ;;
   *)
-    sed -n '6,13p' "$0" | sed 's/^# //'
+    sed -n '6,15p' "$0" | sed 's/^# //'
     exit 1
     ;;
 esac

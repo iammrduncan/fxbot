@@ -1,8 +1,10 @@
 # fxbot's release install: the app, its database, and the local embedder for memory search. setup.sh puts this file in
 # /opt/fxbot beside an .env that sets FXBOT_VERSION, FXBOT_UID and FXBOT_GID (the fxbot user's), FXBOT_DB_PASSWORD,
-# FXBOT_ENGINE, and FXBOT_EMBEDDER. The fxbot command there runs it, with the embedder's profile on unless
-# FXBOT_EMBEDDER is off, a GPU file (compose.gpu.<engine>.yaml) when it's gpu, and compose.docker.yaml on Docker 25 and
-# newer. FXBOT_ROOT puts the machine's folders under another root, for checks.
+# FXBOT_ENGINE, FXBOT_EMBEDDER, and FXBOT_PORT. The fxbot command there runs it, with the embedder's profile on unless
+# FXBOT_EMBEDDER is off, a GPU file (compose.gpu.<engine>.yaml) when it's gpu, compose.docker.yaml on Docker 25 and
+# newer, the computer's compose.computer.yaml, and the owner's own compose.override.yaml. FXBOT_ROOT puts the
+# machine's folders under another root, for checks. `:z` labels each folder for containers where SELinux runs, and does
+# nothing where it doesn't.
 name: fxbot
 services:
   fxbot:
@@ -12,17 +14,20 @@ services:
     environment:
       FXBOT_DATABASE_URL: postgres://fxbot:${FXBOT_DB_PASSWORD:?set FXBOT_DB_PASSWORD}@db/fxbot
       FXBOT_SECRET_KEY_FILE: /run/secrets/fxbot_key
+      # The same port inside as out, so an MCP sign-in comes back to the address the browser used.
+      FXBOT_PORT: ${FXBOT_PORT:-8787}
       FXBOT_DATA: /var/lib/fxbot/data
       FXBOT_BACKUPS: /var/lib/fxbot/backups
       FXBOT_CONTROL: /var/lib/fxbot/control
       FXBOT_EMBED_URL: http://embed:8080/v1
-    secrets: [fxbot_key]
+    # The key as a bind, not a Compose secret, which can't take an SELinux label.
     volumes:
-      - ${FXBOT_ROOT:-}/var/lib/fxbot/data:/var/lib/fxbot/data
-      - ${FXBOT_ROOT:-}/var/lib/fxbot/backups:/var/lib/fxbot/backups
-      - ${FXBOT_ROOT:-}/var/lib/fxbot/control:/var/lib/fxbot/control
+      - ${FXBOT_ROOT:-}/var/lib/fxbot/data:/var/lib/fxbot/data:z
+      - ${FXBOT_ROOT:-}/var/lib/fxbot/backups:/var/lib/fxbot/backups:z
+      - ${FXBOT_ROOT:-}/var/lib/fxbot/control:/var/lib/fxbot/control:z
+      - ${FXBOT_ROOT:-}/etc/fxbot/secret.key:/run/secrets/fxbot_key:ro,z
     # The machine's loopback only, as fxbot always listened. Tailscale or a proxy reaches it there.
-    ports: [ "127.0.0.1:${FXBOT_PORT:-8787}:8787" ]
+    ports: [ "127.0.0.1:${FXBOT_PORT:-8787}:${FXBOT_PORT:-8787}" ]
     depends_on:
       db: { condition: service_healthy }
     # Every 30 seconds. Each check costs podman about 30 ms of CPU, so a check every few seconds kept an idle machine
@@ -57,8 +62,6 @@ services:
     cpu_shares: 256
     healthcheck: { test: [ CMD, curl, -fs, "http://localhost:8080/health" ], interval: 30s, start_period: 10m }
     restart: unless-stopped
-secrets:
-  fxbot_key: { file: "${FXBOT_ROOT:-}/etc/fxbot/secret.key" }
 volumes:
   pgdata: {}
   models: {}
