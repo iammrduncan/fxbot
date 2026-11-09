@@ -41,17 +41,19 @@ type ComputerProvider = {
 
 ## Set up the engine
 
-Computers run in this machine's own container engine, podman or docker, whichever fxbot runs on, started rootless for a user of its own. When the plugin finds no engine, the machine sets it up by itself, with `host/setup.sh`:
+Computers run in a container engine started rootless for a user of its own: podman, where the distribution has 4.9 or newer, beside whichever engine fxbot itself runs on, or else the machine's own Docker, where its packages run it rootless (Docker's `docker-ce`, Debian's `docker.io`, Fedora's `moby-engine`, or openSUSE's `docker`). A user already on rootless Docker keeps it. When the plugin finds no engine, the machine sets it up by itself, with `host/setup.sh`:
 - in a release install, the machine's `fxbot` command runs it, as `fxbot computer on`, from the release's own files, then starts fxbot again
 - in a checkout run as root, the plugin runs it
 - in a checkout run as another user, the plugin's section in **Settings** shows the command to run as root
 
 `host/setup.sh`:
-- installs what the engine needs to run rootless: `uidmap`, `dbus-user-session`, and `nftables`, with `podman` and `passt`, or `rootlesskit` (or Docker's `docker-ce-rootless-extras`) and `slirp4netns`
+- checks first that the machine runs cgroups v2 and lets its users make user namespaces, and stops, changing nothing, when it doesn't
+- installs what the engine needs to run rootless, through apt, dnf, zypper, or pacman, each listed in `/etc/fxbot/packages`: `nftables`, with `podman` and `passt` (and `slirp4netns` for podman 4), or the Docker's rootless package (`docker-ce-rootless-extras`, `rootlesskit`, `moby-engine-rootless-extras`, or `docker-rootless-extras`) and `slirp4netns`; on apt, `uidmap` and `dbus-user-session` too; where SELinux runs, `policycoreutils-python-utils`
 - makes the user `fxbot-computer`, with lingering, and delegates cpu, memory, and pids to it, so limits hold
 - puts the engine's socket in `/var/lib/fxbot-computer/run/`
 - loads a firewall, `/etc/fxbot/fxbot-computer.nft`, that lets the user's connections reach the internet and DNS, and not this machine, its tailnet, or its networks
-- in a release install, writes `/opt/fxbot/compose.override.yaml`, which gives fxbot's container the socket's folder and the user's group
+- where SELinux runs, labels podman's storage in the user's home as `/var/lib/containers` is labelled
+- in a release install, writes `/opt/fxbot/compose.computer.yaml`, which gives fxbot's container the socket's folder and the user's group, and, where SELinux runs, turns the container's labels off, so it can reach the socket. Before 0.3.2 it wrote `compose.override.yaml`: it takes its own lines out of that, and leaves yours.
 
 In a checkout, add `--user <login>` for the login that runs fxbot. `--remove` takes it all away, as `sudo fxbot computer off` does in a release install. It's safe to run again.
 

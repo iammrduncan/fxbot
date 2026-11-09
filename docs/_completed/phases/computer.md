@@ -469,6 +469,7 @@ Checks used a disposable Postgres, a mock model that makes tool calls (one, seve
 - **A plugin at a repository's root** couldn't be added: an empty folder was read as a path outside it. Fixed in the SDK.
 - **Cancelling a turn** isn't something fxbot does, so the shell's cancel path is there for when it does.
 - **The log** gets each computer's start and each build step.
+- **Later, in 0.8.0's [operations](operations.md) (the plugin's 0.3.2):** the engine is rootless podman wherever the distribution has 4.9 or newer, beside whichever engine fxbot runs on, and the machine's own Docker, run rootless, only where podman is older, as on Debian 12 and Ubuntu 22.04. The script installs through apt, dnf, zypper, or pacman, checks for cgroups v2 and user namespaces first, writes `compose.computer.yaml` in place of `compose.override.yaml`, and labels podman's storage where SELinux runs. Before the change, on Ubuntu 24.04 with `docker.io`, its setup stopped with "dockerd-rootless.sh isn't installed", and on Ubuntu 24.04 with podman 4.9, the engine set up but a computer couldn't start: "could not find slirp4netns, the network namespace can't be configured". After it, both run their computers on rootless podman. Two bugs from this build were fixed along the way: on a machine without systemd-resolved, such as a plain Debian, the script stopped silently on reading resolved's file, and a home that was there before its user stayed root's.
 
 ## 5. Open questions
 

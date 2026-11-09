@@ -113,22 +113,25 @@ The script's options, for running it by hand:
 
 | Option | What it does |
 | --- | --- |
-| none | A release install in `/opt/fxbot`: the engine it uses, and `compose.override.yaml`, which gives fxbot's container the socket's folder and the user's group |
+| none | A release install in `/opt/fxbot`, and `compose.computer.yaml` there, which gives fxbot's container the socket's folder and the user's group. Before 0.3.2 it wrote `compose.override.yaml`: it takes its own lines out of that, and leaves yours. |
 | `--user <login>` | A checkout: `<login>` joins the user's group, to reach the socket |
-| `--engine podman` or `--engine docker` | A checkout's engine. Otherwise podman when it's installed, or docker when only docker is |
+| `--engine podman` or `--engine docker` | This engine. Otherwise the one the user already runs rootless; then podman, when the distribution has 4.9 or newer; then the machine's own Docker, when its packages run it rootless |
 | `--name <user>` | Another user than `fxbot-computer` |
 | `--install <folder>` | Another release install than `/opt/fxbot` |
-| `--remove` | Takes it all away: the user, its computers and files, the firewall, and the override. The packages stay. |
+| `--remove` | Takes it all away: the user, its computers and files, the firewall, and `compose.computer.yaml`. The packages stay. |
 
 What it sets up:
 
 | Thing | Where |
 | --- | --- |
-| Packages | `uidmap`, `dbus-user-session`, `nftables`, and `curl`; with podman, `podman` and `passt`; with docker, `rootlesskit` beside Debian's or Ubuntu's `docker.io`, or `docker-ce-rootless-extras` beside Docker's `docker-ce`, and `slirp4netns` |
+| Packages | Through apt, dnf, zypper, or pacman, each listed in `/etc/fxbot/packages`: `nftables`, and `curl` and `util-linux` when they're missing; on apt, `uidmap` and `dbus-user-session`; with podman, `podman` and `passt`, and `slirp4netns` for podman 4; with docker, `docker-ce-rootless-extras` beside Docker's `docker-ce`, `rootlesskit` beside Debian's `docker.io`, `moby-engine-rootless-extras` beside Fedora's `moby-engine`, or `docker-rootless-extras` beside openSUSE's `docker`, and `slirp4netns`; where SELinux runs, `policycoreutils-python-utils` |
 | The user | `fxbot-computer`, home `/var/lib/fxbot-computer`, 65,536 subordinate ids, lingering on |
 | Limits | `/etc/systemd/system/user@<uid>.service.d/fxbot-computer.conf` delegates cpu, memory, and pids to it |
 | The engine | Its socket at `/var/lib/fxbot-computer/run/engine.sock`. Podman starts when called and stops 5 seconds after; Docker's rootless daemon runs all the time, and holds about 180 MB. |
 | The firewall | `/etc/fxbot/fxbot-computer.nft`, loaded at boot by `fxbot-computer-firewall.service` |
+| SELinux | Where it runs, podman's storage in the user's home takes `/var/lib/containers`' labels (`semanage fcontext -e`), and fxbot's container runs with its labels off, to reach the socket |
+
+It stops before it changes anything when the machine runs cgroups v1, without which the limits would do nothing, or keeps its users from making user namespaces. Where podman is older than 4.9 and Docker can't run rootless, as with Ubuntu 22.04's `docker.io`, it stops with the fix: [Fix an install that stopped](/docs/how-to/fix-an-install/#the-computer).
 
 ## What a computer reaches
 

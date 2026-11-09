@@ -1,14 +1,15 @@
 #!/bin/bash
-# The computer plugin's engine, set up once on the machine, as root. A user of its own runs the machine's container
-# engine, podman or docker, rootless; its socket is where fxbot reaches it; its cpu, memory, and pids are delegated so
-# limits hold; and a firewall keeps its computers to the internet. Safe to run again.
+# The computer plugin's engine, set up once on the machine, as root. A user of its own runs a container engine rootless:
+# podman 4.9 or newer where the distribution has it, beside whichever engine fxbot itself runs on, or else the machine's
+# own Docker, where its packages run it rootless. Its socket is where fxbot reaches it; its cpu, memory, and pids are
+# delegated so limits hold; and a firewall keeps its computers to the internet. Safe to run again.
 #
 #   sudo bash setup.sh                 a release install in /opt/fxbot: the app gets the socket's folder
 #   sudo bash setup.sh --user <login>  a checkout run by <login>, who joins the user's group to reach the socket
-#   --engine podman|docker             a checkout's engine; a release install uses its own
+#   --engine podman|docker             this engine, in place of the one it would pick
 #   --name <user>                      another user than fxbot-computer, for checks beside a real install
 #   --install <folder>                 another release install than /opt/fxbot, for checks
-#   --remove                           takes it all away: the user, its computers and files, the firewall, the override
+#   --remove                           takes it all away: the user, its computers and files, the firewall, its compose file
 set -euo pipefail
 
 name=fxbot-computer engine="" login="" install=/opt/fxbot remove=""
@@ -24,22 +25,37 @@ while [ $# -gt 0 ]; do
   esac
 done
 die() { echo "setup.sh: $*" >&2; exit 1; }
+fix=https://fxbot.sh/docs/how-to/fix-an-install
 [ "$(id -u)" = 0 ] || die "run it as root: sudo bash $0"
 [[ $name =~ ^[a-z][a-z0-9-]{0,30}$ ]] || die "--name must be a lowercase user name"
-command -v systemctl >/dev/null && command -v apt-get >/dev/null || die "it needs systemd and apt: Debian 13 or Ubuntu 24.04"
+pm=""
+for p in apt-get zypper dnf pacman; do if command -v "$p" >/dev/null; then pm=${p%-get} && break; fi; done
+command -v systemctl >/dev/null && [ -n "$pm" ] || die "it needs systemd, and apt, dnf, zypper, or pacman"
 
 home=/var/lib/$name
 run=$home/run
 sock=$run/engine.sock
+store=$home/.local/share/containers
 table=${name//-/_}
 rules=/etc/fxbot/$name.nft
 unit=$name-firewall.service
+compose=$install/compose.computer.yaml
 override=$install/compose.override.yaml
 marker="# Written by the computer plugin's setup.sh for $name."
 # A release install, unless --user names a checkout's login.
 release=""
 [ -z "$login" ] && [ -f "$install/.env" ] && [ -x "$install/fxbot" ] && release=1
+selinux=""
+if command -v selinuxenabled >/dev/null && selinuxenabled; then selinux=1; fi
 as() { runuser -u "$name" -- env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" "$@"; }
+
+# Before 0.8.0 this script wrote compose.override.yaml, which an owner may since have added lines of their own to. It
+# takes its own lines out, and the file goes when nothing else is left. It says whether it changed anything.
+untangle() {
+  grep -qxF "$marker" "$override" 2>/dev/null || return 1
+  grep -vxF "$marker" "$override" | grep -v '/run/fxbot-computer' | grep -v 'group_add:' >"$override.new" || true
+  if grep -qvE '^(services:|  fxbot:|[[:space:]]*)$' "$override.new"; then mv "$override.new" "$override"; else rm -f "$override.new" "$override"; fi
+}
 
 if [ -n "$remove" ]; then
   if uid=$(id -u "$name" 2>/dev/null); then
@@ -52,54 +68,126 @@ if [ -n "$remove" ]; then
     # Its group stays while a checkout's login is in it.
     groupdel "$name" 2>/dev/null || true
     sed -i "/^$name:/d" /etc/subuid /etc/subgid
-    rm -rf "$home" "/etc/systemd/system/user@$uid.service.d/$name.conf"
+    # A home that's a disk of its own is emptied, since its folder can't go.
+    if mountpoint -q "$home"; then find "$home" -mindepth 1 -delete; else rm -rf "$home"; fi
+    rm -f "/etc/systemd/system/user@$uid.service.d/$name.conf"
     rmdir "/etc/systemd/system/user@$uid.service.d" 2>/dev/null || true
   fi
+  [ -z "$selinux" ] || semanage fcontext -d -e /var/lib/containers "$store" 2>/dev/null || true
   systemctl disable --now "$unit" >/dev/null 2>&1 || true
   nft delete table inet "$table" 2>/dev/null || true
   rm -f "/etc/systemd/system/$unit" "$rules"
   systemctl daemon-reload
   removed=""
-  if [ -n "$release" ] && grep -qxF "$marker" "$override" 2>/dev/null; then
-    rm -f "$override"
-    "$install/fxbot" up
-    removed=", and $override"
+  if [ -n "$release" ]; then
+    again=""
+    if untangle; then again=1 removed=", and its lines in $override"; fi
+    if grep -qxF "$marker" "$compose" 2>/dev/null; then rm -f "$compose" && again=1 removed=", and $compose"; fi
+    [ -z "$again" ] || "$install/fxbot" up
   fi
   echo "Removed $name: its computers and files, its firewall$removed. The packages stay."
   exit 0
 fi
 
-# The engine fxbot itself runs on: a release install's, or else podman, or docker when only docker is installed.
-if [ -z "$engine" ] && [ -n "$release" ]; then engine=$(sed -n 's/^FXBOT_ENGINE=//p' "$install/.env"); fi
+# The package manager's own: whether a package is installed, and the version it offers.
+there() {
+  case $pm in
+    apt) [ "$(dpkg-query -W -f='${Status}' "$1" 2>/dev/null)" = "install ok installed" ] ;;
+    pacman) pacman -Q "$1" >/dev/null 2>&1 ;;
+    *) rpm -q "$1" >/dev/null 2>&1 ;;
+  esac
+}
+offered() {
+  case $pm in
+    apt) apt-cache policy "$1" 2>/dev/null | sed -n 's/^ *Candidate: \([0-9]*:\)\{0,1\}\([0-9][0-9.]*\).*/\2/p' || true ;;
+    dnf) dnf repoquery -q --latest-limit 1 --qf '%{version}\n' "$1" 2>/dev/null | grep -m 1 . || true ;;
+    zypper) zypper --non-interactive info "$1" 2>/dev/null | version || true ;;
+    pacman) pacman -Si "$1" 2>/dev/null | version || true ;;
+  esac
+}
+version() { sed -n 's/^Version *: *\([0-9]*:\)\{0,1\}\([0-9][0-9.]*\).*/\2/p' | head -n 1; }
+at_least() { [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n 1)" = "$1" ]; }
+# What's missing, each one listed in /etc/fxbot/packages, which uninstall reads. apt alone removes a package to install
+# another without asking, so its plan is read first.
+install_packages() {
+  local want=() p removes
+  for p in "$@"; do there "$p" || want+=("$p"); done
+  [ ${#want[@]} -gt 0 ] || return 0
+  echo "Installing ${want[*]}"
+  case $pm in
+    apt)
+      removes=$(apt-get install -s --no-install-recommends "${want[@]}" 2>/dev/null | sed -n 's/^Remv \([^ ]*\).*/\1/p' | paste -sd' ' -) || true
+      [ -z "$removes" ] || die "installing ${want[*]} would remove $removes, so nothing was installed"
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "${want[@]}" >/dev/null ;;
+    dnf) dnf install -y -q --setopt=install_weak_deps=False "${want[@]}" >/dev/null ;;
+    zypper) zypper --non-interactive --quiet install --no-recommends "${want[@]}" >/dev/null ;;
+    pacman) pacman -S --needed --noconfirm "${want[@]}" >/dev/null ||
+      die "pacman couldn't install ${want[*]}. If its package lists are old, update the system first (sudo pacman -Syu), then run this again: $fix/#old-package-lists-on-arch" ;;
+  esac || die "$pm couldn't install ${want[*]}"
+  mkdir -p /etc/fxbot
+  [ -s /etc/fxbot/packages ] || echo "$pm" >/etc/fxbot/packages
+  for p in "${want[@]}"; do
+    if there "$p" && ! grep -qxF "$p" /etc/fxbot/packages; then echo "$p" >>/etc/fxbot/packages; fi
+  done
+}
+# The package that runs the installed Docker rootless, when there is one.
+docker_rootless() {
+  if there docker-ce; then echo docker-ce-rootless-extras
+  elif there docker.io && [ -x /usr/share/docker.io/contrib/dockerd-rootless.sh ]; then echo rootlesskit
+  elif there moby-engine; then echo moby-engine-rootless-extras
+  elif [ "$pm" = zypper ] && there docker; then echo docker-rootless-extras
+  fi
+}
+
+# Rootless podman when the system has 4.9 or newer, beside whichever engine fxbot runs on: it starts on a call, and
+# doesn't depend on whose Docker this is. Where podman is older, the installed Docker, run rootless, if it can be. A
+# user already on rootless Docker keeps it.
+[ "$pm" != apt ] || apt-get update -qq
+podman=$(podman --version 2>/dev/null | sed -n 's/.* \([0-9][0-9.]*\).*/\1/p') || true
+[ -n "$podman" ] || podman=$(offered podman)
 if [ -z "$engine" ]; then
-  if command -v podman >/dev/null; then engine=podman; elif command -v docker >/dev/null; then engine=docker; else engine=podman; fi
+  if [ -f "$home/.config/systemd/user/docker.service" ]; then engine=docker
+  elif [ -n "$podman" ] && at_least 4.9 "$podman"; then engine=podman
+  elif [ -n "$(docker_rootless)" ]; then engine=docker
+  elif command -v docker >/dev/null && [ "$pm" = apt ]; then
+    die "the computer needs podman 4.9 or newer, or a Docker that runs rootless. This machine has ${podman:+podman }${podman:-no podman}, and its Docker can't run rootless. Docker's own docker-ce can: $fix/#ubuntus-own-docker"
+  elif command -v docker >/dev/null; then
+    die "the computer needs podman 4.9 or newer, or a Docker that runs rootless, and this machine has ${podman:+podman }${podman:-no podman}, and a Docker that can't: $fix/#the-computer"
+  else
+    die "the computer needs podman 4.9 or newer, and this machine has ${podman:+podman }${podman:-none}. Docker's own docker-ce runs rootless too: $fix/#an-old-podman"
+  fi
 fi
 [ "$engine" = podman ] || [ "$engine" = docker ] || die "--engine must be podman or docker"
+# Without cgroups v2, the computers' limits on cpu, memory, and processes would silently do nothing.
+[ "$(stat -fc %T /sys/fs/cgroup 2>/dev/null)" = cgroup2fs ] || die "this machine runs cgroups v1, and the computers' limits need v2: $fix/#cgroups-v1"
+[ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || echo 1)" != 0 ] && [ "$(cat /proc/sys/user/max_user_namespaces 2>/dev/null || echo 1)" != 0 ] ||
+  die "this machine keeps its users from making user namespaces, which a rootless engine needs: $fix/#no-user-namespaces"
 
-need=(uidmap dbus-user-session nftables curl)
+need=(nftables)
+# RHEL 9's curl is the package curl-minimal, which a package named curl would clash with.
+command -v curl >/dev/null || need+=(curl)
+[ "$pm" != apt ] || need+=(uidmap dbus-user-session)
+# runuser and mountpoint, and awk, which a minimal image can leave out.
+command -v runuser >/dev/null || need+=(util-linux)
+command -v awk >/dev/null || need+=(gawk)
 if [ "$engine" = podman ]; then
+  # podman 4.9's rootless network is slirp4netns, and 5's is pasta, from passt. podman 6 has only pasta.
   need+=(podman passt)
-elif dpkg -s docker-ce >/dev/null 2>&1; then
-  need+=(docker-ce-rootless-extras slirp4netns)
-elif dpkg -s docker.io >/dev/null 2>&1; then
-  need+=(rootlesskit slirp4netns)
+  at_least 5 "${podman:-0}" || need+=(slirp4netns)
 else
-  die "docker here isn't Docker's docker-ce or the distribution's docker.io. Install one of those, or use --engine podman."
+  extras=$(docker_rootless)
+  [ -n "$extras" ] || die "this machine's Docker can't run rootless. Docker's own docker-ce can, or use --engine podman: $fix/#ubuntus-own-docker"
+  need+=("$extras" slirp4netns)
 fi
-missing=()
-for package in "${need[@]}"; do dpkg -s "$package" >/dev/null 2>&1 || missing+=("$package"); done
-if [ ${#missing[@]} -gt 0 ]; then
-  echo "Installing ${missing[*]}"
-  apt-get update -qq
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "${missing[@]}" >/dev/null
-fi
+[ -z "$selinux" ] || need+=(policycoreutils-python-utils)
+install_packages "${need[@]}"
 if [ "$engine" = podman ]; then
   version=$(podman --version | grep -oE '[0-9]+\.[0-9]+' | head -1)
-  [ "$(printf '%s\n4.9\n' "$version" | sort -V | head -1)" = 4.9 ] || die "podman $version is too old: the computer needs 4.9 or newer"
+  at_least 4.9 "$version" || die "podman $version is older than the 4.9 the computer needs. Docker's own docker-ce runs rootless here: $fix/#an-old-podman"
   binary=$(command -v podman)
 else
   rootless=$(command -v dockerd-rootless.sh || echo /usr/share/docker.io/contrib/dockerd-rootless.sh)
-  [ -x "$rootless" ] || die "dockerd-rootless.sh isn't installed"
+  [ -x "$rootless" ] || die "dockerd-rootless.sh isn't installed: $fix/#ubuntus-own-docker"
   binary=$(command -v rootlesskit)
 fi
 # Ubuntu keeps unprivileged users from making user namespaces, but for programs an AppArmor profile lets.
@@ -113,10 +201,19 @@ if ! id "$name" >/dev/null 2>&1; then
 fi
 uid=$(id -u "$name")
 gid=$(id -g "$name")
+# A home that was there first, such as a disk of its own, is the user's too.
+chown "$name:$name" "$home"
 chmod 0750 "$home"
 if ! grep -q "^$name:" /etc/subuid; then
   first=$(awk -F: 'BEGIN { m = 100000 } { if ($2 + $3 > m) m = $2 + $3 } END { print m }' /etc/subuid /etc/subgid)
   usermod --add-subuids "$first-$((first + 65535))" --add-subgids "$first-$((first + 65535))" "$name"
+fi
+# A system user's home gets no SELinux rules for home folders, so its podman's storage would keep /var/lib's label,
+# which containers can't use. It gets /var/lib/containers' labels instead.
+if [ -n "$selinux" ] && [ "$engine" = podman ]; then
+  install -d -o "$name" -g "$name" "$home/.local" "$home/.local/share" "$store"
+  semanage fcontext -a -e /var/lib/containers "$store" 2>/dev/null || true
+  restorecon -R "$home/.local/share"
 fi
 
 # Its own systemd, with cpu, memory, and pids delegated: without them, rootless limits are silently dropped.
@@ -130,7 +227,12 @@ fi
 loginctl enable-linger "$name"
 for _ in $(seq 100); do [ -S "/run/user/$uid/systemd/private" ] && break; sleep 0.1; done
 [ -S "/run/user/$uid/systemd/private" ] || die "$name's systemd didn't start"
-as systemctl --user start dbus.socket
+# The user's bus, unless its systemd started it already: openSUSE's refuses a start by hand.
+for _ in $(seq 10); do
+  as systemctl --user is-active -q dbus.socket && break
+  as systemctl --user start dbus.socket 2>/dev/null || sleep 0.5
+done
+as systemctl --user is-active -q dbus.socket || die "$name's user bus didn't start. See: sudo journalctl _UID=$uid"
 
 # The engine's socket, in a folder of its own, which the app mounts: a socket made again keeps its path.
 install -d -o "$name" -g "$name" -m 0750 "$run"
@@ -180,7 +282,8 @@ chown -R "$name:$name" "$config"
 
 # The firewall: its connections reach the internet and DNS, and nothing on this machine, its tailnet, or its networks.
 # DNS goes to the machine's resolvers, and, as rootless Docker's containers ask them, systemd-resolved's upstream ones.
-servers=$(awk '/^nameserver/ { print $2 }' /etc/resolv.conf /run/systemd/resolve/resolv.conf 2>/dev/null | sort -u)
+# The second file is there only where systemd-resolved runs, so awk's complaint about the other is no stop.
+servers=$(awk '/^nameserver/ { print $2 }' /etc/resolv.conf /run/systemd/resolve/resolv.conf 2>/dev/null | sort -u) || true
 dns4=$(grep -v : <<<"$servers" | paste -sd, - || true)
 dns6=$(grep : <<<"$servers" | paste -sd, - || true)
 accept4="" accept6=""
@@ -230,12 +333,18 @@ systemctl daemon-reload
 systemctl enable "$unit" >/dev/null 2>&1
 systemctl restart "$unit"
 
-# Who reaches the socket: the app's container through compose.override.yaml, or a checkout's login.
+# Who reaches the socket: the app's container through compose.computer.yaml, which the fxbot command adds, or a
+# checkout's login. On SELinux, a confined container can't connect to an engine's socket, and this container holds the
+# engine anyway, so its labels are off.
 if [ -n "$release" ]; then
-  if [ -f "$override" ] && ! grep -qxF "$marker" "$override"; then
-    die "$override is someone else's. Add to it: the volume $run:/run/fxbot-computer and group_add $gid on the fxbot service."
+  untangle || true
+  if [ -f "$compose" ] && ! grep -qxF "$marker" "$compose"; then
+    die "$compose is someone else's. Add to it: the volume $run:/run/fxbot-computer and group_add $gid on the fxbot service."
   fi
-  printf '%s\nservices:\n  fxbot:\n    volumes: [ "%s:/run/fxbot-computer" ]\n    group_add: [ "%s" ]\n' "$marker" "$run" "$gid" >"$override"
+  {
+    printf '%s\nservices:\n  fxbot:\n    volumes: [ "%s:/run/fxbot-computer" ]\n    group_add: [ "%s" ]\n' "$marker" "$run" "$gid"
+    [ -z "$selinux" ] || printf '    security_opt: [ label=disable ]\n'
+  } >"$compose"
   "$install/fxbot" up
 fi
 [ -z "$login" ] || usermod -aG "$name" "$login"
@@ -249,4 +358,4 @@ if [ -n "$release" ]; then
 else
   echo "fxbot reaches it at $sock${login:+, as $login}. The computer plugin finds it there when its user is fxbot-computer; otherwise set its engine setting to that path."
 fi
-echo "In place: the user $name and its home $home, its systemd, $rules and $unit${release:+, and $override}${login:+, and the groups of $login}."
+echo "In place: the user $name and its home $home, its systemd, $rules and $unit${release:+, and $compose}${login:+, and the groups of $login}."
