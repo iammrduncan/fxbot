@@ -92,6 +92,8 @@ function Cursors({ computer, hidden }) {
   const marks = data?.marks ?? [];
   const newest = Math.max(0, ...marks.map((m) => m.at));
   const botOf = (id) => bots?.find((b) => b.id === id);
+  // A subagent's mark carries its label, beside its bot's name.
+  const nameOf = (m) => `${botOf(m.bot)?.name ?? "A bot"}${m.label ? ` · ${m.label}` : ""}`;
   const [w, h] = data?.screen ?? [1, 1];
   const scale = size ? Math.min(size[0] / w, size[1] / h) : 0;
   return (
@@ -101,7 +103,7 @@ function Cursors({ computer, hidden }) {
           .filter((m) => m.x !== undefined && m.x !== null)
           .map((m) => (
             <div
-              key={m.bot}
+              key={m.id ?? m.bot}
               data-bot={m.bot}
               style={{ position: "absolute", left: (size[0] - w * scale) / 2 + m.x * scale - 1, top: (size[1] - h * scale) / 2 + m.y * scale - 1, opacity: m.at === newest ? 1 : 0.45, display: "flex", gap: 2 }}
             >
@@ -109,7 +111,7 @@ function Cursors({ computer, hidden }) {
                 <path d="M1 1 L1 15 L5 11 L8 17 L10.5 16 L7.5 10 L13 10 Z" fill={colors[botOf(m.bot)?.color] ?? "#3b82f6"} stroke="#fff" strokeWidth="1.2" strokeLinejoin="round" />
               </svg>
               <span style={{ ...pill, marginTop: 12 }}>
-                {botOf(m.bot)?.name ?? "A bot"} · {m.what} · {since(m.at)}
+                {nameOf(m)} · {m.what} · {since(m.at)}
               </span>
             </div>
           ))}
@@ -117,8 +119,8 @@ function Cursors({ computer, hidden }) {
         {marks
           .filter((m) => m.x === undefined || m.x === null)
           .map((m) => (
-            <span key={m.bot} style={{ ...pill, opacity: m.at === newest ? 1 : 0.6 }}>
-              {botOf(m.bot)?.name ?? "A bot"} · {m.what}
+            <span key={m.id ?? m.bot} style={{ ...pill, opacity: m.at === newest ? 1 : 0.6 }}>
+              {nameOf(m)} · {m.what}
             </span>
           ))}
       </div>

@@ -82,8 +82,11 @@ type ComputerProvider = {
   computerFor(call: { bot: string; session: string }): Promise<{ key: string; name: string } | null>;
   computers(): Promise<{ key: string; name: string }[] | null>;
 };
-// Where a bot last pointed on a computer, and what it did last.
-type Mark = { x?: number; y?: number; what: string; at: number };
+// Who works on a computer: a bot, in its own chat or a room, or a session a plugin labelled, such as a subagent's, which
+// works beside the bot's others at once. `id` is the bot's id, or the bot's and the session's.
+type Actor = { id: string; bot: string; label: string | null };
+// Where an actor last pointed on a computer, and what it did last.
+type Mark = { bot: string; label: string | null; x?: number; y?: number; what: string; at: number };
 type Engine = { state: "ready" | "unreachable" | "rootful"; socket: string; name?: string; version?: string; error?: string };
 type Step = { from: string; run: string };
 type Answer = { status: number; headers: IncomingHttpHeaders; data: Buffer };
@@ -220,8 +223,8 @@ export default async function setup(fx: PluginApi) {
 
   // A command in a container: its exit code and its output, stdout and stderr as they came. Each frame of the stream
   // is its stream's number, three zeros, its length, and its bytes.
-  async function exec(container: string, cmd: string[], { timeout = 60_000, line }: { timeout?: number; line?: (text: string) => void } = {}) {
-    const { Id } = await json("POST", `/containers/${container}/exec`, { AttachStdout: true, AttachStderr: true, Cmd: cmd, Env: desktop, WorkingDir: "/root" });
+  async function exec(container: string, cmd: string[], { timeout = 60_000, line, env = [] }: { timeout?: number; line?: (text: string) => void; env?: string[] } = {}) {
+    const { Id } = await json("POST", `/containers/${container}/exec`, { AttachStdout: true, AttachStderr: true, Cmd: cmd, Env: [...desktop, ...env], WorkingDir: "/root" });
     const parts: Buffer[] = [];
     let pending = Buffer.alloc(0);
     let rest = "";
@@ -551,24 +554,56 @@ export default async function setup(fx: PluginApi) {
     return { name, key: computer.key, shared: Boolean(computer.by) };
   }
 
-  // Where each bot last pointed on each computer, and what it did, by key then bot, for the owner's view and for the
-  // other bots on a shared computer. In memory only. Stop, Reset, and an idle stop clear a computer's.
+  const actorOf = (bot: string, session: string, label: string | null | undefined): Actor => (label ? { id: `${bot}:${session}`, bot, label } : { id: bot, bot, label: null });
+  // Where each actor last pointed on each computer, and what it did, by key then actor, for the owner's view and for
+  // the others on a shared computer. In memory only. Stop, Reset, and an idle stop clear a computer's.
   const marks = new Map<string, Map<string, Mark>>();
-  function mark(key: string, bot: string, what: string, xy?: unknown) {
+  function mark(key: string, actor: Actor, what: string, xy?: unknown) {
     const all = marks.get(key) ?? marks.set(key, new Map()).get(key)!;
-    const at = Array.isArray(xy) && xy.every((n) => Number.isFinite(n)) ? { x: Number(xy[0]), y: Number(xy[1]) } : { x: all.get(bot)?.x, y: all.get(bot)?.y };
-    all.set(bot, { ...at, what, at: Date.now() });
+    const was = all.get(actor.id);
+    const at = Array.isArray(xy) && xy.every((n) => Number.isFinite(n)) ? { x: Number(xy[0]), y: Number(xy[1]) } : { x: was?.x, y: was?.y };
+    all.set(actor.id, { bot: actor.bot, label: actor.label, ...at, what, at: Date.now() });
   }
+  // A bot's own computer is shared while more than one of its actors used it in the last 10 minutes.
+  const several = (key: string) => [...(marks.get(key)?.values() ?? [])].filter((m) => Date.now() - m.at < 10 * 60_000).length > 1;
+  const nameOfActor = async (m: { bot: string; label: string | null }) => `${(await fx.bots.get(m.bot).catch(() => null))?.name ?? "Another bot"}${m.label ? ` · ${m.label}` : ""}`;
   const ago = (ms: number) => (ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))} s ago` : ms < 3_600_000 ? `${Math.round(ms / 60_000)} min ago` : `${Math.round(ms / 3_600_000)} h ago`);
   const doing: Record<string, string> = { browser: "used the browser", "desktop app": "used a desktop app", shell: "ran a command", terminal: "used the terminal", looked: "looked at the screen", typed: "typed", "pressed keys": "pressed keys" };
-  // One line for a bot on a shared computer: where the others last were, newest first, at most five.
-  async function others(key: string, bot: string) {
-    const rest = [...(marks.get(key) ?? [])].filter(([who]) => who !== bot).sort((a, b) => b[1].at - a[1].at).slice(0, 5);
+  // One line for an actor on a shared computer: where the others last were, newest first, at most five.
+  async function others(key: string, actor: Actor) {
+    const rest = [...(marks.get(key) ?? [])].filter(([who]) => who !== actor.id).sort((a, b) => b[1].at - a[1].at).slice(0, 5);
     if (!rest.length) return "";
     const names = new Map((await fx.bots.list()).map((b) => [b.id, b.name]));
-    const said = rest.map(([who, m]) => `${names.get(who) ?? "Another bot"} ${doing[m.what] ?? m.what}${m.x !== undefined && !doing[m.what] ? ` (${m.x}, ${m.y})` : ""} ${ago(Date.now() - m.at)}`);
+    const said = rest.map(([, m]) => `${names.get(m.bot) ?? "Another bot"}${m.label ? ` · ${m.label}` : ""} ${doing[m.what] ?? m.what}${m.x !== undefined && !doing[m.what] ? ` (${m.x}, ${m.y})` : ""} ${ago(Date.now() - m.at)}`);
     return ` Others on this computer: ${said.join("; ")}.`;
   }
+
+  // Turns at a computer's desktop and its terminal, for actors working at once, such as a bot's subagents. An actor
+  // holds one from its call until 20 seconds after its last, or its turn's end; another's call waits up to a minute. A
+  // room's bots take turns already, so they never wait.
+  const holds = new Map<string, { actor: string; name: string; turn: string; until: number }>();
+  async function take(key: string, part: "desktop" | "terminal", actor: Actor, turn: string, signal: AbortSignal) {
+    const id = `${key}:${part}`;
+    for (const end = Date.now() + 60_000; ; await new Promise((r) => setTimeout(r, 500))) {
+      const held = holds.get(id);
+      if (!held || held.actor === actor.id || held.until < Date.now()) {
+        holds.set(id, { actor: actor.id, name: await nameOfActor(actor), turn, until: Infinity });
+        return null;
+      }
+      if (Date.now() > end || signal.aborted) return `${held.name} is using the ${part}. Work in the shell, or in your browser tab, and try the ${part} again in a minute.`;
+    }
+  }
+  function letGo(key: string, part: "desktop" | "terminal", actor: Actor) {
+    const held = holds.get(`${key}:${part}`);
+    if (held?.actor === actor.id) held.until = Date.now() + 20_000;
+  }
+  fx.on("turn.end", (event) => {
+    for (const [id, held] of holds) if (held.turn === event.messageId) holds.delete(id);
+  });
+  // A labelled session's browser commands bind to a tab of its own in the desktop's one Chromium: agent-browser's session
+  // and pin, so another's commands never take it, and the bot's sign-ins are its too.
+  const tabOf = (actor: Actor) =>
+    actor.label ? [`AGENT_BROWSER_SESSION=fxbot-${createHash("sha256").update(actor.id).digest("hex").slice(0, 10)}`, "AGENT_BROWSER_PIN_TAB=1"] : [];
 
   fx.tool({
     name: "shell",
@@ -585,18 +620,19 @@ export default async function setup(fx: PluginApi) {
       required: ["command"],
     },
     idempotent: false,
-    async execute(input: { command?: unknown; timeout?: unknown }, { bot, session, signal }) {
+    async execute(input: { command?: unknown; timeout?: unknown }, { bot, session, label, signal }) {
       const command = typeof input?.command === "string" ? input.command : "";
       if (!command.trim()) return "Give a command to run.";
       const seconds = Math.min(Math.max(Math.trunc(Number(input.timeout) || 120), 1), 600);
       const { name, key } = await ready(bot, session);
-      mark(key, bot, /\bagent-browser\b/.test(command) ? "browser" : /\bagent-desktop\b/.test(command) ? "desktop app" : "shell");
+      const actor = actorOf(bot, session, label);
+      mark(key, actor, /\bagent-browser\b/.test(command) ? "browser" : /\bagent-desktop\b/.test(command) ? "desktop app" : "shell");
       const id = randomUUID();
       const stop = () => void exec(name, ["sh", "-c", `kill -s KILL -- -$(cat /tmp/fxbot/${id}.pid)`]).catch(() => {});
       signal.addEventListener("abort", stop, { once: true });
       busy.set(key, (busy.get(key) ?? 0) + 1);
       try {
-        const { code, output } = await exec(name, ["fxbot-run", id, String(seconds), command], { timeout: (seconds + 60) * 1000 });
+        const { code, output } = await exec(name, ["fxbot-run", id, String(seconds), command], { timeout: (seconds + 60) * 1000, env: tabOf(actor) });
         return signal.aborted ? "Stopped: the turn was cancelled." : `exit ${code}\n${output}`;
       } finally {
         signal.removeEventListener("abort", stop);
@@ -742,14 +778,17 @@ export default async function setup(fx: PluginApi) {
       },
     },
     idempotent: false,
-    async execute(input: { text?: unknown; keys?: unknown; wait?: unknown }, { bot, session, signal }) {
+    async execute(input: { text?: unknown; keys?: unknown; wait?: unknown }, { bot, session, label, messageId, signal }) {
       const text = typeof input?.text === "string" ? input.text : "";
       const keys = (Array.isArray(input?.keys) ? input.keys : []).filter((k): k is string => typeof k === "string" && /^[\w-]{1,20}$/.test(k)).map((k) => tmuxKeys[k.toLowerCase()] ?? k);
       const seconds = Math.min(Math.max(Number(input?.wait ?? 1) || 0, 0), 30);
       const { name, key } = await ready(bot, session);
       const busyWith = taken(key);
       if (busyWith) return busyWith;
-      mark(key, bot, "terminal");
+      const actor = actorOf(bot, session, label);
+      const waited = await take(key, "terminal", actor, messageId, signal);
+      if (waited) return waited;
+      mark(key, actor, "terminal");
       busy.set(key, (busy.get(key) ?? 0) + 1);
       try {
         await exec(name, ["sh", "-c", "tmux has-session -t main 2>/dev/null || tmux new-session -d -s main -x 160 -y 48"]);
@@ -763,6 +802,7 @@ export default async function setup(fx: PluginApi) {
         const { output } = await exec(name, ["tmux", "capture-pane", "-t", "main", "-J", "-p", "-S", "-200"]);
         return cutTo(output.replace(/\s+$/, ""), page) || "(the terminal is empty)";
       } finally {
+        letGo(key, "terminal", actor);
         busy.set(key, busy.get(key)! - 1);
         used(key);
       }
@@ -825,25 +865,29 @@ export default async function setup(fx: PluginApi) {
       required: ["action"],
     },
     idempotent: false,
-    async execute(input: Record<string, any>, { bot, session }) {
+    async execute(input: Record<string, any>, { bot, session, label, messageId, signal }) {
       if (!actions.includes(input?.action)) return `action must be one of ${actions.join(", ")}.`;
       const { name, key, shared } = await ready(bot, session);
       const busyWith = taken(key);
       if (busyWith) return busyWith;
+      const actor = actorOf(bot, session, label);
+      const waited = await take(key, "desktop", actor, messageId, signal);
+      if (waited) return waited;
       busy.set(key, (busy.get(key) ?? 0) + 1);
       try {
         const { output } = await exec(name, ["fxbot-screen", JSON.stringify(input)], { timeout: 90_000 });
         const end = output.indexOf("\n");
         const info = JSON.parse(end < 0 ? output : output.slice(0, end));
         if (info.error) return info.error;
-        // A pointer action moves this bot's mark; typing and looking keep where it last pointed.
+        // A pointer action moves this actor's mark; typing and looking keep where it last pointed.
         const action = String(input.action);
-        mark(key, bot, pointed[action] ?? (action === "type" ? "typed" : action === "key" ? "pressed keys" : "looked"), pointed[action] ? info.cursor : undefined);
-        const text = `${did(input)}. Screen ${info.screen[0]}×${info.screen[1]}. Active window: ${info.window || "none"}. Cursor (${info.cursor[0]}, ${info.cursor[1]}).${shared ? await others(key, bot) : ""}`;
+        mark(key, actor, pointed[action] ?? (action === "type" ? "typed" : action === "key" ? "pressed keys" : "looked"), pointed[action] ? info.cursor : undefined);
+        const text = `${did(input)}. Screen ${info.screen[0]}×${info.screen[1]}. Active window: ${info.window || "none"}. Cursor (${info.cursor[0]}, ${info.cursor[1]}).${shared || several(key) ? await others(key, actor) : ""}`;
         const data = end < 0 ? "" : output.slice(end + 1).trim();
         if (!data) return text;
         return { type: "libfx.tool-result", text: `Screenshot ${keep(bot, info.type, data)}. ${text}`, images: [{ type: "image", mimeType: info.type, data }] };
       } finally {
+        letGo(key, "desktop", actor);
         busy.set(key, busy.get(key)! - 1);
         used(key);
       }
@@ -1070,7 +1114,7 @@ export default async function setup(fx: PluginApi) {
   // Where each bot last pointed, for the screen's arrows: from memory, with no call to the engine.
   fx.route("GET", "/computers/:key/cursors", (_, { key }) => {
     const [w, h] = screen().split("x").map(Number);
-    return Response.json({ screen: [w, h], marks: [...(marks.get(key) ?? [])].map(([bot, m]) => ({ bot, ...m })) });
+    return Response.json({ screen: [w, h], marks: [...(marks.get(key) ?? [])].map(([id, m]) => ({ id, ...m })) });
   });
   fx.route("POST", "/computers/:key/start", (_, { key }) => one(key, async (computer) => void (await open(computer))));
   // { on: true } gives the owner the mouse and keyboard, and pauses the bots' desktop and terminal tools; false hands back.

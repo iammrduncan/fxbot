@@ -13138,6 +13138,7 @@ function Cursors({ computer, hidden }) {
 	const marks = data?.marks ?? [];
 	const newest = Math.max(0, ...marks.map((m) => m.at));
 	const botOf = (id) => bots?.find((b) => b.id === id);
+	const nameOf = (m) => `${botOf(m.bot)?.name ?? "A bot"}${m.label ? ` · ${m.label}` : ""}`;
 	const [w, h] = data?.screen ?? [1, 1];
 	const scale = size ? Math.min(size[0] / w, size[1] / h) : 0;
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
@@ -13180,14 +13181,14 @@ function Cursors({ computer, hidden }) {
 					marginTop: 12
 				},
 				children: [
-					botOf(m.bot)?.name ?? "A bot",
+					nameOf(m),
 					" · ",
 					m.what,
 					" · ",
 					since(m.at)
 				]
 			})]
-		}, m.bot)), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+		}, m.id ?? m.bot)), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 			style: {
 				position: "absolute",
 				top: 6,
@@ -13202,11 +13203,11 @@ function Cursors({ computer, hidden }) {
 					opacity: m.at === newest ? 1 : .6
 				},
 				children: [
-					botOf(m.bot)?.name ?? "A bot",
+					nameOf(m),
 					" · ",
 					m.what
 				]
-			}, m.bot))
+			}, m.id ?? m.bot))
 		})]
 	});
 }
