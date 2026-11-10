@@ -3,12 +3,12 @@
 A plugin for [fxbot](https://fxbot.sh): a bot hands work to subagents, helpers that run in the background while it carries on, and hears back from them together.
 
 - **A subagent is the bot, run again, on one task.** It works in a session of its own, with the bot's instructions, tools, computer, skills, and memories, but not its chat, so the task carries everything it needs.
-- **The bot starts one with `subagents_start`,** a title and a task, and gets its name and id at once, such as Bravo (s:12). Names come from the phonetic alphabet, Alpha, Bravo, Charlie, the first that none in the bot's list has, and each working one has a color of its own, on its name in the panel. The bot can start several, for parallel work, and keep talking with you.
+- **The bot starts one with `subagents_start`,** a title and a task, and gets its name and id at once, such as Curie (s:12): a scientist's name, at random, that none in the bot's list has, as Codex names its agents, and a color of its own too, on its name in the panel. The bot can start several, for parallel work, and keep talking with you.
 - **With the plugin on, a bot hands work that takes a lot of digging to subagents** by itself, and tells you it'll come back with the results. `handOff` turns that off.
 - **A subagent and the bot's chat talk while it works.** It tells the chat what can't wait, a question or a finding, and the bot answers it, or changes its task, by name.
 - **Their reports come back together.** Once every subagent one turn started has ended, one message from **Subagents** reaches the bot's chat with all their reports. It joins the bot's turn if one is running, or starts its next one, and the bot tells you what matters.
 - **You watch them work.** The bot's panel, on the right of its chat, lists its subagents, working and recent, with the tool each is in and its calls. A click opens one's thread: its task, each step, and how it ended, live. **Stop** ends one.
-- **On the computer, they work together,** with the [computer](https://fxbot.sh/docs/how-to/give-bots-a-computer/) 0.4.0 or newer: each has its name and arrow on the computer's screen, such as "Ann · Wren", its own browser tab, and turns at the desktop and the terminal.
+- **On the computer, they work together,** with the [computer](https://fxbot.sh/docs/how-to/give-bots-a-computer/) 0.4.0 or newer: each has its name and arrow on the computer's screen, such as "Ann · Curie", its own browser tab, and turns at the desktop and the terminal.
 
 Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.9.0 or newer. See [Hand work to subagents](https://fxbot.sh/docs/how-to/hand-work-to-subagents/).
 

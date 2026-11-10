@@ -9,7 +9,7 @@ A bot can start subagents: helpers that work in the background on one task each,
 2. Ask a bot for something that takes a lot of digging: "compare the three hosting offers, and check what each says about backups". The bot hands it to subagents, one for each part, tells you what it started and that it'll come back with the results, and you can carry on talking with it.
 3. When the last of them has ended, their reports reach the bot together, in one message from **Subagents**, and the bot tells you what they found.
 
-Each subagent has a name of its own, from the phonetic alphabet: a bot's first is Alpha, then Bravo, Charlie, and on, each the first that none in its list has. Each name has its own color. A subagent hasn't seen your chat, so the bot puts everything it needs in its task.
+Each subagent has a name of its own, a scientist's, such as Curie or Ramanujan, that none in the bot's list has, and a color of its own too. A subagent hasn't seen your chat, so the bot puts everything it needs in its task.
 
 With the plugin on, a bot hands work that takes a lot of digging to subagents by itself. To have it start one only when it decides to, set `handOff` to `off`.
 
@@ -17,7 +17,7 @@ With the plugin on, a bot hands work that takes a lot of digging to subagents by
 
 A subagent can't ask you anything, but it can tell the bot's chat what can't wait for its report: a question only the chat can answer, or a finding to act on now. It shows in the chat as a message from the subagent's name, joins what the bot is doing, or wakes it, and the subagent carries on. A subagent does this at most five times.
 
-The bot answers, or changes a subagent's task, by messaging it by name: the message reaches the subagent at its next step, while it works. You can ask the bot to do it: "tell Bravo to look only at EU regions".
+The bot answers, or changes a subagent's task, by messaging it by name: the message reaches the subagent at its next step, while it works. You can ask the bot to do it: "tell Curie to look only at EU regions".
 
 ## Watch them work
 
@@ -25,7 +25,7 @@ The bot's panel, on the right of its chat, lists its subagents under **Subagents
 
 Click one to open its thread: its task, each step it takes, and what it found, as it works. When it ends, the thread says how long it took, its calls and tokens, and that it reported to the bot. The back button returns to the chat.
 
-In the chat, the bot's call that started one shows as a card, such as **Started Bravo**, with how it's going and **Open**.
+In the chat, the bot's call that started one shows as a card, such as **Started Curie**, with how it's going and **Open**.
 
 ## Stop one
 
@@ -48,7 +48,7 @@ Subagents start only in a bot's own chat with you, not in a room or a routine's 
 
 A bot's subagents share its [computer](/docs/how-to/give-bots-a-computer/), and work on it together as a room's bots do:
 
-- **Each has its name and arrow** on the computer's screen, such as "Ann · Bravo", and each is told what the others did last.
+- **Each has its name and arrow** on the computer's screen, such as "Ann · Curie", and each is told what the others did last.
 - **Each has its own browser tab,** with the bot's sign-ins, so they can browse at once.
 - **They take turns at the desktop and the terminal.** One that finds another using either waits for its turn, up to a minute, then works in the shell or its browser tab meanwhile.
 - **Each keeps its files** in a folder of its own, `~/subagents/s<id>/`.

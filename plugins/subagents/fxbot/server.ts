@@ -35,10 +35,29 @@ const limits = { atOnce: [1, 10, 4], perAsk: [1, 50, 10], minutes: [1, 240, 60],
 const blockedByDefault = "memory_save, memory_forget, messages_send, routines_add, routines_change, routines_remove, computer_ask_owner";
 const minute = 60_000;
 const most = { title: 80, task: 16_000, report: 12_000, taskShown: 2_000, listed: 300, words: 4_000, tells: 5 };
-// The names a bot's subagents are given: the phonetic alphabet, in order, the first that none in its list has, then
-// Alpha 2 and on. And how many colors the page has for them, one for each name in turn.
-const names = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliet", "Kilo", "Lima", "Mike", "November", "Oscar", "Papa", "Quebec", "Romeo", "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "X-ray", "Yankee", "Zulu"];
+// The names a bot's subagents are given, scientists', as Codex names its agents, and how many colors the page has.
+const names = [
+  "Lovelace", "Curie", "Turing", "Hopper", "Noether", "Euler", "Gauss", "Darwin", "Faraday", "Tesla", "Kepler", "Galileo",
+  "Newton", "Hypatia", "Fermat", "Pascal", "Bohr", "Planck", "Feynman", "Shannon", "Fourier", "Boole", "Babbage", "Kovalevskaya",
+  "Meitner", "Franklin", "McClintock", "Hawking", "Sagan", "Goodall", "Lamarr", "Ramanujan", "Riemann", "Cantor", "Hilbert", "Godel",
+  "Dijkstra", "Knuth", "Hamming", "Archimedes", "Euclid", "Avicenna", "Copernicus", "Brahe", "Herschel", "Hubble", "Leavitt", "Rubin",
+  "Pauling", "Mendel", "Pasteur", "Maxwell", "Volta", "Kelvin", "Joule", "Hooke", "Boyle", "Dalton", "Mendeleev", "Bose",
+  "Raman", "Germain", "Agnesi", "Wu", "Hodgkin", "Elion", "Yalow", "Carson",
+];
 const colors = 8;
+const nth = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th")}`;
+// A new subagent's name and color, given the bot's list, working or ended in the last day: a name none of them has, at
+// random, then "Curie the 2nd" and on, as Codex does, and the color the fewest of them have.
+export function pick(taken: { name: string; color: number }[], random = Math.random) {
+  const used = new Set(taken.map((t) => t.name));
+  let name = "";
+  for (let round = 1; !name; round++) {
+    const free = names.map((n) => (round === 1 ? n : `${n} the ${nth(round)}`)).filter((n) => !used.has(n));
+    if (free.length) name = free[Math.floor(random() * free.length)];
+  }
+  const counts = Array.from({ length: colors }, (_, c) => taken.filter((t) => t.color === c).length);
+  return { name, color: counts.indexOf(Math.min(...counts)) };
+}
 const restarted = "It was cut off when fxbot or this plugin restarted.";
 
 // What a subagent is told, after the bot's own instructions. Each paragraph is one line.
@@ -274,12 +293,9 @@ export default async function setup(fx: PluginApi) {
             and (select count(*) from subagents where ask = ${ask}) < ${perAsk}
           on conflict (key) do nothing returning *`;
         if (!row) return [];
-        // A name none in the bot's list has, working or ended in the last day, and a color none of its working ones has.
-        const taken = await sql<{ name: string; color: number; state: string }[]>`select name, color, state from subagents
+        const taken = await sql<{ name: string; color: number }[]>`select name, color from subagents
           where bot = ${call.bot} and id <> ${row.id} and (state = 'working' or ended_at > now() - interval '1 day')`;
-        const used = new Set(taken.map((t) => t.name));
-        const name = [1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((n) => names.map((base) => (n === 1 ? base : `${base} ${n}`))).find((n) => !used.has(n)) ?? `s${row.id}`;
-        const color = Math.max(0, names.indexOf(name.split(" ")[0])) % colors;
+        const { name, color } = pick(taken);
         return sql<Row[]>`update subagents set name = ${name}, color = ${color} where id = ${row.id} returning *`;
       });
       if (made) {
