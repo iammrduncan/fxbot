@@ -38,7 +38,7 @@ In its tab in **Settings**. A bot can't change them.
 | `minutes` | The most minutes one subagent works, 1 to 240 | 60 |
 | `calls` | The most tool calls one subagent makes, 1 to 1,000 | 100 |
 | `handOff` | `on`: the bot hands work that takes a lot of digging to subagents, and tells you it'll come back with the results. `off`: it starts one only when it decides to | `on` |
-| `keepDays` | How many days an ended subagent is kept in the list, 1 to 90 | 30 |
+| `keepDays` | How many days an ended subagent and its thread are kept before they're deleted, 1 to 90. The list shows those that ended in the last day. | 30 |
 | `blocked` | Tools a subagent can't call, comma-separated | as above |
 
 A value outside its range means its default, with one line in the plugin's log.
@@ -53,6 +53,7 @@ A value outside its range means its default, with one line in the plugin's log.
 ## What it costs
 
 - **A subagent's requests** carry the bot's instructions and tools, its rules, about 1.5 KB, and the task, but no chat. In a check with a small bot, its first request was 7.4 KB, against 5.9 KB for that bot's first message in a new chat. A real chat's requests are larger by its history. They run on the bot's provider, which counts their usage.
+- **In every request:** the five `subagents_*` tools' definitions, about 550 tokens, on every bot, as every plugin's tools reach every bot. In a bot's own chat, the hand-off line, about 140 tokens, unless `handOff` is off. Both are cached with the rest.
 - **The skill:** its line in each bot's list of skills, about 80 tokens, and about 1,100 when the bot reads it.
 - **One turn in the bot's chat for each batch,** at the chat's full context, to pass the reports on. That's why reports come together.
 - **At once,** up to `atOnce` turns of a bot, which share fxbot's turns at once with every other bot.

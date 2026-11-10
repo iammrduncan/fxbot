@@ -280,7 +280,7 @@ Then `fx.chats.send(bot, { messageId: "subagents-report-<first id>", label: "Sub
 
 - Each report is quoted as Messages quotes a bot's words, a run of three quotes or more becoming one, so it can't close the quote early.
 - A cut report says where the whole one is: `chat_history` finds a subagent's turn, and the owner reads it in its thread.
-- **Endings each say what happened:** done, failed with the reason, stopped by the owner, past its time, or "fxbot restarted during it".
+- **Endings each say what happened:** done, failed with the reason, stopped by the owner, past its time, or "It was cut off when fxbot or this plugin restarted.".
 - **A batch the bot stopped entirely** sends nothing.
 - **A send that fails,** such as a bot with no provider, leaves `reported_at` empty. The plugin tries again every 30 seconds while any batch is owed, and after a restart. The `messageId` makes a repeat send nothing new. A batch still owed a day after it ended is dropped, with a line in the log, so a plugin turned on again doesn't deliver old news.
 
@@ -289,7 +289,7 @@ Then `fx.chats.send(bot, { messageId: "subagents-report-<first id>", label: "Sub
 - **The owner:** **Stop** on a working row in the panel, and on the thread. It cancels the subagent's session, and it reports as stopped by the owner.
 - **The bot:** `subagents_stop`.
 - **Stop in the bot's chat** stops the chat's turn, not its subagents, as in p2 and openmuse. The panel stops them.
-- **A restart:** setup marks the working ones `stopped`, "fxbot restarted during it", without running them again, then reports their batches 10 seconds later, since turns can't start during setup.
+- **A restart:** setup marks the working ones `stopped`, "It was cut off when fxbot or this plugin restarted.", without running them again, then reports their batches 10 seconds later, since turns can't start during setup.
 - **The plugin unloading,** for an update, or turned off: its cleanup marks the working ones `stopped`, "the plugin was updated or turned off during it", and cancels their sessions. After an update, the new version reports them.
 - **The plugin turned off for a bot, or removed:** its subagents are cancelled. No report: the bot's chat no longer has the plugin.
 - **A deleted bot:** its rows go at the next sweep.
@@ -479,7 +479,7 @@ Nothing reaches a real model or the owner's dev server. Confirm a restarted chec
 - [x] **The owner's Stop** on the thread cancels the turn, the row says Stopped, and the report says the owner stopped it.
 - [x] **`subagents_stop`** stops it, and a batch the bot stopped entirely sends nothing.
 - [x] **Stop in the bot's chat** ends the chat's turn, and its subagents go on.
-- [x] **A restart:** with the server killed while two work, they come back Stopped, "fxbot restarted during it", their sessions aren't run again, and their batch reports once, within a minute of the start.
+- [x] **A restart:** with the server killed while two work, they come back Stopped, "It was cut off when fxbot or this plugin restarted.", their sessions aren't run again, and their batch reports once, within a minute of the start.
 - [x] **Off for a bot:** turning the plugin off for the bot cancels its working subagents, with no report, and its tools refuse.
 - [x] **An update:** reloading the plugin while one works marks it stopped, "It was cut off when fxbot or this plugin restarted.", and the new copy reports its batch.
 - [x] **A deleted bot:** its rows are gone at the next sweep.

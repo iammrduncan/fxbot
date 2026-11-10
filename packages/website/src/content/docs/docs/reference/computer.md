@@ -39,7 +39,7 @@ While the owner has a computer, after **Take over** or `computer_ask_owner`, `co
 
 - **Long output.** Output over 60 KiB comes back as its first 4 KiB and last 56 KiB, with a line saying how much was cut, and where the whole of it is, in `/tmp/fxbot/`. A tool's result can be at most 64 KiB.
 - **Servers.** A command started with `setsid cmd > log 2>&1 &` keeps running after its call, until the computer stops.
-- **Calls at once.** Shell commands run one at a time. Reads and writes in one reply run together.
+- **Calls at once.** A reply's shell commands run one at a time, and its reads and writes run together. Different actors' calls, such as a bot's subagents', run at once.
 - **Skills.** When a bot reads a skill with files besides `SKILL.md`, its files are copied to `/skills/<name>/` on the bot's computer before its next call, and the skill's text says so.
 
 ## Skills and instructions
@@ -61,9 +61,9 @@ Each computer is named for its bot, as its hostname, such as `bob-computer`, and
 - **The Computer screen**, `/computer/computers/<key>`, shows the desktop through [noVNC](https://novnc.com) and the terminal through [xterm.js](https://xtermjs.org), over WebSockets at `/api/plugins/computer/desktop/<key>` and `/api/plugins/computer/terminal/<key>`. A bot's key is its id, and `/computer/bots/<id>`, from before 0.3.0, opens the same screen. The desktop is view-only until **Take over**; the terminal takes typing always. For a stopped computer, the screen has **Start it**.
 - **Cursors.** Over the desktop, each bot, or each of a bot's labelled sessions, that pointed at something has an arrow in its colour, with its name, what it last did, and how long ago. The newest is solid, and the others faded. A bot that last used the browser or an app's accessibility tree, which move no pointer, shows as a label at the top left. They come from `computer_desktop`'s clicks, moves, drags, and scrolls, kept in memory, and cleared when the computer stops or is reset. Since 0.3.0.
 - **The browser** is Chromium, run as root without its sandbox, with its profile in `/root/.config/chromium`, so sign-ins last. The `agent-browser` command starts it on the desktop when it isn't running, brings its window to the front, and drives it over DevTools on `127.0.0.1:9222`, inside the computer.
-- **A bot's sessions at once,** such as its [subagents](/docs/how-to/hand-work-to-subagents/), since 0.4.0. A session a plugin labelled is an actor of its own on the bot's computer, named "<bot> · <label>", such as "Ann · Compare hosting prices":
+- **A bot's sessions at once,** such as its [subagents](/docs/how-to/hand-work-to-subagents/), since 0.4.0. A session a plugin labelled is an actor of its own on the bot's computer, named "<bot> · <label>", such as "Ann · Curie":
   - Its arrow and its pill carry that name, and a `computer_desktop` result names the others while more than one of the bot's actors has used the computer in the last 10 minutes.
-  - **Turns at the desktop and the terminal.** An actor holds each from its call until 20 seconds after its last, or its turn's end. Another actor's call waits for its turn, up to a minute, then answers "Ann · Compare hosting prices is using the desktop…". A room's bots take turns already, so they never wait.
+  - **Turns at the desktop and the terminal.** An actor holds each from its call until 20 seconds after its last, or its turn's end. Another actor's call waits for its turn, up to a minute, then answers "Ann · Curie is using the desktop…". A room's bots take turns already, so they never wait.
   - **A tab each.** Its `computer_shell` calls get `AGENT_BROWSER_SESSION`, a name of its own, and `AGENT_BROWSER_PIN_TAB=1`, so its agent-browser commands stay on a tab of their own, which no one else's take, with the bot's sign-ins.
   - **The shell** runs every actor's calls at once.
 - **Accessibility** is on for every app, so `agent-desktop` reads their trees.

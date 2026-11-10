@@ -21,6 +21,9 @@ The bot answers, or changes a subagent's task, by messaging it by name: the mess
 
 ## Watch them work
 
+<img class="shot dark:sl-hidden" src="/shots/subagents-desktop-light.png" width="1280" height="800" alt="Atlas's chat: three subagents started, Curie, Hopper, and Turing, each at work, and the bot's panel listing them under Subagents, 3 working" />
+<img class="shot light:sl-hidden" src="/shots/subagents-desktop-dark.png" width="1280" height="800" alt="Atlas's chat: three subagents started, Curie, Hopper, and Turing, each at work, and the bot's panel listing them under Subagents, 3 working" />
+
 The bot's panel, on the right of its chat, lists its subagents under **Subagents**, each with its name in a color of its own and what it's working on: the ones working, with the tool each is in and how many calls it has made, and those that ended in the last day. Past the three newest that ended, the rest fold under **N earlier**. On a phone, the panel opens from the button at the top right of the chat.
 
 Click one to open its thread: its task, each step it takes, and what it found, as it works. When it ends, the thread says how long it took, its calls and tokens, and that it reported to the bot. The back button returns to the chat.
@@ -51,7 +54,7 @@ A bot's subagents share its [computer](/docs/how-to/give-bots-a-computer/), and 
 - **Each has its name and arrow** on the computer's screen, such as "Ann · Curie", and each is told what the others did last.
 - **Each has its own browser tab,** with the bot's sign-ins, so they can browse at once.
 - **They take turns at the desktop and the terminal.** One that finds another using either waits for its turn, up to a minute, then works in the shell or its browser tab meanwhile.
-- **Each keeps its files** in a folder of its own, `~/subagents/s<id>/`.
+- **Each is told to keep its files** in a folder of its own, `~/subagents/s<id>/`.
 
 ## What it costs
 
@@ -71,7 +74,7 @@ Open **Settings** › **Subagents**:
 | `handOff` | `on`: the bot hands work that takes a lot of digging to subagents, and tells you it'll come back with the results. `off`: it starts one only when it decides to | `on` |
 | `blocked` | Tools a subagent can't call | its chat's: memories, messages, routines, and asking you for the computer |
 
-`perAsk` counts the subagents your message started, and those the bot starts from their reports, so a bot can't keep fanning out forever. A bot can't change these.
+`perAsk` counts the subagents your message started, and those the bot starts from their reports. A bot can't change these.
 
 ## If it doesn't work
 

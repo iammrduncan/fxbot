@@ -9,6 +9,9 @@ With the **mermaid** plugin, the ```` ```mermaid ```` code blocks your bots writ
 2. Ask a bot for something a picture explains: "draw how a refund goes through our support", or "show the steps between the app, the server, and the bank when someone pays".
 3. The diagram draws in its reply, as the bot writes it.
 
+<img class="shot dark:sl-hidden" src="/shots/diagram-desktop-light.png" width="1280" height="800" alt="Pixel's chat: a flowchart of an order's journey, from Order placed through Paid? to the customer's door, drawn in the reply" />
+<img class="shot light:sl-hidden" src="/shots/diagram-desktop-dark.png" width="1280" height="800" alt="Pixel's chat: a flowchart of an order's journey, from Order placed through Paid? to the customer's door, drawn in the reply" />
+
 Bots draw one by themselves when a picture explains it better than words, such as a process, the steps between people or systems, a structure, or a timeline. To have one, or to stop them, say so.
 
 ## Where they draw
@@ -29,7 +32,7 @@ The buttons at a diagram's top right show on hover, and always on a phone:
 
 A diagram with a mistake shows its code, and a line saying what's wrong and where. Tell the bot, "the diagram didn't draw", and it fixes it.
 
-Bots check a diagram with the `mermaid_check` tool before they send it, which draws it as you'll see it. A diagram that takes longer than 3 seconds to draw stops, and shows its code.
+Bots check a diagram with the `mermaid_check` tool before they send it, which draws it as you'll see it. A diagram that takes longer than 3 seconds to draw stops, and shows its code, and so does one over 50,000 characters.
 
 ## What a diagram can't do
 

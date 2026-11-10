@@ -204,13 +204,13 @@ A plugin's turns run as the owner's do, with the same hooks, history, library, a
 
 | Call | What it does |
 | --- | --- |
-| `fx.chats.newSession(bot, { label? })` | A session of the plugin's own for the bot, on the bot's provider now. Keep its id. `label`, since 0.9.0, names it, up to 80 characters, such as a subagent's title: each of its tool calls gets it, so a plugin such as the computer can tell the bot's sessions apart. |
+| `fx.chats.newSession(bot, { label? })` | A session of the plugin's own for the bot, on the bot's provider now. Keep its id. `label`, since 0.9.0, names it, up to 80 characters, such as a subagent's name: each of its tool calls gets it, so a plugin such as the computer can tell the bot's sessions apart. |
 | `fx.chats.send(bot, { text, shown?, label?, steer?, files?, session?, messageId?, asked? })` | A message. `shown`, since 0.6.0, is what the chat shows of it, when that isn't `text`, which the model gets. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. `asked`, since 0.7.0, is the owner's own words the message carries on, up to 8,000 characters, which the plugin quotes from a chat of theirs, such as what they asked the bot it's from. Hooks get it with the message and its turn. |
 | `fx.chats.stream(bot, session, cursor?)` | That session's lines, as NDJSON, from `cursor` on, then each new one. The same lines as [`fxbot.stream`](/sdk/how-to/stream-replies/). |
 | `fx.chats.ownerSaid(bot, limit)` | The owner's newest messages in the bot's own chat, oldest first, with no plugin's or other bot's. Since 0.6.0. |
 | `fx.chats.cancel(bot, session?)` | Stops the turn running in one of the plugin's own sessions, if one runs. It ends `cancelled`, and the session's stream says so. Since 0.4.1. With no `session`, since 0.6.0, it stops the turn running in the bot's own chat, if this plugin started it. Any other turn there throws with `status` 409, and with nothing running it does nothing. |
 
-In a bot's own chat, since 0.6.0, `send` also takes these, and its answer has `joined`:
+In a bot's own chat, since 0.6.0, and in a session of the plugin's own, since 0.9.0, `send` also takes these, and its answer has `joined`:
 
 | Field | What it does |
 | --- | --- |
@@ -254,7 +254,7 @@ The computer and chat rooms provide objects of their own: see [the computer's](/
 
 ## Page code
 
-`page` is one CommonJS bundle that leaves `react`, `react/jsx-runtime`, and `@fxbot/app` out. The page runs it with a `require` that gives those three, its own copies, and nothing else. Its default export is called with `app`:
+`page` is one CommonJS bundle that leaves `react`, `react/jsx-runtime`, and `@fxbot/app` out. The page runs it with a `require` that gives those three, its own copies, and nothing else. Its default export is called with `app`, which has the plugin's `name` and `version`, and these:
 
 | Call | Where it shows |
 | --- | --- |
@@ -267,7 +267,7 @@ The computer and chat rooms provide objects of their own: see [the computer's](/
 | `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. |
 | `app.box(Component)` | Replaces the textarea in a bot's chat, for the first plugin that sets one. It gets `bot` and a textarea's props, and acts as one: `value` is the text, `onChange` gets `{ target: { value, selectionStart } }`, and its `ref` has `selectionStart` and `setSelectionRange`. One that throws falls back to the textarea. Since 0.6.0. |
 | `app.fold({ message, tool })` | Folds messages in a bot's chat into a pill, which counts what was received and sent, shows each bot's face, and opens to show them. `message(id)` gets a message's id, and answers `{ fold, bot }`, or nothing: `fold` is `"turn"` to fold it with the turn it starts, or `"message"` to fold it alone, and `bot` is the id of who it's from. `tool(call)` gets a tool call, and answers `{ bot, name }` when it sent a message, or nothing, and its card goes in a pill. A run of them makes one pill, until something that doesn't fold. A turn the owner wrote into stays in view. Since 0.6.0. |
-| `app.codeBlock(language, Component)` | Draws each fenced code block of `language`, such as ```` ```mermaid ````, wherever the app shows Markdown: a bot's replies, Markdown pages, rooms, and the library's preview. `Component` gets `code`, `language`, `meta` (what follows the language on the fence), and `incomplete`, true while the block is still streaming in. The first plugin to claim a language draws it, and one that throws leaves the plain code. Since 0.9.0. |
+| `app.codeBlock(language, Component)` | Draws each fenced code block of `language`, such as ```` ```mermaid ````, wherever the app shows Markdown: a bot's replies, Markdown pages, rooms, and the library's preview. `Component` gets `code`, `language`, `meta` (what follows the language on the fence), and `incomplete`, true while the block is still streaming in: in a bot's reply as it arrives, and in `ui.Streamdown` when the plugin passes it `isAnimating`. The first plugin to claim a language draws it, and one that throws leaves the plain code. Since 0.9.0. |
 | `app.said(pattern, Component)` | Draws each match of `pattern`, a global regex, in what the owner or a plugin said in a bot's chat. `Component` gets `match`. Since 0.6.0. |
 | `app.toolView(tool, Component, { open? })` | How a call of `<plugin>_<tool>` shows in a reply. With `open`, since 0.6.0, it stays in sight below the folded steps, for what the owner shouldn't miss. It gets `call`: `name`, `input`, `output`, `error`, and `done`. |
 | `app.settings(Component)` | A part of the plugin's tab in Settings, at `/settings/plugins/<plugin>`, above its bots and settings. Every plugin has that tab, and several calls stack in it. Before 0.6.0, only a plugin that called this had a tab, and before 0.5.0, it was a section of Settings' one page. |

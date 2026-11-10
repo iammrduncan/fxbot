@@ -62,7 +62,7 @@ Open fxbot from the home screen. It opens on its own, without the browser's bars
 
 ## Set up fxbot
 
-The first time you open it, fxbot shows **Essentials**: the plugins most people want, each with what it gives you. One of them, the computer, sets up a computer engine on this machine, then restarts fxbot, and it says so there. Another, web pairing, opens fxbot on your phone later, and connects to nothing until you pair one.
+The first time you open it, fxbot shows **Essentials**: the plugins most people want, each with what it gives you. One of them, the computer, sets up a computer engine on this machine, then restarts fxbot, and it says so there. Web pairing, which opens fxbot on your phone, isn't among them: add it from **Plugins** when you want it.
 
 Tap **Set up Essentials**. fxbot adds them one by one, and moves on by itself. To pick your own instead, tap **Choose my own**, where they're already ticked, and untick what you don't want. Plugins you leave out are under **Plugins** for later.
 
