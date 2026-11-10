@@ -268,7 +268,7 @@ Each box is something that ran, by hand or by a script, against a disposable fxb
 - [x] A wide `flowchart LR` is laid out again for 390 pixels, from 646×186 to 348×336, top to bottom, and back when the window widens.
 - [x] The controls show on hover and focus, and on a touch screen; **Code**, **Copy**, **Download**, and **Expand** each work, and the downloaded SVG looks the same opened on its own.
 - [x] Screenshots of the set, light and dark, at 1280 and 390 pixels, are looked at.
-- [ ] The owner agrees with the look.
+- [x] The owner agrees with the look: "looks good to me" (2026-11-10), from a demo served on the tailnet, with every type, an error, and its fix.
 
 **M4. Streaming and errors** (the mock model, writing a diagram slowly)
 - [x] The diagram grows as lines arrive, never shows an error before the fence closes, and keeps its last drawing.
