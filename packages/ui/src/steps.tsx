@@ -1,10 +1,9 @@
 import { Fragment, useState, type ComponentType, type ReactNode } from "react";
 import { BookOpenIcon, BrainIcon, CircleAlertIcon, CircleCheckIcon, EraserIcon, FileTextIcon, HistoryIcon, LibraryIcon, LoaderCircleIcon, SaveIcon, SearchIcon, WrenchIcon } from "lucide-react";
-import { Streamdown } from "streamdown";
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import type { Part, Turn } from "@fxbot/sdk/client";
 import { Fold } from "./fold.tsx";
-import { PluginPart, useFold, usePluginToolView } from "./plugins.tsx";
+import { Markdown, PluginPart, useFold, usePluginToolView } from "./plugins.tsx";
 
 type Tool = Extract<Part, { type: "tool" }>;
 type Step = Extract<Part, { type: "reasoning" | "tool" }>;
@@ -21,7 +20,7 @@ type Joined = Extract<Part, { type: "user" }>;
 export function Reply({ turn, said }: { turn: Turn; said?: (messages: Joined[]) => ReactNode }) {
   const parts = turn.parts ?? [];
   // A turn from an earlier chat has only its text.
-  if (!parts.length) return turn.reply ? <Streamdown>{turn.reply}</Streamdown> : turn.done ? null : <p className="animate-pulse text-muted-foreground">Thinking…</p>;
+  if (!parts.length) return turn.reply ? <Markdown>{turn.reply}</Markdown> : turn.done ? null : <p className="animate-pulse text-muted-foreground">Thinking…</p>;
   const blocks: (string | Step[] | { joined: Joined[] })[] = [];
   for (const part of parts) {
     const last = blocks.at(-1);
@@ -35,7 +34,10 @@ export function Reply({ turn, said }: { turn: Turn; said?: (messages: Joined[]) 
   }
   return blocks.map((block, i) =>
     typeof block === "string" ? (
-      <Streamdown key={i}>{block}</Streamdown>
+      // The last text of a turn still running is still arriving: a code block there may be unfinished.
+      <Markdown key={i} isAnimating={!turn.done && i === blocks.length - 1}>
+        {block}
+      </Markdown>
     ) : Array.isArray(block) ? (
       <Steps key={i} steps={block} working={!turn.done && i === blocks.length - 1} />
     ) : (

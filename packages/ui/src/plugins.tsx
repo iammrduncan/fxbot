@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as jsxRuntime from "react/jsx-runtime";
-import { Component, createContext, useContext, useSyncExternalStore, type ComponentProps, type ComponentType, type ReactNode } from "react";
+import { Component, createContext, useContext, useMemo, useSyncExternalStore, type ComponentProps, type ComponentType, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
 import { createPortal } from "react-dom";
 import * as attachment from "@/components/ui/attachment";
@@ -41,6 +41,9 @@ export type Fold = {
   message?: (id: string) => { fold: "turn" | "message"; bot?: string } | void;
   tool?: (call: ToolCall) => { bot?: string; name?: string } | void;
 };
+// A fenced code block a plugin draws: its text, its language, what follows the language on the fence, and whether the
+// fence is still open, as it is while a reply streams.
+export type CodeBlockProps = { code: string; language: string; meta?: string; incomplete: boolean };
 type Nav = { label: string; path: string; icon?: ComponentType<{ className?: string }> };
 type Places = {
   routes: { path: string; parts: string[]; Component: ComponentType<{ params: Record<string, string> }> }[];
@@ -56,13 +59,14 @@ type Places = {
   box: ComponentType<any>[];
   fold: Fold[];
   said: { pattern: RegExp; Component: ComponentType<{ match: RegExpMatchArray }> }[];
+  codeBlocks: { language: string; Component: ComponentType<CodeBlockProps> }[];
   // Places other plugins leave with Slot, by name, such as `chat-rooms.room-header`.
   slots: Map<string, ComponentType<any>[]>;
 };
 // `key` is the URLs it loaded from, which change with its files.
 type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places; pageError?: string };
 
-const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], libraryItem: [], chat: [], box: [], fold: [], said: [], slots: new Map() });
+const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], libraryItem: [], chat: [], box: [], fold: [], said: [], codeBlocks: [], slots: new Map() });
 
 // The loaded plugins, by name. A change makes a new array, which the places read through usePlugins.
 let loaded: Loaded[] = [];
@@ -92,7 +96,7 @@ const ui = () => ({
   ...sidebar,
   ...switches,
   ...textarea,
-  Streamdown,
+  Streamdown: Markdown,
   Header,
   Blob,
   Reply,
@@ -148,6 +152,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     box: (Component: ComponentType<any>) => places.box.push(Component),
     fold: (fold: Fold) => places.fold.push(fold),
     said: (pattern: RegExp, Component: ComponentType<{ match: RegExpMatchArray }>) => places.said.push({ pattern, Component }),
+    codeBlock: (language: string, Component: ComponentType<CodeBlockProps>) => places.codeBlocks.push({ language: String(language).toLowerCase(), Component }),
     slot: (name: string, Component: ComponentType<any>) => places.slots.set(name, [...(places.slots.get(name) ?? []), Component]),
   });
   return places;
@@ -211,6 +216,41 @@ export function useFold() {
     }
   };
   return { message: (id: string) => first((fold) => fold.message?.(id)), tool: (call: ToolCall) => first((fold) => fold.tool?.(call)) };
+}
+
+// The code blocks plugins draw, as Streamdown's renderers: the first plugin to claim a language draws it, in its own
+// error boundary, and the plain code shows if it throws. Made once for each list of loaded plugins, so a renderer keeps
+// its identity, and its state, while a reply streams.
+type Renderer = { language: string; component: ComponentType<{ code: string; isIncomplete: boolean; language: string; meta?: string }> };
+const renderersOf = new WeakMap<Loaded[], Renderer[]>();
+function useCodeBlocks() {
+  const plugins = usePlugins();
+  let renderers = renderersOf.get(plugins);
+  if (!renderers) {
+    const claimed = new Set<string>();
+    renderers = plugins.flatMap(({ name, places }) =>
+      places.codeBlocks.flatMap(({ language, Component }): Renderer[] => {
+        if (claimed.has(language)) return [];
+        claimed.add(language);
+        const component = ({ code, isIncomplete, language, meta }: { code: string; isIncomplete: boolean; language: string; meta?: string }) => (
+          <PluginPart plugin={name} fallback={<pre className="my-4 overflow-x-auto rounded-xl border p-4 text-sm"><code>{code}</code></pre>}>
+            <Component code={code} language={language} meta={meta} incomplete={isIncomplete} />
+          </PluginPart>
+        );
+        return [{ language, component }];
+      }),
+    );
+    renderersOf.set(plugins, renderers);
+  }
+  return renderers;
+}
+
+// Markdown as the app draws it everywhere, and gives plugins as ui.Streamdown: Streamdown, with the code blocks plugins
+// draw. With none, it's Streamdown as it is.
+export function Markdown({ plugins, ...props }: ComponentProps<typeof Streamdown>) {
+  const blocks = useCodeBlocks();
+  const merged = useMemo(() => (blocks.length ? { ...plugins, renderers: [...(plugins?.renderers ?? []), ...blocks] } : plugins), [plugins, blocks]);
+  return <Streamdown {...props} plugins={merged} />;
 }
 
 // What the owner or a plugin said, with each match of a plugin's `said` pattern drawn by its part.

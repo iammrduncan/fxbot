@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { DownloadIcon, FileTextIcon, LibraryIcon, SearchIcon, Trash2Icon } from "lucide-react";
-import { Streamdown } from "streamdown";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -11,7 +10,7 @@ import { itemKinds, type ItemKind, type LibraryItem, type LibraryPage as Page, t
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
 import { follow } from "./nav.ts";
-import { Place } from "./plugins.tsx";
+import { Markdown, Place } from "./plugins.tsx";
 
 const kindLabels: Record<ItemKind, string> = { image: "Images", document: "Documents" };
 
@@ -205,7 +204,7 @@ export function Preview({ item, profiles, onClose, onRemoved }: { item: LibraryI
             <p className="p-3 text-sm text-muted-foreground">{error ? "" : "Loading…"}</p>
           ) : markdown ? (
             <div className="p-4 text-sm">
-              <Streamdown>{text}</Streamdown>
+              <Markdown>{text}</Markdown>
             </div>
           ) : (
             <pre className="p-3 text-xs break-words whitespace-pre-wrap">{text}</pre>
