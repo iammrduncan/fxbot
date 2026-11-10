@@ -36,7 +36,7 @@ Passwords, secrets, and tokens never go back to the page. Add `?transport=tcp` t
 | Open pairings at once | 3 |
 | A code | `N-DDDD-DDDD`: a number from 1 to 999 that finds fxbot at the relay, then eight digits |
 | A code's guesses | 1 |
-| The lockout | 3 wrong codes, or refused passkeys, in 15 minutes lock pairing for 15 minutes. Restarting fxbot ends it. |
+| The lockout | 3 wrong codes in 15 minutes lock pairing for 15 minutes. Restarting fxbot ends it. |
 | The link | `https://web.fxbot.sh/pair#1.<address>.<ticket>.<key>.<secret>`, with the relay at the end when it isn't fxbot.sh's |
 
 ## Devices

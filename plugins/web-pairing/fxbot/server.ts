@@ -333,7 +333,7 @@ export default async function webPairing(fx: PluginApi) {
     finishTicket(t);
     if (wrongCode) countFailure();
   }
-  // Three wrong codes, or refused passkeys, in 15 minutes lock pairing for 15 minutes.
+  // Three wrong codes in 15 minutes lock pairing for 15 minutes.
   function countFailure() {
     const now = Date.now();
     failures.push(now);
@@ -557,8 +557,8 @@ export default async function webPairing(fx: PluginApi) {
       await checkAssertion(p, hs.rs!, key, wire.shellOf(config.relay), nonces);
       await fx.sql`update passkeys set used_at = now() where id = ${key.id}`;
     } catch (error) {
+      // Not a wrong code: the lockout is for codes, which can be guessed.
       fx.log(`A passkey was refused: ${error instanceof Error ? error.message : error}`);
-      countFailure();
       send(c, wire.failure("failed"));
       return end(c, 500);
     }
