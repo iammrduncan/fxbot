@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { LoaderCircleIcon } from "lucide-react";
+import { ExternalLinkIcon, LoaderCircleIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,14 @@ import { client } from "./client.ts";
 import { usePageError } from "./plugins.tsx";
 
 // What Browse opens for a package: a card from fxbot's list, or a repository the owner typed.
-export type PluginTarget = { ref: string; from: "fxbot" | "github"; name?: string; iconKey?: string; description?: string };
+export type PluginTarget = { ref: string; from: "fxbot" | "github"; name?: string; iconKey?: string; description?: string; docs?: string };
+
+// A plugin's page in fxbot's docs, for one fxbot's list has a page for.
+export const DocsLink = ({ docs }: { docs: string }) => (
+  <a href={`https://fxbot.sh${docs}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 self-start text-sm font-medium underline underline-offset-4">
+    Docs <ExternalLinkIcon className="size-3.5" />
+  </a>
+);
 
 const size = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
 const fromText = { fxbot: "fxbot's list", github: "GitHub" };
@@ -185,6 +192,7 @@ export function PluginDialog({
             <DialogTitle className="truncate">{name}</DialogTitle>
           </div>
           {(page?.description || target.description) && <DialogDescription>{page?.description || target.description}</DialogDescription>}
+          {target.docs && <DocsLink docs={target.docs} />}
         </DialogHeader>
         <div className="-mx-4 grid min-h-0 flex-1 grid-cols-1 content-start gap-4 overflow-y-auto px-4">
           {!page && !error && (

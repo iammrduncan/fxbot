@@ -6,62 +6,72 @@
       "description": "A Linux computer for each bot: a desktop you watch and take over, a terminal, a browser, and files.",
       "note": "Sets up a computer engine on this machine, then restarts fxbot.",
       "repo": "iammrduncan/fxbot",
-      "path": "plugins/computer"
+      "path": "plugins/computer",
+      "docs": "/docs/how-to/give-bots-a-computer/"
     },
     {
       "name": "chat-rooms",
       "description": "Rooms where several of your bots talk with you: tag a bot with @, and bots hand work to each other.",
       "repo": "iammrduncan/fxbot",
-      "path": "plugins/chat-rooms"
+      "path": "plugins/chat-rooms",
+      "docs": "/docs/how-to/talk-in-a-room/"
     },
     {
       "name": "fresh",
       "description": "/fresh starts a bot's chat over toward what you write next, from a summary that keeps what matters.",
       "repo": "iammrduncan/fxbot",
-      "path": "plugins/fresh"
+      "path": "plugins/fresh",
+      "docs": "/docs/how-to/start-fresh/"
     },
     {
       "name": "chat-rooms-computer",
       "description": "A computer a chat room's bots share, taking turns, with an arrow where each one last pointed.",
       "repo": "iammrduncan/fxbot",
-      "path": "plugins/chat-rooms-computer"
+      "path": "plugins/chat-rooms-computer",
+      "docs": "/docs/how-to/give-bots-a-computer/#give-a-room-a-computer"
     },
     {
       "name": "dreams",
       "description": "Each night, a bot goes over its day and keeps what it learned as memories and skills, with Undo.",
       "repo": "iammrduncan/fxbot",
-      "path": "plugins/dreams"
+      "path": "plugins/dreams",
+      "docs": "/docs/how-to/let-bots-dream/"
     },
     {
       "name": "routines",
       "description": "Bots run saved tasks on a schedule, such as a morning summary, and tell you in their chat.",
       "repo": "iammrduncan/fxbot",
-      "path": "plugins/routines"
+      "path": "plugins/routines",
+      "docs": "/docs/how-to/give-a-bot-a-routine/"
     },
     {
       "name": "messages",
       "description": "Your bots message each other in their own chats, and you watch them work together.",
       "repo": "iammrduncan/fxbot",
-      "path": "plugins/messages"
+      "path": "plugins/messages",
+      "docs": "/docs/how-to/let-bots-work-together/"
     },
     {
       "name": "permissions",
       "description": "Decide what each bot can do on its own: ask, a reviewer model, or run everything.",
       "repo": "iammrduncan/fxbot",
-      "path": "plugins/permissions"
+      "path": "plugins/permissions",
+      "docs": "/docs/how-to/choose-what-a-bot-can-do-alone/"
     },
     {
       "name": "pages",
       "description": "Bots write reports, guides, and plans to read outside the chat, kept in the library with every version.",
       "repo": "iammrduncan/fxbot",
-      "path": "plugins/pages"
+      "path": "plugins/pages",
+      "docs": "/docs/how-to/keep-what-a-bot-writes/"
     },
     {
       "name": "web-pairing",
       "description": "Your fxbot from your phone or any computer, at web.fxbot.sh, over a connection straight to it, paired once.",
       "note": "Connects to fxbot.sh's relay only once you pair a device, and finds the way through with Cloudflare's STUN.",
       "repo": "iammrduncan/fxbot",
-      "path": "plugins/web-pairing"
+      "path": "plugins/web-pairing",
+      "docs": "/docs/how-to/reach-it-from-your-phone/"
     }
   ]
 }

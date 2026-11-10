@@ -16,7 +16,7 @@ import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
 import { follow, go } from "./nav.ts";
 import { Essentials } from "./add-plugins.tsx";
-import { PluginDialog, PluginSettings, RepoForm, usePackageSearch, type PluginTarget } from "./packages.tsx";
+import { DocsLink, PluginDialog, PluginSettings, RepoForm, usePackageSearch, type PluginTarget } from "./packages.tsx";
 import { loadPlugins } from "./plugins.tsx";
 import { blurb } from "@/lib/utils";
 import { InstalledSkill, SkillDialog, SkillResults, SkillSettings, useSkillSearch } from "./skills.tsx";
@@ -57,6 +57,7 @@ const targetOf = (addon: PackagePlugin): PluginTarget => ({
   name: addon.name,
   iconKey: addon.iconKey,
   description: addon.description,
+  docs: addon.docs,
 });
 
 // A plugin's tab in Settings, after /settings/: a package's by its name, which is unique, and any other's by its id.
@@ -124,7 +125,7 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
   const packagesAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "package" ? [a.name] : [])));
   // fxbot's picks from its three lists, as one list: packages, then servers, then skills, without those added.
   const listed: Card[] = [
-    ...(packageSearch.result?.cards ?? []).map((c) => ({ key: `p:${c.ref}`, name: c.name, iconKey: c.iconKey, carries: "", description: c.description, added: packagesAdded.has(c.name), open: () => setPlugin({ ref: c.ref, from: "fxbot", name: c.name, iconKey: c.iconKey, description: c.description }) })),
+    ...(packageSearch.result?.cards ?? []).map((c) => ({ key: `p:${c.ref}`, name: c.name, iconKey: c.iconKey, carries: "", description: c.description, added: packagesAdded.has(c.name), open: () => setPlugin({ ref: c.ref, from: "fxbot", name: c.name, iconKey: c.iconKey, description: c.description, docs: c.docs }) })),
     ...(search.result?.cards ?? []).filter((c) => c.from === "fxbot").map((c) => ({ key: `m:${c.name}`, name: c.title || c.name, iconKey: c.iconKey, carries: "MCP server", description: c.description, added: added.has(c.name), open: () => setEntry(c) })),
     ...(skillSearch.result?.cards ?? []).filter((c) => c.from === "fxbot").map((c) => ({ key: `s:${c.id}`, name: c.name, iconKey: c.iconKey, carries: "Skill", description: c.description ?? "", added: skillsAdded.has(c.id), open: () => setSkill(c) })),
   ];
@@ -217,7 +218,7 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
           )}
           {tab === "browse" && (
             <div className="grid gap-6">
-              {!words && <Essentials added={(addons ?? []).map((addon) => addon.name)} onOpen={(card) => setPlugin({ ref: card.ref, from: card.from, name: card.name, iconKey: card.iconKey, description: card.description })} onChange={() => void load()} />}
+              {!words && <Essentials added={(addons ?? []).map((addon) => addon.name)} onOpen={(card) => setPlugin({ ref: card.ref, from: card.from, name: card.name, iconKey: card.iconKey, description: card.description, docs: card.docs })} onChange={() => void load()} />}
               <section className="grid gap-2">
                 <h2 className={heading}>fxbot's picks</h2>
                 {picks.map((pick) => (
@@ -307,6 +308,7 @@ export function PluginTab({ addon, installed, profiles, children }: { addon: Plu
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-medium">{addon.name}</h2>
           {blurb(description) && <p className="text-sm text-muted-foreground">{blurb(description)}</p>}
+          {addon.kind === "package" && addon.docs && <DocsLink docs={addon.docs} />}
         </div>
         <Switch aria-label={`Use ${addon.name}`} checked={addon.enabled} onCheckedChange={(enabled) => client.plugins.change(addon.id, { enabled }).then(replace, (e: Error) => setError(e.message))} />
       </div>

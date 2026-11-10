@@ -278,6 +278,8 @@ export type PackagePlugin = PluginCommon & {
   error?: string;
   /** Why it doesn't run on this fxbot. Its files, settings, and tables stay. */
   unsupported?: string;
+  /** Its page in fxbot's docs, a path on fxbot.sh, when fxbot's list has one for it. Since 0.9.0. */
+  docs?: string;
 };
 export type Plugin = McpPlugin | SkillPlugin | PackagePlugin;
 // A plugin by its GitHub repository and the folder it's in: `<owner>/<repo>`, or `<owner>/<repo>/<folder>`.
@@ -315,8 +317,9 @@ export type PackagePreview = {
   needsFxbot?: string;
 };
 // A plugin in fxbot's own list.
-// `note` is what the owner should know before adding it, such as that it changes the machine.
-export type PackageCard = { kind: "package"; name: string; iconKey: string; description: string; ref: string; from: "fxbot"; note?: string };
+// `note` is what the owner should know before adding it, such as that it changes the machine. `docs` is its page in
+// fxbot's docs, a path on fxbot.sh, since 0.9.0.
+export type PackageCard = { kind: "package"; name: string; iconKey: string; description: string; ref: string; from: "fxbot"; note?: string; docs?: string };
 // `essentials` is the pack fxbot recommends, by name, in the order to add them, whatever the search matched.
 export type PackageSearch = { cards: PackageCard[]; essentials: string[] };
 // What the page loads for a running plugin: its page code and its CSS, by URL.

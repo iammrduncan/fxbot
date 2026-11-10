@@ -424,7 +424,7 @@ Each is read at each use, and a value outside its range means its default, said 
 ### What changes
 
 - **New:** `plugins/subagents/`, with its README.
-- **fxbot's plugin list:** an entry for subagents, outside **Essentials** unless the owner says otherwise.
+- **fxbot's plugin list:** an entry for subagents, outside **Essentials** unless the owner says otherwise, with `"docs": "/docs/how-to/hand-work-to-subagents/"`, so its page in **Plugins** and its tab in **Settings** link to the how-to.
 - **The docs:** a how-to, "Hand work to subagents", listed in the sidebar; a line in the plugin directory; the README's phases list; `AGENTS.md`'s "What this repo is"; and a bullet under `## Unreleased`.
 - **Core:** a session's label: migration `0015_session_labels`, `newSession`'s `label`, and `label` on tool calls and their hooks, with its rows in the plugin API's reference, and a line in **Before upgrading**. Nothing is removed, so no line in `plugin-breaks.json`.
 - **The computer 0.4.0:** actors, turns at the desktop and the terminal, and a browser tab each, with its README and its reference page.
@@ -516,7 +516,7 @@ Nothing reaches a real model or the owner's dev server. Confirm a restarted chec
 
 **M8. Docs and checks**
 - [ ] The plugin's README: what it does, its settings, what a subagent costs as measured, and the build command.
-- [ ] The how-to, its sidebar entry, the plugin list's entry, the README's phases list, `AGENTS.md`, and the changelog bullets: the plugin, the computer 0.4.0, and the label for plugin authors.
+- [ ] The how-to, its sidebar entry, the plugin list's entry with its `docs` path, the README's phases list, `AGENTS.md`, and the changelog bullets: the plugin, the computer 0.4.0, and the label for plugin authors.
 - [ ] The computer's README and reference page: actors, turns, and a tab each.
 - [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass, and `page.js` matches its source.
 - [ ] This doc moves to `docs/_completed/phases/`, with What the build changed.

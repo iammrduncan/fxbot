@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { validBreak, type PluginBreak } from "./plugin-fit.ts";
 import type { Sql } from "./store.ts";
-import type { McpCard, RegistryFrom, RegistryInfo, PluginMark, McpSearch, PackageCard, PackageSearch, SkillCard, SkillSearch } from "./types.ts";
+import type { McpCard, RegistryFrom, RegistryInfo, PluginMark, McpSearch, PackageCard, PackageSearch, PackageSource, SkillCard, SkillSearch } from "./types.ts";
 
 type Fetch = typeof fetch;
 const hour = 60 * 60 * 1000;
@@ -94,7 +94,10 @@ const skillCard = (e: SkillEntry, from: SkillCard["from"]): SkillCard => ({
 });
 
 // A plugin in fxbot's plugins list: its GitHub repository, and the folder it is in, if it isn't the repository's root.
-export type PluginEntry = { name: string; description: string; repo: string; path?: string; note?: string };
+// `docs` is its page in fxbot's docs, a path on fxbot.sh.
+export type PluginEntry = { name: string; description: string; repo: string; path?: string; note?: string; docs?: string };
+// Only a path in fxbot's docs goes to the page, as a link. Anything else is left out, and the entry stays.
+const docsOf = (e?: PluginEntry) => (typeof e?.docs === "string" && /^\/docs\/[a-z0-9/#-]{1,200}$/.test(e.docs) ? e.docs : undefined);
 const pluginEntry = (e: PluginEntry) =>
   typeof e?.name === "string" && typeof e.description === "string" && typeof e.repo === "string" && /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/.test(e.repo) && (e.path === undefined || typeof e.path === "string");
 const shippedBreaks = () => (JSON.parse(readFileSync(new URL("./plugin-breaks.json", import.meta.url), "utf8")) as { breaks: PluginBreak[] }).breaks.filter(validBreak);
@@ -152,6 +155,7 @@ export function createRegistry({
   const searches = new Map<string, { at: number; cards: McpCard[] }>();
   const latest = new Map<string, { at: number; entry: Entry | null | undefined }>();
   const get = (url: string | URL) => fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(30_000) });
+  const ourPackage = (ref: string) => ourPlugins.find((e) => `${e.repo}${e.path ? `/${e.path}` : ""}`.toLowerCase() === ref.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/+$/, "").toLowerCase());
 
   function waitFrom(res: Response) {
     const retry = Number(res.headers.get("retry-after"));
@@ -405,9 +409,13 @@ export function createRegistry({
     // A skill in fxbot's list, for its page.
     ourSkill: (id: string) => ourSkills.find((e) => e.id === id),
     // A package in fxbot's list, by its repository and folder.
-    ourPackage: (ref: string) => ourPlugins.find((e) => `${e.repo}${e.path ? `/${e.path}` : ""}`.toLowerCase() === ref.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/+$/, "").toLowerCase()),
+    ourPackage,
     // The owner of the repository of the plugin by this name in fxbot's list, so a checkout's folder of it draws its icon.
     listedOwner: (name: string) => ourPlugins.find((e) => e.name === name)?.repo.split("/")[0],
+    // An installed package's page in fxbot's docs: its list entry's, by its repository and folder, or by its name for a
+    // checkout's folder.
+    listedDocs: (source: PackageSource, name: string) =>
+      docsOf("repo" in source ? ourPackage(`${source.repo}${source.path ? `/${source.path}` : ""}`) : ourPlugins.find((e) => e.name === name)),
     // What releases broke for plugins, and a call for when the published list changes that.
     breaks: () => ourBreaks,
     onBreaks: (call: () => void) => void (breaksChanged = call),
@@ -416,7 +424,7 @@ export function createRegistry({
       const words = typeof q === "string" ? q.trim().toLowerCase().slice(0, 100) : "";
       const cards = ourPlugins
         .filter((e) => !words || [e.name, e.repo, e.description].some((t) => t.toLowerCase().includes(words)))
-        .map((e): PackageCard => ({ kind: "package", name: e.name.slice(0, 64), iconKey: `${e.repo.split("/")[0]}/${e.name}`, description: e.description.slice(0, 1024), ref: `${e.repo}${e.path ? `/${e.path}` : ""}`, from: "fxbot", ...(typeof e.note === "string" ? { note: e.note.slice(0, 200) } : {}) }));
+        .map((e): PackageCard => ({ kind: "package", name: e.name.slice(0, 64), iconKey: `${e.repo.split("/")[0]}/${e.name}`, description: e.description.slice(0, 1024), ref: `${e.repo}${e.path ? `/${e.path}` : ""}`, from: "fxbot", ...(typeof e.note === "string" ? { note: e.note.slice(0, 200) } : {}), ...(docsOf(e) ? { docs: docsOf(e) } : {}) }));
       return { cards, essentials: ourEssentials.filter((name) => ourPlugins.some((e) => e.name === name)) };
     },
     close: () => clearInterval(timer),

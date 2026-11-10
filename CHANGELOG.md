@@ -2,6 +2,10 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
+## Unreleased
+
+- **Each of fxbot's plugins links to its docs.** Its page in **Plugins**, its tab in **Settings**, and its page in the [plugin directory](https://fxbot.sh/plugins/) have **Docs**, which opens its guide on fxbot.sh. The links come with fxbot's plugin list, which fxbot reads hourly, so a new guide needs no release. For the SDK, a `PackagePlugin` and a `PackageCard` carry `docs`, a path on fxbot.sh, when the list has one.
+
 ## 0.8.0 (2026-11-10)
 
 **Before upgrading.** Migration `0014_provider_fields` adds `fields` and `model_ids` columns to `providers`, for a provider's region or account and the models you type for it. Every provider you have carries on as it is. The update to 0.8.0 runs 0.7.0's `fxbot` command, which leaves 0.7.0's image: `sudo podman rmi ghcr.io/iammrduncan/fxbot:0.7.0`, or `sudo docker rmi` on Docker, takes it away. With the computer, run `sudo fxbot computer on` once after updating: it moves the computer's lines out of `compose.override.yaml`, into a file of their own.

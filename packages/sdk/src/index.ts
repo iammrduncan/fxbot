@@ -176,6 +176,7 @@ export async function createFxbot(options: FxbotOptions) {
     dirs: options.pluginDirs ?? [],
     taken: () => mcp.prefixes(),
     listedOwner: registry.listedOwner,
+    listedDocs: registry.listedDocs,
     version,
     breaks: registry.breaks,
     onChange: () => void retool(),

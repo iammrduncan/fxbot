@@ -19,6 +19,7 @@ const where = plugin.source.replace(/^https:\/\//, "");
       <p class="fxbot-plugin-meta">{plugin.creator} · {plugin.carries}</p>
       {plugin.minFxbot && <p class="fxbot-plugin-meta">Needs fxbot {plugin.minFxbot} or newer</p>}
       <p>{plugin.description}</p>
+      {plugin.docs && <p><a href={`${base}${plugin.docs.slice(1)}`}>Docs</a></p>}
     </div>
   </div>
 

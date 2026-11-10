@@ -24,9 +24,10 @@ export type Listed = {
   server?: { url: string; key?: string; website?: string };
   skillsSh?: string;
   readme?: string; // HTML
+  docs?: string; // its page in the docs, from its list entry
 };
 
-type PluginEntry = { name: string; description: string; repo: string; path?: string };
+type PluginEntry = { name: string; description: string; repo: string; path?: string; docs?: string };
 type ServerEntry = { server: { name: string; title?: string; description: string; websiteUrl?: string; remotes?: { url: string; headers?: { description?: string; isSecret?: boolean }[] }[] } };
 type SkillEntry = { id: string; source: string; skillId: string; name: string; description?: string };
 type Manifest = { name: string; extensions?: { "sh.fxbot"?: { minFxbot?: string; server?: string; page?: string; settings?: { name: string; description: string }[] } } };
@@ -46,7 +47,7 @@ const frontMatter = (text: string, field: string) => text.match(new RegExp(`^---
 
 function packageOf(entry: PluginEntry): Listed {
   const creator = entry.repo.split("/")[0];
-  const base = { slug: entry.name, kind: "package" as const, name: entry.name, creator, iconKey: `${creator}/${entry.name}`, description: entry.description, source: `https://github.com/${entry.repo}${entry.path ? `/tree/main/${entry.path}` : ""}` };
+  const base = { slug: entry.name, kind: "package" as const, name: entry.name, creator, iconKey: `${creator}/${entry.name}`, description: entry.description, source: `https://github.com/${entry.repo}${entry.path ? `/tree/main/${entry.path}` : ""}`, ...(entry.docs ? { docs: entry.docs } : {}) };
   const folder = entry.repo === ownRepo && entry.path ? entry.path : undefined;
   const manifest = folder && inFolder(folder, "plugin.json") ? (JSON.parse(inFolder(folder, "plugin.json")) as Manifest) : undefined;
   if (!folder || !manifest) return { ...base, carries: "Plugin" };

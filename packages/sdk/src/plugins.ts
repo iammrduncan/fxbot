@@ -213,11 +213,13 @@ export async function createPlugins(options: {
   host: PluginHost;
   // The owner of fxbot's list entry with a plugin's name, for a checkout's folder of it.
   listedOwner: (name: string) => string | undefined;
+  // Its page in fxbot's docs, from fxbot's list.
+  listedDocs: (source: PackageSource, name: string) => string | undefined;
   /** The running version, and what fxbot's releases broke for plugins. */
   version: string;
   breaks: () => PluginBreak[];
 }) {
-  const { store, databaseUrl, secretKey, dataDir, archives, dirs, taken, onChange, host, listedOwner, version, breaks } = options;
+  const { store, databaseUrl, secretKey, dataDir, archives, dirs, taken, onChange, host, listedOwner, listedDocs, version, breaks } = options;
   // Settings, secret or not, are sealed together, as an MCP server's header values are.
   const secrets = createSecrets(store.sql, secretKey, "plugin_secrets");
   const plugins = new Map<string, Package>();
@@ -749,6 +751,7 @@ export async function createPlugins(options: {
 
   function view(plugin: Package): PackagePlugin {
     const { record, loaded } = plugin;
+    const docs = listedDocs(record.source, record.name);
     return {
       id: record.id,
       kind: "package",
@@ -781,6 +784,7 @@ export async function createPlugins(options: {
       ...(plugin.error ? { error: plugin.error } : {}),
       ...(plugin.unsupported ? { unsupported: plugin.unsupported } : {}),
       ...(marks.has(record.id) ? { mark: marks.get(record.id) } : {}),
+      ...(docs ? { docs } : {}),
     };
   }
 
