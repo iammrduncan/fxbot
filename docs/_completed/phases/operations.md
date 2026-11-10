@@ -487,7 +487,7 @@ Docs only, in [Run a checkout beside a release](https://fxbot.sh/docs/how-to/che
 - **The computer on Amazon Linux 2023,** which has no podman and no Docker that runs rootless. fxbot itself installs once `dnf install docker` has run.
 - **SLES,** whose packages weren't put to zypper here, and **Gentoo, Void, and Slackware,** with other package managers.
 - **A Mac's own install:** [Mac support](../../phases/mac-support.md).
-- **Windows.** WSL 2's Ubuntu with systemd may run `setup.sh` as it is: unchecked. The system check names it.
+- **Windows.** WSL 2's Ubuntu with systemd runs `setup.sh` as it is: the owner checked it on 2026-11-10. The system check names it.
 - **Proxmox's LXC containers,** which need nesting turned on for an engine to run inside.
 - **Removing packages** on uninstall.
 - **Backups on a schedule,** or to another machine.

@@ -24,6 +24,8 @@ And from others: "Does it only work with local models?"
 
 Then: "With web pairing, tailscale isn't the recommended way anymore."
 
+And: "Windows does work through WSL 2. I tested it. And for v0.10.0 we should make it work for windows, linux, mac natively, so for now don't mention 'linux', cause you will cause more confusion and make work for us to revert later when we add more platforms and distribution channels."
+
 ## 0. Core or plugin
 
 Neither. Nothing in the app changes. This phase changes words and pictures:
@@ -69,7 +71,8 @@ Both readers asked the owner's questions back, so the words cause them, not the 
 - **The GitHub description:** "fxbot is your bot, built and configured how you want it." It names no category, model, or device. The topics are `agent-harness`, `agent-tools`, `ai-agents`, `autonomous-agents`, `harness`, `mcp-tools`, and `multi-agent`. Nothing says self-hosted or assistant.
 - **The README and the docs' first page** open with the same line, then local models before hosted ones, then Tailscale as the recommended way in.
 - **The home page's feature list** leads with plumbing: bots and chats, providers, the library, an installable app, plugins, and releases. The things bots do that people would want aren't in it: a computer of their own, routines, subagents, pages, and rooms. Most are in the gallery further down, titled by feature, not by task.
-- **The only Mac and Windows line** is the tutorial's "On a Mac or on Windows, use a Linux machine, or a Linux VM." `setup.sh` accepts WSL 2 with systemd, but [operations](../_completed/phases/operations.md) left that unchecked.
+- **The only Mac and Windows line** is the tutorial's "On a Mac or on Windows, use a Linux machine, or a Linux VM." `setup.sh` runs in WSL 2's Ubuntu with systemd, which the owner checked on 2026-11-10, though [operations](../_completed/phases/operations.md) had left it unchecked.
+- **"Linux" is on the first screen three times:** the line under the install command, step 1's list of distros, and the Machine row. Native Windows, Linux, and Mac installs are planned for 0.10.0 ([Distribution](distribution.md)), so a platform named now is wrong soon.
 
 ### The products people do understand
 
@@ -157,33 +160,33 @@ The owner picks the words ([open questions](#5-open-questions)). Recommended:
 - **Three facts, as a row under the hero:**
   - **Any model:** sign in with ChatGPT or Grok, add a key for Claude, Gemini, or OpenRouter, or run one with Ollama or LM Studio.
   - **On your phone:** the fxbot app, away from home too, with web pairing. No VPN needed. (A network that blocks direct connections needs one of the other ways, as [When a device can't connect](../../packages/website/src/content/docs/docs/how-to/when-a-device-cant-connect.md) says, so the FAQ links there.)
-  - **On your machine:** a Linux computer, home server, or VPS. One command installs it.
+  - **On your machine:** your computer, a home server, or a small VPS. One command installs it, and your bots, chats, files, and keys stay there.
 - **The description** (meta, og, the docs' default): "Your own AI assistants, on your own machine. Use any model, hosted or local, and talk to them from any browser or your phone. Free and open source." That's about 150 characters.
+- **No platform is named on a first impression.** The card, the home page, the README's opener, the docs' first page, and GitHub say "your own machine," never Linux, Windows, or Mac. Native installs for all three are planned for 0.10.0, and this way nothing here changes when they land. What each install runs on stays where it's needed: the tutorial's "You need," `agent-setup.txt`, and `setup.sh`'s checks.
 - **"Local first" and "a lean core" leave the first screen.** "On your own machine" says what "local first" meant, with no doubt about models. The lean core stays in "Who it's for" and the docs, for the people it's for.
-- **A pitch for the owner to paste** when sharing a link: "fxbot is my own AI assistant app. It runs on my Linux box, and I use it from the browser or the app on my phone, with any model: ChatGPT, Claude, Gemini, or a local one. Each bot gets its own computer, runs routines, and hands big jobs to helpers. Plugins add features like those to the app."
+- **A pitch for the owner to paste** when sharing a link: "fxbot is my own AI assistant app. It runs on my own machine, and I use it from the browser or the app on my phone, with any model: ChatGPT, Claude, Gemini, or a local one. Each bot gets its own computer, runs routines, and hands big jobs to helpers. Plugins add features like those to the app."
 
 ### The home page (`packages/website/src/home.tsx`)
 
 In this order:
 1. **The hero:** the crowd, then the line as the H1, then the sentence, then the three facts as a row of three short items, each with a small blob. On a phone they stack.
-2. **The install:** the command and the AI-agent prompt, as now. Under them: "v0.9.0 · Linux · Free and open source (Apache-2.0)."
+2. **The install:** the command and the AI-agent prompt, as now. Under them: "v0.9.0 · Free and open source (Apache-2.0)". "Linux" leaves it.
 3. **The screenshot:** as now. The address bar reads `127.0.0.1:8787` in place of the tailnet address. The caption says the phone beside it is the fxbot app, paired with web pairing.
 4. **"What your bots do"** in place of "What it looks like": the same gallery, each card titled by its task, as the bots in the shots say it. The page shot becomes "Plan a weekend, as a page you keep," and the routine shot, added beside it, "Every Monday, send three design reads." The subagents shot, also added, becomes "Compare three hosts at once, with subagents." "Bots that work together", "Rooms", "You decide what needs asking", and "A look for each bot" keep their shots. "Plugins you pick" becomes "Add what you want: a computer, routines, subagents."
 5. **Get started**, in three steps, with no Tailscale:
-   1. **Install it:** the command, on a Linux machine.
+   1. **Install it:** the command, on your computer or a server. "What it runs on" links to the tutorial's "You need." The list of distros leaves the home page.
    2. **Set it up:** open `http://127.0.0.1:8787` on the machine, or over SSH from another computer. Sign in to a model, and make your first bot.
    3. **Put it on your phone:** add **Web pairing** from **Plugins**, and scan its code at web.fxbot.sh. The fxbot app installs from there.
 6. **Questions people ask**, new, as a short list with a line or two each, linking to the guide that says more:
    - **Is it a browser extension?** No. fxbot is an app that runs on a machine of yours, and you open it in a browser or as an app on your phone. Plugins add features to fxbot itself.
    - **Does it only work with local models?** No. Sign in with ChatGPT or Grok, use a key from Anthropic, Google, OpenAI, OpenRouter, or about 30 others, or run one locally. Each bot can use a different one.
-   - **Does a bot use my computer?** No. With the computer plugin, each bot gets a Linux computer of its own, in a container on your machine, with a desktop you watch and take over.
+   - **Does a bot use my computer?** No. With the computer plugin, each bot gets a computer of its own, in a container on your machine, with a desktop and a browser you watch and take over.
    - **Do I need Tailscale?** No. Web pairing opens your fxbot from your phone or any computer, at web.fxbot.sh, over a connection straight to it. Tailscale, SSH, and your own proxy also work.
    - **Can I talk to it on Telegram or Discord?** Not yet. fxbot has its own app, which installs on your phone and shows everything a bot does: its pages, its computer, its subagents, and the cards where it asks you first.
-   - **Does it run on a Mac or Windows?** Not on their own yet. Use a Linux machine, a small VPS, or a Linux VM. On Windows, WSL 2's Ubuntu with systemd may run it, but nobody has checked yet.
    - **Is there a hosted version, or an account?** No. It runs on your machine, and your bots, chats, files, and keys stay there.
    - **What does it cost?** fxbot is free and open source. You pay your model's provider, use a plan you already have, such as ChatGPT, or nothing with a local model.
 7. **What it does:** the feature list, with the computer, routines, and subagents in place of the library and releases, which move to "Who it's for."
-8. **Who it's for:** web pairing is the way in from other devices. The Network row becomes "127.0.0.1:8787; from other devices, web pairing, or Tailscale, SSH, or a proxy of your own."
+8. **Who it's for:** web pairing is the way in from other devices. The Machine row becomes "Your computer, a home server, or a small VPS," linking to what it runs on. The Network row becomes "127.0.0.1:8787; from other devices, web pairing, or Tailscale, SSH, or a proxy of your own."
 9. **The SDK:** as now.
 
 ### Link previews
@@ -197,14 +200,14 @@ In this order:
 
 - **The docs' first page** (`docs/index.mdx`): the line and the sentence, then "From your phone, add web pairing ([Reach fxbot from your phone](/docs/how-to/reach-it-from-your-phone/))."
 - **The tutorial** (`tutorials/first-fxbot.md`):
-  - Tailscale leaves "You need."
+  - Tailscale leaves "You need." Windows joins it, through WSL 2's Ubuntu with systemd on, which the owner checked. On a Mac, a Linux VM, as now. The tutorial says nothing about what's planned.
   - The order becomes install, then open it on the machine or over SSH, then set it up, then pair your phone with web pairing.
   - It ends with the bot answering on the phone.
   - Tailscale stays a link, under other ways in.
 - **Reach it** (`how-to/reach-it.md`): web pairing comes right after "On the machine itself," as "With web pairing (recommended)." Then SSH, then Tailscale, then the rest. The link to its old Tailscale heading in `how-to/when-a-device-cant-connect.md` follows the new anchor.
 - **Security** (`explanation/security.md`): "Through web pairing, the recommended way in, only devices you've paired get in. Through Tailscale, your tailnet's access rules decide." The reasoning about a second login stays.
 - **The README:** the line and the sentence, then the three facts. Under "Reaching it," web pairing comes first and Tailscale moves to the other ways.
-- **`agent-setup.txt`:** fxbot is "their own AI assistants." "From other devices, such as a phone," leads with web pairing, then Tailscale.
+- **`agent-setup.txt`:** fxbot is "their own AI assistants." The setup steps keep naming the systems it runs on, since the agent needs them, and add Windows through WSL 2. "From other devices, such as a phone," leads with web pairing, then Tailscale.
 - **`setup.sh`'s last lines:**
 
   ```
@@ -228,7 +231,7 @@ In this order:
 ### Not in this phase
 
 - **Telegram or Discord.** Every consumer product people compare fxbot with leads with chat apps, and its quickstart ends there. Whether fxbot gets a plugin for them is the owner's call ([open questions](#5-open-questions)). Until then the FAQ answers "Not yet."
-- **fxbot on a Mac or Windows itself.** [Mac support](mac-support.md) and [Distribution](distribution.md) plan it. The FAQ says "not on their own yet."
+- **Native installs on Windows, Linux, and Mac.** They're planned for 0.10.0 ([Distribution](distribution.md), [Mac support](mac-support.md)). This phase names no platform on a first impression, so nothing in it changes when they land.
 - **Web pairing in Essentials.** The owner took it out in 0.9.0. The phone step names it instead.
 - **Renaming plugins,** or any change in the app.
 
@@ -251,7 +254,8 @@ The words:
 - [ ] The line, the sentence, the three facts, and the description are the owner's choice from the open questions, and the same everywhere they appear.
 - [ ] No first-impression surface says "Local first," "local-first," or names local models without hosted ones: the card, the meta tags, the home page's first screen, the README's opener, the docs' first page, and GitHub's description.
 - [ ] Nothing calls Tailscale recommended or required: `grep -rn -i "recommended" | grep -i tailscale` over `packages/website`, `README.md`, and `setup.sh` finds nothing.
-- [ ] Every claim in the FAQ and the facts row is checked against the code: the providers named are in `providers-registry.json`, Windows is named only as unchecked, and web pairing's guide covers the phone step.
+- [ ] Every claim in the FAQ and the facts row is checked against the code: the providers named are in `providers-registry.json`, and web pairing's guide covers the phone step.
+- [ ] No first impression names a platform: `grep -n -i -E "linux|debian|ubuntu|fedora|windows|macos|wsl"` over `home.tsx`, `pages/index.astro`, Starlight's description, `docs/index.mdx`, the README's opener, and the card's words finds nothing. The tutorial's "You need" names Windows through WSL 2.
 
 The home page:
 - [ ] The hero, the facts row, the install line, the screenshot's address bar and caption, the task gallery, the three steps, the FAQ, the features, and the Network row, as above.
@@ -287,5 +291,4 @@ Only a person can check:
    - keeping "Your bot, built and configured how you want it" as the second line, under the new first one
 2. **Name the others?** One FAQ entry, "How is it different from OpenClaw or Hermes Agent?", would say where fxbot sits: the same kind of thing, with its own app in place of chat apps, a computer for each bot, and several bots that work together. People place a new product by the ones they know. Recommended: yes.
 3. **Telegram and Discord.** Write a one-page stub, `docs/phases/chat-apps.md`, for a plugin that lets a bot answer in Telegram first ("just a bot token," as OpenClaw puts it), then Discord? Or keep the app as the only way, and let the FAQ say so?
-4. **Mac and Windows.** The FAQ says "not on their own yet," with WSL 2 as unchecked. Should someone check WSL 2 on a real Windows machine first, so the facts row can say "Linux, or Windows with WSL 2"? Or leave Windows out of the copy until [Distribution](distribution.md) is built?
-5. **Release posts.** Add the line saying what fxbot is under the first line of each post?
+4. **Release posts.** Add the line saying what fxbot is under the first line of each post?
