@@ -144,8 +144,12 @@ docker_repo() {
     mv "$key.new" "$key" && chmod a+r "$key"
     printf 'Types: deb\nURIs: %s\nSuites: %s\nComponents: stable\nArchitectures: %s\nSigned-By: %s\n' \
       "$docker_files/linux/$distro" "$codename" "$(dpkg --print-architecture)" "$key" >"$sources"
+    # Left in apt's sources, a repository with nothing for this release would fail every apt-get update after.
+    if ! apt-get update -qq; then
+      rm -f "$sources" "$key"
+      die "Docker's repository has nothing for $distro $codename, so it wasn't added. Install podman or Docker, then run this again."
+    fi
     record "$sources" "$key"
-    apt-get update -qq || die "Docker's repository has nothing for $distro $codename. Install podman or Docker, then run this again."
   fi
   # Ubuntu's docker-compose-v2 holds the same file as Docker's plugin, and does the same.
   local plugin=docker-compose-plugin
