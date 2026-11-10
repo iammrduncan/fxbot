@@ -215,7 +215,7 @@ In a bot's own chat, since 0.6.0, `send` also takes these, and its answer has `j
 | Field | What it does |
 | --- | --- |
 | `label` | Who the chat says the message is from, in place of the plugin's name. Hooks still get the plugin in `from`. |
-| `steer` | `true` lets the message join a turn that's running, instead of waiting behind it, when that turn takes messages: the owner's turns, and plugin turns sent with `steer`. The turn this message starts takes messages the same way. A message with an image never joins, since that would end the running turn. |
+| `steer` | `true` lets the message join a turn that's running, instead of waiting behind it, when that turn takes messages: the owner's turns, and plugin turns sent with `steer`. The turn this message starts takes messages the same way. A message with an image never joins, since that would end the running turn. Since 0.9.0, it works the same in a session of the plugin's own: a turn there sent with `steer` takes the plugin's later messages sent with `steer`. |
 | `joined` | In the answer: the `messageId` of the turn the message joined, when it did. Its text reaches that turn, and the turn's hooks stay that turn's. A message that came just too late runs as a turn of its own, under its own `messageId`, with `turn.start` and `turn.end`. |
 
 A session belongs to the provider it started on. After the bot moves to another provider, `send` and `stream` for it fail with `status` 409: make a new one.

@@ -733,9 +733,10 @@ export async function createFxbot(options: FxbotOptions) {
     const sent: Sent = { text, ...by, steer };
     try {
       // A message to a chat with a turn running joins it, when the turn takes messages and this one may: the owner's
-      // always, and a plugin's that asks, unless it has an image, since an image ends the running turn. libfx runs it as
-      // the next turn if the running one ended meanwhile, so it's read either way. Nothing is read when it joined.
-      const running = session || (from && (!steer || files.some((f) => f.type.startsWith("image/")))) ? undefined : working.get(sessionId)?.[0];
+      // always, and a plugin's that asks, in the bot's own chat or a session of the plugin's own, unless it has an image,
+      // since an image ends the running turn. libfx runs it as the next turn if the running one ended meanwhile, so it's
+      // read either way. Nothing is read when it joined.
+      const running = from && (!steer || files.some((f) => f.type.startsWith("image/"))) ? undefined : working.get(sessionId)?.[0];
       if (running?.steerable && running.messageId !== messageId) {
         const chat = await open(profile, sessionId, messageId);
         steers.set(messageId, { ...sent, session: sessionId });
@@ -754,7 +755,8 @@ export async function createFxbot(options: FxbotOptions) {
         await history.record(id, sessionId, messageId, "user", text + names);
         return { messageId, sessionId, joined: running.messageId };
       }
-      const own = session ? undefined : workingOn(id, messageId, sent);
+      // A plugin's session is followed as the bot's own chat is when the plugin steers in it, so a later steer finds its turn.
+      const own = session && !steer ? undefined : workingOn(id, messageId, sent);
       if (own && !working.get(sessionId)?.some((t) => t.messageId === messageId)) working.set(sessionId, [...(working.get(sessionId) ?? []), own]);
       // A messageId the session already accepted runs nothing new and resolves to the same ids.
       const chat = await open(profile, sessionId, messageId);
@@ -767,7 +769,7 @@ export async function createFxbot(options: FxbotOptions) {
       finish(profile, chat, accepted.sessionId, turn, sent, own && "own");
       return accepted;
     } catch (error) {
-      if (!session) drop(sessionId, messageId);
+      if (!session || steer) drop(sessionId, messageId);
       // libfx throws a TypeError or RangeError for a prompt it refuses, such as an image whose bytes are not its type.
       throw error instanceof TypeError || error instanceof RangeError ? Object.assign(error, { status: 400 }) : error;
     }

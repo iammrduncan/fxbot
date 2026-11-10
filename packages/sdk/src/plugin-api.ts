@@ -106,6 +106,7 @@ export type PluginApi = {
      * `shown` is what the chat shows of it, when that isn't `text`, which the model gets, and `label` who it says it's
      * from, in place of the plugin. With `steer`, a message to the own chat joins a turn that's running, and answers
      * that turn's id as `joined`, and its own turn takes messages the same way. One with an image waits instead. Since 0.6.0.
+     * Since 0.9.0, `steer` works the same in a session of the plugin's own.
      * `asked` is the owner's own words this message carries on, which the plugin quotes from a chat of theirs, such as
      * what they asked the bot that sent it. Hooks get it with the message and its turn. Since 0.7.0. */
     send(bot: string, message: { text: string; shown?: string; label?: string; steer?: boolean; files?: Upload[]; session?: string; messageId?: string; asked?: string }): Promise<{ messageId: string; sessionId: string; joined?: string }>;
