@@ -126,10 +126,11 @@ export default async function setup(fx: PluginApi) {
   fx.tool({
     name: "write",
     description:
-      "Write a page for the owner to read and keep: a report, a guide, a plan, or a summary of a project. Use it when they ask for something to keep or come back to, not for a short answer. " +
-      `It's Markdown, at most ${most.toLocaleString("en-US")} bytes: headings, tables, code, and images from the library, as ![what it shows](library:<id>). Leave the title out of the text. ` +
+      "Write a page in Markdown for the owner to read and keep: a report, a comparison, a plan, a guide, or research findings. Write one when they ask, " +
+      "and without being asked when your answer would be long or they'll come back to it. Not for an answer a few sentences give. " +
+      `At most ${most.toLocaleString("en-US")} bytes: headings, tables, code, and images from the library, as ![what it shows](library:<id>). Leave the title out of the text. ` +
       "A task list (- [ ] item) gets boxes the owner can tick, and library_read shows what they ticked, so keep their ticks when you rewrite it. " +
-      "To rewrite a page, give its library:<id>. For a small change, use pages_edit.",
+      "To rewrite a page, give its library:<id>. For a small change, use pages_edit. The skill pages says how to write a good one.",
     inputSchema: {
       type: "object",
       properties: { title: { type: "string" }, text: { type: "string", description: "The whole page, in Markdown" }, id: { type: "string", description: "library:<id>, to rewrite that page" } },
@@ -179,11 +180,11 @@ export default async function setup(fx: PluginApi) {
   fx.tool({
     name: "html",
     description:
-      "Write a page as one HTML document, for what Markdown can't do: a chart, filters and controls, or a designed layout. Use pages_write for everything else, since this costs far more to write. " +
-      `It's self-contained, at most ${most.toLocaleString("en-US")} bytes, with its CSS and JavaScript inline, and it can load nothing: no network, no CDN, and no outside fonts. ` +
-      'Images come from the library, as <img src="library:<id>">. It must read on a phone 375 pixels wide, in light and dark. A link opens once the owner agrees. ' +
-      "To keep what the owner does on it, use await fxpage.set(key, value), fxpage.get(key), fxpage.del(key), and fxpage.list(prefix). For numbers that change, draw from await fxpage.data(), and fxpage.on(\"data\", draw), which you fill with pages_data. " +
-      "To reach you, a button can call fxpage.say(text), and the owner sends it. These fail when the page is opened alone, so draw something sensible without them. " +
+      "Write a page as one HTML document, for what Markdown can't do: a chart, filters and controls, or numbers you'll send again. Use pages_write for everything else, since this costs far more to write. " +
+      "Before your first, read the skill pages' file references/html.md: the rules, the fxpage API, and a page to start from. " +
+      `In short: it's self-contained, at most ${most.toLocaleString("en-US")} bytes, with its CSS and JavaScript inline, and loads nothing: no network, no CDN, and no outside fonts. ` +
+      'Images come from the library, as <img src="library:<id>">. It must read on a phone 375 pixels wide, in light and dark. ' +
+      "fxpage.set, get, del, and list keep what the owner does on it; fxpage.data() and fxpage.on(\"data\", draw) take what you send with pages_data; fxpage.say(text) drafts a message to you. These fail when the page is opened alone, so draw something sensible without them. " +
       "To change a page, give its library:<id> and the whole document.",
     inputSchema: {
       type: "object",
@@ -224,6 +225,14 @@ export default async function setup(fx: PluginApi) {
       return `Waiting: the owner hasn't approved this page to hold data. It arrives when they open the page and choose Allow, so tell them.`;
     },
   });
+
+  // Each chat of a bot it's on for: write long answers as pages without being asked. What a good page is waits in the
+  // skill, for when one is written.
+  const unasked =
+    "When your answer would be long, such as a report, a comparison, research findings, a plan, or a guide, or the owner will come back to it, " +
+    "write it as a page with pages_write without being asked, and say in the chat, in a sentence or two, what it covers. Answer in the chat what " +
+    "a few sentences answer. Your skill pages says how to write a good one.";
+  fx.on("instructions", (event) => void event.instructions.push(unasked));
 
   // A page the owner deleted leaves no old text behind. No table of a plugin's points at core's, so this does what a
   // foreign key would.

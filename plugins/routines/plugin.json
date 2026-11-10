@@ -1,6 +1,6 @@
 {
   "name": "routines",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Bots run saved tasks on a schedule, such as a morning summary, and tell you in their chat.",
   "license": "Apache-2.0",
   "extensions": {

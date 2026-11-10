@@ -373,7 +373,7 @@ export default async function setup(fx: PluginApi) {
 
   fx.tool({
     name: "send",
-    description: "Send a message to another of the owner's bots. It wakes in its own chat and knows only what you write. A reply comes later, as a new message: don't wait for it.",
+    description: "Send a message to another of the owner's bots. It wakes in its own chat and knows only what you write. A reply comes later, as a new message: don't wait for it. The skill messages says how to write one.",
     inputSchema: {
       type: "object",
       properties: {

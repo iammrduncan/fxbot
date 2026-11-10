@@ -273,7 +273,7 @@ export default async function setup(fx: PluginApi) {
 
   fx.tool({
     name: "add",
-    description: "Save a task you run on a schedule, in a session of your own. Your last message goes to the owner.",
+    description: "Save a task you run on a schedule, in a session of your own. Your last message goes to the owner. The skill routines says how to write the task, with schedules to copy.",
     inputSchema: {
       type: "object",
       properties: {

@@ -4,6 +4,8 @@ A plugin for [fxbot](https://fxbot.sh): the owner's bots message each other in t
 
 Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.6.0 or newer. See [Let bots work together](https://fxbot.sh/docs/how-to/let-bots-work-together/).
 
+Its skill, `messages`, says when to message another bot, how to write a message it can act on, how replies go, and what to do when one reaches you.
+
 ## A message
 
 - **Sending:** a bot calls `messages_send` with `to`, `text`, and optionally `reply: false` and `files`. Who it's from, its conversation, and what it answers come from the call and the rows, never from the model.
@@ -76,7 +78,7 @@ Each send deletes conversations older than 30 days. Removing the plugin drops th
 
 ## Cost
 
-- **Each message of any bot:** one in-memory check per tool call. Every request of every bot carries the tool's definition, about 120 tokens, cached with the rest. Plugin tools join every agent, so a bot the plugin is off for carries it too.
+- **Each message of any bot:** one in-memory check per tool call. Every request of every bot carries the tool's definition, about 130 tokens, cached with the rest. A bot it's on for carries the skill's line in its list of skills, about 60 tokens, and about 700 when it reads the skill. Plugin tools join every agent, so a bot the plugin is off for carries it too.
 - **Each chat that opens:** one read of the bots and their lines, and one short entry in its instructions.
 - **Idle:** nothing, but a timer for each message working.
 - **A message to an idle bot:** one turn at its whole chat, cached where the provider caches. This is the cost to watch: a conversation of 20 messages is at most 20 turns.
@@ -96,6 +98,7 @@ Each send deletes conversations older than 30 days. Removing the plugin drops th
 | `fxbot/box.jsx` | The message box, with `@` and its chips |
 | `fxbot/page.css` | The box's styles, and the rules ProseMirror needs |
 | `fxbot/page.js` | `page.jsx` and `box.jsx`, built |
+| `skills/messages/SKILL.md` | Its skill |
 | `fxbot/page-licenses.txt` | The licenses of what `page.js` bundles |
 | `package.json` | `"type": "module"`, for the server code, and what the page is built from |
 

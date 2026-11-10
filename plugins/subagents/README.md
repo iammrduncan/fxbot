@@ -8,6 +8,7 @@ A plugin for [fxbot](https://fxbot.sh): a bot hands work to subagents, helpers t
 - **A subagent and the bot's chat talk while it works.** It tells the chat what can't wait, a question or a finding, and the bot answers it, or changes its task, by name.
 - **Their reports come back together.** Once every subagent one turn started has ended, one message from **Subagents** reaches the bot's chat with all their reports. It joins the bot's turn if one is running, or starts its next one, and the bot tells you what matters.
 - **You watch them work.** The bot's panel, on the right of its chat, lists its subagents, working and recent, with the tool each is in and its calls. A click opens one's thread: its task, each step, and how it ended, live. **Stop** ends one.
+- **Its skill, `subagents`, says when to hand work off and when not,** how to split it and write a task a subagent can do alone, with an example, and what to do while they work and when they report.
 - **On the computer, they work together,** with the [computer](https://fxbot.sh/docs/how-to/give-bots-a-computer/) 0.4.0 or newer: each has its name and arrow on the computer's screen, such as "Ann · Curie", its own browser tab, and turns at the desktop and the terminal.
 
 Add it from **Plugins**, or with **Essentials**, which has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.9.0 or newer. See [Hand work to subagents](https://fxbot.sh/docs/how-to/hand-work-to-subagents/).
@@ -52,6 +53,7 @@ A value outside its range means its default, with one line in the plugin's log.
 ## What it costs
 
 - **A subagent's requests** carry the bot's instructions and tools, its rules, about 1.5 KB, and the task, but no chat. In a check with a small bot, its first request was 7.4 KB, against 5.9 KB for that bot's first message in a new chat. A real chat's requests are larger by its history. They run on the bot's provider, which counts their usage.
+- **The skill:** its line in each bot's list of skills, about 80 tokens, and about 1,100 when the bot reads it.
 - **One turn in the bot's chat for each batch,** at the chat's full context, to pass the reports on. That's why reports come together.
 - **At once,** up to `atOnce` turns of a bot, which share fxbot's turns at once with every other bot.
 - **Storage:** about 260 bytes a subagent in the plugin's table, and its session, kept as any chat's is.

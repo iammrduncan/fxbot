@@ -577,6 +577,7 @@ What changed, the same day:
 - **Handing off by default.** While the plugin is on for a bot, its own chat is told to hand work that takes a lot of digging to subagents, tell the owner it'll come back with the results, and carry on. The `handOff` setting, `on` by default, turns that off.
 - **In Essentials,** at the owner's word: "subagents belong in essentials." It comes after Messages in the list, so a new install that takes Essentials hands work off from its first chat.
 - **The panel's width.** The list's grid may shrink below its longest title, which now ends in an ellipsis, and **Stop** stays in view.
+- **A skill, `subagents` (later the same day, [issue #14](https://github.com/iammrduncan/fxbot/issues/14)):** when to hand work off and when not, how to split it, how to write a task, with an example, and what to do while they work and when they report. `subagents_start` names it.
 - **A lesson for building:** fxbot reloads a plugin from a local folder whenever a file in it changes. Edits to `plugins/subagents` in the main tree reloaded it in the owner's dev app, and cut off three subagents it was running. Later edits went into a copy of the branch first.
 
 **M9. After the build**

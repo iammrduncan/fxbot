@@ -790,3 +790,4 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - **`atOnce` counts a run from the moment it starts,** before it has a session. The first build counted it after, so four due at once all started.
 - **A plugin in `FXBOT_PLUGIN_DIRS` keeps its MCP servers across a restart.** A check of Settings' plugin tabs found that each start dropped them, in a commit of its own.
 - **The size:** a net 75 core lines, 765 of the plugin, and 26 fewer in dreams.
+- **A skill, `routines` (0.9.0, [issue #14](https://github.com/iammrduncan/fxbot/issues/14)):** when a request is a routine, how to write a task that runs with no one there, and cron for what people say, with what doesn't fit. `routines_add` names it. Routines 0.2.0.

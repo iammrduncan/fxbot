@@ -9,6 +9,9 @@ A plugin for [fxbot](https://fxbot.sh): a bot writes something to keep, and you 
 - **Ticks that stay.** A task list has boxes you tick, and the bot sees them.
 - **A page that remembers.** An HTML page saves what you do on it, and a bot sends it numbers without rewriting it.
 - **A way back to the bot.** A button on a page drafts a message for you to send.
+- **Without being asked.** A bot writes a long answer, such as a report, a comparison, or a plan, as a page by itself, and says in the chat what it covers. A short answer stays in the chat, and so does anything you ask to have there.
+
+Its skill, `pages`, says when a page serves you better than a chat message, and how to write a good one. Its `references/html.md` has the rules for an HTML page, its `fxpage` API, and a page to start from. A line in each chat's instructions says to write long answers as pages, for a bot that reads no skill.
 
 Add it from **Plugins**, or with **Essentials**. It needs fxbot 0.7.0 or newer. It runs inside fxbot: read its code there before you add it. Removing it leaves each page in the library as a document, at its newest version, and its older versions go.
 
@@ -88,14 +91,15 @@ Every check is on the reader's side, and a page's id and version come from the r
 ## Cost
 
 - **Idle:** nothing. No process, no timer, and no request.
-- **In a chat:** four tool descriptions in each turn, on every bot, about 450 tokens. A plugin's tools reach every bot, and a call from one it's off for fails.
+- **In a chat:** four tool descriptions in each turn, on every bot, about 460 tokens. A plugin's tools reach every bot, and a call from one it's off for fails. A bot it's on for also carries its line in the instructions, about 90 tokens, and the skill's in its list of skills, about 80, cached with the rest.
+- **The skill:** about 1,200 tokens when a bot reads it, and 1,300 more for `references/html.md`.
 - **A Markdown page:** the model's output, as if it had written it in the chat. An edit costs what it changes.
 - **An HTML page:** several times that, and any change rewrites it. On **Auto**, the reviewer reads the call too.
 - **New numbers:** about 150 tokens with `pages_data`, where a rewrite can be 17,000.
 
 ## Files
 
-`page.js` is `page.jsx` bundled with [rolldown](https://rolldown.rs), which comes with fxbot's packages. It bundles nothing else. Rebuild it after changing `page.jsx`, from this folder:
+`skills/pages/` is its skill. `page.js` is `page.jsx` bundled with [rolldown](https://rolldown.rs), which comes with fxbot's packages. It bundles nothing else. Rebuild it after changing `page.jsx`, from this folder:
 
 ```sh
 npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app --no-comments --file fxbot/page.js

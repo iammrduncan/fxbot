@@ -4,6 +4,8 @@ A plugin for [fxbot](https://fxbot.sh): a bot runs saved tasks on a schedule, su
 
 Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.6.0 or newer. See [Give a bot a routine](https://fxbot.sh/docs/how-to/give-a-bot-a-routine/).
 
+Its skill, `routines`, says when a request is a routine, how to write a task that runs with no one there, and cron for what people say, with what doesn't fit.
+
 ## A run
 
 - **Making one:** the owner asks in the bot's own chat, and the bot saves it with `routines_add`: five-field cron in numbers, or one local time, in the time zone in **Settings** › **General**. The reply shows a card with **Remove**. It's on at once, and waits for its first time. `routines_change` and `routines_remove` work only in that chat too, so a page a run reads or another bot's message can't add one. `routines_list` works anywhere.
@@ -40,7 +42,7 @@ In the plugin's own schema, `plugin_routines`, from `fxbot/migrations/0001_routi
 
 ## Cost
 
-- **Each message:** one in-memory check per tool call. Every request of every bot carries the four tools' definitions, about 300 tokens, cached with the rest.
+- **Each message:** one in-memory check per tool call. Every request of every bot carries the four tools' definitions, about 320 tokens, cached with the rest. A bot it's on for carries the skill's line in its list of skills, about 60 tokens, and about 850 when it reads the skill.
 - **Idle:** one indexed read every 30 seconds.
 - **A run:** one turn of the bot's own model, with no chat history, and as many tool calls as the task takes. On a computer, it starts the computer if it's stopped.
 - **Telling the owner:** one turn at the chat's full context, plus any text files it carries. A quiet run costs none. A morning summary is two turns a day.
@@ -56,6 +58,7 @@ In the plugin's own schema, `plugin_routines`, from `fxbot/migrations/0001_routi
 | `fxbot/migrations/0001_routines.sql` | Its two tables |
 | `fxbot/page.jsx` | The Routines section, and the card in a reply |
 | `fxbot/page.js` | `page.jsx`, built |
+| `skills/routines/SKILL.md` | Its skill |
 | `package.json` | `"type": "module"`, for the server code |
 
 Build `page.js` from this folder with:

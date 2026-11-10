@@ -9,6 +9,8 @@ A page is something a bot writes for you to read and keep, outside the chat, suc
 2. Ask a bot for something to keep, in your own words: "write up our trip plan as a page", or "make a report on last week's sales".
 3. The bot writes it, and says in a sentence what it covers. A card in the chat has the page's title and **Open**.
 
+A bot also writes a page without being asked when its answer would be long, such as a report, a comparison, research findings, or a plan. What a few sentences answer stays in the chat. To have an answer in the chat instead, say so: "just tell me here".
+
 <img class="shot dark:sl-hidden" src="/shots/page-desktop-light.png" width="1280" height="800" alt="A page called A slow weekend in Lisbon, with two boxes ticked" />
 <img class="shot light:sl-hidden" src="/shots/page-desktop-dark.png" width="1280" height="800" alt="A page called A slow weekend in Lisbon, with two boxes ticked" />
 

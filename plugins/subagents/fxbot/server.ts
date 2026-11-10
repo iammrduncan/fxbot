@@ -263,7 +263,7 @@ export default async function setup(fx: PluginApi) {
       "computer, skills, and memories, but hasn't seen this chat: put everything it needs in task, such as names, dates, ids, files in your " +
       "library, and what to hand back. It can't ask you or the owner anything. Its report reaches you on its own, with those of the others this " +
       "turn starts, once they've all ended: don't wait or check for it. Start several for parallel work, each with its own part. Only in your " +
-      "chat with the owner.",
+      "chat with the owner. The skill subagents says how to split work and write a task.",
     inputSchema: {
       type: "object",
       properties: {
