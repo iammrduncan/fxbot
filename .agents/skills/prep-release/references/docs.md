@@ -71,10 +71,10 @@ Docs that live outside the site:
 - **`CHANGELOG.md` `## Unreleased`:** the full record. The site's changelog page is built from it.
 - **`README.md`:**
   - **Phases:** each built phase gets `[x]` and its release, as in `(plugin; 0.7.0)`.
-  - **Status.**
+  - **Status:** a few lines. The Phases list carries the features, so Status doesn't list them again.
   - **Install, Update, and Run from a checkout.**
   - **The variables table.**
-- **`AGENTS.md`:** the "What this repo is" paragraph, and the list of built phases at the top, with links into `docs/_completed/phases/`.
+- **`AGENTS.md`:** "Where things are" and "What this repo is", only when the repo's shape changes: a new package, a plugin in `plugins/`, or a new kind of doc. It doesn't list each built phase: `docs/_completed/phases/` holds them, and the README's Phases list links them.
 - **`docs/_completed/phases/<phase>.md`:** a phase moves here from `docs/phases/` once it's built. Fix every link to it. Its "What the build changed" section records what came out differently from the plan.
 - **`packages/website/src/home.tsx`:** the home page's features. Change it only when a headline feature changes what fxbot is.
 

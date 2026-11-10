@@ -62,7 +62,7 @@ Read [references/docs.md](references/docs.md). It covers Diátaxis, where each k
 3. **Check the reference pages against the code:** the plugin API, HTTP API, client, server API, configuration, and commands. A reference page that's wrong is worse than none.
 4. **Bring the rest up to date** with what was built:
    - the README's Phases list and Status
-   - `AGENTS.md` ("What this repo is" and its list of built phases)
+   - `AGENTS.md` ("Where things are" and "What this repo is"), only when the repo's shape changed
    - each changed plugin's README and description, in `plugin.json` and in `plugins-registry.json`
    - the "What the build changed" notes in each phase doc
    - the home page's features, only if a headline feature changed what fxbot is
