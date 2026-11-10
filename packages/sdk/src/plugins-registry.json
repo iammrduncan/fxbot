@@ -52,6 +52,13 @@
       "docs": "/docs/how-to/let-bots-work-together/"
     },
     {
+      "name": "subagents",
+      "description": "Bots hand work to subagents that run in the background, and report back together. The bot's panel lists them, each with its thread.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/subagents",
+      "docs": "/docs/how-to/hand-work-to-subagents/"
+    },
+    {
       "name": "permissions",
       "description": "Decide what each bot can do on its own: ask, a reviewer model, or run everything.",
       "repo": "iammrduncan/fxbot",

@@ -4,6 +4,11 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
+**Before upgrading.** Migration `0015_session_labels` adds a `label` column to `plugin_sessions`, for the name a plugin gives a session of its own. Every session you have carries on as it is. Then update Computer from **Plugins**, if you have it.
+
+- **Subagents.** The new **subagents** plugin lets a bot hand work to helpers that run in the background while it carries on talking with you. Each is the bot itself, run again on one task, with its tools, computer, skills, and memories, but not its chat. The subagents one turn starts report back together, in one message from **Subagents**, once the last has ended, and the bot tells you what they found. The bot's panel lists them, working and recent, and each opens to its thread, live, with **Stop**. A subagent can't start one of its own, and leaves memories, messages to other bots, routines, and asking you to the bot's chat. See [Hand work to subagents](https://fxbot.sh/docs/how-to/hand-work-to-subagents/).
+- **A bot's subagents work on its computer together,** with Computer 0.4.0: each has its name and arrow on the computer's screen, its own browser tab with the bot's sign-ins, and turns at the desktop and the terminal, as a room's bots take turns.
+- **For plugins:** `fx.chats.newSession(bot, { label })` names a session of the plugin's own, and each of its tool calls, and `tool.before` and `tool.after`, get `label`, or null in a bot's own chat.
 - **Each of fxbot's plugins links to its docs.** Its page in **Plugins**, its tab in **Settings**, and its page in the [plugin directory](https://fxbot.sh/plugins/) have **Docs**, which opens its guide on fxbot.sh. The links come with fxbot's plugin list, which fxbot reads hourly, so a new guide needs no release. For the SDK, a `PackagePlugin` and a `PackageCard` carry `docs`, a path on fxbot.sh, when the list has one.
 
 ## 0.8.0 (2026-11-10)

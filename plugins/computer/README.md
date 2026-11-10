@@ -37,6 +37,7 @@ type ComputerProvider = {
 - Each call asks the plugins that provide one, in turn, which computer the chat uses; otherwise it's the bot's own.
 - A plugin's computer goes when the plugin is removed, or runs and doesn't list it. One added but not running, or that answers null, keeps its own.
 - On a shared computer, a `computer_desktop` result says where the other bots last pointed, **Take over** pauses every bot's desktop and terminal tools, and **Hand back** sends nothing: the owner tells the bot to go on.
+- Since 0.4.0, a session another plugin labelled, such as a [subagent](https://fxbot.sh/docs/how-to/hand-work-to-subagents/)'s, is an actor of its own on the bot's computer, named "<bot> · <label>": its own arrow, its own pinned browser tab through `AGENT_BROWSER_SESSION` and `AGENT_BROWSER_PIN_TAB`, and turns at the desktop and the terminal with the bot's other actors, held until 20 seconds after an actor's last call or its turn's end, and waited for up to a minute. The shell runs for every actor at once. On fxbot before 0.9.0, which has no labels, every call is the bot's, as in 0.3.
 - The page's routes are under `computers/<key>/`: `state`, `cursors`, `start`, `stop`, `reset`, and `takeover`.
 
 ## Set up the engine

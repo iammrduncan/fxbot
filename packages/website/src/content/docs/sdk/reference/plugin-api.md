@@ -120,7 +120,7 @@ Handlers run in the order the plugins were added, and change the event's fields 
 | --- | --- | --- | --- |
 | `message` | Before a message runs, after the chat is known | `bot`, `session`, `text`, `files`, `from`, `asked` | Change `text` and `files`; answer `{ handled: true }`, and no turn runs; or answer `{ startOver: { ask } }`, and the message goes to a new chat |
 | `instructions` | Each time a chat opens | `bot`, `session`, `instructions`, a list | Add, change, or remove entries |
-| `tool.before` | Before every tool call: fxbot's, MCP servers', skills', and plugins' | `bot`, `session`, `messageId`, the message whose turn it's in, since 0.6.0, and since 0.6.0, `callId`, which holds across a restart, `tool`, `description`, `input`, and `safe`, the tool's own word that it only reads or writes the bot's own notes | Change `input`, answer `{ block: reason }`, which the model gets as a failed call, or since 0.6.0 answer `{ wait }`: a function core calls after every hook, with `{ input }`, the final one, and no time limit but the call's own. It answers `{ block: reason }`, or nothing, and the call runs. Since 0.7.0, the bot's `waiting` is true while a `wait` holds one of its calls |
+| `tool.before` | Before every tool call: fxbot's, MCP servers', skills', and plugins' | `bot`, `session`, and since 0.9.0 `label`, the session's from `newSession`, or null, `messageId`, the message whose turn it's in, since 0.6.0, and since 0.6.0, `callId`, which holds across a restart, `tool`, `description`, `input`, and `safe`, the tool's own word that it only reads or writes the bot's own notes | Change `input`, answer `{ block: reason }`, which the model gets as a failed call, or since 0.6.0 answer `{ wait }`: a function core calls after every hook, with `{ input }`, the final one, and no time limit but the call's own. It answers `{ block: reason }`, or nothing, and the call runs. Since 0.7.0, the bot's `waiting` is true while a `wait` holds one of its calls |
 | `tool.after` | After it | the same, with `result`, or `error` when it failed | Change `result` |
 | `turn.start` | Once libfx stores the prompt, or since 0.6.0, in a bot's own chat, when the turn it waited behind ends | `bot`, `session`, `messageId`, `text`, `from`, `asked` | Observe |
 | `turn.end` | When the turn ends | the same, with `reply`, `error` when it failed, as when the provider answered with an error, and `cancelled` when it was stopped, since 0.6.0 | Observe |
@@ -155,7 +155,7 @@ fx.tool({
 | `inputSchema` | A JSON Schema object for the input |
 | `idempotent` | Whether running a call twice is harmless, so a call cut off by a crash runs again |
 | `safe` | Optional: it only reads, or writes the bot's own notes, and reaches nothing outside. A hook sees this on `tool.before`. Since 0.6.0. |
-| `execute(input, call)` | Runs one call. `call` has the `bot` and `session` of the chat, the `messageId` of the message whose turn it's in, since 0.6.0, and a `signal` that aborts with the turn. A string goes to the model as it is, and anything else as JSON, but for `{ type: "libfx.tool-result", text, images }`, whose images, up to 8, the model sees. |
+| `execute(input, call)` | Runs one call. `call` has the `bot` and `session` of the chat, the session's `label` from `newSession`, or null in the bot's own chat, since 0.9.0, the `messageId` of the message whose turn it's in, since 0.6.0, and a `signal` that aborts with the turn. A string goes to the model as it is, and anything else as JSON, but for `{ type: "libfx.tool-result", text, images }`, whose images, up to 8, the model sees. |
 
 Adding a tool makes fxbot's agents again. A call from a bot the plugin isn't on for fails, and so does a result over 64 KiB.
 
@@ -204,7 +204,7 @@ A plugin's turns run as the owner's do, with the same hooks, history, library, a
 
 | Call | What it does |
 | --- | --- |
-| `fx.chats.newSession(bot)` | A session of the plugin's own for the bot, on the bot's provider now. Keep its id. |
+| `fx.chats.newSession(bot, { label? })` | A session of the plugin's own for the bot, on the bot's provider now. Keep its id. `label`, since 0.9.0, names it, up to 80 characters, such as a subagent's title: each of its tool calls gets it, so a plugin such as the computer can tell the bot's sessions apart. |
 | `fx.chats.send(bot, { text, shown?, label?, steer?, files?, session?, messageId?, asked? })` | A message. `shown`, since 0.6.0, is what the chat shows of it, when that isn't `text`, which the model gets. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. `asked`, since 0.7.0, is the owner's own words the message carries on, up to 8,000 characters, which the plugin quotes from a chat of theirs, such as what they asked the bot it's from. Hooks get it with the message and its turn. |
 | `fx.chats.stream(bot, session, cursor?)` | That session's lines, as NDJSON, from `cursor` on, then each new one. The same lines as [`fxbot.stream`](/sdk/how-to/stream-replies/). |
 | `fx.chats.ownerSaid(bot, limit)` | The owner's newest messages in the bot's own chat, oldest first, with no plugin's or other bot's. Since 0.6.0. |
