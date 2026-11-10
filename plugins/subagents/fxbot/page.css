@@ -1,0 +1,100 @@
+/* The subagents' list in a bot's panel, a subagent's thread, and its card in the chat. The page holds only the classes the
+   app uses, so the layout these need is here, on the app's own colors. */
+.subagents-panel {
+  display: grid;
+  gap: 0.375rem;
+}
+.subagents-list {
+  display: grid;
+  gap: 0.125rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.subagents-row {
+  align-items: center;
+  display: flex;
+  gap: 0.25rem;
+}
+.subagents-open {
+  align-items: center;
+  border-radius: 0.5rem;
+  display: flex;
+  flex: 1;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  text-align: left;
+}
+.subagents-open:hover,
+.subagents-open:focus-visible {
+  background: var(--accent);
+}
+.subagents-state {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+[data-state="failed"] .subagents-state {
+  color: var(--destructive);
+}
+.subagents-more {
+  justify-self: start;
+  padding: 0 0.5rem;
+}
+/* Working pulses; done is solid; failed is red; stopped is hollow. */
+.subagents-dot {
+  border: 1.5px solid var(--muted-foreground);
+  border-radius: 999px;
+  flex: none;
+  height: 0.5rem;
+  width: 0.5rem;
+}
+[data-state="working"] .subagents-dot {
+  animation: subagents-pulse 1.4s ease-in-out infinite;
+  background: var(--foreground);
+  border-color: var(--foreground);
+}
+[data-state="done"] .subagents-dot {
+  background: var(--muted-foreground);
+}
+[data-state="failed"] .subagents-dot {
+  background: var(--destructive);
+  border-color: var(--destructive);
+}
+@keyframes subagents-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-state="working"] .subagents-dot {
+    animation: none;
+  }
+}
+.subagents-status {
+  align-items: center;
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-inline: auto;
+  max-width: 48rem;
+  padding: 0 1rem 0.5rem;
+  width: 100%;
+}
+.subagents-gone {
+  box-sizing: border-box;
+  margin-inline: auto;
+  max-width: 48rem;
+  padding: 0 1rem 1rem;
+  width: 100%;
+}
+.subagents-card {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
