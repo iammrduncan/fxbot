@@ -74,6 +74,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Image and video generation](docs/phases/media-generation.md) (plugin): bots create images and video
 - [ ] [Voice memos](docs/phases/voice-memos.md) (plugin): send a bot a recorded voice memo
 - [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): talk with a bot by voice, in the app or over a phone line
+- [ ] [Mermaid](docs/phases/plugin-mermaid.md) (plugin, with a small core hook): Mermaid code blocks draw as diagrams in chats, pages, and rooms, in the app's own look
 
 The previous design and spike are in [archive/](archive/README.md). The git host may still use the old repository name until the owner renames it.
 
