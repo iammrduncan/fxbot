@@ -23,6 +23,7 @@ export const topics: Topic[] = [
         about: "Steps for one task, when you know what you want.",
         pages: [
           { slug: "how-to/reach-it-from-your-phone", label: "Reach it from your phone" },
+          { slug: "how-to/reach-it-from-your-computer", label: "Reach it from your computer" },
           { slug: "how-to/reach-it", label: "Reach it from other devices" },
           { slug: "how-to/pair-another-device", label: "Pair another device" },
           { slug: "how-to/add-a-provider", label: "Add a provider" },

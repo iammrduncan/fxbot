@@ -120,6 +120,7 @@ Open the bot panel with the button at the top right of the chat, then **Edit**. 
 
 A release of fxbot, on your machine and paired with your phone, with a provider and a bot that keeps its chat. From here:
 
+- [Put fxbot on your computer too](/docs/how-to/reach-it-from-your-computer/), as an app of its own.
 - [Add a skill](/docs/how-to/add-a-skill/) to give your bots instructions for a kind of task.
 - [Add an MCP server](/docs/how-to/add-an-mcp-server/) to give your bots tools.
 - [Pair another device](/docs/how-to/pair-another-device/), so a phone that loses its pairing can pair again from anywhere, or [reach it another way](/docs/how-to/reach-it/), such as Tailscale.

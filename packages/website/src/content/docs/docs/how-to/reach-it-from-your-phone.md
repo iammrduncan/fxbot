@@ -11,7 +11,7 @@ You need the **web-pairing** plugin: add it from **Plugins**. It needs fxbot 0.8
 
 - **On an iPhone or iPad,** open web.fxbot.sh in Safari, tap **Share**, then **Add to Home Screen**. Open fxbot from the Home Screen, and pair there. The Home Screen app keeps its own storage, apart from Safari's, and Safari clears a site's storage after seven days without a visit. A pairing made in Safari stays in Safari.
 - **On Android,** open web.fxbot.sh in Chrome, and tap **Install app** in its menu. Pair in the installed app.
-- **On a computer,** open web.fxbot.sh in Chrome, Edge, Firefox, or Safari. Installing it is optional.
+- **On a computer,** see [Reach it from your computer](/docs/how-to/reach-it-from-your-computer/).
 
 Don't pair in a private window: what it stores is gone when it closes. The app says so when it sees one.
 

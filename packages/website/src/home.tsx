@@ -121,7 +121,7 @@ const questions: { question: string; link?: [string, string]; answer: ReactNode 
   {
     question: "Is it a browser extension?",
     link: ["/docs/explanation/core-and-plugins/", "How plugins work"],
-    answer: <>No. fxbot is an app that runs on a machine of yours, and you open it in a browser, or as an app on your phone. Plugins add features to fxbot itself.</>,
+    answer: <>No. fxbot is an app that runs on a machine of yours, and you open it in a browser, or as an app on your phone or computer. Plugins add features to fxbot itself.</>,
   },
   {
     question: "Does it only work with local models?",
