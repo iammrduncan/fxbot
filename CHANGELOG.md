@@ -2,7 +2,7 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
-## Unreleased
+## 0.9.0 (2026-11-10)
 
 **Before upgrading.** Migration `0015_session_labels` adds a `label` column to `plugin_sessions`, for the name a plugin gives a session of its own. Every session you have carries on as it is. Then update Computer from **Plugins**, if you have it.
 
