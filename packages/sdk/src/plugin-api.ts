@@ -13,10 +13,10 @@ export type HookEvents = {
   instructions: { bot: string; session: string; instructions: string[] };
   /** Before every tool call: change `input`, or answer `{ block: reason }`, which the model gets as a failed call, or
    * `{ wait }`, for what takes longer than a hook may. `callId` holds across a restart, and `safe` is the tool's own word
-   * that it only reads, or writes the bot's own notes. */
-  "tool.before": { bot: string; session: string; messageId: string; callId: string; tool: string; description: string; input: unknown; safe: boolean };
+   * that it only reads, or writes the bot's own notes. `label` is the session's, from `newSession`, or null. Since 0.9.0. */
+  "tool.before": { bot: string; session: string; label: string | null; messageId: string; callId: string; tool: string; description: string; input: unknown; safe: boolean };
   /** After it: change `result`. A call that failed has `error` instead. */
-  "tool.after": { bot: string; session: string; messageId: string; tool: string; input: unknown; result?: unknown; error?: string };
+  "tool.after": { bot: string; session: string; label: string | null; messageId: string; tool: string; input: unknown; result?: unknown; error?: string };
   /** Once libfx accepts the prompt, or in a bot's own chat, when a turn it waited behind ends. Only observes. */
   "turn.start": { bot: string; session: string; messageId: string; text: string; from?: string; asked?: string };
   /** When the turn ends, with its reply, or `error` when it failed, or `cancelled` when it was stopped. Only observes. */
@@ -38,8 +38,8 @@ export type HookAnswers = {
 };
 export type Hook<E extends keyof HookEvents> = (event: HookEvents[E]) => unknown;
 
-// A tool for bots, named `<plugin>_<name>` when they see it. `bot` and `session` are the chat's that called it, and
-// `messageId` the message whose turn it's in.
+// A tool for bots, named `<plugin>_<name>` when they see it. `bot` and `session` are the chat's that called it,
+// `label` the session's, from `newSession`, or null in a bot's own chat, and `messageId` the message whose turn it's in.
 export type PluginTool = {
   name: string;
   description: string;
@@ -48,7 +48,7 @@ export type PluginTool = {
   idempotent: boolean;
   /** It only reads, or writes the bot's own notes, and reaches nothing outside. Since 0.6.0. */
   safe?: boolean;
-  execute: (input: any, call: { bot: string; session: string; messageId: string; signal: AbortSignal }) => unknown;
+  execute: (input: any, call: { bot: string; session: string; label: string | null; messageId: string; signal: AbortSignal }) => unknown;
 };
 
 // A plugin that needs this one, with what it asked of it: its block under `needs` in its plugin.json. `api` is what it
@@ -99,8 +99,9 @@ export type PluginApi = {
     on(id: string): boolean;
   };
   chats: {
-    /** A session of the plugin's own for a bot, on its current provider. */
-    newSession(bot: string): Promise<string>;
+    /** A session of the plugin's own for a bot, on its current provider. `label` names it, up to 80 characters, and
+     * each of its tool calls gets it. Since 0.9.0. */
+    newSession(bot: string, options?: { label?: string }): Promise<string>;
     /** A message, as the owner's are sent, marked as the plugin's. Without `session`, it goes to the bot's own chat.
      * `shown` is what the chat shows of it, when that isn't `text`, which the model gets, and `label` who it says it's
      * from, in place of the plugin. With `steer`, a message to the own chat joins a turn that's running, and answers

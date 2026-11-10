@@ -182,7 +182,7 @@ export type PluginHost = {
   machine: PluginApi["machine"];
   localUrl: string;
   chats: {
-    newSession(plugin: string, bot: string): Promise<string>;
+    newSession(plugin: string, bot: string, options?: { label?: string }): Promise<string>;
     send(plugin: string, bot: string, message: Parameters<PluginApi["chats"]["send"]>[1]): Promise<{ messageId: string; sessionId: string; joined?: string }>;
     stream(plugin: string, bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
     ownerSaid: PluginApi["chats"]["ownerSaid"];
@@ -604,7 +604,7 @@ export async function createPlugins(options: {
       },
       localUrl: host.localUrl,
       chats: {
-        newSession: (bot) => host.chats.newSession(record.name, bot),
+        newSession: (bot, options) => host.chats.newSession(record.name, bot, options),
         send: (bot, message) => host.chats.send(record.name, bot, message),
         stream: (bot, session, cursor) => host.chats.stream(record.name, bot, session, cursor),
         ownerSaid: host.chats.ownerSaid,
@@ -705,8 +705,8 @@ export async function createPlugins(options: {
       ...tool,
       async execute(input, context) {
         if (!hooked("tool.before") && !hooked("tool.after")) return execute(input, context);
-        const { bot = "", messageId = "" } = (context.context ?? {}) as { bot?: string; messageId?: string };
-        const call = { bot, session: context.sessionId, messageId, callId: context.executionId, tool: tool.name, description: tool.description ?? "", input, safe };
+        const { bot = "", messageId = "", label = null } = (context.context ?? {}) as { bot?: string; messageId?: string; label?: string | null };
+        const call = { bot, session: context.sessionId, label, messageId, callId: context.executionId, tool: tool.name, description: tool.description ?? "", input, safe };
         const answer = await run("tool.before", call);
         if (answer?.block) throw new Error(answer.block);
         // A wait outlasts a hook's time, for a person or a model, and ends with the call.
@@ -738,9 +738,9 @@ export async function createPlugins(options: {
       inputSchema: tool.inputSchema as FxAgentHostTool["inputSchema"],
       idempotent: tool.idempotent,
       async execute(input, context) {
-        const { bot, messageId = "" } = (context.context ?? {}) as { bot?: string; messageId?: string };
+        const { bot, messageId = "", label = null } = (context.context ?? {}) as { bot?: string; messageId?: string; label?: string | null };
         if (!bot || !applies(plugin, bot)) throw new Error(`${plugin.record.name} is off for this bot.`);
-        return tool.execute(input, { bot, session: context.sessionId, messageId, signal: context.signal });
+        return tool.execute(input, { bot, session: context.sessionId, label, messageId, signal: context.signal });
       },
     }, tool.safe === true));
   }

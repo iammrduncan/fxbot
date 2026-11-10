@@ -208,12 +208,14 @@ export async function createFxbot(options: FxbotOptions) {
       localUrl: options.localUrl ?? "http://127.0.0.1:8787",
       timeZone: () => timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       chats: {
-        async newSession(plugin, bot) {
+        async newSession(plugin, bot, { label } = {}) {
           started();
           const profile = await get(bot);
           if (!profile.provider) fail(400, "This bot has no provider.");
+          if (label !== undefined && (typeof label !== "string" || !label.trim() || label.length > 80)) fail(400, "label must be 1 to 80 characters");
           const id = await (await providers.agentFor(profile.provider, "")).newSessionId();
-          await store.sql`insert into plugin_sessions (id, profile_id, provider, plugin) values (${id}, ${bot}, ${profile.provider}, ${plugin})`;
+          await store.sql`insert into plugin_sessions (id, profile_id, provider, plugin, label) values (${id}, ${bot}, ${profile.provider}, ${plugin}, ${label?.trim() ?? null})`;
+          labels.set(id, label?.trim() ?? null);
           return id;
         },
         ownerSaid: async (bot, limit) => (await get(bot), history.ownerSaid(bot, limit)),
@@ -297,6 +299,13 @@ export async function createFxbot(options: FxbotOptions) {
   // characters a token, or 8,000 characters each when the window is unknown. libfx takes at most 64 KiB in all, so the
   // memories get no more than what the rest leaves. They change only when a memory does, so the prompt cache holds.
   // Plugins' instructions hooks change the list last.
+  // A plugin session's label, which each of its tool calls gets: read once, and null for a bot's own chat.
+  const labels = new Map<string, string | null>();
+  async function labelOf(sessionId: string) {
+    if (!labels.has(sessionId)) labels.set(sessionId, (await store.sql<{ label: string | null }[]>`select label from plugin_sessions where id = ${sessionId}`)[0]?.label ?? null);
+    return labels.get(sessionId)!;
+  }
+
   async function open(profile: StoredProfile, sessionId: string, messageId?: string) {
     const model = await modelFor(profile);
     const agent = await providers.agentFor(profile.provider, model);
@@ -311,7 +320,7 @@ export async function createFxbot(options: FxbotOptions) {
       await packages.run("instructions", event);
       instructions = (Array.isArray(event.instructions) ? event.instructions : []).filter((entry) => typeof entry === "string" && entry);
     }
-    return agent.session(sessionId, { model: model || undefined, instructions, context: { bot: profile.id, messageId } });
+    return agent.session(sessionId, { model: model || undefined, instructions, context: { bot: profile.id, messageId, label: await labelOf(sessionId) } });
   }
 
   async function get(id: string) {
