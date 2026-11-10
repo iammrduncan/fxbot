@@ -4,7 +4,7 @@ Join the Hackers in the Loop community on [Discord](https://discord.gg/3Qs2uejUf
 
 fxbot is your bot, built and configured how you want it. It starts simple, with a lean, fast core: bots, their chats, and their files. Make each bot yours, from its look and instructions to its model and tools. Grow fxbot with only the plugins you want: skills, MCP servers, and plugins that change the app itself.
 
-fxbot is local first. One Node server and Postgres run on your own machine, and the browser is the UI on desktop and mobile. [libfx](https://fx.sh/docs/lib) sends each chat to the provider its bot uses: a local model server such as Ollama or LM Studio, a key for one of about 30 gateways, labs, and clouds, or an account you sign in to: ChatGPT, Grok, Vercel, OpenRouter, Hugging Face, or OrcaRouter.
+fxbot is local first. One Node server and Postgres run on your own machine, and the browser is the UI on desktop and mobile. [libfx](https://fx.sh/docs/lib) sends each chat to the provider its bot uses: a local model server such as Ollama or LM Studio, a key for one of about 30 gateways, labs, and clouds, or an account you sign in to: ChatGPT, Grok, OpenRouter, Hugging Face, or OrcaRouter.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="packages/website/public/shots/hero-desktop-dark.png">
@@ -56,7 +56,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Avatars](docs/_completed/phases/avatars.md) (core; 0.7.0): a look for each bot, of 32 shapes in soft color with big dark eyes, a feeling, and things to wear, that shows when it's working, waiting, finished, or asleep
 - [x] [Web pairing](docs/_completed/phases/web-pairing.md) (plugin, in Essentials, with two small hooks; 0.8.0): web.fxbot.sh opens your own fxbot from a phone or any computer over a WebRTC connection straight to it, STUN only, with only the handshake passing through fxbot.sh, paired once with a code and kept, and docs for Tailscale, WireGuard, and your own TURN when a network won't connect directly
 - [x] [Operations](docs/_completed/phases/operations.md) (core; 0.8.0): the computer on every engine, Fedora, AlmaLinux, openSUSE, and Arch beside Debian and Ubuntu, `setup.sh` checks before it changes anything, another port, and `fxbot backup` and `fxbot uninstall`
-- [x] [Providers v2](docs/_completed/phases/providers-v2.md) (core; 0.8.0): an Add provider page that leads with sign-ins (Vercel, ChatGPT/Codex, Grok, OpenRouter, Hugging Face, OrcaRouter), walks through making a key for each popular gateway, takes the clouds' own sign-ins, and leads first-run setup, with docs for each provider
+- [x] [Providers v2](docs/_completed/phases/providers-v2.md) (core; 0.8.0): an Add provider page that leads with sign-ins (ChatGPT/Codex, Grok, OpenRouter, Hugging Face, OrcaRouter), walks through making a key for each popular gateway, takes the clouds' own sign-ins, and leads first-run setup, with docs for each provider
 - [ ] [Distribution](docs/phases/distribution.md) (core; after 0.8.0): the main install, one download for Linux, macOS, and Windows that brings its own Postgres and embedder and a Linux machine for the computer, and later the desktop app; the container release is for hosting
 - [ ] [Mac support](docs/phases/mac-support.md) (core; after 0.8.0): one line installs fxbot on a Mac, as Distribution's macOS download built first, with only the computer in a Lima VM, and a handoff to check it on a real Mac
 - [ ] [Triggers](docs/phases/triggers.md) (plugins): webhooks and new email start a bot's turn

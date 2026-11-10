@@ -2,7 +2,7 @@
 
 Adding a provider becomes one page that walks the owner through it, in Settings and in first-run setup:
 - **Sign in with nothing to paste.** One button each, for:
-  - **Vercel, ChatGPT and Codex, and Grok,** by device code, as today. Vercel now works out of the box with fxbot's own app.
+  - **Vercel, ChatGPT and Codex, and Grok,** by device code, as today. Vercel was to work out of the box with fxbot's own app, but Vercel doesn't let it use a device code yet, so its sign-in is off unless a server names an app of its own (**Built**, below).
   - **OpenRouter,** by a redirect back to fxbot's own page.
   - **Hugging Face and OrcaRouter,** by device code.
 
