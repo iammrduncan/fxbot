@@ -1,16 +1,19 @@
 # First impressions
 
 What fxbot says it is, in the places people meet it first: the link preview, the home page's first screen, the README, the docs' first page, and the install's last lines. Each should answer, before anyone reads further, what people now ask:
-- **What it is:** your own AI assistants, on a machine of yours, which you talk to in fxbot's own app.
+- **What it is:** AI assistants that do real work, built your way, which you talk to in fxbot's own app. An open alternative to OpenClaw, Hermes Agent, Grok Bot, Muse, Claude Duet, and OpenAI's Dots.
 - **Which models:** any, hosted or local. Sign in with ChatGPT, add a key for Claude or Gemini, or run one with Ollama.
 - **How to reach it:** from any browser, and from your phone, away from home too, in the fxbot app, with web pairing. Tailscale isn't needed, and it's no longer the recommended way in.
-- **What plugins are:** features you add to fxbot itself, such as a computer for each bot, routines, and subagents. They aren't browser extensions.
+- **What plugins are:** what you add to fxbot itself, said by what they let a bot do: a computer of its own, routines, subagents. The word stays, and "extensions" never appears.
 - **What a bot does for you:** tasks named plainly, with the screenshots we already have.
 
-Status: planned on 2026-11-10, not built. Researched the same day:
+Status: planned on 2026-11-10, not built. The owner answered the open questions the same day ([5](#5-open-questions)). Researched the same day:
 - the questions people asked the owner after a link to fxbot.sh
 - a test of today's link preview and home page on two fresh readers who knew nothing about fxbot
-- how OpenClaw, Hermes Agent, Pi, eve, Grok's bot, Muse, and Open WebUI introduce themselves, from their own sites, READMEs, and docs
+- how OpenClaw, Hermes Agent, Pi, eve, Grok's bot, Muse, Claude Duet, OpenAI's Dots, and Open WebUI introduce themselves
+- a panel of six readers, each playing a common kind of person, on four headlines and six words for plugins
+
+The chat apps people asked for are two stubs of their own: [Gateways](gateways.md) and [Telegram and Discord](telegram-and-discord.md).
 
 ## What the owner asked
 
@@ -23,6 +26,8 @@ And from others: "Does it only work with local models?"
 "Our taglines and stuff and first impressions must be wrong, people don't understand what it is or how to use it. People know what hermes is, or open claw, or grokbot, or muse. Why can't they understand fxbot? Use the research directive to better adjust our marketing, docs, and quick starts." And: "people don't read the docs."
 
 Then: "With web pairing, tailscale isn't the recommended way anymore."
+
+On the open questions: "Headline: 'Your AI Assistants' or something... whats others tagline? I think local is less of a thing but more of the 'Its your assistant, configure and built just the way you want it'... Whatever works best... I think 'on your own machine' is obvious if you install it." "Name OpenClaw, Duet, Dots, Muse, GrokBot, Hermes in a FAQ entry. We are an open alternative to those, that is lighter weight, fully featured, and user experience first." "Write stub phase for telegram/discord. We should add a stub phase for general gateway plugins." "Also plugins gives people confusion it seems? Should we use addons or plugins or extensions or what? Run a naive discovery panel against common public personas." "Release posts should yes get a line saying what fxbot is."
 
 And: "Windows does work through WSL 2. I tested it. And for v0.10.0 we should make it work for windows, linux, mac natively, so for now don't mention 'linux', cause you will cause more confusion and make work for us to revert later when we add more platforms and distribution channels."
 
@@ -126,6 +131,10 @@ Fetched from their own sites, READMEs, and docs on 2026-11-10.
 - **[OpenBot](https://github.com/CopilotKit/openbot):** "A modular, self-hostable workspace for AI coworkers. Choose your models." Its second section: "Use OpenAI, Claude, Gemini, or open models… Fully local is an option."
 - **[OpenDuet](https://github.com/CopilotKit/OpenDuet):** "Each agent has a computer of its own. Use it on the web, on mobile, in Slack, or in Microsoft Teams. Host OpenDuet yourself and choose your own model."
 
+**Claude Duet and OpenAI's Dots**, from news coverage found on 2026-11-10, not their makers' own pages (the build checks their names there):
+- **Claude Duet,** Anthropic's, a research preview since 2026-10-21: a standalone app, on iOS, Android, and claude.ai, where Claude works in the background with connected apps and a browser in the cloud, and asks before sensitive actions. OpenDuet follows it.
+- **Dots,** OpenAI's, since 2026-09-29: always-on agents, reached in ChatGPT, Slack, and Microsoft Teams. OpenDots follows it.
+
 **Open WebUI** ([openwebui.com](https://openwebui.com)), the self-hosted chat page people may take fxbot for:
 - **Title:** "Open WebUI: Self-Hosted AI Platform".
 - **README, first two sentences:** "Connect local models through Ollama or use OpenAI-compatible APIs for local and cloud models." Its site: "Connect to any model, local or cloud."
@@ -138,33 +147,66 @@ Fetched from their own sites, READMEs, and docs on 2026-11-10.
 - **Models, in one of two ways.** The hosted products hide them. The self-hosted ones name hosted and local together, in the first or second line.
 - **A computer of the bot's own** is what Grok's bot, Muse, OpenMuse, and OpenDuet all lead with. fxbot has it, in its computer plugin, and its first screen doesn't say so.
 
+### The words, on a panel of six
+
+Six fresh readers, each a model playing a common kind of person, answered from a link preview and one line of the page, with the order of the choices changed for each:
+- a school administrator, 56, who uses an iPhone and the ChatGPT app
+- a college student, 20, on Discord, with Chrome extensions and game mods
+- a software engineer, 34, with VS Code, Claude Code, and Ollama
+- a sysadmin, 41, with Docker, Tailscale, and WordPress plugins
+- a shop owner, 38, with Shopify apps, Zapier, and Google Workspace add-ons
+- a designer, 29, with Figma plugins and Raycast extensions
+
+It's a quick read on what words suggest, not a survey of people. [A person checks it](#4-checklist).
+
+**Headlines:**
+
+| Headline | Clearest | Most want to try | What they said |
+| --- | --- | --- | --- |
+| "AI assistants that do real work. Built your way." | 2 | 5 | "That's what I care about." "'Real work' is the pitch I care about." "A bit buzzwordy." |
+| "Your own AI assistants, on your own machine." | 4 | 1 | The student, the engineer, the sysadmin, and the designer: "It says what it is and where it runs." The administrator: "'Machine' makes me nervous." The shop owner: "Feels like homework." |
+| "Your AI assistants, built the way you want them." | 0 | 0 | "Vague." "Sounds like I'd have to build something." "Sounds like a lot of other products." |
+| "Your bot, built and configured how you want it." (today's) | 0 | 0 | "'Bot' feels dated and small." "'Bot' sounds like Discord." "'Configured' sounds like work." |
+
+**Words for what you add**, each put in "Add only what you want: ___":
+
+| Word | What it meant to them | Would it go in the browser? | Their verdict |
+| --- | --- | --- | --- |
+| plugins | Features that extend one app: WordPress, Figma, game mods | 5 said no, 1 maybe | Clearest for the engineer, the sysadmin, and the designer, and second for the student |
+| add-ons | The same as plugins, but older: Firefox, Google Docs | 5 said maybe, 1 no | More browser-like than plugins |
+| extensions | Chrome extensions | 6 said yes | Most misleading, for all six: "I'd go hunting in the Chrome store" |
+| skills | Alexa skills, a résumé, Claude's instruction packs | 6 said no | Clearest for the administrator and the student, as what the assistant can do. fxbot's skills are already something else: the instructions plugins carry |
+| integrations | Two services connected: Zapier, Slack to Jira | 6 said no | Clearest for the shop owner, who'd expect connectors to Gmail and Shopify, and said it "might undersell what fxbot adds" |
+| apps | Phone apps, the App Store | Unsure | Misleading for two: "I'd think of the App Store" |
+
 ## 2. Key takeaways
 
-1. **Every product people understand says what it is in its first line, with a category word:** "AI assistant", "AI agent", "agent harness". fxbot's first line, "Your bot, built and configured how you want it," has none. "Bot" alone could be a chat bot, a Discord bot, or a browser bot.
+1. **Every product people understand says what it is in its first line, with a category word:** "AI assistant", "AI agent", "agent harness". fxbot's first line, "Your bot, built and configured how you want it," has none. "Bot" alone could be a chat bot, a Discord bot, or a browser bot, and to the panel it sounded "dated and small." A result sells it: "do real work" made five of six want to try it.
 2. **None of them lets "local" stand alone.** Each names hosted and local models in one sentence, as the owner's choice. fxbot's "Local first" means the data is on your machine, but people read it as "local models only," and the description says only local models.
 3. **They say how you reach it, by name, on the first screen.** OpenClaw and Hermes name chat apps. fxbot's answer is its own app, from any browser and on your phone through web pairing, and the first screen should say so as plainly. Today it shows Tailscale.
 4. **They show tasks, not parts.** "Organizes your inbox, checks you in for flights." fxbot shows "the library" and "releases and updates." fxbot's screenshots already show tasks: a trip plan written as a page, a routine every Monday, three subagents comparing hosts, two bots working together.
 5. **A computer of the bot's own is what this kind of product leads with now.** Grok's bot, Muse, and CopilotKit's versions all say it first. fxbot gives each bot one, a desktop the owner watches and takes over, and none of its first impressions mention it. Grok's quickstart ends on a routine, which fxbot has too.
 6. **Their FAQs answer "do I need X?" head-on.** fxbot has no FAQ. The questions are known now, and each has a one-line answer.
 7. **The quickstart ends on the phone.** OpenClaw: "Want to chat from your phone instead?" fxbot's ends on Tailscale. Its tutorial should end with the phone paired through web pairing, the way the owner already answers in person.
-8. **"Plugins" needs examples beside it.** Name what they add, a computer for each bot, routines, subagents, and pages, and say once, in the FAQ, that they're features of fxbot, not browser extensions.
+8. **"Plugins" stays, with what it does beside it.** The panel put plugins inside fxbot once fxbot said what it is. Add-ons and extensions read as the browser's, apps as the App Store's, integrations as connectors, and skills is taken. The friend's "plugin for the browser" came from a page that never said what fxbot is. Say what a plugin lets a bot do, in plain verbs, and keep the word beside it.
 9. **Nobody reads the docs, so the link preview is the product's first page.** The card and the description are what people see in a chat. They have to carry the category, any model, and any device in about 20 words.
 
 ## 3. Implementation
 
 ### The words
 
-The owner picks the words ([open questions](#5-open-questions)). Recommended:
-- **The line, everywhere it's first** (card, hero, README, docs, GitHub): **"Your own AI assistants, on your own machine."**
-- **The sentence after it:** "Bots that chat, remember, work on a computer of their own, and run tasks on a schedule. Use any model, hosted or local, and talk to them from any browser or the fxbot app on your phone."
+From the owner's answers and the panel:
+- **The line, everywhere it's first** (card, hero, README, docs, GitHub): **"AI assistants that do real work. Built your way."** "Built your way" is the owner's "configured and built just the way you want it," in three words. In the hero, "Built your way." is the H1's second line, in the muted color.
+- **The sentence after it:** "Each one chats, remembers, works on a computer of its own, and runs tasks on a schedule. Pick its model, hosted or local, its look, and what it can do, and talk to it from any browser or the fxbot app on your phone."
 - **Three facts, as a row under the hero:**
   - **Any model:** sign in with ChatGPT or Grok, add a key for Claude, Gemini, or OpenRouter, or run one with Ollama or LM Studio.
   - **On your phone:** the fxbot app, away from home too, with web pairing. No VPN needed. (A network that blocks direct connections needs one of the other ways, as [When a device can't connect](../../packages/website/src/content/docs/docs/how-to/when-a-device-cant-connect.md) says, so the FAQ links there.)
-  - **On your machine:** your computer, a home server, or a small VPS. One command installs it, and your bots, chats, files, and keys stay there.
-- **The description** (meta, og, the docs' default): "Your own AI assistants, on your own machine. Use any model, hosted or local, and talk to them from any browser or your phone. Free and open source." That's about 150 characters.
+  - **Yours:** free and open source, on your own machine. One command installs it, and your bots, chats, files, and keys stay with you.
+- **The description** (meta, og, the docs' default): "AI assistants that do real work, built your way. Use any model, hosted or local, from any browser or the app on your phone. Free and open source." That's about 150 characters.
 - **No platform is named on a first impression.** The card, the home page, the README's opener, the docs' first page, and GitHub say "your own machine," never Linux, Windows, or Mac. Native installs for all three are planned for 0.10.0, and this way nothing here changes when they land. What each install runs on stays where it's needed: the tutorial's "You need," `agent-setup.txt`, and `setup.sh`'s checks.
-- **"Local first" and "a lean core" leave the first screen.** "On your own machine" says what "local first" meant, with no doubt about models. The lean core stays in "Who it's for" and the docs, for the people it's for.
-- **A pitch for the owner to paste** when sharing a link: "fxbot is my own AI assistant app. It runs on my own machine, and I use it from the browser or the app on my phone, with any model: ChatGPT, Claude, Gemini, or a local one. Each bot gets its own computer, runs routines, and hands big jobs to helpers. Plugins add features like those to the app."
+- **"Local first" and "a lean core" leave the first screen.** "On your own machine," in the third fact, says what "local first" meant, with no doubt about models. The lean core stays in "Who it's for" and the docs, for the people it's for.
+- **Plugins, by what they do.** Where everyone reads it, the copy says what a plugin lets a bot do, then the word: "Add what you want them to do: a computer of their own, routines, subagents, pages, and more, as plugins." The app, the docs, and the plugin directory keep "plugins." No first impression says "extensions" or "add-ons."
+- **A pitch for the owner to paste** when sharing a link: "fxbot is an open alternative to OpenClaw, Hermes, Grok Bot, and Muse: AI assistants that do real work, built your way. I run it on my own machine and use it from the browser or the app on my phone, with any model: ChatGPT, Claude, Gemini, or a local one. Each assistant gets its own computer, runs routines, and hands big jobs to helpers. Plugins add features like those to the app."
 
 ### The home page (`packages/website/src/home.tsx`)
 
@@ -172,17 +214,18 @@ In this order:
 1. **The hero:** the crowd, then the line as the H1, then the sentence, then the three facts as a row of three short items, each with a small blob. On a phone they stack.
 2. **The install:** the command and the AI-agent prompt, as now. Under them: "v0.9.0 · Free and open source (Apache-2.0)". "Linux" leaves it.
 3. **The screenshot:** as now. The address bar reads `127.0.0.1:8787` in place of the tailnet address. The caption says the phone beside it is the fxbot app, paired with web pairing.
-4. **"What your bots do"** in place of "What it looks like": the same gallery, each card titled by its task, as the bots in the shots say it. The page shot becomes "Plan a weekend, as a page you keep," and the routine shot, added beside it, "Every Monday, send three design reads." The subagents shot, also added, becomes "Compare three hosts at once, with subagents." "Bots that work together", "Rooms", "You decide what needs asking", and "A look for each bot" keep their shots. "Plugins you pick" becomes "Add what you want: a computer, routines, subagents."
+4. **"What your bots do"** in place of "What it looks like": the same gallery, each card titled by its task, as the bots in the shots say it. The page shot becomes "Plan a weekend, as a page you keep," and the routine shot, added beside it, "Every Monday, send three design reads." The subagents shot, also added, becomes "Compare three hosts at once, with subagents." "Bots that work together", "Rooms", "You decide what needs asking", and "A look for each bot" keep their shots. "Plugins you pick" becomes "Add what you want them to do: a computer, routines, subagents."
 5. **Get started**, in three steps, with no Tailscale:
    1. **Install it:** the command, on your computer or a server. "What it runs on" links to the tutorial's "You need." The list of distros leaves the home page.
    2. **Set it up:** open `http://127.0.0.1:8787` on the machine, or over SSH from another computer. Sign in to a model, and make your first bot.
    3. **Put it on your phone:** add **Web pairing** from **Plugins**, and scan its code at web.fxbot.sh. The fxbot app installs from there.
 6. **Questions people ask**, new, as a short list with a line or two each, linking to the guide that says more:
+   - **How is it different from OpenClaw, Hermes Agent, Grok Bot, Muse, Claude Duet, or OpenAI's Dots?** It's the same kind of thing: AI assistants that do real work, with a computer of their own, routines, and helpers. fxbot is the open alternative: free and open source, lighter, fully featured, and made to be good to use. It runs on your own machine, works with any model, and has only what you add.
    - **Is it a browser extension?** No. fxbot is an app that runs on a machine of yours, and you open it in a browser or as an app on your phone. Plugins add features to fxbot itself.
    - **Does it only work with local models?** No. Sign in with ChatGPT or Grok, use a key from Anthropic, Google, OpenAI, OpenRouter, or about 30 others, or run one locally. Each bot can use a different one.
    - **Does a bot use my computer?** No. With the computer plugin, each bot gets a computer of its own, in a container on your machine, with a desktop and a browser you watch and take over.
    - **Do I need Tailscale?** No. Web pairing opens your fxbot from your phone or any computer, at web.fxbot.sh, over a connection straight to it. Tailscale, SSH, and your own proxy also work.
-   - **Can I talk to it on Telegram or Discord?** Not yet. fxbot has its own app, which installs on your phone and shows everything a bot does: its pages, its computer, its subagents, and the cards where it asks you first.
+   - **Can I talk to it on Telegram or Discord?** Not yet ([Gateways](gateways.md) is a stub). fxbot has its own app, which installs on your phone and shows everything a bot does: its pages, its computer, its subagents, and the cards where it asks you first.
    - **Is there a hosted version, or an account?** No. It runs on your machine, and your bots, chats, files, and keys stay there.
    - **What does it cost?** fxbot is free and open source. You pay your model's provider, use a plan you already have, such as ChatGPT, or nothing with a local model.
 7. **What it does:** the feature list, with the computer, routines, and subagents in place of the library and releases, which move to "Who it's for."
@@ -191,9 +234,9 @@ In this order:
 
 ### Link previews
 
-- **The home page's tags** (`src/pages/index.astro`): the title becomes "fxbot: your own AI assistants, on your own machine". The description becomes the new one, and the image's alt text the card's words.
+- **The home page's tags** (`src/pages/index.astro`): the title becomes "fxbot: AI assistants that do real work, built your way". The description becomes the new one, and the image's alt text the card's words.
 - **The docs' default description** (`astro.config.mjs`, Starlight's `description`) becomes the same.
-- **The plugin directory** (`src/pages/plugins/index.astro`): the title becomes "fxbot plugins". The description and a line at the top of the page say: "Features to add to fxbot, your own AI assistants: a computer for each bot, routines, subagents, pages, rooms, and more."
+- **The plugin directory** (`src/pages/plugins/index.astro`): the title becomes "fxbot plugins". The description and a line at the top of the page say: "What you can add to fxbot's AI assistants: a computer of their own, routines, subagents, pages, rooms, and more."
 - **The card** (`public/card.png`): the crowd, the line, then "Any model. Any device. Free and open source." A script draws it from the site's own blob code and font, `scripts/screenshots/card.mjs`, run with `npm run card`, so the card follows the words when they change. It uses the Playwright the screenshots already use. AGENTS.md's Checks gets a line for it.
 
 ### Docs, README, and the rest
@@ -207,7 +250,7 @@ In this order:
 - **Reach it** (`how-to/reach-it.md`): web pairing comes right after "On the machine itself," as "With web pairing (recommended)." Then SSH, then Tailscale, then the rest. The link to its old Tailscale heading in `how-to/when-a-device-cant-connect.md` follows the new anchor.
 - **Security** (`explanation/security.md`): "Through web pairing, the recommended way in, only devices you've paired get in. Through Tailscale, your tailnet's access rules decide." The reasoning about a second login stays.
 - **The README:** the line and the sentence, then the three facts. Under "Reaching it," web pairing comes first and Tailscale moves to the other ways.
-- **`agent-setup.txt`:** fxbot is "their own AI assistants." The setup steps keep naming the systems it runs on, since the agent needs them, and add Windows through WSL 2. "From other devices, such as a phone," leads with web pairing, then Tailscale.
+- **`agent-setup.txt`:** fxbot is "AI assistants that do real work, built their way." The setup steps keep naming the systems it runs on, since the agent needs them, and add Windows through WSL 2. "From other devices, such as a phone," leads with web pairing, then Tailscale.
 - **`setup.sh`'s last lines:**
 
   ```
@@ -222,18 +265,18 @@ In this order:
 
   ```sh
   gh repo edit iammrduncan/fxbot \
-    --description "Your own AI assistants, on your own machine. Any model, hosted or local. Use it from any browser or the app on your phone." \
+    --description "AI assistants that do real work, built your way. Any model, hosted or local. Use it from any browser or the app on your phone. Open source." \
     --add-topic self-hosted --add-topic ai-assistant --add-topic personal-assistant --add-topic llm --add-topic ollama --add-topic pwa
   ```
 
-- **Release posts** (`docs/releases/`, and the format in the prep-release skill's `references/docs.md`): a line under the first one, "fxbot is your own AI assistants, on your own machine," so a post shared on its own says what fxbot is.
+- **Release posts** (`docs/releases/`, and the format in the prep-release skill's `references/docs.md`): a line under the first one, "fxbot: AI assistants that do real work, built your way," so a post shared on its own says what fxbot is.
 
 ### Not in this phase
 
-- **Telegram or Discord.** Every consumer product people compare fxbot with leads with chat apps, and its quickstart ends there. Whether fxbot gets a plugin for them is the owner's call ([open questions](#5-open-questions)). Until then the FAQ answers "Not yet."
+- **Telegram, Discord, and other chat apps.** Every consumer product people compare fxbot with leads with chat apps. They're stubs of their own, [Gateways](gateways.md) and [Telegram and Discord](telegram-and-discord.md). Until one's built, the FAQ answers "Not yet."
 - **Native installs on Windows, Linux, and Mac.** They're planned for 0.10.0 ([Distribution](distribution.md), [Mac support](mac-support.md)). This phase names no platform on a first impression, so nothing in it changes when they land.
 - **Web pairing in Essentials.** The owner took it out in 0.9.0. The phone step names it instead.
-- **Renaming plugins,** or any change in the app.
+- **Renaming plugins,** which the panel kept, or any change in the app.
 
 ### Size
 
@@ -251,7 +294,9 @@ No app code, no new dependency, and no new page in the docs.
 ## 4. Checklist
 
 The words:
-- [ ] The line, the sentence, the three facts, and the description are the owner's choice from the open questions, and the same everywhere they appear.
+- [ ] The line, the sentence, the three facts, and the description are as in [The words](#the-words), and the same everywhere they appear.
+- [ ] Claude Duet's and Dots' names and makers are checked on Anthropic's and OpenAI's own pages before the FAQ names them.
+- [ ] No first impression says "extensions" or "add-ons" for plugins.
 - [ ] No first-impression surface says "Local first," "local-first," or names local models without hosted ones: the card, the meta tags, the home page's first screen, the README's opener, the docs' first page, and GitHub's description.
 - [ ] Nothing calls Tailscale recommended or required: `grep -rn -i "recommended" | grep -i tailscale` over `packages/website`, `README.md`, and `setup.sh` finds nothing.
 - [ ] Every claim in the FAQ and the facts row is checked against the code: the providers named are in `providers-registry.json`, and web pairing's guide covers the phone step.
@@ -273,7 +318,7 @@ Docs and the rest:
 
 Proof:
 - [ ] Two fresh readers, given only the new link preview and only the new first screen, as in [the research](#todays-first-impression-on-fresh-readers), with the same questions. Both say, with medium or high confidence, that:
-  - it's an AI assistant you run yourself
+  - it's AI assistants that do things, which you run yourself
   - it works with ChatGPT or Claude
   - Tailscale isn't needed
   - the phone uses the fxbot app
@@ -286,9 +331,10 @@ Only a person can check:
 
 ## 5. Open questions
 
-1. **The line.** Recommended: "Your own AI assistants, on your own machine." Others:
-   - "AI agents that work for you, on your own machine," in the words of Hermes and of fxbot's own topics
-   - keeping "Your bot, built and configured how you want it" as the second line, under the new first one
-2. **Name the others?** One FAQ entry, "How is it different from OpenClaw or Hermes Agent?", would say where fxbot sits: the same kind of thing, with its own app in place of chat apps, a computer for each bot, and several bots that work together. People place a new product by the ones they know. Recommended: yes.
-3. **Telegram and Discord.** Write a one-page stub, `docs/phases/chat-apps.md`, for a plugin that lets a bot answer in Telegram first ("just a bot token," as OpenClaw puts it), then Discord? Or keep the app as the only way, and let the FAQ say so?
-4. **Release posts.** Add the line saying what fxbot is under the first line of each post?
+All answered by the owner on 2026-11-10:
+1. **The line:** "whatever works best," with "built just the way you want it" over "local," and "on your own machine is obvious if you install it." The panel picked "AI assistants that do real work. Built your way."
+2. **The others:** yes, named in one FAQ entry: OpenClaw, Hermes Agent, Grok Bot, Muse, Claude Duet, and OpenAI's Dots. fxbot is "an open alternative to those, that is lighter weight, fully featured, and user experience first."
+3. **Telegram and Discord:** stubs, [Telegram and Discord](telegram-and-discord.md), and [Gateways](gateways.md) for chat-app plugins in general.
+4. **Plugins:** the panel kept the word ([research](#the-words-on-a-panel-of-six)).
+5. **Release posts:** yes, a line saying what fxbot is.
+6. **Platforms:** none named on a first impression, and Windows works through WSL 2.
