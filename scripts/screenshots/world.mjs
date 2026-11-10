@@ -56,6 +56,23 @@ h1{font-size:20px;margin:0 0 4px}p{margin:0 0 20px;color:#59636e}
 
 // Each entry: the bot, the words that start it (found anywhere in the newest message to it, so a room's or another
 // bot's frame works too), and its steps: a tool call, or what it says. Step n answers after n tool calls.
+// A subagent's task, for one host.
+const hosting = (host, others) =>
+  `The owner is choosing a host for a small Postgres database, about 20 GB, in the EU, for under €30 a month. Look at ${host} only: others cover ${others}. Find the plans that fit, with price, memory, disk, and backups: how often, kept how long, and what they cost. Hand back a table with a row for each plan.`;
+const order = `Here's the journey, from the click to the doorstep:
+
+\`\`\`mermaid
+flowchart LR
+  order[Order placed] --> paid{Paid?}
+  paid -->|yes| pack[Packed in the studio]
+  paid -->|no| remind[Reminder email]
+  remind --> paid
+  pack --> ship[Shipped with tracking]
+  ship --> door[At the customer's door]
+\`\`\`
+
+Packing is the slow step, about a day, so that's where a second pair of hands would help most.`;
+
 export const script = [
   { bot: "Juniper", when: "What's on this week?", steps: [{ say: "Here's your week:\n\n- **Tuesday:** dentist at 10:30. I'll remind you at 9.\n- **Wednesday:** Maya's birthday. The card is in the drawer by the door.\n- **Friday:** fly to Lisbon at 18:40, so leave by 15:30.\n\nThe weather looks dry all week, and warm by the weekend." }] },
   { bot: "Juniper", when: "plan a slow weekend in Lisbon", steps: [{ tool: "pages_write", input: { title: "A slow weekend in Lisbon", text: lisbon } }, { say: "I put it in a page you can tick off as you go: two easy days on foot, with a long lunch each day and the busy sights early, before the crowds.\n\nI've already ticked the tram and the coffee for Saturday, since you said you'd do those first. Want me to find a table for Sunday's dinner?" }] },
@@ -68,4 +85,13 @@ export const script = [
   { bot: "Ledger", when: "chart of this month's spending", steps: [{ tool: "pages_html", input: { title: "Spending this month", html: spending } }, { say: "Here's this month so far: $1,840, which is $160 under budget. Eating out is a little higher than last month, and everything else is about the same." }] },
   { bot: "Pixel", when: "garden party on Saturday", steps: [{ say: "A long table under the tree, a white cloth, and mismatched jars of wildflowers down the middle. Add string lights in the branches for after dark." }] },
   { bot: "Sprout", when: "garden party on Saturday", steps: [{ say: "Pot up lavender and rosemary in small terracotta pots for the table. They smell lovely, they're cheap, and guests can take one home." }] },
+  // Atlas hands a comparison to three subagents, which stay at work for the shot.
+  { bot: "Atlas", when: "Compare the three hosting offers", steps: [
+    { tool: "subagents_start", input: { title: "Hetzner's offers", task: hosting("Hetzner", "OVH and Scaleway") } },
+    { tool: "subagents_start", input: { title: "OVH's offers", task: hosting("OVH", "Hetzner and Scaleway") } },
+    { tool: "subagents_start", input: { title: "Scaleway's offers", task: hosting("Scaleway", "Hetzner and OVH") } },
+    { say: "I've handed this to three subagents, one for each host, so they can dig at once. I'll come back with the plans side by side, and what each says about backups, when they report." },
+  ] },
+  { bot: "Atlas", when: 'Your task, "', steps: [{ hold: true }] },
+  { bot: "Pixel", when: "how an order gets from our shop", steps: [{ say: order }] },
 ];

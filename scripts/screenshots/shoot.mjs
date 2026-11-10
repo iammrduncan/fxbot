@@ -52,7 +52,7 @@ async function main() {
 
   // Everything else, on an install with fxbot's plugins and the demo bots. The computer needs a container engine set
   // up for it, so it isn't here.
-  const plugins = ["pages", "chat-rooms", "messages", "permissions", "routines", "fresh", "dreams"].map((name) => join(root, "plugins", name));
+  const plugins = ["pages", "chat-rooms", "messages", "permissions", "routines", "fresh", "dreams", "subagents", "mermaid"].map((name) => join(root, "plugins", name));
   const fx = await fxbot(db, "world", key, plugins, model.embed);
   const w = await world(fx, model);
   // A page shows when it was saved: one fixed time, so a shot looks the same on every run.
@@ -96,6 +96,17 @@ async function main() {
     await pg.getByRole("dialog").getByRole("region", { name: "Sign in" }).waitFor();
   } });
   await shoot("memory", fx, "/settings/memory", { main: true, height: 440 });
+  // Atlas's subagents at work, and a diagram from Pixel. Shot last, so the scenes above stay as they were. Subagents
+  // get scientists' names at random, so theirs are set here, for a shot that's the same on every run.
+  await w.say("Atlas", "Compare the three hosting offers for our little database, and what each says about backups.");
+  db.sql("shots_world", "update plugin_subagents.subagents set name = (array['Curie', 'Hopper', 'Turing'])[id] where id <= 3");
+  await shoot("subagents", fx, at("Atlas"), { scale: 2, async then(pg) {
+    // The panel, which lists them.
+    const panel = pg.getByRole("button", { name: "Bot panel" });
+    if ((await panel.getAttribute("aria-expanded")) !== "true") await panel.click();
+  } });
+  await w.say("Pixel", "Draw how an order gets from our shop to the customer.");
+  await shoot("diagram", fx, at("Pixel"), { scale: 2 });
   await fx.stop();
 }
 
@@ -167,6 +178,8 @@ async function fxbot(db, name, key, plugins, embed) {
 async function scriptedModel() {
   const names = bots.map((b) => b.name);
   const text = (m) => (typeof m.content === "string" ? m.content : (m.content ?? []).map((p) => p.text ?? "").join(""));
+  const held = [];
+  cleanups.push(() => held.forEach((res) => res.destroy()));
   const server = createServer(async (req, res) => {
     let body = "";
     for await (const chunk of req) body += chunk;
@@ -199,6 +212,8 @@ async function scriptedModel() {
         const made = json.messages.slice(at + 1).filter((m) => m.role === "assistant" && m.tool_calls?.length).length;
         const step = entry.steps[made];
         if (step?.tool) call = { id: "call_" + randomBytes(4).toString("hex"), type: "function", function: { name: step.tool, arguments: JSON.stringify(step.input) } };
+        // A step that holds never answers, so its turn stays at work, as a subagent's does in its shot.
+        else if (step?.hold) return void held.push(res);
         else reply = step?.say ?? "Done.";
       }
     }
@@ -269,6 +284,7 @@ async function world(fx, model) {
   w.lisbon = items.find((i) => i.name.startsWith("A slow weekend"))?.id;
   w.chart = items.find((i) => i.name.startsWith("Spending this month"))?.id;
   w.room = room.id;
+  w.say = say;
   if (!w.lisbon || !w.chart) throw new Error(`The pages weren't written: ${items.map((i) => i.name).join(", ")}`);
   return w;
 }
