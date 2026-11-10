@@ -558,3 +558,31 @@ Built on 2026-11-10, on `release/0.9.0`. The core change is 27 lines in and 17 o
 - **Permissions with a real reviewer model,** on a subagent's calls.
 - **Several subagents on a real computer,** browsing and using the desktop at once, for whether 20 seconds of hold and a minute of waiting feel right.
 - **What a batch costs** on a real provider.
+
+## After the build
+
+The owner tried it in dev on 2026-11-10 and asked for more:
+- "subagents shoudl be given unique names when they are started. they should be able to communicate with the main thread as needed. They should get their own color on their name in the sidebar."
+- "something on the right sidebar is cutoff": a long title pushed the panel's list past its edge, hiding **Stop**.
+- "When subagents are enabled, by default if something is going to take a lot of work and digging into, the main thread should call the subagent and let the user know its working on it and will come back with a result later etc..."
+
+What changed, the same day:
+- **Names.** Each subagent gets a name from the phonetic alphabet, the owner's word: a bot's first is Alpha, then Bravo, Charlie, and on to Zulu, each the first that none in the bot's list has, working or ended in the last day, then Alpha 2. It's in migration `0002_names.sql`, which names earlier subagents in the order each bot started them. It's the session's label, so the computer shows "Ann · Bravo", and the tools, the report, the panel, the thread's header, and the card all use it. `subagents_stop` and `subagents_message` take a name or an id. A first build gave first names and named earlier rows `s` and their id, which the owner turned down.
+- **Colors.** Each name has its color, Alpha's, Bravo's, and on, among eight, so a list's names never share one until its ninth. It's drawn in the panel, the thread, and the card, with lighter shades in dark mode. A first build gave a color none of the working ones had, which left the ended ones all one color.
+- **Talking with the bot.**
+  - `subagents_tell({ text })`, only in a subagent's session, tells the bot's own chat what can't wait, as a message from the subagent's name. It joins the chat's turn or wakes it, framed as the subagent's words, with how to answer. At most five a subagent.
+  - `subagents_message({ to, text })`, from the bot's chat, reaches a working subagent at its next step. Both are `safe`: they reach nothing outside the bot.
+  - A subagent's rules say it can tell its chat, and that an answer may reach it as it works.
+- **A steer in a plugin's own session (core).** For the bot's message to reach a working subagent, `fx.chats.send` with `steer` now joins a turn running in a session of the plugin's own, as it does in the bot's own chat: core follows such a session's turns when the plugin steers there. Three lines in `deliver`. A send without `steer` still waits behind the running turn, as before.
+- **Handing off by default.** While the plugin is on for a bot, its own chat is told to hand work that takes a lot of digging to subagents, tell the owner it'll come back with the results, and carry on. The `handOff` setting, `on` by default, turns that off.
+- **The panel's width.** The list's grid may shrink below its longest title, which now ends in an ellipsis, and **Stop** stays in view.
+- **A lesson for building:** fxbot reloads a plugin from a local folder whenever a file in it changes. Edits to `plugins/subagents` in the main tree reloaded it in the owner's dev app, and cut off three subagents it was running. Later edits went into a copy of the branch first.
+
+**M9. After the build**
+- [x] Three started in one step get three names and colors of their own, the tool says each one's name, its session's label is its name, and a later one doesn't take a recent name.
+- [x] The hand-off line is in the bot's chat and not in a subagent's, and isn't there with `handOff` off. A subagent is told its name.
+- [x] A subagent's `subagents_tell` reaches the bot's chat as a message from its name, framed with how to answer, and the tool answers.
+- [x] The bot's `subagents_message` to a working subagent joins its turn: the subagent's next request has it, its thread has one turn, and it finishes.
+- [x] A message to one that ended is refused, `subagents_tell` from the bot's chat is refused, and a sixth tell is refused.
+- [x] A long title ends in an ellipsis in the panel, which fits its column with **Stop** in view, in light and dark, at 1280 and 390 pixels, with names in colors of their own.
+- [x] The earlier checks of starting one, the report, and the limits pass again with the core change.
