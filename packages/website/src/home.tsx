@@ -29,7 +29,7 @@ const facts: { shape: string; color: string; title: string; link: string; body: 
     shape: "heart",
     color: "pink",
     title: "Yours",
-    link: "/docs/tutorials/first-fxbot/",
+    link: "/docs/reference/under-the-hood/",
     body: <>Free and open source, on your own machine. One command installs it, and your bots, chats, files, and keys stay with you.</>,
   },
 ];
@@ -148,7 +148,13 @@ const questions: { question: string; link?: [string, string]; answer: ReactNode 
     answer: <>Not yet. fxbot has its own app, which installs on your phone and shows everything a bot does: its pages, its computer, its subagents, and the cards where it asks you first.</>,
   },
   {
+    question: "Can my family or team share it?",
+    link: ["/docs/explanation/security/#loopback-only-with-no-login", "Who can reach it"],
+    answer: <>It's made for one person. fxbot has no login of its own, so everyone who reaches it sees every bot and every chat.</>,
+  },
+  {
     question: "Is there a hosted version, or an account?",
+    link: ["/docs/reference/under-the-hood/", "Under the hood"],
     answer: <>No. It runs on your machine, and your bots, chats, files, and keys stay there.</>,
   },
   {
@@ -380,48 +386,6 @@ export function Home() {
               </li>
             ))}
           </ul>
-        </section>
-
-        <section className="mx-auto grid max-w-6xl gap-10 px-4 pt-20 sm:px-6 sm:pt-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-16">
-          <div>
-            <SectionTitle eyebrow="Who it's for" title="People who run their own machine" />
-            <div className="mt-5 grid max-w-2xl gap-4 text-pretty text-muted-foreground">
-              <p>
-                fxbot is for one person with a machine of their own: the computer under the desk, a home server, or a small VPS. It listens on loopback and has no login of its own, so whatever you put in front of it decides who reaches it, and everyone who does sees every bot and every chat. From your phone and other devices,{" "}
-                <a className="text-foreground underline underline-offset-4" href={href("/docs/how-to/reach-it-from-your-phone/")}>
-                  web pairing
-                </a>{" "}
-                is the recommended way in.
-              </p>
-              <p>There is no hosted version and no account to make. Bots, chats, files, and keys are stored on your machine. Each message goes to the provider its bot uses, or stays on your network with a local model server.</p>
-            </div>
-          </div>
-          <dl className="grid content-start gap-px overflow-hidden rounded-xl border bg-border text-sm">
-            {(
-              [
-                [
-                  "Machine",
-                  <>
-                    Your computer, a home server, or a small VPS:{" "}
-                    <a className="underline underline-offset-4" href={href("/docs/tutorials/first-fxbot/")}>
-                      what it runs on
-                    </a>
-                  </>,
-                ],
-                ["Runtime", "podman or docker, which setup.sh installs when neither is there"],
-                ["Records", "Postgres with pgvector, in a container, with every key and token sealed"],
-                ["Agents", "libfx, one agent per provider"],
-                ["Files", "One library of every file the chats hold, searched across every bot"],
-                ["Updates", "From Settings, with a backup first, and the release before when one doesn't start"],
-                ["Network", "127.0.0.1:8787; from other devices, web pairing, or Tailscale, SSH, or a proxy of your own"],
-              ] as [string, ReactNode][]
-            ).map(([term, detail]) => (
-              <div key={term} className="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 bg-background px-4 py-3">
-                <dt className="font-medium">{term}</dt>
-                <dd className="text-muted-foreground">{detail}</dd>
-              </div>
-            ))}
-          </dl>
         </section>
 
         <section className="mx-auto grid max-w-6xl gap-10 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center">

@@ -353,7 +353,8 @@ All answered by the owner on 2026-11-10:
 - **The routine shot** is 1024 by 800 and mostly an empty chat. It's cropped to 16:10 from the top, so its row lines up, and it sits in the second row, not the first.
 - **Get started:** in three columns the install command was cut off, so step 1 spans the row, and steps 2 and 3 sit under it. Its title is "From one command to your phone."
 - **The questions** don't link the Gateways stub, since a phase doc isn't for the public site.
-- **What it does** is six cards: bots and chats, any model, a computer of its own, routines, subagents, and on your phone. The library and updates are rows in "Who it's for," as Files and Updates.
+- **What it does** is six cards: bots and chats, any model, a computer of its own, routines, subagents, and on your phone.
+- **"Who it's for" left the home page** after the owner's review: "this seems off brand now", then "just move that bit to docs under reference section." Its facts are a reference page, [Under the hood](../../../packages/website/src/content/docs/docs/reference/under-the-hood.md): install, what it runs as, agents, data, updates, ways in, hosting, and that it's for one person. The home page's "Yours" fact links there. That it's for one person is a question of its own too, "Can my family or team share it?"
 
 **The rest:**
 - **The plugin directory** keeps "Plugins" as its heading, and only its `og:title` is "fxbot plugins," through the page's `head`.

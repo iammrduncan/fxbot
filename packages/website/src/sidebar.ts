@@ -100,6 +100,7 @@ export const topics: Topic[] = [
         title: "Reference",
         about: "Facts to look up: settings, paths, commands, providers, and changes.",
         pages: [
+          { slug: "reference/under-the-hood", label: "Under the hood" },
           { slug: "reference/configuration", label: "Configuration" },
           { slug: "reference/install-layout", label: "What setup.sh creates" },
           { slug: "reference/commands", label: "Commands" },
