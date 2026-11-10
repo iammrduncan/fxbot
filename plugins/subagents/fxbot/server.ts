@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import type { PluginApi } from "@fxbot/sdk";
 
 // Subagents: a bot hands work to helpers that run in the background, each the same bot in a session of the plugin's
-// own, labelled with its title. The subagents one turn starts report back together, in one message to the bot's own
+// own, labelled with its name. The subagents one turn starts report back together, in one message to the bot's own
 // chat, once the last of them has ended. A restart stops a subagent, which reports as stopped
-// (docs/phases/subagents.md).
+// (docs/_completed/phases/subagents.md).
 
 type Row = {
   id: number;
