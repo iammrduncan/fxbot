@@ -58,7 +58,7 @@
     },
     {
       "name": "web-pairing",
-      "description": "Your fxbot from your phone or any computer, at web.fxbot.sh, peer to peer and end-to-end encrypted, with nothing exposed.",
+      "description": "Your fxbot from your phone or any computer, at web.fxbot.sh, over a connection straight to it, paired once.",
       "note": "Connects to fxbot.sh's relay only once you pair a device, and finds the way through with Cloudflare's STUN.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/web-pairing"

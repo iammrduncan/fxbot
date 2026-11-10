@@ -1,9 +1,9 @@
 ---
 title: "Reach fxbot from your phone"
-description: "Open your own fxbot from a phone or any computer, at web.fxbot.sh, over a connection straight to it, with nothing exposed and no Tailscale."
+description: "Open your own fxbot from a phone or any computer, at web.fxbot.sh, over a connection straight to it, with no Tailscale."
 ---
 
-Open your own fxbot from a phone or any computer, at [web.fxbot.sh](https://web.fxbot.sh), over a connection straight to it, with nothing exposed and no Tailscale. You pair each device once, and it stays paired until you remove it.
+Open your own fxbot from a phone or any computer, at [web.fxbot.sh](https://web.fxbot.sh), over a connection straight to it, with no Tailscale. You pair each device once, and it stays paired until you remove it.
 
 You need the **web-pairing** plugin, which **Essentials** adds. Otherwise, add it from **Plugins**. It needs fxbot 0.8.0 or newer.
 

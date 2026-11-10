@@ -1,6 +1,6 @@
 # web-pairing
 
-A plugin for [fxbot](https://fxbot.sh): your fxbot from your phone or any computer, at [web.fxbot.sh](https://web.fxbot.sh), with nothing exposed and no Tailscale.
+A plugin for [fxbot](https://fxbot.sh): your fxbot from your phone or any computer, at [web.fxbot.sh](https://web.fxbot.sh), over a connection straight to it, with no Tailscale.
 
 - **Peer to peer.** A device reaches fxbot over a WebRTC data channel. fxbot.sh passes only the sealed handshake, through a relay that can read none of it and stores nothing.
 - **fxbot's own page.** The device runs the same page and plugins it would on the machine, from fxbot itself.
