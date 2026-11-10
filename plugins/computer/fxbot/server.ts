@@ -581,21 +581,22 @@ export default async function setup(fx: PluginApi) {
   // Turns at a computer's desktop and its terminal, for actors working at once, such as a bot's subagents. An actor
   // holds one from its call until 20 seconds after its last, or its turn's end; another's call waits up to a minute. A
   // room's bots take turns already, so they never wait.
-  const holds = new Map<string, { actor: string; name: string; turn: string; until: number }>();
+  const holds = new Map<string, { actor: Actor; turn: string; until: number }>();
   async function take(key: string, part: "desktop" | "terminal", actor: Actor, turn: string, signal: AbortSignal) {
     const id = `${key}:${part}`;
     for (const end = Date.now() + 60_000; ; await new Promise((r) => setTimeout(r, 500))) {
       const held = holds.get(id);
-      if (!held || held.actor === actor.id || held.until < Date.now()) {
-        holds.set(id, { actor: actor.id, name: await nameOfActor(actor), turn, until: Infinity });
+      // Taken with no wait between the look and the hold, so two calls arriving together can't both take it.
+      if (!held || held.actor.id === actor.id || held.until < Date.now()) {
+        holds.set(id, { actor, turn, until: Infinity });
         return null;
       }
-      if (Date.now() > end || signal.aborted) return `${held.name} is using the ${part}. Work in the shell, or in your browser tab, and try the ${part} again in a minute.`;
+      if (Date.now() > end || signal.aborted) return `${await nameOfActor(held.actor)} is using the ${part}. Work in the shell, or in your browser tab, and try the ${part} again in a minute.`;
     }
   }
   function letGo(key: string, part: "desktop" | "terminal", actor: Actor) {
     const held = holds.get(`${key}:${part}`);
-    if (held?.actor === actor.id) held.until = Date.now() + 20_000;
+    if (held?.actor.id === actor.id) held.until = Date.now() + 20_000;
   }
   fx.on("turn.end", (event) => {
     for (const [id, held] of holds) if (held.turn === event.messageId) holds.delete(id);
