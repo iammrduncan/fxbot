@@ -1,9 +1,9 @@
 # Set up fxbot: instructions for an AI agent
 
-You are an AI agent helping a person set up fxbot on a Linux machine. fxbot is their own bot: an
-app they run on a machine of theirs, with bots, chats, memories, and plugins, on hosted models or
-local ones. Its documentation is https://fxbot.sh/docs/, and all of it in one file is
-https://fxbot.sh/llms-full.txt.
+You are an AI agent helping a person set up fxbot on a Linux machine, or on Windows in WSL 2. fxbot
+is AI assistants that do real work, built their way: an app they run on a machine of theirs, with
+bots, chats, memories, and plugins, on hosted models or local ones. Its documentation is
+https://fxbot.sh/docs/, and all of it in one file is https://fxbot.sh/llms-full.txt.
 
 Follow these steps in order. Run the commands yourself where you can, say what each one does
 before you run it, and stop to ask the person when a step needs their choice or their hands.
@@ -28,8 +28,10 @@ fxbot needs:
 
 - Linux with systemd, on x86_64 or arm64, with apt, dnf, zypper, or pacman: Debian, Ubuntu,
   Fedora, AlmaLinux and the other RHEL rebuilds, openSUSE, Arch, or a distro built on one of them.
-  It doesn't run on macOS or Windows. If that is what you are on, ask the person which Linux
-  machine to use, such as a home server or a small VPS, and how you can reach it.
+  On Windows, it runs in WSL 2's Ubuntu, with systemd on: add `[boot]` and `systemd=true` to
+  /etc/wsl.conf, then run `wsl --shutdown` in Windows and open Ubuntu again. It doesn't run on
+  macOS itself. If that is what you are on, ask the person which Linux machine to use, such as a
+  home server, a small VPS, or a Linux VM, and how you can reach it.
 - curl, an internet connection, and sudo. In a root shell with no sudo, leave `sudo` out below.
 - About 1 GB of available memory (the `available` column of `free -h`) and 3 GB free in /var/lib.
   Its images and a model take about 2 GB.
@@ -110,9 +112,14 @@ Piped or run without a terminal, it prints the last 100 lines and ends.
 
 ## 5. Ask how the person will reach it
 
-Ask where they'll use it. A machine with no screen, such as a VPS, needs one of the last two.
+Ask where they'll use it. A machine with no screen, such as a VPS, needs SSH at least once, to
+open fxbot's Settings.
 
 - **On this machine:** open http://127.0.0.1:8787 in a browser here.
+- **From their phone and other devices:** web pairing is the recommended way. Once fxbot is set up
+  (step 6), they add **Web pairing** from **Plugins**, and pair each device once at
+  https://web.fxbot.sh, over a connection straight to fxbot, with nothing on this machine opened.
+  See https://fxbot.sh/docs/how-to/reach-it-from-your-phone/
 - **From their own computer, over SSH:** give them this to run on their computer, and keep it
   running. fxbot is then at http://127.0.0.1:8787 on that computer, and on nothing else:
 
@@ -120,8 +127,8 @@ Ask where they'll use it. A machine with no screen, such as a VPS, needs one of 
   ssh -N -L 8787:127.0.0.1:8787 <user>@<machine>
   ```
 
-- **From other devices, such as a phone:** Tailscale is the recommended way. It needs Tailscale on
-  this machine and on their devices, in one tailnet, with HTTPS turned on. Ask before you install
+- **With Tailscale,** if they use it already: it needs Tailscale on this machine and on their
+  devices, in one tailnet, with HTTPS turned on. Ask before you install
   it, and leave its sign-in to the person. Then:
 
   ```sh
@@ -139,6 +146,8 @@ The rest is for the person, in the app, because it takes their sign-ins. Tell th
 1. Open fxbot. It walks them through plugins, a provider, and their first bot. See
    https://fxbot.sh/docs/tutorials/first-fxbot/#set-up-fxbot
 2. Say hello to their bot.
+3. For their phone, add **Web pairing** from **Plugins**, and pair it at https://web.fxbot.sh. See
+   https://fxbot.sh/docs/how-to/reach-it-from-your-phone/
 
 Then tell them what you did: the version, the address, and what the machine now has. Point them at:
 

@@ -409,11 +409,12 @@ EOF
 
   say "fxbot ${tag#v} runs on http://127.0.0.1:$port"
   echo "Open it there, or reach it:"
+  echo "  from your phone: add Web pairing in Plugins (https://fxbot.sh/docs/how-to/reach-it-from-your-phone/)"
   echo "  from your computer, over SSH:  ssh -N -L $port:127.0.0.1:$port <you>@<this machine>"
   if command -v tailscale >/dev/null; then
-    echo "  from your phone, with Tailscale:  sudo tailscale serve --bg $port"
+    echo "  with Tailscale:  sudo tailscale serve --bg $port"
   else
-    echo "  from your phone, with Tailscale (https://tailscale.com/download/linux):  sudo tailscale serve --bg $port"
+    echo "  with Tailscale (https://tailscale.com/download/linux):  sudo tailscale serve --bg $port"
   fi
   echo "Settings shows each new release, with an Update button. To uninstall: sudo fxbot uninstall"
   if [ "$moving" = yes ]; then

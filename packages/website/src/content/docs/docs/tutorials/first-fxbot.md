@@ -1,14 +1,15 @@
 ---
 title: "Your first fxbot"
-description: "In this tutorial you install fxbot on a Linux machine, open it on your phone, and chat with a bot you made."
+description: "In this tutorial you install fxbot on a machine of yours, make a bot, and chat with it there and on your phone."
 ---
 
-In this tutorial you install fxbot on a Linux machine, open it on your phone, and chat with a bot you made.
+In this tutorial you install fxbot on a machine of yours, make a bot, and chat with it there and on your phone.
 
 You need:
 
-- a Linux machine with systemd, where you can use `sudo`: Debian 12 or 13, Ubuntu 22.04 or 24.04, Fedora, AlmaLinux 9 or 10, openSUSE Tumbleweed or Leap 16, Arch, or a distro built on one of them. It needs an x86_64 or arm64 CPU, 3 GB free in `/var/lib`, and 1 GB of memory free, more for each bot's computer. On a Mac or on Windows, use a Linux machine, or a Linux VM.
-- [Tailscale](https://tailscale.com/download) on that machine and on your phone, in the same tailnet, with [HTTPS turned on](https://tailscale.com/kb/1153/enabling-https). This tutorial uses it to reach fxbot from your phone, the recommended way; fxbot itself doesn't need it.
+- a Linux machine with systemd, where you can use `sudo`: Debian 12 or 13, Ubuntu 22.04 or 24.04, Fedora, AlmaLinux 9 or 10, openSUSE Tumbleweed or Leap 16, Arch, or a distro built on one of them. On Windows, WSL 2's Ubuntu works, with systemd on ([how](/docs/how-to/fix-an-install/)). On a Mac, use a Linux VM. It needs an x86_64 or arm64 CPU, 3 GB free in `/var/lib`, and 1 GB of memory free, more for each bot's computer.
+- a browser on that machine, or, for a server with no screen, SSH to it from your computer
+- a phone, for the last part
 - an account to sign in with, such as a ChatGPT plan or OpenRouter, or a key from a provider such as OpenAI or Groq
 
 ## Install fxbot
@@ -24,8 +25,9 @@ The script checks the machine first, and stops with what to do if it can't insta
 ```
 fxbot <version> runs on http://127.0.0.1:8787
 Open it there, or reach it:
+  from your phone: add Web pairing in Plugins (https://fxbot.sh/docs/how-to/reach-it-from-your-phone/)
   from your computer, over SSH:  ssh -N -L 8787:127.0.0.1:8787 <you>@<this machine>
-  from your phone, with Tailscale:  sudo tailscale serve --bg 8787
+  with Tailscale:  sudo tailscale serve --bg 8787
 Settings shows each new release, with an Update button. To uninstall: sudo fxbot uninstall
 ```
 
@@ -43,26 +45,21 @@ sudo fxbot status
 
 It names the version, the engine, and where the local embedder runs, then lists three containers, `fxbot`, `db`, and `embed`.
 
-## Reach it from your phone
+## Open it
 
-Using fxbot only on this machine? Open `http://127.0.0.1:8787` there, and carry on at the next step. Otherwise, serve it on your tailnet:
+On the machine, open `http://127.0.0.1:8787` in a browser. fxbot shows **Set up fxbot**.
+
+On a server with no screen, run this on your computer instead, and keep it running:
 
 ```sh
-sudo tailscale serve --bg 8787
+ssh -N -L 8787:127.0.0.1:8787 <you>@<the machine>
 ```
 
-Tailscale prints the address it serves, `https://<machine>.<tailnet>.ts.net`. Open that address on your phone. fxbot shows **Set up fxbot**.
-
-Install it as an app:
-
-- **Android, in Chrome:** open Chrome's menu, and tap **Add to Home screen** or **Install app**.
-- **iPhone:** tap **Share**, then **Add to Home Screen**, and leave Open as Web App on.
-
-Open fxbot from the home screen. It opens on its own, without the browser's bars.
+While it runs, open `http://127.0.0.1:8787` on your computer.
 
 ## Set up fxbot
 
-The first time you open it, fxbot shows **Essentials**: the plugins most people want, each with what it gives you. One of them, the computer, sets up a computer engine on this machine, then restarts fxbot, and it says so there. Web pairing, which opens fxbot on your phone, isn't among them: add it from **Plugins** when you want it.
+The first time you open it, fxbot shows **Essentials**: the plugins most people want, each with what it gives you. One of them, the computer, sets up a computer engine on this machine, then restarts fxbot, and it says so there. Web pairing, which puts fxbot on your phone, isn't among them: you'll add it at the end.
 
 Tap **Set up Essentials**. fxbot adds them one by one, and moves on by itself. To pick your own instead, tap **Choose my own**, where they're already ticked, and untick what you don't want. Plugins you leave out are under **Plugins** for later.
 
@@ -97,17 +94,33 @@ If you leave partway, fxbot comes back to the same step. **Skip for now** skips 
 
 Send `Hello! What can you do?`. While Scout works, its blob in the sidebar hops and looks around, and the reply streams in as it is written.
 
-Now close the app and open it again. The chat is still there, because it lives on the server, not in the page. A reply still being written when you leave carries on without you.
+Now reload the page. The chat is still there, because it lives on the server, not in the page. A reply still being written when you leave carries on without you.
 
 ## Give it instructions
 
 Open the bot panel with the button at the top right of the chat, then **Edit**. Under **Instructions**, write `Answer in one short paragraph.` and tap **Save**. Ask Scout something else, and notice the shorter reply.
 
+## Put it on your phone
+
+Web pairing opens your fxbot at [web.fxbot.sh](https://web.fxbot.sh), on your phone, over a connection straight to it, away from home too.
+
+1. In fxbot, open **Plugins**, find **Web pairing**, and add it.
+2. On your phone, open web.fxbot.sh and install it:
+   - **iPhone:** in Safari, tap **Share**, then **Add to Home Screen**. Open fxbot from the Home Screen.
+   - **Android:** in Chrome, tap **Install app** in its menu, and open the app.
+3. In fxbot, open **Settings** › **Web pairing**, and choose **Pair a device**. It shows a code and a QR code.
+4. On your phone, in the app, choose **Pair a device**, and type the code. On Android, **Scan the QR code** scans it instead.
+5. Both screens show six digits. Check they're the same, then choose **Approve** in fxbot.
+
+The phone says **Paired**. Tap **Open**, and Scout is there. Send it a message: the reply streams in as it did on the machine.
+
+To check it'll connect away from home, see **Settings** › **Web pairing** › **Reachability**. A network that won't connect directly has [other ways](/docs/how-to/when-a-device-cant-connect/).
+
 ## What you have now
 
-A release of fxbot, served on your tailnet and installed on your phone, with a provider and a bot that keeps its chat. From here:
+A release of fxbot, on your machine and paired with your phone, with a provider and a bot that keeps its chat. From here:
 
 - [Add a skill](/docs/how-to/add-a-skill/) to give your bots instructions for a kind of task.
 - [Add an MCP server](/docs/how-to/add-an-mcp-server/) to give your bots tools.
-- [Serve fxbot at its own name](/docs/how-to/tailscale-service/), such as `bot.<tailnet>.ts.net`, or [reach it another way](/docs/how-to/reach-it/).
+- [Pair another device](/docs/how-to/pair-another-device/), so a phone that loses its pairing can pair again from anywhere, or [reach it another way](/docs/how-to/reach-it/), such as Tailscale.
 - Read about [bots, chats, memories, and the library](/docs/explanation/bots-and-chats/), and the [security model](/docs/explanation/security/).

@@ -24,7 +24,7 @@ The quickest test. A phone that can't connect on cellular often connects on Wi-F
 "This network blocks UDP" means a STUN server never answered. A direct connection needs UDP on both sides, so nothing in this list connects through it but these:
 
 1. **A TURN server of your own, over TLS on port 443,** which looks like web traffic. See [Run your own TURN server](/docs/how-to/run-your-own-turn/).
-2. **Tailscale,** whose relays run over HTTPS. See [Reach it with Tailscale](/docs/how-to/reach-it/#with-tailscale-recommended).
+2. **Tailscale,** whose relays run over HTTPS. See [Reach it with Tailscale](/docs/how-to/reach-it/#with-tailscale).
 
 When your fxbot's side says it, its own network blocks UDP: check the machine's firewall lets UDP out.
 

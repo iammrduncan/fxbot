@@ -101,6 +101,7 @@ Each bullet opens with a bold sentence that says what the owner gets, then follo
 
 ```md
 fxbot v<version> is out!
+fxbot: AI assistants that do real work, built your way.
 
 https://fxbot.sh/docs/reference/changelog/
 
@@ -114,6 +115,7 @@ Changes:
 ```
 
 - The first line must be exactly `fxbot v<version> is out!`, or the release workflow refuses to publish.
+- The second line says what fxbot is, in the home page's own headline, so a post shared on its own makes sense to someone who's never heard of it. When the headline changes, so does this line.
 - Include **Before upgrading** only when the changelog has one, and keep it above **Changes**. Settings' box is small, and a warning at the bottom goes unseen.
 - Write one line for each thing an owner would notice, newest headline first. Leave out developer-only bullets, unless a plugin author must act.
 - Use plain Markdown that reads the same on GitHub and in Discord. Write no tables, no nested lists, and no bold.

@@ -2,9 +2,13 @@
 
 Join the Hackers in the Loop community on [Discord](https://discord.gg/3Qs2uejUf9) to talk about fxbot, share what you build with it, and get help.
 
-fxbot is your bot, built and configured how you want it. It starts simple, with a lean, fast core: bots, their chats, and their files. Make each bot yours, from its look and instructions to its model and tools. Grow fxbot with only the plugins you want: skills, MCP servers, and plugins that change the app itself.
+fxbot is AI assistants that do real work, built your way. Each one chats, remembers, works on a computer of its own, and runs tasks on a schedule. Pick its model, hosted or local, its look, and what it can do, and talk to it from any browser or the fxbot app on your phone. It's an open alternative to OpenClaw, Hermes Agent, Grok Bot, Muse, Claude Duet, and OpenAI's dots: free and open source, lighter, fully featured, and made to be good to use.
 
-fxbot is local first. One Node server and Postgres run on your own machine, and the browser is the UI on desktop and mobile. [libfx](https://fx.sh/docs/lib) sends each chat to the provider its bot uses: a local model server such as Ollama or LM Studio, a key for one of about 30 gateways, labs, and clouds, or an account you sign in to: ChatGPT, Grok, OpenRouter, Hugging Face, or OrcaRouter.
+- **Any model.** Sign in with ChatGPT, Grok, or OpenRouter, add a key for Claude, Gemini, or about 30 others, or run one with Ollama or LM Studio. Each bot can use a different one.
+- **On your phone.** The fxbot app, away from home too, with [web pairing](https://fxbot.sh/docs/how-to/reach-it-from-your-phone/). No VPN needed.
+- **Yours.** One command installs it on your own machine, and your bots, chats, files, and keys stay with you. Add only what you want them to do, as plugins: a computer of their own, routines, subagents, pages, and more.
+
+Under the hood, one Node server and Postgres run on your machine, and the browser is the UI on desktop and mobile. [libfx](https://fx.sh/docs/lib) sends each chat to the provider its bot uses.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="packages/website/public/shots/hero-desktop-dark.png">
@@ -58,8 +62,8 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Operations](docs/_completed/phases/operations.md) (core; 0.8.0): the computer on every engine, Fedora, AlmaLinux, openSUSE, and Arch beside Debian and Ubuntu, `setup.sh` checks before it changes anything, another port, and `fxbot backup` and `fxbot uninstall`
 - [x] [Providers v2](docs/_completed/phases/providers-v2.md) (core; 0.8.0): an Add provider page that leads with sign-ins (ChatGPT/Codex, Grok, OpenRouter, Hugging Face, OrcaRouter), walks through making a key for each popular gateway, takes the clouds' own sign-ins, and leads first-run setup, with docs for each provider
 - [x] [Subagents](docs/_completed/phases/subagents.md) (plugin, with a session label in core; 0.9.0): a bot starts helpers that work in the background with its tools, sharing its computer as a room's bots do, their reports come back to its chat together, and its panel lists them, each opening to its thread
+- [x] [First impressions](docs/_completed/phases/first-impressions.md) (site and docs, no app code; on `main` after 0.9.0): the link preview, home page, README, and tutorial say what fxbot is, "AI assistants that do real work. Built your way.", that it takes any model, hosted or local, and that phones use web pairing, with answers to what people ask first
 - [x] [Mermaid](docs/_completed/phases/plugin-mermaid.md) (plugin, with a code-block hook in core; 0.9.0): the Mermaid diagrams bots write draw in replies, pages, rooms, and the library, with Pele, in the app's own look
-- [ ] [First impressions](docs/phases/first-impressions.md) (site and docs, no app code): the link preview, home page, README, and tutorial say what fxbot is, that it takes any model, hosted or local, and that phones use web pairing, not Tailscale, with answers to the questions people ask
 - [ ] [Gateways](docs/phases/gateways.md) (plugins, with a small core hook): talk to bots from the chat apps you already use, as the owner, in the same conversation the app shows
 - [ ] [Telegram and Discord](docs/phases/telegram-and-discord.md) (plugins): the first two gateways
 - [ ] [Distribution](docs/phases/distribution.md) (core; after 0.8.0): the main install, one download for Linux, macOS, and Windows that brings its own Postgres and embedder and a Linux machine for the computer, and later the desktop app; the container release is for hosting
@@ -120,7 +124,9 @@ Running it again finishes an install that stopped, and leaves a working one alon
 
 fxbot listens on 127.0.0.1:8787 and has no login of its own. On the machine itself, open `http://127.0.0.1:8787`: everything works there, installing the app included.
 
-From your other devices, [Tailscale](https://tailscale.com) is the recommended way. It adds HTTPS, which a phone needs to install the app, and only your own devices can reach fxbot. Give it the machine's own address:
+From your phone and other devices, web pairing is the recommended way: add **Web pairing** from **Plugins**, and pair each device once at [web.fxbot.sh](https://web.fxbot.sh), over a connection straight to your fxbot ([Reach fxbot from your phone](https://fxbot.sh/docs/how-to/reach-it-from-your-phone/)).
+
+[Tailscale](https://tailscale.com) works too. It adds HTTPS, which a phone needs to install the app, and only your own devices can reach fxbot. Give it the machine's own address:
 
 ```sh
 sudo tailscale serve --bg 8787       # https://<machine>.<tailnet>.ts.net

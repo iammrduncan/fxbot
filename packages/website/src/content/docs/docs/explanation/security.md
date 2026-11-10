@@ -7,7 +7,7 @@ fxbot is built for one person's machine. It keeps every secret on the server, se
 
 ## Loopback only, with no login
 
-fxbot listens on the machine's 127.0.0.1 and has no accounts, so what sits in front of it decides who gets in. On the machine itself, that is whoever uses that machine. Through Tailscale, the recommended way in, it is your tailnet's access rules: Tailscale already knows each device and each person, so a second login in fxbot would be one more password guarding the same door, and a weaker one.
+fxbot listens on the machine's 127.0.0.1 and has no accounts, so what sits in front of it decides who gets in. On the machine itself, that is whoever uses that machine. Through web pairing, the recommended way in, it is the devices you've paired, each with a key of its own that you approved. Through Tailscale, it is your tailnet's access rules. Either way, each device is already known, so a second login in fxbot would be one more password guarding the same door, and a weaker one.
 
 The cost is that whoever reaches the address can use all of fxbot: every bot, every chat, every provider. So fxbot should never be open to a network directly, through port forwarding or [Tailscale Funnel](https://tailscale.com/kb/1223/funnel), and any other way in, such as a reverse proxy, needs a login of its own ([Reach it from other devices](/docs/how-to/reach-it/)).
 
