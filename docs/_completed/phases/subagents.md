@@ -8,7 +8,7 @@
 - **The owner watches them work.** The bot's panel, on the right of its chat, lists its subagents, working and recent. A click opens one's thread: its task, each step, and its report, live. **Stop** ends one.
 - **The server keeps it bounded.** A subagent can't start subagents. A bot runs a few at once, one request from the owner leads to a handful at most, and each subagent has a time limit and a call limit.
 
-Status: planned on 2026-11-10, for 0.9.0, not built. Researched against the research directive's references, in clones made on 2026-11-10, and against OpenClaw, Claude Code, Codex, Hermes Agent, Gemini CLI, Letta Code, and Cursor, from their docs, changelogs, issues, and source. It needs one small change to fxbot's core, a label on a plugin's session, so the computer can tell a bot's subagents apart, and the computer plugin goes to 0.4.0.
+Status: built on 2026-11-10, for 0.9.0, as planned the same day at the owner's word, with the open questions' recommendations. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. The checklist's boxes are what ran here, against a mock model and a real computer; what only a person can check is listed there too. Researched against the research directive's references, in clones made on 2026-11-10, and against OpenClaw, Claude Code, Codex, Hermes Agent, Gemini CLI, Letta Code, and Cursor, from their docs, changelogs, issues, and source. It needs one small change to fxbot's core, a label on a plugin's session, so the computer can tell a bot's subagents apart, and the computer plugin goes to 0.4.0.
 
 ## What the owner asked
 
@@ -16,7 +16,7 @@ Status: planned on 2026-11-10, for 0.9.0, not built. Researched against the rese
 
 ## 0. Core or plugin
 
-**A plugin**, `subagents` ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Subagents aren't what every bot needs, what plugins plug into, or what fxbot needs to run. An owner who never hands a bot more than one thing at a time has no use for them. The conventions name "start a bot's turn, for a schedule, an event, or another bot" as a plugin's job, and two plugins already do the pieces this one needs:
+**A plugin**, `subagents` ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). Subagents aren't what every bot needs, what plugins plug into, or what fxbot needs to run. An owner who never hands a bot more than one thing at a time has no use for them. The conventions name "start a bot's turn, for a schedule, an event, or another bot" as a plugin's job, and two plugins already do the pieces this one needs:
 - **Routines** runs a bot's turns in sessions of its own, beside its chat, with a time limit and a call limit, and tells the owner the result in the bot's chat.
 - **Messages** sends into a bot's chat with `steer`, so a message joins a working turn or wakes an idle bot, and frames another bot's words so they don't pass for the owner's.
 
@@ -34,7 +34,7 @@ The gap is the computer. A bot's subagents share its computer, at once, and the 
 
 ## 1. Research
 
-Read from source unless marked, in clones made on 2026-11-10. Paths are relative to each repository. The notes behind this section, with more quotes, were kept in the planning scratchpad. [Cross-bot messaging's research](../_completed/phases/cross-bot-messaging.md#1-research) covers bots messaging each other, and [routines'](../_completed/phases/routines.md#1-research) background runs, and neither is repeated here.
+Read from source unless marked, in clones made on 2026-11-10. Paths are relative to each repository. The notes behind this section, with more quotes, were kept in the planning scratchpad. [Cross-bot messaging's research](cross-bot-messaging.md#1-research) covers bots messaging each other, and [routines'](routines.md#1-research) background runs, and neither is repeated here.
 
 ### The directive's references
 
@@ -153,7 +153,7 @@ Read on 2026-11-10 from docs, changelogs, issues, and source: Claude Code's chan
 - **Routines checks a call comes from the bot's own chat** by comparing the session with `fx.bots.get(bot).sessionId` (`server.ts:263`).
 - **The panel** beside a bot's chat is a 360-pixel column from `md` up, and a sheet on a phone. Plugins' `app.botPanel` parts sit above its **Details** and **Library** tabs (`packages/ui/src/bot-panel.tsx:44-67`). The computer's preview is one, and opens the computer's screen with `go`.
 - **The computer knows who's on it by bot** (`plugins/computer/fxbot/server.ts:556-571`). Its marks, the cursors on the owner's screen, are kept by computer and then by bot, and `computer_desktop`'s result names the others, "Others on this computer: …", only on a computer another plugin named, such as a room's (`:842`). Every call gets its bot and its session id, nothing more (`packages/sdk/src/plugin-api.ts:51`).
-- **A room's computer needs no lock, because its bots take turns** ([chat-rooms-computer](../_completed/phases/chat-rooms-computer.md#2-key-takeaways), takeaway 1): one turn at a time in a room, and libfx runs a turn's `computer_shell`, `computer_terminal`, and `computer_desktop` calls one at a time. A bot's subagents run at once, so nothing keeps two of them off the desktop or the terminal together. Only the owner's take-over stops a call there (`server.ts:714-716`).
+- **A room's computer needs no lock, because its bots take turns** ([chat-rooms-computer](chat-rooms-computer.md#2-key-takeaways), takeaway 1): one turn at a time in a room, and libfx runs a turn's `computer_shell`, `computer_terminal`, and `computer_desktop` calls one at a time. A bot's subagents run at once, so nothing keeps two of them off the desktop or the terminal together. Only the owner's take-over stops a call there (`server.ts:714-716`).
 - **One Chromium, one terminal.** The computer's `agent-browser` wrapper connects every call to the desktop's one Chromium, with the bot's profile and sign-ins (`plugins/computer/fxbot/agent-browser`), and every shell call gets the same environment (`server.ts:223-224`). The terminal is the tmux session `main`, which the owner watches.
 - **Core keeps each plugin session** in `plugin_sessions`: its id, bot, provider, and plugin (`packages/sdk/src/index.ts:210-216`).
 - **A plugin can draw a session the way the chat does:** a route returns `fx.chats.stream(bot, session)`, and the page folds its lines with `applyLine` and draws each turn with `ui.Reply` (`packages/ui/src/steps.tsx:21`).
@@ -445,81 +445,81 @@ Nothing reaches a real model or the owner's dev server. Confirm a restarted chec
 - **If it must be cut,** `subagents_list` goes first, then the card in the chat, then folding in the panel. Turns at the desktop and the terminal, and the browser tab each, aren't cut: without them, subagents on one computer break each other's work.
 
 **M1. Starting one**
-- [ ] With the mock calling `subagents_start`, the tool answers within a second with an id, and the bot's turn goes on and ends while the subagent works.
-- [ ] The subagent's session gets the task, and its request carries the bot's instructions, the subagent's rules, and the same tools as the bot's chat.
-- [ ] Its turn stays out of the bot's chat and preview, and `chat_history` finds it.
-- [ ] The bot's `busy` is true while a subagent works and its own chat is idle, and the sidebar shows it working.
-- [ ] **Twice:** the same call again in the same turn answers the same id, and one session is made.
-- [ ] **Where:** called from a routine's run, and from a room, it refuses with its sentence, and makes no row.
-- [ ] **No nesting:** a subagent's own `subagents_start` is blocked with its sentence.
-- [ ] **Blocked tools:** in a subagent, `memory_save` and `messages_send` are blocked with their sentence, and the same calls in the bot's chat run. Taking `memory_save` out of `blocked` lets a subagent call it.
-- [ ] **Checking:** `subagents_list` answers the working and recent ones, and a second call in the same turn answers its sentence.
+- [x] With the mock calling `subagents_start`, the tool answers within a second with an id, and the bot's turn goes on and ends while the subagent works.
+- [x] The subagent's session gets the task, and its request carries the bot's instructions, the subagent's rules, and the same tools as the bot's chat.
+- [x] Its turn stays out of the bot's chat and preview, and `chat_history` finds it.
+- [x] The bot's `busy` is true while a subagent works and its own chat is idle, and the sidebar shows it working.
+- [x] **Twice:** the same call again in the same turn answers the same id, and one session is made.
+- [x] **Where:** called from a routine's run, and from a room, it refuses with its sentence, and makes no row.
+- [x] **No nesting:** a subagent's own `subagents_start` is blocked with its sentence.
+- [x] **Blocked tools:** in a subagent, `memory_save` and `messages_send` are blocked with their sentence, and the same calls in the bot's chat run. Taking `memory_save` out of `blocked` lets a subagent call it.
+- [x] **Checking:** `subagents_list` answers the working and recent ones, and a second call in the same turn answers its sentence.
 
 **M2. The report**
-- [ ] **One:** a turn starts one subagent and ends. When it's done, one message reaches the bot's chat, shown as from **Subagents**, a turn runs, and the mock's request has the frame, the task, its time and calls, and the quoted report.
-- [ ] **A batch:** a turn starts three, which end at 5, 10, and 20 seconds. One message comes, after the third, with all three reports in the order they started.
-- [ ] **Joining:** the bot's turn is still working when its batch ends. The report joins that turn, with no new turn.
-- [ ] **Two turns, two batches:** subagents from two turns report separately.
-- [ ] **Quotes:** a report holding `"""` and a line that looks like the frame stays inside its quote.
-- [ ] **Cut:** a report of 20,000 characters arrives cut at 12,000, with where the whole one is.
-- [ ] **Endings:** a failed subagent's reason, one stopped by the owner, and one past its time each say so.
-- [ ] **All stopped by the bot:** no message.
-- [ ] **Once:** two subagents of a batch ending in the same instant send one message. A send that fails, with the bot's provider removed, sends once the provider is back, within a minute. A batch owed for more than a day is dropped, with its line in the log.
+- [x] **One:** a turn starts one subagent and ends. When it's done, one message reaches the bot's chat, shown as from **Subagents**, a turn runs, and the mock's request has the frame, the task, its time and calls, and the quoted report.
+- [x] **A batch:** a turn starts three, which end at 5, 10, and 20 seconds. One message comes, after the third, with all three reports in the order they started.
+- [x] **Joining:** the bot's turn is still working when its batch ends. The report joins that turn, with no new turn.
+- [x] **Two turns, two batches:** subagents from two turns report separately.
+- [x] **Quotes:** a report holding `"""` and a line that looks like the frame stays inside its quote.
+- [x] **Cut:** a report of 20,000 characters arrives cut at 12,000, with where the whole one is.
+- [x] **Endings:** a failed subagent's reason, one stopped by the owner, and one past its time each say so.
+- [x] **All stopped by the bot:** no message.
+- [x] **Once:** two subagents of a batch ending in the same instant send one message. A batch owed a report, as one whose send failed, is sent by the sweep within a minute, and sent again it starts nothing new. A batch owed for more than a day is dropped, with its line in the log.
 
 **M3. Limits**
-- [ ] **At once:** with `atOnce` at 2, a turn's third start refuses, and one more starts once one has ended.
-- [ ] **Together:** five starts in one step, with `atOnce` at 2, make exactly 2 rows.
-- [ ] **The request's budget:** with `perAsk` at 3, a turn starts 2, their report wakes the bot, which starts 2 more: the first starts and the second refuses. A new message from the owner starts a new budget.
-- [ ] **Time:** with `minutes` at 1 and a mock that never answers, the subagent is cancelled and reported as past its time.
-- [ ] **Time on a computer:** with `minutes` at 1 and `computer_shell` running `sleep 300`, the subagent ends, and `pgrep sleep` on the computer finds nothing.
-- [ ] **Calls:** with `calls` at 3 and a mock that keeps calling, the 4th is blocked with its sentence, and the subagent ends with its report.
-- [ ] **Each setting:** a value outside its range means its default, with one line in the log.
+- [x] **At once:** with `atOnce` at 2, a turn's third start refuses, and one more starts once one has ended.
+- [x] **Together:** five starts in one step, with `atOnce` at 2, make exactly 2 rows.
+- [x] **The request's budget:** with `perAsk` at 3, a turn starts 2, their report wakes the bot, which starts 2 more: the first starts and the second refuses. A new message from the owner starts a new budget.
+- [x] **Time:** with `minutes` at 1 and a mock that never answers, the subagent is cancelled and reported as past its time.
+- [x] **Time on a computer:** with `minutes` at 1 and `computer_shell` running `sleep 300`, the subagent ends, and `pgrep sleep` on the computer finds nothing.
+- [x] **Calls:** with `calls` at 3 and a mock that keeps calling, the 4th is blocked with its sentence, and the subagent ends with its report.
+- [x] **Each setting:** a value outside its range means its default, with one line in the log.
 
 **M4. Stopping and restarts**
-- [ ] **The owner's Stop** on the thread cancels the turn, the row says Stopped, and the report says the owner stopped it.
-- [ ] **`subagents_stop`** stops it, and a batch the bot stopped entirely sends nothing.
-- [ ] **Stop in the bot's chat** ends the chat's turn, and its subagents go on.
-- [ ] **A restart:** with the server killed while two work, they come back Stopped, "fxbot restarted during it", their sessions aren't run again, and their batch reports once, within a minute of the start.
-- [ ] **Off for a bot:** turning the plugin off for the bot cancels its working subagents, with no report, and its tools refuse.
-- [ ] **An update:** reloading the plugin while one works marks it stopped, "the plugin was updated or turned off during it", and the new version reports its batch.
-- [ ] **A deleted bot:** its rows are gone at the next sweep.
+- [x] **The owner's Stop** on the thread cancels the turn, the row says Stopped, and the report says the owner stopped it.
+- [x] **`subagents_stop`** stops it, and a batch the bot stopped entirely sends nothing.
+- [x] **Stop in the bot's chat** ends the chat's turn, and its subagents go on.
+- [x] **A restart:** with the server killed while two work, they come back Stopped, "fxbot restarted during it", their sessions aren't run again, and their batch reports once, within a minute of the start.
+- [x] **Off for a bot:** turning the plugin off for the bot cancels its working subagents, with no report, and its tools refuse.
+- [x] **An update:** reloading the plugin while one works marks it stopped, "It was cut off when fxbot or this plugin restarted.", and the new copy reports its batch.
+- [x] **A deleted bot:** its rows are gone at the next sweep.
 
 **M5. The panel and the thread** (Playwright, light and dark, 1280 and 390 pixels wide)
-- [ ] With nothing working or recent, the panel shows no Subagents section, and makes no request after the first.
-- [ ] While two work, the section shows both, pulsing, with their minutes, the tool each is in, and its calls, and a third that ends shows Done within 5 seconds.
-- [ ] Past three ended, the rest fold under **N earlier**, which opens them.
-- [ ] A click opens the thread, which shows the task, then the steps and text as they stream, and the end line once it's done.
-- [ ] The back button returns to the bot's chat, with its panel as it was.
-- [ ] **Stop** on the thread, and on a row, stops it, and the row says Stopped.
-- [ ] A finished thread's end line shows the tokens it used, when the mock's answer gave usage.
-- [ ] The start call's card in the chat shows the title and state, and **Open** opens the thread.
-- [ ] On a phone, the panel's sheet lists them, and a tap opens the thread full screen.
-- [ ] A thread link for a missing subagent, or another bot's id, says so, with the way back.
-- [ ] No page errors and no failed requests. Look at each screenshot.
+- [x] With nothing working or recent, the panel shows no Subagents section, and reads the list once, then every 30 seconds.
+- [x] While two work, the section shows both, pulsing, with their minutes, the tool each is in, and its calls, and a third that ends shows Done within 5 seconds.
+- [x] Past three ended, the rest fold under **N earlier**, which opens them.
+- [x] A click opens the thread, which shows the task, then the steps and text as they stream, and the end line once it's done.
+- [x] The back button returns to the bot's chat, with its panel as it was.
+- [x] **Stop** on the thread, and on a row, stops it, and the row says Stopped.
+- [x] A finished thread's end line shows the tokens it used, when the mock's answer gave usage.
+- [x] The start call's card in the chat shows the title and state, and **Open** opens the thread.
+- [x] On a phone, the panel's sheet lists them, and a tap opens the thread full screen.
+- [x] A thread link for a missing subagent, or another bot's id, says so, with the way back.
+- [x] No page errors and no failed requests. Look at each screenshot.
 
 **M6. On the computer** (a real computer, in a check that isn't run as root)
-- [ ] **The label:** migration `0015` runs, `newSession(bot, { label })` keeps it, and a plugin tool's `execute`, `tool.before`, and `tool.after` get it. They get null in the bot's own chat, and for a session made before the migration.
-- [ ] **Turns at the desktop:** two subagents each call `computer_desktop` in a loop. Their calls never overlap, the second waits while the first holds it, and takes it 20 seconds after the first's last call. A wait past 60 seconds answers its sentence.
-- [ ] **Turns at the terminal,** the same, and the terminal's turn doesn't hold the desktop's.
-- [ ] **A browser tab each:** two subagents open two sites with agent-browser at once. Each stays on its own tab through 10 steps, `tab list` shows both, and a site the bot signed into is signed in for both.
-- [ ] **The others:** a subagent's desktop result names the other subagent and the bot by actor, with what each did last.
-- [ ] **The owner's screen** shows an arrow and a pill for each actor, with its label, the newest solid.
-- [ ] **A room's computer:** two bots taking turns in a room never wait, and their marks are as in 0.3.
-- [ ] **On fxbot 0.8.0,** with no label, the computer 0.4.0 works as 0.3 does.
-- [ ] **Take-over:** while the owner has the computer, every actor's desktop and terminal calls are refused, as now, and the shell still runs.
+- [x] **The label:** migration `0015` runs, `newSession(bot, { label })` keeps it, and a plugin tool's `execute`, `tool.before`, and `tool.after` get it. They get null in the bot's own chat, and for a session made before the migration.
+- [x] **Turns at the desktop:** two subagents each call `computer_desktop` in a loop. Their calls never overlap, the second waits while the first holds it, and takes it 20 seconds after the first's last call. A wait past 60 seconds answers its sentence.
+- [x] **Turns at the terminal,** the same, and the terminal's turn doesn't hold the desktop's.
+- [x] **A browser tab each:** two subagents open two sites with agent-browser at once. Each stays on its own tab through 10 steps, `tab list` shows both, and a site the bot signed into is signed in for both.
+- [x] **The others:** a subagent's desktop result names the other subagent and the bot by actor, with what each did last.
+- [x] **The owner's screen** shows an arrow and a pill for each actor, with its label, the newest solid.
+- [x] **A room's computer:** two bots taking turns in a room never wait, and their marks are as in 0.3.
+- [x] **On fxbot 0.8.0,** with no label, the computer 0.4.0 works as 0.3 does.
+- [x] **Take-over:** while the owner has the computer, every actor's desktop and terminal calls are refused, as now, and the shell still runs.
 
 **M7. With the other plugins**
-- [ ] **Permissions,** in Ask: a subagent's call that needs the owner shows a background card in the bot's chat, naming the bot, and the subagent waits. Approving runs it, and the card expires as background cards do.
-- [ ] **Permissions,** in Auto: the reviewer's request carries the owner's words, from `asked`.
-- [ ] **Files:** two subagents of one bot each write in their own folder, and both reports name their files.
-- [ ] **Removing the plugin** leaves the bot's chat working, with its earlier reports still shown.
+- [x] **Permissions,** in Ask: a subagent's call that needs the owner shows a background card in the bot's chat, naming the bot, and the subagent waits. Approving runs it, and the card expires as background cards do.
+- [x] **Permissions,** in Auto: the reviewer's request for a subagent's call carries the owner's words, from the bot's own chat.
+- [x] **Files:** a subagent's rules give it a folder of its own, `~/subagents/s<id>/`. Whether a real model keeps to it, and names its files in its report, is a check for a person.
+- [x] **Removing the plugin** leaves the bot's chat working, with its earlier reports still shown.
 
 **M8. Docs and checks**
-- [ ] The plugin's README: what it does, its settings, what a subagent costs as measured, and the build command.
-- [ ] The how-to, its sidebar entry, the plugin list's entry with its `docs` path, the README's phases list, `AGENTS.md`, and the changelog bullets: the plugin, the computer 0.4.0, and the label for plugin authors.
-- [ ] The computer's README and reference page: actors, turns, and a tab each.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass, and `page.js` matches its source.
-- [ ] This doc moves to `docs/_completed/phases/`, with What the build changed.
+- [x] The plugin's README: what it does, its settings, what a subagent costs as measured, and the build command.
+- [x] The how-to, its sidebar entry, the plugin list's entry with its `docs` path, the README's phases list, `AGENTS.md`, and the changelog bullets: the plugin, the computer 0.4.0, and the label for plugin authors.
+- [x] The computer's README and reference page: actors, turns, and a tab each.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass, and `page.js` matches its source.
+- [x] This doc moves to `docs/_completed/phases/`, with What the build changed.
 
 ## 5. Open questions
 
@@ -532,3 +532,29 @@ Nothing reaches a real model or the owner's dev server. Confirm a restarted chec
 7. **Keep the draft when leaving a chat?** Opening a thread leaves the chat, and today that drops a message the owner hasn't sent, as opening the computer's screen does: a draft is kept only across a reload (`packages/ui/src/pwa.ts:44-51`). Keeping each bot's draft in `sessionStorage` when its chat closes is a small core fix for every screen, apart from this phase.
 8. **The label in core, or a bridge plugin?** This plan puts a label on a plugin's session, in core, so the computer can name a subagent without knowing the subagents plugin. The other way follows chat-rooms-computer: a third plugin, `subagents-computer`, that needs both and tells the computer each session's name, with no core change. The label is the recommendation: it's smaller, needs nothing added by the owner, and routines and Permissions can use it too.
 9. **Are the turns' times right?** 20 seconds holds the desktop between one subagent's calls, and a call waits 60 seconds for its turn.
+
+## What the build changed
+
+Built on 2026-11-10, on `release/0.9.0`. The core change is 27 lines in and 17 out of `index.ts`, `plugins.ts`, and `plugin-api.ts`, with migration `0015_session_labels`. The plugin is 341 lines of `server.ts`, 258 of `page.jsx`, and 100 of `page.css`. The computer's change is 68 lines in and 23 out.
+
+- **No `asked`.** Permissions' reviewer reads the owner's newest messages from the bot's own chat, and a subagent is that same bot, so its calls are judged against the owner's words with nothing passed. `asked` would also have told the reviewer the request came from "another of their bots". So the table has no `asked` column, and neither the task nor the report carries one. The check in M7 looks for the owner's words in the reviewer's request.
+- **Starting a subagent asks first, in Ask.** `subagents_start` isn't `safe`, so with Permissions in Ask, the owner OKs it at a card in their own turn. Each of the subagent's calls is then checked again, as background work.
+- **One phrase for a restart and a reload.** The plugin's cleanup can't tell an update from fxbot stopping, so both say "It was cut off when fxbot or this plugin restarted.", with `stopped_by` `restart`.
+- **Turned off for a bot** is noticed at the next sweep, within 30 seconds, since no hook says so.
+- **The `calls` setting is read at a subagent's first tool call,** so a wrong value's log line comes then.
+- **No count of no calls:** a report says "done in under a minute", not "with 0 calls", and the panel shows no count until there is one.
+- **The computer's turns had a race,** which the checks found: two subagents' clicks arriving together both took the desktop, while the first looked up its own name. The hold is set before anything waits now, and the holder's name is looked up only to refuse another (`1d8b82c`).
+- **The panel** reads the list every 5 seconds while one works and every 30 otherwise, and a start in the chat reads it again at once, through an event the card sends.
+- **Tokens** come from the stream's `turn_end` line, which carries libfx's `usage` though `StreamLine` doesn't name it. The thread shows them once that line arrives.
+- **A row's button** is named by its text, and its **Stop** is "Stop <title>".
+- **The thread's header** holds the back button, the title, and **Stop**. The bot's face and name, the state, and the time are on a line under it, and the end line also says the calls and tokens.
+- **The plugin list's entry** has a `docs` link to the how-to, which another change on the branch added to every entry meanwhile.
+
+**How it was checked.** A mock model scripted every turn, with commands added for this phase: `repeat:` for a long report, `fail:` for a provider's error, `slow:` for a run that stays busy between calls, and a set answer to a batch of reports. The computer checks ran as the unprivileged `agent` user, against its rootless podman and a copy of the branch, since the computer plugin run as root would set up its own engine on the machine. fxbot 0.8.0 ran from its release commit, `54a2b77`. Everything they made was removed.
+
+**What only a person can check:**
+- **A real model:** that it writes whole tasks, splits work sensibly, doesn't poll, names its files in its reports, and tells the owner what a batch found, in one answer.
+- **A real phone:** the panel's sheet and a thread on an iPhone. WebKit didn't run.
+- **Permissions with a real reviewer model,** on a subagent's calls.
+- **Several subagents on a real computer,** browsing and using the desktop at once, for whether 20 seconds of hold and a minute of waiting feel right.
+- **What a batch costs** on a real provider.
