@@ -7,7 +7,7 @@ import { Cipher, Handshake, generateKeyPair, keyPairFromPrivate, privateBytes, t
 import * as wire from "../../../packages/web-app/protocol/wire.ts";
 import { bridged, serve } from "./bridge.ts";
 import { checkAssertion, checkNew } from "./passkey.ts";
-import { Mapper, check, checkEntry, cloudflareStun, forWerift, freePort, globalV6, hostAddresses, iceServers, shown, type IceEntry } from "./reach.ts";
+import { Mapper, check, checkEntry, cloudflareStun, forWerift, freePort, globalV6, hostAddresses, iceServers, inContainer, shown, type IceEntry } from "./reach.ts";
 
 // Web pairing: the owner's fxbot from their phone or any computer, over a WebRTC data channel, with nothing exposed.
 // fxbot.sh's relay passes the sealed handshake and stores nothing; this plugin holds fxbot's keys and its devices, and
@@ -87,7 +87,8 @@ export default async function webPairing(fx: PluginApi) {
     return { I, Lpub, Lpriv };
   })();
   const rid = await wire.ridOf(keys.Lpub, keys.I.publicKey);
-  const name = hostname().split(".")[0] || "fxbot";
+  // Inside a container, the host name is the container's id, which changes with each update.
+  const name = (!inContainer() && hostname().split(".")[0]) || "fxbot";
 
   // --- What the owner sets in the tab, sealed, since TURN credentials are in it.
   let config: Config = { on: true, relay: wire.defaultRelay, ice: [cloudflareStun], ports: [8790, 8799], mapping: true, ...JSON.parse((await fx.secrets.get("config")) ?? "{}") };

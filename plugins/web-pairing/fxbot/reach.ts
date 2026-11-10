@@ -131,7 +131,7 @@ const stunTargets = (list: IceEntry[]) =>
     .filter((m): m is RegExpExecArray => Boolean(m))
     .map((m) => ({ host: m[1].replace(/^\[|\]$/g, ""), port: Number(m[2] ?? 3478) }));
 
-const inContainer = () => existsSync("/.dockerenv") || existsSync("/run/.containerenv");
+export const inContainer = () => existsSync("/.dockerenv") || existsSync("/run/.containerenv");
 const isCgnat = (ip: string) => {
   const [a, b] = ip.split(".").map(Number);
   return a === 100 && b >= 64 && b <= 127;
