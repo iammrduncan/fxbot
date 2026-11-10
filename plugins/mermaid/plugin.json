@@ -1,0 +1,14 @@
+{
+  "name": "mermaid",
+  "version": "0.1.0",
+  "description": "Mermaid code blocks in your bots' replies and pages draw as diagrams, in the app's own colors and font, light and dark.",
+  "license": "Apache-2.0",
+  "extensions": {
+    "sh.fxbot": {
+      "minFxbot": "0.9.0",
+      "server": "./fxbot/server.ts",
+      "page": "./fxbot/page.js",
+      "css": "./fxbot/page.css"
+    }
+  }
+}

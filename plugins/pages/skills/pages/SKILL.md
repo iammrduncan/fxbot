@@ -42,7 +42,7 @@ Use `pages_html` only for what Markdown can't do: a chart, filters or controls, 
 - **Images** from your library, as `![what it shows](library:<id>)`, such as a screenshot you saved. Any other image shows as a link.
 - **Dates** written out, such as "Tuesday 12 November", since the owner may read it weeks later. Say when you checked what changes, such as prices.
 - **At most 60,000 bytes.** For more, write two pages, and link each to the other.
-- **No diagrams in Markdown.** A Mermaid block shows as code, so draw a diagram in an HTML page.
+- **Diagrams:** with the mermaid plugin on, a ```` ```mermaid ```` block draws as a diagram, and your skill `mermaid` says how. Without it, a Mermaid block shows as code, so draw a diagram in an HTML page.
 
 ## Changing a page
 

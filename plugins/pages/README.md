@@ -47,7 +47,7 @@ A task list in Markdown (`- [ ] Book flights`) draws as boxes. A tick changes `[
 - The same text again changes nothing, and answers the same page.
 - A new page with the text of a document a bot saved becomes that item. One with the text of something you sent is refused, and so is a revision that matches another item.
 - Markdown images come from the library, as `![what it shows](library:<id>)`. Any other shows as a link, and doesn't load.
-- A Mermaid block shows as code. fxbot doesn't draw diagrams in Markdown, so a bot draws one with `pages_html`.
+- A Mermaid block draws as a diagram when the [mermaid](https://fxbot.sh/docs/how-to/draw-diagrams-in-chat/) plugin is on. Without it, the block shows as code, and a bot draws a diagram with `pages_html`.
 
 ## HTML pages
 

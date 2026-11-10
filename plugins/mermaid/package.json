@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "fxbot reads only type, which makes the server code an ES module. page.js is built from page.jsx: see the README."
+}

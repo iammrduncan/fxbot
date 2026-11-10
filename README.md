@@ -58,6 +58,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Operations](docs/_completed/phases/operations.md) (core; 0.8.0): the computer on every engine, Fedora, AlmaLinux, openSUSE, and Arch beside Debian and Ubuntu, `setup.sh` checks before it changes anything, another port, and `fxbot backup` and `fxbot uninstall`
 - [x] [Providers v2](docs/_completed/phases/providers-v2.md) (core; 0.8.0): an Add provider page that leads with sign-ins (ChatGPT/Codex, Grok, OpenRouter, Hugging Face, OrcaRouter), walks through making a key for each popular gateway, takes the clouds' own sign-ins, and leads first-run setup, with docs for each provider
 - [x] [Subagents](docs/_completed/phases/subagents.md) (plugin, with a session label in core; 0.9.0): a bot starts helpers that work in the background with its tools, sharing its computer as a room's bots do, their reports come back to its chat together, and its panel lists them, each opening to its thread
+- [x] [Mermaid](docs/_completed/phases/plugin-mermaid.md) (plugin, with a code-block hook in core; 0.9.0): the Mermaid diagrams bots write draw in replies, pages, rooms, and the library, with Pele, in the app's own look
 - [ ] [Distribution](docs/phases/distribution.md) (core; after 0.8.0): the main install, one download for Linux, macOS, and Windows that brings its own Postgres and embedder and a Linux machine for the computer, and later the desktop app; the container release is for hosting
 - [ ] [Mac support](docs/phases/mac-support.md) (core; after 0.8.0): one line installs fxbot on a Mac, as Distribution's macOS download built first, with only the computer in a Lima VM, and a handoff to check it on a real Mac
 - [ ] [Triggers](docs/phases/triggers.md) (plugins): webhooks and new email start a bot's turn
@@ -74,7 +75,6 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Image and video generation](docs/phases/media-generation.md) (plugin): bots create images and video
 - [ ] [Voice memos](docs/phases/voice-memos.md) (plugin): send a bot a recorded voice memo
 - [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): talk with a bot by voice, in the app or over a phone line
-- [ ] [Mermaid](docs/phases/plugin-mermaid.md) (plugin, with a small core hook): Mermaid code blocks draw as diagrams in chats, pages, and rooms, in the app's own look
 
 The previous design and spike are in [archive/](archive/README.md). The git host may still use the old repository name until the owner renames it.
 

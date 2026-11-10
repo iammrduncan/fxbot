@@ -73,6 +73,13 @@
       "docs": "/docs/how-to/keep-what-a-bot-writes/"
     },
     {
+      "name": "mermaid",
+      "description": "Mermaid code blocks in your bots' replies and pages draw as diagrams, in the app's own colors and font, light and dark.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/mermaid",
+      "docs": "/docs/how-to/draw-diagrams-in-chat/"
+    },
+    {
       "name": "web-pairing",
       "description": "Your fxbot from your phone or any computer, at web.fxbot.sh, over a connection straight to it, paired once.",
       "note": "Connects to fxbot.sh's relay only once you pair a device, and finds the way through with Cloudflare's STUN.",

@@ -8,7 +8,7 @@
 - **Bots know.** A line in each chat says diagrams draw, a skill says how to write one that does, and `mermaid_check` lets a bot try one before it sends it.
 - **It's light, and nothing runs.** [Pele](https://pele.run), Obsidian's Mermaid renderer, draws it in a worker the plugin can stop, with no code from the diagram and no links or images. Its 273 KB, gzipped, loads with the first diagram, so a chat without one pays nothing.
 
-Status: planned on 2026-11-10, from [issue #9](https://github.com/iammrduncan/fxbot/issues/9). Not built. Researched against the [research directive](../research-directive.md)'s references, the chat apps that draw Mermaid today, and the renderers that could do it.
+Status: built on 2026-11-10, for 0.9.0, from [issue #9](https://github.com/iammrduncan/fxbot/issues/9), as planned the same day, with the owner's answers to the open questions. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. The checklist's boxes are what ran here, against a mock model, in Chromium; what only a person can check is listed there too. Researched against the [research directive](../../research-directive.md)'s references, the chat apps that draw Mermaid today, and the renderers that could do it.
 
 ## What the owner asked
 
@@ -16,7 +16,7 @@ Status: planned on 2026-11-10, from [issue #9](https://github.com/iammrduncan/fx
 
 ## 0. Core or plugin
 
-**A plugin**, `mermaid` ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Diagrams aren't what every bot needs, what plugins plug into, or what fxbot needs to run, and the owner asked for it optional. "A way to show a message" is a plugin's job in the conventions.
+**A plugin**, `mermaid` ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). Diagrams aren't what every bot needs, what plugins plug into, or what fxbot needs to run, and the owner asked for it optional. "A way to show a message" is a plugin's job in the conventions.
 
 **One small core hook.** A plugin can't change how the app draws Markdown today:
 - A bot's reply is drawn by the app's own `Streamdown`, in `packages/ui/src/steps.tsx`, with no plugins, so a ```` ```mermaid ```` block shows as code.
@@ -111,7 +111,7 @@ In `packages/ui/src/plugins.tsx`:
 - `Places` gains `codeBlocks: { language: string; Component }[]`, and setup gains `codeBlock(language, Component)`, which keeps the language in lowercase.
 - A `Markdown` component wraps Streamdown. It reads the loaded plugins' code blocks, the first plugin to claim a language drawing it, and passes them as `plugins.renderers`, after any a caller passes. Each is wrapped in `PluginPart`, with the plain code block as its fallback, so a plugin that throws leaves the code. The list is memoized on the loaded plugins, since Streamdown is memoized.
 - The component gets `code`, `language`, `meta`, and `incomplete`, from Streamdown's `isIncomplete`.
-- `steps.tsx`, `library.tsx`, and `release.tsx` draw with `Markdown`, and `ui.Streamdown` is `Markdown`, so pages and rooms get it unchanged.
+- `steps.tsx` and `library.tsx` draw with `Markdown`, and `ui.Streamdown` is `Markdown`, so pages and rooms get it unchanged. A reply's last text, while its turn runs, passes Streamdown `isAnimating`, so a code block there can be unfinished.
 
 About 30 lines. With no plugin claiming a language, Streamdown gets no `plugins`, as now.
 
@@ -149,7 +149,7 @@ plugins/mermaid/
 
 One render goes at a time, the newest text for each diagram winning. Results are kept by source, width, and font, the last 50, so a chat that opens again doesn't redraw.
 
-**Putting it in.** The card is a host element with a closed shadow root. The SVG is parsed with `DOMParser` as `image/svg+xml`, which runs nothing, and walked once: an element outside SVG's drawing elements, `foreignObject`, `script`, `a`, `image`, and `use` among those left out, and any `on…` attribute or `href` are removed, as a second check on Pele's output. Then it goes into the shadow root. Its `<style>` applies only there. The `--pele-*` variables, set on the host, reach in.
+**Putting it in.** The card is a host element with a shadow root. The SVG is parsed with `DOMParser` as `image/svg+xml`, which runs nothing, and walked once: an element outside SVG's drawing elements, `foreignObject`, `script`, `a`, `image`, and `use` among those left out, and any `on…` attribute or `href` are removed, as a second check on Pele's output. Then it goes into the shadow root. Its `<style>` applies only there. The `--pele-*` variables, set on the host, reach in.
 
 **Width.** A `ResizeObserver` on the card redraws, 150 ms after its width changes, with the new `maxWidth`, so a phone gets Pele's narrow layout and a wide window the source's direction.
 
@@ -184,7 +184,7 @@ Small icon buttons at the card's top right, shown on hover and focus, and always
 - **Code** switches between the diagram and its source, `aria-pressed`.
 - **Copy** copies the source.
 - **Download** saves `diagram.svg`, with the current values of the `--pele-*` variables and the font written into its `<style>`, so it looks the same on its own.
-- **Expand** opens a full-screen dialog, the app's `ui.Dialog`, with the diagram at its natural size, scrolling both ways, and Pele's `enableZoom`.
+- **Expand** opens a full-screen dialog, the app's `ui.Dialog`, with the diagram at its natural size, scrolling both ways.
 
 The diagram is `role="img"`, named by its title, or by its type, such as "Flowchart". Pele writes a `<title>` and `<desc>` into the SVG.
 
@@ -231,7 +231,7 @@ The diagram is `role="img"`, named by its title, or by its type, such as "Flowch
 
 ### What changes
 
-- **Core:** `plugins.tsx` (`codeBlock`, `Markdown`), and `steps.tsx`, `library.tsx`, and `release.tsx` drawing with `Markdown`.
+- **Core:** `plugins.tsx` (`codeBlock`, `Markdown`), and `steps.tsx` and `library.tsx` drawing with `Markdown`.
 - **The plugin:** `plugins/mermaid/`, and its entry in `packages/sdk/src/plugins-registry.json`, with `docs`.
 - **Pages:** its skill's line and README.
 - **Docs:**
@@ -250,53 +250,68 @@ About 30 lines of core. The plugin's own code: about 250 lines of page code, 70 
 Each box is something that ran, by hand or by a script, against a disposable fxbot and the mock model.
 
 **M1. The hook**
-- [ ] `app.codeBlock` draws a probe plugin's component for ```` ```probe ```` in a reply, a Markdown page, a room message, and the library's preview, and gets `code`, `language`, `meta`, and `incomplete`, true while it streams.
-- [ ] With no plugin claiming `mermaid`, a block shows as code, as before.
-- [ ] A component that throws leaves the plain code block, and the rest of the reply.
-- [ ] `npm run typecheck` and `npm run build` pass.
+- [x] `app.codeBlock` draws a probe plugin's component for ```` ```probe ```` in a reply, with `code`, `language`, `meta`, and `incomplete`, true while it streams. Mermaid's draws in a Markdown page and the library's preview too. A room wasn't opened: it draws with the same `ui.Streamdown` as pages.
+- [x] With no plugin claiming `mermaid`, a block shows as code, as before.
+- [x] A component that throws leaves the plain code block, and the rest of the reply.
+- [x] `npm run typecheck` and `npm run build` pass.
 
 **M2. Drawing**
-- [ ] `pele.js` is 1.12.0's file, with the sha256 in the README; the route answers it gzipped, `immutable`, and the page fetches it only once a diagram shows.
-- [ ] A flowchart, sequence, state, class, ER, Gantt, timeline, mindmap, pie, and XY chart each draw in Chromium, with their labels inside their shapes, in Geist.
-- [ ] With the font's file blocked, a diagram draws in `system-ui`, its labels still inside their shapes.
-- [ ] A diagram that takes too long ends at 3 seconds with its code and "took too long", the page answers throughout, and the next diagram draws.
-- [ ] Source over 50,000 characters shows its code and Pele's limit.
-- [ ] A chat with twenty diagrams opens again with no new renders.
+- [x] `pele.js` is 1.12.0's file, with the sha256 in the README; the route answers it gzipped, `immutable`, and the page fetches it only once a diagram shows.
+- [x] The skill's nine examples, a flowchart, sequence, state, ER, Gantt, timeline, mindmap, pie, and XY chart, each draw in Chromium, and the flowchart's labels sit inside their shapes, in Geist. A class diagram draws with `mermaid_check`.
+- [x] With the font's file blocked, a diagram draws in `system-ui`, its labels still inside their shapes.
+- [x] A diagram that takes too long, with a Pele the check served that never answers for it, ends at 3 seconds with its code and "took too long", the page answers throughout, and the next diagram draws.
+- [x] Source over 50,000 characters shows its code and Pele's limit.
+- [x] A chat with nine diagrams opens again, from another chat, with no new renders.
 
 **M3. The look** (Playwright, light and dark, at 1280 and 390 pixels)
-- [ ] The card and the diagram use the app's tokens, and switching the color scheme changes them with no new render.
-- [ ] A wide `flowchart LR` turns top to bottom at 390 pixels, and back when the window widens.
-- [ ] The controls show on hover and focus, and on a touch screen; **Code**, **Copy**, **Download**, and **Expand** each work, and the downloaded SVG looks the same opened on its own.
-- [ ] Screenshots of the set, against Pele's own defaults, are looked at, and the owner agrees.
+- [x] The card and the diagram use the app's tokens, and switching the color scheme changes them with no new render.
+- [x] A wide `flowchart LR` is laid out again for 390 pixels, from 646×186 to 348×336, top to bottom, and back when the window widens.
+- [x] The controls show on hover and focus, and on a touch screen; **Code**, **Copy**, **Download**, and **Expand** each work, and the downloaded SVG looks the same opened on its own.
+- [x] Screenshots of the set, light and dark, at 1280 and 390 pixels, are looked at.
+- [ ] The owner agrees with the look.
 
 **M4. Streaming and errors** (the mock model, writing a diagram slowly)
-- [ ] The diagram grows as lines arrive, never shows an error before the fence closes, and keeps its last drawing.
-- [ ] A diagram that can't draw ends as its code and one quiet line, in both schemes, and a label with `<b>` in its error shows the tag as text.
-- [ ] A stopped turn keeps its last drawing.
+- [x] The diagram grows as lines arrive, never shows an error before the fence closes, and keeps its last drawing.
+- [x] A diagram that can't draw ends as its code and one quiet line, in both schemes, and a label with `<b>` in its error shows the tag as text.
+- [x] A stopped turn keeps its last drawing.
 
 **M5. Hostile diagrams** (Playwright, with every request logged)
-- [ ] `click A href "javascript:…"`, `click A call alert()`, `<img src=x onerror=…>` in a label, a `classDef` and `style` with `}`, `~`, `+`, and `@import`, frontmatter and `%%{init}%%` setting `themeCSS` and `fontFamily`, and `![](https://…)` images: nothing runs, nothing is requested, the page's own styles don't change, and the shadow root holds no `a`, `image`, `foreignObject`, or `on…` attribute.
+- [x] `click A href "javascript:…"`, `click A call alert()`, `<img src=x onerror=…>` in a label, a `classDef` and `style` with `}`, `~`, `+`, and `@import`, frontmatter and `%%{init}%%` setting `themeCSS` and `fontFamily`, and `![](https://…)` images: nothing runs, nothing is requested, the page's own styles don't change, and the shadow root holds no `a`, `image`, `foreignObject`, or `on…` attribute.
 
 **M6. Bots**
-- [ ] The line is in the instructions of a bot the plugin is on for, and not of one it's off for.
-- [ ] The skill loads, and each of its examples draws.
-- [ ] `mermaid_check` answers "Draws: …" for a good diagram and Pele's error for a bad one, and ends one that takes too long at 3 seconds, with fxbot answering throughout.
+- [x] The line is in the instructions of a bot the plugin is on for, and not of one it's off for.
+- [x] The skill loads, and each of its examples draws.
+- [x] `mermaid_check` answers "Draws: …" for a good diagram, Pele's error for a bad one, takes a fenced one, and refuses source over 50,000 characters.
+- [ ] Its 3-second end wasn't reached: Pele drew 2,400 edges in 59 ms, and stops at 50,000 characters.
 
 **M7. Other places**
-- [ ] A Markdown page draws its diagram, and prints it; a room and the library's preview draw theirs.
-- [ ] Pages' skill and README say diagrams draw with the plugin on.
+- [x] A Markdown page draws its diagram, and prints it, and the library's preview draws it.
+- [x] Pages' skill and README say diagrams draw with the plugin on.
 
 **M8. Docs and checks**
-- [ ] The plugin API reference, the how-to, the plugin's README, the registry entry, and `CHANGELOG.md` are written.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass.
-- [ ] What only a person can check is listed: Safari and Firefox, a phone, web pairing, and real models' diagrams.
+- [x] The plugin API reference, the how-to, the plugin's README, the registry entry, and `CHANGELOG.md` are written.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass.
+- [x] What only a person can check is listed: Safari and Firefox, a phone, web pairing, and real models' diagrams.
 
 ## 5. Open questions
 
-Each has a default the build takes.
+Each had a default. The owner answered each on 2026-11-10: "pele is fine", "not essentials", "mermaid_check is fine", "accent is default", and "1.12 is fine".
 
 1. **Pele or Mermaid itself.** *Default:* Pele, for its size, its live theming, and drawing no code. If exact Mermaid matters more, Mermaid 12 runs in a sandboxed frame and shows as an image, at 5.5 MB, with colors fixed at drawing and a redraw when the scheme changes.
 2. **In Essentials.** *Default:* no. It's optional, as asked, and listed in **Browse**.
 3. **`mermaid_check`.** *Default:* yes. It costs one tool definition a request, and a call for each diagram a bot checks.
 4. **The accent.** *Default:* the app's neutral `--primary`. The bot's own color would tie a diagram to its bot, but a code block doesn't know whose reply it's in.
 5. **Pele's version.** *Default:* 1.12.0, the newest two weeks old today. 1.13.0 is two weeks old on 2026-11-14.
+
+## What the build changed
+
+- **A reply passes Streamdown `isAnimating` (core).** Streamdown marks a code block unfinished only when told the text is still arriving, and the app never told it, so a half-written diagram would have counted as finished. A reply's last text, while its turn runs, now passes `isAnimating`. With it, a diagram grows as it streams and shows no error until its fence closes.
+- **Release notes stay on plain Streamdown.** They're fxbot's own text, and `release.tsx` would have imported the plugin code for nothing.
+- **The shadow root is open.** It's there to keep the diagram's styles in, not to hide it from the app's own scripts, and an open one lets checks and accessibility tools look inside.
+- **Expand has no zoom of its own.** Pele's `enableZoom` would have meant loading Pele on the page too. The dialog shows the diagram at its own size, fits a small one, and scrolls around a big one, and a phone pinches.
+- **The font:** the page takes the body's first font, loads every `@font-face` of it, each subset with its `unicode-range`, into the worker, and puts the family the worker measured with on each card, so a diagram measured in `system-ui` shows in it.
+- **Charts' colors** are the avatars' deep "wears" stop in light, so text in the card's color reads on them, and their soft body stop in dark.
+- **Gzip through web pairing.** Its bridge reads responses with `fetch`, which unzips them, and drops `content-encoding`, so the route gzips safely.
+- **`mermaid_check` answers** "Draws: flowchart, 4 nodes, 673 by 171 pixels.", or "Doesn't draw: " and Pele's message, with its line and a caret. It takes the source with or without its fence.
+- **Pele is fast.** 300 nodes and 900 edges took 43 ms, and 2,400 edges 59 ms, on the server. A real diagram doesn't reach 3 seconds, so the page's check served a Pele that never answers for a marked diagram.
+- **Not checked here:** Safari, Firefox, a real phone, web pairing (the worker comes from a blob, and Pele through the plugin's route, so it should need nothing new), a room, and real models' diagrams.
