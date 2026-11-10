@@ -422,7 +422,7 @@ uninstall() {
     fi
   fi
   systemctl disable --now fxbot >/dev/null 2>&1 || true
-  images=$(compose config --images 2>/dev/null)
+  images=$(compose config --images 2>/dev/null || true)
   compose down --volumes --rmi all --remove-orphans >/dev/null 2>&1 || echo "Compose couldn't take everything down: see fxbot compose ps -a"
   # fxbot's own images at every version, and the GPU trial's, by name; never a prune.
   images+=$'\n'$("$engine" images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${FXBOT_IMAGE:-ghcr.io/iammrduncan/fxbot}:" || true)$'\n'$cuda
