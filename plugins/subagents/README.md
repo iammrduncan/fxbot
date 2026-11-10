@@ -10,7 +10,7 @@ A plugin for [fxbot](https://fxbot.sh): a bot hands work to subagents, helpers t
 - **You watch them work.** The bot's panel, on the right of its chat, lists its subagents, working and recent, with the tool each is in and its calls. A click opens one's thread: its task, each step, and how it ended, live. **Stop** ends one.
 - **On the computer, they work together,** with the [computer](https://fxbot.sh/docs/how-to/give-bots-a-computer/) 0.4.0 or newer: each has its name and arrow on the computer's screen, such as "Ann · Curie", its own browser tab, and turns at the desktop and the terminal.
 
-Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.9.0 or newer. See [Hand work to subagents](https://fxbot.sh/docs/how-to/hand-work-to-subagents/).
+Add it from **Plugins**, or with **Essentials**, which has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.9.0 or newer. See [Hand work to subagents](https://fxbot.sh/docs/how-to/hand-work-to-subagents/).
 
 ## The tools
 

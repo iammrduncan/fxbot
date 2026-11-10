@@ -21,7 +21,7 @@ While it runs, fxbot is at `http://127.0.0.1:8787` on that computer, and on noth
 
 ## With web pairing
 
-The **web-pairing** plugin, in **Essentials**, opens your fxbot at [web.fxbot.sh](https://web.fxbot.sh) on a phone or any computer, over a WebRTC connection straight to it. Nothing on the machine is exposed, and fxbot.sh passes only the sealed handshake. You pair each device once. See [Reach fxbot from your phone](/docs/how-to/reach-it-from-your-phone/).
+The **web-pairing** plugin opens your fxbot at [web.fxbot.sh](https://web.fxbot.sh) on a phone or any computer, over a WebRTC connection straight to it. Nothing on the machine is exposed, and fxbot.sh passes only the sealed handshake. You pair each device once. See [Reach fxbot from your phone](/docs/how-to/reach-it-from-your-phone/).
 
 Most networks connect directly. Some, such as work Wi-Fi that blocks UDP, need Tailscale, WireGuard, or a TURN server of your own: **Settings** › **Web pairing** › **Reachability** says in advance, and [When a device can't connect](/docs/how-to/when-a-device-cant-connect/) has the fixes.
 

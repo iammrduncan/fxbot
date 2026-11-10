@@ -9,7 +9,7 @@ A plugin for [fxbot](https://fxbot.sh): your fxbot from your phone or any comput
 - **It says what will connect.** **Settings** › **Web pairing** checks this machine's network, and a device that can't connect says why, with a link to the docs page that fixes it.
 - **STUN only, by default.** Cloudflare's STUN finds each end's public address. Add your own STUN and TURN servers, in your order.
 
-Add it from **Plugins**, or with **Essentials**. It needs fxbot 0.8.0 or newer. It runs inside fxbot: read its code there before you add it. With nothing paired, it connects to nothing. Removing it unpairs every device: it deletes fxbot's keys and its list of devices, so each device pairs again after you add it back. Turn off **Remote access** instead to pause it.
+Add it from **Plugins**. It needs fxbot 0.8.0 or newer. It runs inside fxbot: read its code there before you add it. With nothing paired, it connects to nothing. Removing it unpairs every device: it deletes fxbot's keys and its list of devices, so each device pairs again after you add it back. Turn off **Remote access** instead to pause it.
 
 ## Settings › Web pairing
 

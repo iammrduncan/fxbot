@@ -5,7 +5,7 @@ description: "A bot can start subagents, helpers that work in the background on 
 
 A bot can start subagents: helpers that work in the background on one task each, while it carries on talking with you. Each subagent is the bot itself, run again in a session of its own, with its tools, computer, skills, and memories, but not its chat.
 
-1. Add **subagents** from **Plugins**, on **Browse**. It needs fxbot 0.9.0 or newer.
+1. Add **subagents** from **Plugins**, on **Browse**, or with **Essentials**, which has it. It needs fxbot 0.9.0 or newer.
 2. Ask a bot for something that takes a lot of digging: "compare the three hosting offers, and check what each says about backups". The bot hands it to subagents, one for each part, tells you what it started and that it'll come back with the results, and you can carry on talking with it.
 3. When the last of them has ended, their reports reach the bot together, in one message from **Subagents**, and the bot tells you what they found.
 

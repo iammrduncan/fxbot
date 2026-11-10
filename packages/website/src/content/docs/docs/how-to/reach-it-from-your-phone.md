@@ -5,7 +5,7 @@ description: "Open your own fxbot from a phone or any computer, at web.fxbot.sh,
 
 Open your own fxbot from a phone or any computer, at [web.fxbot.sh](https://web.fxbot.sh), over a connection straight to it, with no Tailscale. You pair each device once, and it stays paired until you remove it.
 
-You need the **web-pairing** plugin, which **Essentials** adds. Otherwise, add it from **Plugins**. It needs fxbot 0.8.0 or newer.
+You need the **web-pairing** plugin: add it from **Plugins**. It needs fxbot 0.8.0 or newer.
 
 ## Install the app on the device
 

@@ -896,3 +896,7 @@ Still open:
 4. **Cloudflare's free plan, or paid ($5 a month)?** The default is paid from launch. On the free plan, going over the cap stops every pairing worldwide until midnight UTC. Essentials adds no load until a device is paired. *The owner's, at deploy.*
 5. **May a paired device pair others?** The default is yes, since that's what keeps a pairing from waiting for home. The alternative is that only fxbot's own screen approves. *Built as the default.*
 6. **If werift fails a browser in M1, fix it or fork it?** The default is a fix upstream, with a fork bundled meanwhile. It's plain TypeScript with one maintainer, so either is in reach. node-datachannel connects in a third of the time at 2–3× the speed, but it's native, so core would have to carry it, which the owner ruled out. *Neither was needed: with fxbot making the offer, Firefox connects (see **Built**).*
+
+## After the build
+
+On 2026-11-10, for 0.9.0, the owner took web pairing out of **Essentials**: "web-pairing does not belong in essentials." It's added from **Plugins**, and an install that has it keeps it. The guides and the README say so.

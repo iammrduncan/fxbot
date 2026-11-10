@@ -424,7 +424,7 @@ Each is read at each use, and a value outside its range means its default, said 
 ### What changes
 
 - **New:** `plugins/subagents/`, with its README.
-- **fxbot's plugin list:** an entry for subagents, outside **Essentials** unless the owner says otherwise, with `"docs": "/docs/how-to/hand-work-to-subagents/"`, so its page in **Plugins** and its tab in **Settings** link to the how-to.
+- **fxbot's plugin list:** an entry for subagents, in **Essentials** at the owner's word, with `"docs": "/docs/how-to/hand-work-to-subagents/"`, so its page in **Plugins** and its tab in **Settings** link to the how-to.
 - **The docs:** a how-to, "Hand work to subagents", listed in the sidebar; a line in the plugin directory; the README's phases list; `AGENTS.md`'s "What this repo is"; and a bullet under `## Unreleased`.
 - **Core:** a session's label: migration `0015_session_labels`, `newSession`'s `label`, and `label` on tool calls and their hooks, with its rows in the plugin API's reference, and a line in **Before upgrading**. Nothing is removed, so no line in `plugin-breaks.json`.
 - **The computer 0.4.0:** actors, turns at the desktop and the terminal, and a browser tab each, with its README and its reference page.
@@ -524,7 +524,7 @@ Nothing reaches a real model or the owner's dev server. Confirm a restarted chec
 ## 5. Open questions
 
 1. **Reports together, or one by one?** This plan sends a turn's reports together, once the last one ends: one turn and one answer, but a slow one holds back the others, whose reports the owner can still read in the panel. fx and p2 send each one as it ends, which wakes the bot once for each. Together is the recommendation.
-2. **Essentials?** This plan leaves subagents out of **Essentials**, so an owner adds them when they want parallel work. They could join it, since they cost nothing until a bot starts one.
+2. **Essentials?** This plan left subagents out of **Essentials**, so an owner would add them when they wanted parallel work. The owner put them in on 2026-11-10: "subagents belong in essentials."
 3. **A cheaper model for subagents?** fx, Claude Code, and p2 let a subagent run on another model. Here that needs `fx.chats.newSession(bot, { model })`, about 10 core lines, and a setting or a tool field. The recommendation is to wait until owners ask.
 4. **Should Stop in the bot's chat stop its subagents too?** This plan says no, as p2 and openmuse do: they're background work, with Stop of their own in the panel.
 5. **Are the defaults right?** 4 at once, 10 for one request, 60 minutes, and 100 calls each. Hermes found a wall clock kills busy work, and moved to a limit on time without progress, which this plan leaves for later.
@@ -575,6 +575,7 @@ What changed, the same day:
   - A subagent's rules say it can tell its chat, and that an answer may reach it as it works.
 - **A steer in a plugin's own session (core).** For the bot's message to reach a working subagent, `fx.chats.send` with `steer` now joins a turn running in a session of the plugin's own, as it does in the bot's own chat: core follows such a session's turns when the plugin steers there. Three lines in `deliver`. A send without `steer` still waits behind the running turn, as before.
 - **Handing off by default.** While the plugin is on for a bot, its own chat is told to hand work that takes a lot of digging to subagents, tell the owner it'll come back with the results, and carry on. The `handOff` setting, `on` by default, turns that off.
+- **In Essentials,** at the owner's word: "subagents belong in essentials." It comes after Messages in the list, so a new install that takes Essentials hands work off from its first chat.
 - **The panel's width.** The list's grid may shrink below its longest title, which now ends in an ellipsis, and **Stop** stays in view.
 - **A lesson for building:** fxbot reloads a plugin from a local folder whenever a file in it changes. Edits to `plugins/subagents` in the main tree reloaded it in the owner's dev app, and cut off three subagents it was running. Later edits went into a copy of the branch first.
 
