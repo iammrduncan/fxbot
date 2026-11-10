@@ -5,10 +5,13 @@ import PluginIcon from "../../components/PluginIcon.astro";
 import { essentials, listed } from "../../plugins.ts";
 
 const base = import.meta.env.BASE_URL;
-const description = "The plugins fxbot vets: code, MCP servers, and skills to add to your fxbot.";
+const description = "What you can add to fxbot's AI assistants: a computer of their own, routines, subagents, pages, rooms, and more.";
 ---
 
-<StarlightPage frontmatter={{ title: "Plugins", description, template: "splash", pageActions: false }}>
+<StarlightPage frontmatter={{ title: "Plugins", description, template: "splash", pageActions: false, head: [{ tag: "meta", attrs: { property: "og:title", content: "fxbot plugins" } }] }}>
+  <p>
+    {description} Each plugin adds to fxbot itself, the app on your machine.
+  </p>
   <p>
     These are the plugins fxbot vets. <strong>Browse</strong>, in fxbot's <strong>Plugins</strong>, shows them while unvetted plugins are off, and each costs nothing until it's added.
   </p>

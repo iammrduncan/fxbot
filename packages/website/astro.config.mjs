@@ -104,7 +104,7 @@ export default defineConfig({
     react(),
     starlight({
       title: "fxbot",
-      description: "fxbot is your bot, built and configured how you want it: a lean, local-first core that works with local models and grows with the plugins you pick.",
+      description: "AI assistants that do real work, built your way, on your own machine. Any model, hosted or local, from any browser or the fxbot app on your phone. Open source.",
       favicon: "/icon-192.png",
       head: [
         { tag: "meta", attrs: { property: "og:image", content: `${site}${base}card.png` } },
@@ -145,7 +145,7 @@ export default defineConfig({
         starlightPageActions({ actions: { chatgpt: true, claude: true, markdown: true } }),
         starlightLlmsTxt({
           projectName: "fxbot",
-          description: "fxbot is your bot, built and configured how you want it: a lean, local-first core, on libfx, that works with local models and grows with the plugins you pick.",
+          description: "fxbot is AI assistants that do real work, built your way: bots that chat, remember, work on a computer of their own, and run tasks on a schedule, on any model, hosted or local, from any browser or the fxbot app on a phone. It runs on the owner's own machine, on libfx, and grows with the plugins they pick.",
           details: `To set fxbot up on a machine, follow [agent-setup.txt](${site}${base}agent-setup.txt).`,
           customSets: [
             { label: "Docs", paths: ["docs/**"], description: "running fxbot: install, providers, plugins, updates, and how it works" },

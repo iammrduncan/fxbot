@@ -21,7 +21,8 @@
     "build-site": "npm run build -w @fxbot/website",
     "typecheck": "npm run typecheck --workspaces && tsc -p plugins/tsconfig.json && node scripts/check-plugins.mjs",
     "rotate-key": "node --env-file-if-exists=.env packages/server/src/rotate-key.ts",
-    "shots": "node scripts/screenshots/shoot.mjs"
+    "shots": "node scripts/screenshots/shoot.mjs",
+    "card": "node scripts/screenshots/card.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
