@@ -40,7 +40,7 @@ services:
     ports: [ "8790-8799:8790-8799/udp" ]
 ```
 
-The file is yours: nothing else writes over it. The computer keeps its own lines in `compose.computer.yaml`. Then run `sudo fxbot up`, which starts the app again with the ports published.
+The file is yours: nothing else writes over it. The computer keeps its own lines in `compose.computer.yaml`. On an install updated from 0.7.0 with the computer, its lines are still in `compose.override.yaml`, under `# Written by the computer plugin's setup.sh`: run `sudo fxbot computer on` once first, which moves them to their own file. Then run `sudo fxbot up`, which starts the app again with the ports published.
 
 With ufw active, let the range through to the container too, since ufw drops what the machine forwards:
 

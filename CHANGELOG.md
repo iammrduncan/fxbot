@@ -4,7 +4,7 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
-**Before upgrading.** Migration `0014_provider_fields` adds `fields` and `model_ids` columns to `providers`, for a provider's region or account and the models you type for it. Every provider you have carries on as it is. The update to 0.8.0 runs 0.7.0's `fxbot` command, which leaves 0.7.0's image: `sudo podman rmi ghcr.io/iammrduncan/fxbot:0.7.0`, or `sudo docker rmi` on Docker, takes it away.
+**Before upgrading.** Migration `0014_provider_fields` adds `fields` and `model_ids` columns to `providers`, for a provider's region or account and the models you type for it. Every provider you have carries on as it is. The update to 0.8.0 runs 0.7.0's `fxbot` command, which leaves 0.7.0's image: `sudo podman rmi ghcr.io/iammrduncan/fxbot:0.7.0`, or `sudo docker rmi` on Docker, takes it away. With the computer, run `sudo fxbot computer on` once after updating: it moves the computer's lines out of `compose.override.yaml`, into a file of their own.
 
 - **A new page for adding a provider.** **Add provider**, in **Settings** › **Providers**, opens a page of providers, each with its logo, sign-ins first, then keys, clouds, and servers on your own machine, with a search over about 200 providers. First-run setup shows the same page, sign-ins first.
 - **Sign in to OpenRouter and OrcaRouter, with nothing to paste.** OpenRouter's sign-in comes back to fxbot's own page, or shows a code to paste where it can't. OrcaRouter's is a device code. Each makes a key on your account, which fxbot keeps sealed. Hugging Face signs in by device code too, through fxbot's own app there. Requests to OpenRouter now name fxbot as the app that sent them.
