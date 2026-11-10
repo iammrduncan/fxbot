@@ -282,7 +282,7 @@ THE SOFTWARE.
 
 MIT License
 
-Copyright (c) 2020 
+Copyright (c) 2020
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -307,7 +307,7 @@ SOFTWARE.
 
 MIT License
 
-Copyright (c) 2020 
+Copyright (c) 2020
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -332,7 +332,7 @@ SOFTWARE.
 
 MIT License
 
-Copyright (c) 2020 
+Copyright (c) 2020
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -357,7 +357,7 @@ SOFTWARE.
 
 MIT License
 
-Copyright (c) 2020 
+Copyright (c) 2020
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -382,7 +382,7 @@ SOFTWARE.
 
 MIT License
 
-Copyright (c) 2020 
+Copyright (c) 2020
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -432,7 +432,7 @@ SOFTWARE.
 
 MIT License
 
-Copyright (c) 2020 
+Copyright (c) 2020
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -457,7 +457,7 @@ SOFTWARE.
 
 MIT License
 
-Copyright (c) 2020 
+Copyright (c) 2020
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -482,7 +482,7 @@ SOFTWARE.
 
 MIT License
 
-Copyright (c) 2020 
+Copyright (c) 2020
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -507,7 +507,7 @@ SOFTWARE.
 
 MIT License
 
-Copyright (c) 2020 
+Copyright (c) 2020
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -912,7 +912,7 @@ Apache License
 
 Version 2.0, January 2004
 
-http://www.apache.org/licenses/ 
+http://www.apache.org/licenses/
 
 TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 
