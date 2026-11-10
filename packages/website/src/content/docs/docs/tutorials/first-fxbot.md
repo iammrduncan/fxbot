@@ -1,9 +1,9 @@
 ---
 title: "Your first fxbot"
-description: "In this tutorial you install fxbot on a machine of yours, make a bot, and chat with it there and on your phone."
+description: "In this tutorial you install fxbot on a machine of yours, make a bot, put fxbot on your phone, and chat with the bot there."
 ---
 
-In this tutorial you install fxbot on a machine of yours, make a bot, and chat with it there and on your phone.
+In this tutorial you install fxbot on a machine of yours, make a bot, put fxbot on your phone, and chat with the bot there.
 
 You need:
 
@@ -90,19 +90,9 @@ If you leave partway, fxbot comes back to the same step. **Skip for now** skips 
 <img class="shot dark:sl-hidden" src="/shots/setup-bot-desktop-light.png" width="1280" height="800" alt="First-run setup, on Make a bot, with the look picker" />
 <img class="shot light:sl-hidden" src="/shots/setup-bot-desktop-dark.png" width="1280" height="800" alt="First-run setup, on Make a bot, with the look picker" />
 
-## Chat
-
-Send `Hello! What can you do?`. While Scout works, its blob in the sidebar hops and looks around, and the reply streams in as it is written.
-
-Now reload the page. The chat is still there, because it lives on the server, not in the page. A reply still being written when you leave carries on without you.
-
-## Give it instructions
-
-Open the bot panel with the button at the top right of the chat, then **Edit**. Under **Instructions**, write `Answer in one short paragraph.` and tap **Save**. Ask Scout something else, and notice the shorter reply.
-
 ## Put it on your phone
 
-Web pairing opens your fxbot at [web.fxbot.sh](https://web.fxbot.sh), on your phone, over a connection straight to it, away from home too.
+Before you say hello, put fxbot on your phone. Web pairing opens your fxbot at [web.fxbot.sh](https://web.fxbot.sh), on your phone, over a connection straight to it, away from home too.
 
 1. In fxbot, open **Plugins**, find **Web pairing**, and add it.
 2. On your phone, open web.fxbot.sh and install it:
@@ -112,9 +102,19 @@ Web pairing opens your fxbot at [web.fxbot.sh](https://web.fxbot.sh), on your ph
 4. On your phone, in the app, choose **Pair a device**, and type the code. On Android, **Scan the QR code** scans it instead.
 5. Both screens show six digits. Check they're the same, then choose **Approve** in fxbot.
 
-The phone says **Paired**. Tap **Open**, and Scout is there. Send it a message: the reply streams in as it did on the machine.
+The phone says **Paired**. Tap **Open**: your fxbot fills the screen, with your bots, plugins, and settings. Open Scout's chat.
 
 To check it'll connect away from home, see **Settings** › **Web pairing** › **Reachability**. A network that won't connect directly has [other ways](/docs/how-to/when-a-device-cant-connect/).
+
+## Chat
+
+On your phone, send `Hello! What can you do?`. The reply streams in as it is written, and the same chat on the machine shows it too.
+
+Now close the app and open it again. The chat is still there, because it lives on your fxbot, not in the app. A reply still being written when you leave carries on without you.
+
+## Give it instructions
+
+Open the bot panel with the button at the top right of the chat, then **Edit**. Under **Instructions**, write `Answer in one short paragraph.` and tap **Save**. Ask Scout something else, and notice the shorter reply.
 
 ## What you have now
 

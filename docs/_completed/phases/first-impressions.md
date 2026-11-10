@@ -360,6 +360,7 @@ All answered by the owner on 2026-11-10:
 - **The README's opener** names the products fxbot is an open alternative to, as the questions do.
 - **The tutorial** opens fxbot on the machine, or over SSH, in a new "Open it." It reloads the page where it had closed the app, since the chat is in a desktop browser at that point, and ends with "Put it on your phone."
 - **`agent-setup.txt`'s hand-over** gained a third step, for the phone.
+- **The phone comes early,** after the owner's review: "shouldn't the reach-it go under tutorials and be something pretty early on, especially phone access?" The tutorial pairs the phone right after setup, so the first chat is on it. The two phone guides and Pair another device lead the how-to list. "Reach it" stays a how-to, since it's a choice among ways, not a lesson. The docs' first page and the agent tutorial point to the phone.
 - **[naive-panel](../../../.agents/skills/naive-panel/SKILL.md),** at the owner's word, is a skill now. It runs the fresh readers and the panel this phase's research used.
 
 **The proof.** Fresh readers, each a model told to answer only from what it was shown.
