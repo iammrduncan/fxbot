@@ -53,7 +53,8 @@ import { follow, go } from "./nav.ts";
 import { Header } from "./header.tsx";
 import { BotsProvider, loadPlugins, MessageBox, Place, SaidText, useFold, usePluginNav, usePluginScreen } from "./plugins.tsx";
 import { ModelField } from "./providers.tsx";
-import { keepDraft, reload, takeDraft, useNewVersion } from "./pwa.ts";
+import { draftOf, keepDraft } from "./drafts.ts";
+import { reload, useNewVersion } from "./pwa.ts";
 import { SettingsScreen } from "./settings.tsx";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { useTurnStream } from "./use-turn-stream.ts";
@@ -618,12 +619,9 @@ function useSettled(element: { current: HTMLElement | null }, ready: boolean) {
 function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profile[] | null; onChange: () => void; onShown: () => void }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState("");
-  // A draft left before a new build's reload comes back (pwa.ts).
-  const [draft, setDraft] = useState(() => takeDraft(id));
-  useEffect(() => {
-    keepDraft(id, draft);
-    return () => keepDraft(id, "");
-  }, [id, draft]);
+  // Its unsent message, kept until it's sent (drafts.ts).
+  const [draft, setDraft] = useState(() => draftOf(id));
+  useEffect(() => keepDraft(id, draft), [id, draft]);
   const [attached, setAttached] = useState<Upload[]>([]);
   const [notice, setNotice] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);

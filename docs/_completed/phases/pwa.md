@@ -177,6 +177,7 @@ What the build found or changed, checked against vite-plugin-pwa 2.0.0 and Playw
   - the page drops its left inset while the sidebar sits beside it
 - **Headless Chromium offered to install by itself** on `127.0.0.1`. It fired a real `beforeinstallprompt`, and Settings showed Install before the check dispatched its own.
 - **On a phone the sidebar is a sheet,** so "New version" shows once the sheet is opened, as planned.
+- **A draft stays until it's sent,** in 0.9.0 ([issue #13](https://github.com/iammrduncan/fxbot/issues/13)). Each bot's unsent message goes to `localStorage` as it's typed, from `drafts.ts`, so it comes back after another screen, a reload, or the app closing, where it lasted only through **Reload**. `pwa.ts` no longer hands one over. With storage off, as in a private window, a draft lasts while its chat is open.
 
 ### Size
 

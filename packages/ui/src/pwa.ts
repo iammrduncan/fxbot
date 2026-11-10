@@ -39,19 +39,8 @@ const update = registerSW({
 
 export const useNewVersion = () => useSyncExternalStore(subscribe, () => waiting);
 
-// The open chat's draft crosses the reload in sessionStorage, and that chat takes it back.
-let draft = { bot: "", text: "" };
-export function keepDraft(bot: string, text: string) {
-  draft = { bot, text };
-}
-export function takeDraft(bot: string) {
-  const text = sessionStorage.getItem(`draft:${bot}`) ?? "";
-  sessionStorage.removeItem(`draft:${bot}`);
-  return text;
-}
-
+// A chat's draft is kept as it's typed (drafts.ts), so a reload loses nothing.
 export function reload() {
-  if (draft.text) sessionStorage.setItem(`draft:${draft.bot}`, draft.text);
   // The new worker reloads the pages it takes over. A page no worker controls yet, as on its first visit, reloads itself.
   if (navigator.serviceWorker?.controller) void update();
   else void update().then(() => location.reload());
