@@ -15,6 +15,7 @@
         { "name": "perAsk", "description": "The most subagents one request from you leads to, 1 to 50", "default": "10" },
         { "name": "minutes", "description": "The most minutes one subagent works, 1 to 240", "default": "60" },
         { "name": "calls", "description": "The most tool calls one subagent makes, 1 to 1000", "default": "100" },
+        { "name": "handOff", "description": "on: your bot hands work that takes a lot of digging to subagents, and tells you it'll come back with the results. off: it starts one only when it decides to", "default": "on" },
         { "name": "keepDays", "description": "How many days an ended subagent is kept, 1 to 90", "default": "30" },
         { "name": "blocked", "description": "Tools a subagent can't call, comma-separated: its chat does these", "default": "memory_save, memory_forget, messages_send, routines_add, routines_change, routines_remove, computer_ask_owner" }
       ]

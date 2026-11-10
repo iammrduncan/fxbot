@@ -41,17 +41,26 @@ function usePoll(path, working, { busy = 5000, idle = 30000 } = {}) {
   return value;
 }
 
+// A subagent's name, in its color.
+const Name = ({ s }) => (
+  <span className="subagents-name" data-color={s.color ?? 0}>
+    {s.name || `s${s.id}`}
+  </span>
+);
+
 function Row({ s }) {
   const { Button } = ui;
   const calls = s.calls ? `${s.calls} ${s.calls === 1 ? "call" : "calls"}` : "";
   const detail = s.state === "working" ? [s.tool, calls].filter(Boolean).join(" · ") : s.state === "done" ? "" : s.ended;
   return (
     <li className="subagents-row" data-state={s.state}>
-      <button type="button" className="subagents-open" onClick={() => go(screenOf(s))} title={`Open ${s.title}`}>
+      <button type="button" className="subagents-open" onClick={() => go(screenOf(s))} title={`Open ${s.name}: ${s.title}`}>
         <span className="subagents-dot" aria-hidden="true" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm">{s.title}</span>
-          {detail && <span className="block truncate text-xs text-muted-foreground">{detail}</span>}
+        <span className="subagents-text">
+          <span className="subagents-line text-sm">
+            <Name s={s} /> {s.title}
+          </span>
+          {detail && <span className="subagents-line text-xs text-muted-foreground">{detail}</span>}
         </span>
         <span className="subagents-state text-xs">
           {s.state === "working" ? "" : `${word[s.state]} · `}
@@ -59,7 +68,7 @@ function Row({ s }) {
         </span>
       </button>
       {s.state === "working" && (
-        <Button type="button" size="xs" variant="ghost" onClick={() => stop(s)} aria-label={`Stop ${s.title}`}>
+        <Button type="button" size="xs" variant="ghost" onClick={() => stop(s)} aria-label={`Stop ${s.name}`}>
           Stop
         </Button>
       )}
@@ -183,7 +192,7 @@ function Thread({ params }) {
   }[run.state];
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Header title={run.title} lead={lead}>
+      <Header title={<Name s={run} />} lead={lead}>
         {run.state === "working" && (
           <Button type="button" size="sm" variant="outline" onClick={() => stop(run)}>
             Stop
@@ -193,9 +202,9 @@ function Thread({ params }) {
       <div className="subagents-status text-xs text-muted-foreground" data-state={run.state}>
         {bot && <Blob {...bot} size={18} />}
         <span className="subagents-dot" aria-hidden="true" />
-        <span>
-          {bot ? `${bot.name}'s subagent · ` : ""}
-          {word[run.state]} · {took}
+        <span className="subagents-line">
+          {bot ? `${bot.name}'s subagent, on ` : "On "}
+          {run.title} · {word[run.state]} · {took}
           {run.state === "working" && run.tool ? ` · ${run.tool}` : ""}
         </span>
       </div>
@@ -240,7 +249,9 @@ function Started({ call: started }) {
   return (
     <div className="subagents-card" data-state={run?.state ?? "working"}>
       <span className="subagents-dot" aria-hidden="true" />
-      <span className="min-w-0 flex-1 truncate text-sm">Started subagent: {title}</span>
+      <span className="subagents-line min-w-0 flex-1 text-sm">
+        Started {run ? <Name s={run} /> : "a subagent"}: {title}
+      </span>
       <span className="text-xs text-muted-foreground">{run === null ? "Gone" : word[run?.state ?? "working"]}</span>
       {run && (
         <Button type="button" size="xs" variant="outline" onClick={() => go(screenOf(run))}>

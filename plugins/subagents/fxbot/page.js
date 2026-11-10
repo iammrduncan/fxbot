@@ -37,6 +37,11 @@ function usePoll(path, working, { busy = 5e3, idle = 3e4 } = {}) {
 	}, [path]);
 	return value;
 }
+const Name = ({ s }) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+	className: "subagents-name",
+	"data-color": s.color ?? 0,
+	children: s.name || `s${s.id}`
+});
 function Row({ s }) {
 	const { Button } = _fxbot_app.ui;
 	const calls = s.calls ? `${s.calls} ${s.calls === 1 ? "call" : "calls"}` : "";
@@ -48,19 +53,23 @@ function Row({ s }) {
 			type: "button",
 			className: "subagents-open",
 			onClick: () => (0, _fxbot_app.go)(screenOf(s)),
-			title: `Open ${s.title}`,
+			title: `Open ${s.name}: ${s.title}`,
 			children: [
 				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 					className: "subagents-dot",
 					"aria-hidden": "true"
 				}),
 				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-					className: "min-w-0 flex-1",
-					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: "block truncate text-sm",
-						children: s.title
+					className: "subagents-text",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: "subagents-line text-sm",
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Name, { s }),
+							" ",
+							s.title
+						]
 					}), detail && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: "block truncate text-xs text-muted-foreground",
+						className: "subagents-line text-xs text-muted-foreground",
 						children: detail
 					})]
 				}),
@@ -74,7 +83,7 @@ function Row({ s }) {
 			size: "xs",
 			variant: "ghost",
 			onClick: () => stop(s),
-			"aria-label": `Stop ${s.title}`,
+			"aria-label": `Stop ${s.name}`,
 			children: "Stop"
 		})]
 	});
@@ -215,7 +224,7 @@ function Thread({ params }) {
 		className: "flex min-h-0 flex-1 flex-col",
 		children: [
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Header, {
-				title: run.title,
+				title: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Name, { s: run }),
 				lead,
 				children: run.state === "working" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
 					type: "button",
@@ -237,13 +246,18 @@ function Thread({ params }) {
 						className: "subagents-dot",
 						"aria-hidden": "true"
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
-						bot ? `${bot.name}'s subagent · ` : "",
-						word[run.state],
-						" · ",
-						took,
-						run.state === "working" && run.tool ? ` · ${run.tool}` : ""
-					] })
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: "subagents-line",
+						children: [
+							bot ? `${bot.name}'s subagent, on ` : "On ",
+							run.title,
+							" · ",
+							word[run.state],
+							" · ",
+							took,
+							run.state === "working" && run.tool ? ` · ${run.tool}` : ""
+						]
+					})
 				]
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageScrollerProvider, {
@@ -302,8 +316,13 @@ function Started({ call: started }) {
 				"aria-hidden": "true"
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-				className: "min-w-0 flex-1 truncate text-sm",
-				children: ["Started subagent: ", title]
+				className: "subagents-line min-w-0 flex-1 text-sm",
+				children: [
+					"Started ",
+					run ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Name, { s: run }) : "a subagent",
+					": ",
+					title
+				]
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 				className: "text-xs text-muted-foreground",

@@ -3,10 +3,12 @@
 A plugin for [fxbot](https://fxbot.sh): a bot hands work to subagents, helpers that run in the background while it carries on, and hears back from them together.
 
 - **A subagent is the bot, run again, on one task.** It works in a session of its own, with the bot's instructions, tools, computer, skills, and memories, but not its chat, so the task carries everything it needs.
-- **The bot starts one with `subagents_start`,** a title and a task, and gets its id at once. It can start several, for parallel work, and keep talking with you.
+- **The bot starts one with `subagents_start`,** a title and a task, and gets its name and id at once, such as Bravo (s:12). Names come from the phonetic alphabet, Alpha, Bravo, Charlie, the first that none in the bot's list has, and each working one has a color of its own, on its name in the panel. The bot can start several, for parallel work, and keep talking with you.
+- **With the plugin on, a bot hands work that takes a lot of digging to subagents** by itself, and tells you it'll come back with the results. `handOff` turns that off.
+- **A subagent and the bot's chat talk while it works.** It tells the chat what can't wait, a question or a finding, and the bot answers it, or changes its task, by name.
 - **Their reports come back together.** Once every subagent one turn started has ended, one message from **Subagents** reaches the bot's chat with all their reports. It joins the bot's turn if one is running, or starts its next one, and the bot tells you what matters.
 - **You watch them work.** The bot's panel, on the right of its chat, lists its subagents, working and recent, with the tool each is in and its calls. A click opens one's thread: its task, each step, and how it ended, live. **Stop** ends one.
-- **On the computer, they work together,** with the [computer](https://fxbot.sh/docs/how-to/give-bots-a-computer/) 0.4.0 or newer: each has its name and arrow on the computer's screen, its own browser tab, and turns at the desktop and the terminal.
+- **On the computer, they work together,** with the [computer](https://fxbot.sh/docs/how-to/give-bots-a-computer/) 0.4.0 or newer: each has its name and arrow on the computer's screen, such as "Ann · Wren", its own browser tab, and turns at the desktop and the terminal.
 
 Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.9.0 or newer. See [Hand work to subagents](https://fxbot.sh/docs/how-to/hand-work-to-subagents/).
 
@@ -14,13 +16,15 @@ Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read i
 
 - **`subagents_start({ title, task })`:** starts one, only in the bot's own chat with you, not in a room or a routine's run. The same call twice in one turn, as libfx runs a call a restart cut off, finds the subagent the first one started.
 - **`subagents_list()`:** the bot's subagents working now, and those that ended in the last day, for when you ask how they're going. A second call in the same turn answers that their reports come on their own, so a bot doesn't wait by polling.
-- **`subagents_stop({ id })`:** stops one. A batch the bot stopped entirely sends no report.
+- **`subagents_stop({ id })`:** stops one, by name or id. A batch the bot stopped entirely sends no report.
+- **`subagents_message({ to, text })`:** from the bot's chat, sends a working subagent an answer or a change, which reaches it at its next step, while it works.
+- **`subagents_tell({ text })`:** only in a subagent: tells the bot's chat what can't wait for its report. It joins the chat's turn, or wakes it, as a message from the subagent's name, and the subagent carries on. At most five times a subagent.
 
 ## What a subagent can't do
 
-- **Start a subagent of its own.** There's one level.
+- **Start a subagent of its own.** There's one level. Its only `subagents_*` tool is `subagents_tell`.
 - **The tools in the `blocked` setting,** which are by default what the bot's chat decides: `memory_save`, `memory_forget`, `messages_send`, `routines_add`, `routines_change`, `routines_remove`, and `computer_ask_owner`. It says in its report what it would do instead.
-- **Ask anyone anything.** Nobody watches a subagent. A call that needs your OK waits at a card in the bot's chat, from [Permissions](https://fxbot.sh/docs/how-to/choose-what-a-bot-can-do-alone/), as background work does.
+- **Ask you anything.** Nobody watches a subagent, though it can tell the bot's chat. A call that needs your OK waits at a card in the bot's chat, from [Permissions](https://fxbot.sh/docs/how-to/choose-what-a-bot-can-do-alone/), as background work does.
 
 ## Its limits
 
@@ -32,6 +36,7 @@ In its tab in **Settings**. A bot can't change them.
 | `perAsk` | The most subagents one request from you leads to, through every turn their reports wake, 1 to 50 | 10 |
 | `minutes` | The most minutes one subagent works, 1 to 240 | 60 |
 | `calls` | The most tool calls one subagent makes, 1 to 1,000 | 100 |
+| `handOff` | `on`: the bot hands work that takes a lot of digging to subagents, and tells you it'll come back with the results. `off`: it starts one only when it decides to | `on` |
 | `keepDays` | How many days an ended subagent is kept in the list, 1 to 90 | 30 |
 | `blocked` | Tools a subagent can't call, comma-separated | as above |
 
