@@ -514,7 +514,9 @@ export async function createFxbot(options: FxbotOptions) {
   async function keyWords(provider: string, status: number) {
     const named = provider ? await providers.describe(provider).catch(() => null) : null;
     const label = named?.label ?? "The provider";
-    const whose = named && named.name !== named.label ? `${named.name}'s` : "this provider's";
+    // A name of its own, not one like 0.7.0's defaults, "OpenRouter key" or "ChatGPT plan".
+    const own = named && !named.name.toLowerCase().includes(named.label.toLowerCase()) && !/ (key|plan|account)$/i.test(named.name);
+    const whose = own ? `${named.name}'s` : "this provider's";
     return status === 403
       ? `${label} refused ${whose} key (HTTP 403): it may lack a permission, or the account may need credit or be over its quota. Check the account, or replace the key in Settings › Providers.`
       : `${label} rejected ${whose} key. Replace it in Settings › Providers.`;
