@@ -515,6 +515,7 @@ Checks use v1's harness: a disposable Postgres, the mock model making scripted t
 - **`setDraft`** in a composer control takes a function too, as React's setters do, so the Computer button doesn't add `$computer` twice. The type and the Plugin API reference say so.
 - **The plugin's `package.json`** holds the page's build dependencies, and `"type": "module"`, which the server code needs for `import.meta`.
 - **The tools' list** stays the same for every bot, as fxbot lists every plugin's tools; a bot the computer is off for is refused when it calls one. The instructions entry is the part that's only for its bots.
+- **The browser and desktop skills hold their commands (0.9.0, [issue #14](https://github.com/iammrduncan/fxbot/issues/14)).** They sent a bot to `agent-browser skills get core` and `agent-desktop skills get desktop`, a second read that bots seldom made: in one week of a test install, `agent-browser` ran 25 times and its guide was read once. Now each skill has the commands a bot needs, from agent-browser 0.41.1's and agent-desktop 1.1.0's own guides, with what's different on this computer: one Chromium the owner watches, already connected, sign-ins through `computer_ask_owner`, and pointer input through `computer_desktop`, not `--headed`. Each still names its tool's guide for the rest, and the comment beside the pinned versions says to check the skills when either changes. The standing rule and the `computer` skill point to them.
 
 ## 5. Open questions
 

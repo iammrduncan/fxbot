@@ -10,8 +10,8 @@ Your computer is a Debian machine with a desktop your owner can watch: XFCE, a t
 | Use | When |
 | --- | --- |
 | `computer_shell`, `computer_read_file`, `computer_write_file` | Anything a command or a file can do: install, run, fetch, convert, read, edit |
-| `agent-browser` through `computer_shell` | A web page: open, read, fill, click. Run `agent-browser skills get core` before the first page |
-| `agent-desktop` through `computer_shell` | A desktop app's buttons, menus, and fields, by its accessibility tree. Run `agent-desktop skills get desktop` before the first app |
+| `agent-browser` through `computer_shell` | A web page: open, read, fill, click. Your skill `browser` has its commands |
+| `agent-desktop` through `computer_shell` | A desktop app's buttons, menus, and fields, by its accessibility tree. Your skill `desktop` has its commands |
 | `computer_terminal` | A program that asks and waits: a REPL, an installer's prompts, `ssh`, `top`. It's the terminal window your owner sees |
 | `computer_desktop` | Only what has no tree: a canvas, a video, a game, a drag. One action, then a screenshot, in pixels |
 | `computer_to_library` | Saving what your owner should see: a screenshot, a file you made |

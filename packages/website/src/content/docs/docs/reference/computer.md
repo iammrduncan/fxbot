@@ -51,8 +51,8 @@ The plugin has three skills:
 | Skill | What it covers |
 | --- | --- |
 | `computer` | Which tool for which job, and how to act on a screen and check what happened. `$computer` in a message, or the screen button beside the message box, sends it with the message. |
-| `browser` | Web pages with `agent-browser`. It has the bot run `agent-browser skills get core`, the text that comes with the version on the computer. |
-| `desktop` | Desktop apps with `agent-desktop`, by their accessibility trees. It has the bot run `agent-desktop skills get desktop`. |
+| `browser` | Web pages with `agent-browser` 0.41.1, the version on the computer: how to open, read, fill, click, wait, and take screenshots, what to leave as it is on this computer, and what to do when a step fails. `agent-browser skills get core` has the rest. |
+| `desktop` | Desktop apps with `agent-desktop` 1.1.0, by their accessibility trees: the commands, refs, when it's safe to try a step again, and when to use `computer_desktop` instead. `agent-desktop skills get desktop` has the rest. |
 
 ## The desktop
 
