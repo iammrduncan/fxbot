@@ -7,13 +7,13 @@ What fxbot says it is, in the places people meet it first: the link preview, the
 - **What plugins are:** what you add to fxbot itself, said by what they let a bot do: a computer of its own, routines, subagents. The word stays, and "extensions" never appears.
 - **What a bot does for you:** tasks named plainly, with the screenshots we already have.
 
-Status: planned on 2026-11-10, not built. The owner answered the open questions the same day ([5](#5-open-questions)). Researched the same day:
+Status: built on 2026-11-10, for `main` after 0.9.0, as planned the same day, with the owner's answers to the open questions ([5](#5-open-questions)). Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. Researched the same day:
 - the questions people asked the owner after a link to fxbot.sh
 - a test of today's link preview and home page on two fresh readers who knew nothing about fxbot
 - how OpenClaw, Hermes Agent, Pi, eve, Grok's bot, Muse, Claude Duet, OpenAI's Dots, and Open WebUI introduce themselves
 - a panel of six readers, each playing a common kind of person, on four headlines and six words for plugins
 
-The chat apps people asked for are two stubs of their own: [Gateways](gateways.md) and [Telegram and Discord](telegram-and-discord.md).
+The chat apps people asked for are two stubs of their own: [Gateways](../../phases/gateways.md) and [Telegram and Discord](../../phases/telegram-and-discord.md).
 
 ## What the owner asked
 
@@ -39,7 +39,7 @@ Neither. Nothing in the app changes. This phase changes words and pictures:
 - the README, `agent-setup.txt`, and the last lines `setup.sh` prints
 - the GitHub repository's description and topics, which the owner sets
 
-All of it is site work, which goes live on a push to `main` with no release ([Site deploys from main](../../README.md#releasing)). `release/0.10.0` holds no app work yet, so it ships to `main` now, and `release/0.10.0` moves along with it.
+All of it is site work, which goes live on a push to `main` with no release ([Site deploys from main](../../../README.md#releasing)). `release/0.10.0` holds no app work yet, so it ships to `main` now, and `release/0.10.0` moves along with it.
 
 ## 1. Research
 
@@ -76,8 +76,8 @@ Both readers asked the owner's questions back, so the words cause them, not the 
 - **The GitHub description:** "fxbot is your bot, built and configured how you want it." It names no category, model, or device. The topics are `agent-harness`, `agent-tools`, `ai-agents`, `autonomous-agents`, `harness`, `mcp-tools`, and `multi-agent`. Nothing says self-hosted or assistant.
 - **The README and the docs' first page** open with the same line, then local models before hosted ones, then Tailscale as the recommended way in.
 - **The home page's feature list** leads with plumbing: bots and chats, providers, the library, an installable app, plugins, and releases. The things bots do that people would want aren't in it: a computer of their own, routines, subagents, pages, and rooms. Most are in the gallery further down, titled by feature, not by task.
-- **The only Mac and Windows line** is the tutorial's "On a Mac or on Windows, use a Linux machine, or a Linux VM." `setup.sh` runs in WSL 2's Ubuntu with systemd, which the owner checked on 2026-11-10, though [operations](../_completed/phases/operations.md) had left it unchecked.
-- **"Linux" is on the first screen three times:** the line under the install command, step 1's list of distros, and the Machine row. Native Windows, Linux, and Mac installs are planned for 0.10.0 ([Distribution](distribution.md)), so a platform named now is wrong soon.
+- **The only Mac and Windows line** is the tutorial's "On a Mac or on Windows, use a Linux machine, or a Linux VM." `setup.sh` runs in WSL 2's Ubuntu with systemd, which the owner checked on 2026-11-10, though [operations](operations.md) had left it unchecked.
+- **"Linux" is on the first screen three times:** the line under the install command, step 1's list of distros, and the Machine row. Native Windows, Linux, and Mac installs are planned for 0.10.0 ([Distribution](../../phases/distribution.md)), so a platform named now is wrong soon.
 
 ### The products people do understand
 
@@ -200,9 +200,9 @@ From the owner's answers and the panel:
 - **The sentence after it:** "Each one chats, remembers, works on a computer of its own, and runs tasks on a schedule. Pick its model, hosted or local, its look, and what it can do, and talk to it from any browser or the fxbot app on your phone."
 - **Three facts, as a row under the hero:**
   - **Any model:** sign in with ChatGPT or Grok, add a key for Claude, Gemini, or OpenRouter, or run one with Ollama or LM Studio.
-  - **On your phone:** the fxbot app, away from home too, with web pairing. No VPN needed. (A network that blocks direct connections needs one of the other ways, as [When a device can't connect](../../packages/website/src/content/docs/docs/how-to/when-a-device-cant-connect.md) says, so the FAQ links there.)
+  - **On your phone:** the fxbot app, away from home too, with web pairing. No VPN needed. (A network that blocks direct connections needs one of the other ways, as [When a device can't connect](../../../packages/website/src/content/docs/docs/how-to/when-a-device-cant-connect.md) says, so the FAQ links there.)
   - **Yours:** free and open source, on your own machine. One command installs it, and your bots, chats, files, and keys stay with you.
-- **The description** (meta, og, the docs' default): "AI assistants that do real work, built your way. Use any model, hosted or local, from any browser or the app on your phone. Free and open source." That's about 150 characters.
+- **The description** (meta, og, the docs' default): "AI assistants that do real work, built your way, on your own machine. Any model, hosted or local, from any browser or the fxbot app on your phone. Open source." That's 159 characters. The plan's first one left out "on your own machine" and "the fxbot app," and the [proof](#what-the-build-changed) missed both.
 - **No platform is named on a first impression.** The card, the home page, the README's opener, the docs' first page, and GitHub say "your own machine," never Linux, Windows, or Mac. Native installs for all three are planned for 0.10.0, and this way nothing here changes when they land. What each install runs on stays where it's needed: the tutorial's "You need," `agent-setup.txt`, and `setup.sh`'s checks.
 - **"Local first" and "a lean core" leave the first screen.** "On your own machine," in the third fact, says what "local first" meant, with no doubt about models. The lean core stays in "Who it's for" and the docs, for the people it's for.
 - **Plugins, by what they do.** Where everyone reads it, the copy says what a plugin lets a bot do, then the word: "Add what you want them to do: a computer of their own, routines, subagents, pages, and more, as plugins." The app, the docs, and the plugin directory keep "plugins." No first impression says "extensions" or "add-ons."
@@ -225,7 +225,7 @@ In this order:
    - **Does it only work with local models?** No. Sign in with ChatGPT or Grok, use a key from Anthropic, Google, OpenAI, OpenRouter, or about 30 others, or run one locally. Each bot can use a different one.
    - **Does a bot use my computer?** No. With the computer plugin, each bot gets a computer of its own, in a container on your machine, with a desktop and a browser you watch and take over.
    - **Do I need Tailscale?** No. Web pairing opens your fxbot from your phone or any computer, at web.fxbot.sh, over a connection straight to it. Tailscale, SSH, and your own proxy also work.
-   - **Can I talk to it on Telegram or Discord?** Not yet ([Gateways](gateways.md) is a stub). fxbot has its own app, which installs on your phone and shows everything a bot does: its pages, its computer, its subagents, and the cards where it asks you first.
+   - **Can I talk to it on Telegram or Discord?** Not yet ([Gateways](../../phases/gateways.md) is a stub). fxbot has its own app, which installs on your phone and shows everything a bot does: its pages, its computer, its subagents, and the cards where it asks you first.
    - **Is there a hosted version, or an account?** No. It runs on your machine, and your bots, chats, files, and keys stay there.
    - **What does it cost?** fxbot is free and open source. You pay your model's provider, use a plan you already have, such as ChatGPT, or nothing with a local model.
 7. **What it does:** the feature list, with the computer, routines, and subagents in place of the library and releases, which move to "Who it's for."
@@ -265,7 +265,7 @@ In this order:
 
   ```sh
   gh repo edit iammrduncan/fxbot \
-    --description "AI assistants that do real work, built your way. Any model, hosted or local. Use it from any browser or the app on your phone. Open source." \
+    --description "AI assistants that do real work, built your way, on your own machine. Any model, hosted or local, from any browser or the fxbot app on your phone. Open source." \
     --add-topic self-hosted --add-topic ai-assistant --add-topic personal-assistant --add-topic llm --add-topic ollama --add-topic pwa
   ```
 
@@ -273,8 +273,8 @@ In this order:
 
 ### Not in this phase
 
-- **Telegram, Discord, and other chat apps.** Every consumer product people compare fxbot with leads with chat apps. They're stubs of their own, [Gateways](gateways.md) and [Telegram and Discord](telegram-and-discord.md). Until one's built, the FAQ answers "Not yet."
-- **Native installs on Windows, Linux, and Mac.** They're planned for 0.10.0 ([Distribution](distribution.md), [Mac support](mac-support.md)). This phase names no platform on a first impression, so nothing in it changes when they land.
+- **Telegram, Discord, and other chat apps.** Every consumer product people compare fxbot with leads with chat apps. They're stubs of their own, [Gateways](../../phases/gateways.md) and [Telegram and Discord](../../phases/telegram-and-discord.md). Until one's built, the FAQ answers "Not yet."
+- **Native installs on Windows, Linux, and Mac.** They're planned for 0.10.0 ([Distribution](../../phases/distribution.md), [Mac support](../../phases/mac-support.md)). This phase names no platform on a first impression, so nothing in it changes when they land.
 - **Web pairing in Essentials.** The owner took it out in 0.9.0. The phone step names it instead.
 - **Renaming plugins,** which the panel kept, or any change in the app.
 
@@ -294,37 +294,38 @@ No app code, no new dependency, and no new page in the docs.
 ## 4. Checklist
 
 The words:
-- [ ] The line, the sentence, the three facts, and the description are as in [The words](#the-words), and the same everywhere they appear.
-- [ ] Claude Duet's and Dots' names and makers are checked on Anthropic's and OpenAI's own pages before the FAQ names them.
-- [ ] No first impression says "extensions" or "add-ons" for plugins.
-- [ ] No first-impression surface says "Local first," "local-first," or names local models without hosted ones: the card, the meta tags, the home page's first screen, the README's opener, the docs' first page, and GitHub's description.
-- [ ] Nothing calls Tailscale recommended or required: `grep -rn -i "recommended" | grep -i tailscale` over `packages/website`, `README.md`, and `setup.sh` finds nothing.
-- [ ] Every claim in the FAQ and the facts row is checked against the code: the providers named are in `providers-registry.json`, and web pairing's guide covers the phone step.
-- [ ] No first impression names a platform: `grep -n -i -E "linux|debian|ubuntu|fedora|windows|macos|wsl"` over `home.tsx`, `pages/index.astro`, Starlight's description, `docs/index.mdx`, the README's opener, and the card's words finds nothing. The tutorial's "You need" names Windows through WSL 2.
+- [x] The line, the sentence, the three facts, and the description are as in [The words](#the-words), and the same everywhere they appear.
+- [x] Claude Duet's and Dots' names and makers are checked on Anthropic's and OpenAI's own pages before the FAQ names them.
+- [x] No first impression says "extensions" or "add-ons" for plugins.
+- [x] No first-impression surface says "Local first," "local-first," or names local models without hosted ones: the card, the meta tags, the home page's first screen, the README's opener, the docs' first page, and GitHub's description.
+- [x] Nothing calls Tailscale recommended or required: `grep -rn -i "recommended" | grep -i tailscale` over `packages/website`, `README.md`, and `setup.sh` finds nothing.
+- [x] Every claim in the FAQ and the facts row is checked against the code: the providers named are in `providers-registry.json`, and web pairing's guide covers the phone step.
+- [x] No first impression names a platform: `grep -n -i -E "linux|debian|ubuntu|fedora|windows|macos|wsl"` over `home.tsx`, `pages/index.astro`, Starlight's description, `docs/index.mdx`, the README's opener, and the card's words finds nothing. The tutorial's "You need" names Windows through WSL 2.
 
 The home page:
-- [ ] The hero, the facts row, the install line, the screenshot's address bar and caption, the task gallery, the three steps, the FAQ, the features, and the Network row, as above.
-- [ ] Looked at, rendered from the build in Chromium, at 1280 and 390 wide, light and dark. Nothing overflows, and the facts row stacks on a phone.
+- [x] The hero, the facts row, the install line, the screenshot's address bar and caption, the task gallery, the three steps, the FAQ, the features, and the Network row, as above.
+- [x] Looked at, rendered from the build in Chromium, at 1280 and 390 wide, light and dark. Nothing overflows, and the facts row stacks on a phone.
 
 Link previews:
-- [ ] `npm run card` writes `card.png`, 1200 by 630, and the card has been looked at.
-- [ ] The home page's and the plugin directory's `og:title`, `og:description`, and `og:image` read right in the built HTML.
+- [x] `npm run card` writes `card.png`, 1200 by 630, and the card has been looked at.
+- [x] The home page's and the plugin directory's `og:title`, `og:description`, and `og:image` read right in the built HTML.
 
 Docs and the rest:
-- [ ] The docs' first page, the tutorial (no Tailscale in "You need," ending on the phone), reach-it (web pairing first, the anchor fixed), and security.
-- [ ] The README, `agent-setup.txt`, and `setup.sh`'s last lines. `bash -n setup.sh` passes.
-- [ ] The release-notes format has the line saying what fxbot is.
-- [ ] `npm run build-site` passes, with every link resolving. `git diff --check` is clean.
+- [x] The docs' first page, the tutorial (no Tailscale in "You need," ending on the phone), reach-it (web pairing first, the anchor fixed), and security.
+- [x] The README, `agent-setup.txt`, and `setup.sh`'s last lines. `bash -n setup.sh` passes.
+- [x] The release-notes format has the line saying what fxbot is.
+- [x] `npm run build-site` passes, with every link resolving. `git diff --check` is clean.
 
 Proof:
-- [ ] Two fresh readers, given only the new link preview and only the new first screen, as in [the research](#todays-first-impression-on-fresh-readers), with the same questions. Both say, with medium or high confidence, that:
+- [x] A fresh reader, given only the new first screen, as in [the research](#todays-first-impression-on-fresh-readers), with the same questions, says with medium or high confidence that:
   - it's AI assistants that do things, which you run yourself
   - it works with ChatGPT or Claude
   - Tailscale isn't needed
   - the phone uses the fxbot app
   - plugins add features to fxbot, not to a browser
-  Their answers go in [What the build changed](#what-the-build-changed).
-- [ ] Committed on `release/0.10.0` with `main` moved to it, and the owner has the push command and the `gh repo edit` command.
+  Its answers are in [What the build changed](#what-the-build-changed).
+- [ ] A fresh reader, given only the new link preview, says the same, where a preview can. On its second run it said that you run it yourself, and that it takes hosted models, at medium or high confidence. The phone was right, "open the fxbot app on my phone and connect to the copy running on my own machine," but at low confidence: "I don't know how the connection or login works." A preview has no room to say how pairing works, and plugins aren't on it. Its answers are in [What the build changed](#what-the-build-changed).
+- [x] Committed on `release/0.10.0` with `main` moved to it, and the owner has the push command and the `gh repo edit` command.
 
 Only a person can check:
 - [ ] The card, in a text to three people who've never heard of fxbot, asking: "What is it, does it work with ChatGPT, and how would you use it from your phone?"
@@ -334,7 +335,61 @@ Only a person can check:
 All answered by the owner on 2026-11-10:
 1. **The line:** "whatever works best," with "built just the way you want it" over "local," and "on your own machine is obvious if you install it." The panel picked "AI assistants that do real work. Built your way."
 2. **The others:** yes, named in one FAQ entry: OpenClaw, Hermes Agent, Grok Bot, Muse, Claude Duet, and OpenAI's Dots. fxbot is "an open alternative to those, that is lighter weight, fully featured, and user experience first."
-3. **Telegram and Discord:** stubs, [Telegram and Discord](telegram-and-discord.md), and [Gateways](gateways.md) for chat-app plugins in general.
+3. **Telegram and Discord:** stubs, [Telegram and Discord](../../phases/telegram-and-discord.md), and [Gateways](../../phases/gateways.md) for chat-app plugins in general.
 4. **Plugins:** the panel kept the word ([research](#the-words-on-a-panel-of-six)).
 5. **Release posts:** yes, a line saying what fxbot is.
 6. **Platforms:** none named on a first impression, and Windows works through WSL 2.
+
+## What the build changed
+
+**The words:**
+- **The description** gained "on your own machine" and "the fxbot app." The plan's first one, "Use any model, hosted or local, from any browser or the app on your phone. Free and open source.", left a fresh reader at "it may also be something you host yourself," at low-medium confidence, and "open it in the phone's browser or install the app," at low.
+- **llms.txt's description,** in `astro.config.mjs`'s `starlightLlmsTxt`, still said "local-first" and "works with local models." The plan missed it, and it says the same as the others now.
+- **The names.** Claude Duet is checked on Anthropic's own page, [claude.com/duet](https://claude.com/duet): "Claude Duet is a proactive agent that understands what needs your attention." OpenAI's and xAI's pages refuse automated fetches. Their names come from their own pages' titles in search results: "Introducing dots" and "Meet dots," lowercase, so the FAQ says "OpenAI's dots," and "Introducing Grok Bot."
+
+**The home page:**
+- **The crowd** moved to `src/crowd.ts`, so the page and `scripts/screenshots/card.mjs` draw the same seven.
+- **The gallery** is nine cards: the page, subagents, bots working together, the routine, rooms, approvals, a diagram, the look, and plugins. The diagram shot joined to fill the third row.
+- **The routine shot** is 1024 by 800 and mostly an empty chat. It's cropped to 16:10 from the top, so its row lines up, and it sits in the second row, not the first.
+- **Get started:** in three columns the install command was cut off, so step 1 spans the row, and steps 2 and 3 sit under it. Its title is "From one command to your phone."
+- **The questions** don't link the Gateways stub, since a phase doc isn't for the public site.
+- **What it does** is six cards: bots and chats, any model, a computer of its own, routines, subagents, and on your phone. The library and updates are rows in "Who it's for," as Files and Updates.
+
+**The rest:**
+- **The plugin directory** keeps "Plugins" as its heading, and only its `og:title` is "fxbot plugins," through the page's `head`.
+- **The README's opener** names the products fxbot is an open alternative to, as the questions do.
+- **The tutorial** opens fxbot on the machine, or over SSH, in a new "Open it." It reloads the page where it had closed the app, since the chat is in a desktop browser at that point, and ends with "Put it on your phone."
+- **`agent-setup.txt`'s hand-over** gained a third step, for the phone.
+- **[naive-panel](../../../.agents/skills/naive-panel/SKILL.md),** at the owner's word, is a skill now. It runs the fresh readers and the panel this phase's research used.
+
+**The proof.** Fresh readers, each a model told to answer only from what it was shown.
+
+The new first screen:
+
+| Question | What they said | Confidence |
+| --- | --- | --- |
+| What it is | "A tool for making your own customizable AI chatbots or assistants that you run yourself, with a chat app, memory, its own computer, and scheduled tasks" | Medium |
+| Where it runs | "On my own computer or a server, installed by one curl command… in a browser at http://127.0.0.1:8787, or through the phone app" | High |
+| Tailscale | "No. The page says 'No VPN needed' and says to use web pairing" | Medium-high |
+| Models | "Both. You can sign in with ChatGPT, Grok, or OpenRouter, add a key for Claude or Gemini, or run local models" | High |
+| From a phone | "Add Web pairing from Plugins, open web.fxbot.sh on the phone, enter the code fxbot shows, and install the app from there" | Medium |
+| Plugins | "Add-ons for fxbot itself, added from a Plugins area inside the app… They aren't browser extensions" | Medium |
+| Telegram | "My guess is no" | Low-medium |
+
+Its questions back: what a bot's computer can do, and whether it's safe; what models cost; and what hardware it needs.
+
+The new link preview, on its second run:
+
+| Question | What they said | Confidence |
+| --- | --- | --- |
+| What it is | "An app or service for building your own AI assistants… that you run yourself" | Medium |
+| Where it runs | "On my own machine or a server I control, and I reach it through a browser or a phone app" | Medium |
+| Models | "'Any model, hosted or local' suggests it works with ChatGPT, Claude, and the like" | Medium-high |
+| From a phone | "Open the fxbot app on my phone and connect to the copy running on my own machine. I don't know how the connection or login works" | Low |
+| Plugins | "The word isn't on this preview" | Low |
+
+Its questions back: whether setup is technical, what it costs, and what it really does.
+
+Before, the preview's reader read "local first" as local models only, and plugins as browser extensions. The first screen's reader read Tailscale as needed on the phone. None of the new readers did.
+
+**Not checked:** real link previews in iMessage, Discord, and Slack, which keep a cached card for a while; the site on a real phone; and real people. Those are the person's check above.
