@@ -37,6 +37,15 @@ fxbot keeps the account's tokens sealed, and renews them before they end. AI Gat
 
 The key bills the team it was made in, so it needs no **Team**.
 
+## Claude with your own Anthropic key
+
+AI Gateway can bill Claude to your own Anthropic key, at Anthropic's prices with no markup ([Bring Your Own Key](https://vercel.com/docs/ai-gateway/authentication-and-byok/byok)). On AI Gateway's **Bring Your Own Key** page, find **Anthropic**, choose **Add**, paste the key, leave **Enabled** on, and choose **Test Key**. fxbot keeps using the AI Gateway key, and AI Gateway's logs say which key served each request.
+
+Through AI Gateway, fxbot's agent library marks Claude's prompts for Anthropic's prompt caching, so a long chat costs less than through the [Anthropic](/docs/providers/anthropic/) provider, whose OpenAI-compatible API has none. From Vercel's docs:
+
+- **It needs the paid tier,** with AI Gateway credits bought.
+- **A request your key fails is tried again on Vercel's own credentials,** and billed to the team's credits.
+
 ## Its models
 
 fxbot lists the models from AI Gateway's own list, whichever way you came in.

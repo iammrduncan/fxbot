@@ -34,7 +34,7 @@ fxbot lists the models from Anthropic's own list, with each one's context window
 These come from Anthropic's docs. fxbot hasn't run Anthropic with a real key yet.
 
 - **Not Anthropic's own API.** Anthropic says its OpenAI-compatible API is "not considered a long-term or production-ready solution".
-- **No prompt caching.** So a long chat costs more than it would through Anthropic's own API.
+- **No prompt caching.** So a long chat costs more than it would through Anthropic's own API. For caching now, reach Claude through [AI Gateway with your own Anthropic key](/docs/providers/vercel/#claude-with-your-own-anthropic-key).
 - **No thinking shown.** Claude 5 models think by default there, but the answer doesn't carry the thinking, so fxbot shows none.
 - **A key for one workspace.** A key that isn't scoped to a workspace needs Anthropic's `anthropic-workspace-id` header on every request. fxbot doesn't send it, and Anthropic answers with 400.
 

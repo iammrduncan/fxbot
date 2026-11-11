@@ -69,7 +69,7 @@
       "baseUrl": "https://api.anthropic.com/v1",
       "keyPage": "https://platform.claude.com/settings/keys",
       "steps": ["Choose Create key, and pick a workspace for it.", "Add credit under Billing first."],
-      "note": "Anthropic says its OpenAI-compatible API is \"not considered a long-term or production-ready solution\". It has no prompt caching, and returns no thinking.",
+      "note": "Anthropic says its OpenAI-compatible API is \"not considered a long-term or production-ready solution\". It has no prompt caching, and returns no thinking. For prompt caching now, add Claude through AI Gateway, with your own Anthropic key there.",
       "headers": { "x-api-key": "{apiKey}", "anthropic-version": "2023-06-01" },
       "modelsDev": "anthropic",
       "recommended": "claude-sonnet-5-5",
