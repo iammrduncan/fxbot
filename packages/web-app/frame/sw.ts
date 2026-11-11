@@ -73,13 +73,21 @@ async function handle(request: Request): Promise<Response> {
     const kept = await caches.match(request);
     if (kept) return kept;
   }
+  // A page load that can't reach fxbot starts over from the frame's first page, which gets a way to the shell and loads
+  // it again, once the app connects. The browser's own error page would stay up after that.
+  const again = () => Response.redirect(`/__fxbot/start?path=${encodeURIComponent(url.pathname + url.search)}`, 302);
   const l = await getLine();
   if (!l) {
-    // No way to the shell: start over from the frame's first page, which gets one.
-    if (request.mode === "navigate") return Response.redirect(`/__fxbot/start?path=${encodeURIComponent(url.pathname + url.search)}`, 302);
+    if (request.mode === "navigate") return again();
     return new Response("Not connected to your fxbot.", { status: 503 });
   }
-  let res = await l.fetch(request);
+  let res: Response;
+  try {
+    res = await l.fetch(request);
+  } catch (error) {
+    if (request.mode === "navigate") return again();
+    throw error;
+  }
   const csp = res.headers.get("content-security-policy");
   const type = res.headers.get("content-type") ?? "";
   if (csp || type.startsWith("text/html")) {

@@ -900,3 +900,14 @@ Still open:
 ## After the build
 
 On 2026-11-10, for 0.9.0, the owner took web pairing out of **Essentials**: "web-pairing does not belong in essentials." It's added from **Plugins**, and an install that has it keeps it. The guides and the README say so.
+
+On 2026-11-11, a fix to the app at web.fxbot.sh, from the owner's Windows PC in Edge: after its connection dropped ("its path stopped answering"), the app said **Connecting…** and never connected again, and the fxbot's page in it was Edge's own error page. Two faults, both in `packages/web-app`:
+- **An attempt could hang for good.** `openCall` waited for the relay's WebSocket with no limit, and a socket can neither open nor fail after a computer wakes. While one attempt said `connecting`, every other start was skipped, coming back to the app and the network returning included. Now the socket gets 10 seconds to open. An attempt that's still going after 45 seconds is replaced by a new one, and an older attempt that ends late changes nothing.
+- **A page load while disconnected ended on the browser's error page.** The frame's service worker passed the failure on, and nothing loaded the page again. Now it sends a failed page load back to the frame's first page, which loads the page again once the app connects.
+
+Checked in Chromium against the disposable fxbot and the relay under `wrangler dev`, behind a proxy that can leave a call to the relay unanswered:
+- **Coming back to the app during a drop:** today's code stayed on **Connecting…** for 90 seconds after the relay answered and fxbot was back. The fix connected 2 seconds after.
+- **Reloading the app during a drop:** today's code showed Edge's error page in the frame and never recovered. The fix showed no error page, and the page was back 14 seconds after.
+- **Regressions:** the end-to-end check passes 16 of 16 in Chromium, Firefox, and WebKit, and the check of a drop with no notice passes.
+
+It reaches devices when the app at web.fxbot.sh is deployed again, apart from a release of fxbot.

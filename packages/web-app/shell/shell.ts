@@ -94,6 +94,8 @@ type Inbox = { send(e: wire.Envelope): void; next(ms: number): Promise<wire.Enve
 function openCall(url: string): Promise<Inbox> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
+    // A socket that neither opens nor fails, as one can after a computer wakes up, is given up after 10 seconds.
+    const opening = setTimeout(() => (ws.close(), reject(new Error("The relay didn't answer."))), 10_000);
     const got: unknown[] = [];
     let wake: (() => void) | null = null;
     let closed = false;
@@ -104,7 +106,8 @@ function openCall(url: string): Promise<Inbox> {
       wake?.();
     };
     ws.onclose = () => ((closed = true), wake?.(), reject(new Error("The relay can't be reached, or nothing is waiting there. Check the code, and your connection.")));
-    ws.onopen = () =>
+    ws.onopen = () => (
+      clearTimeout(opening),
       resolve({
         send: (e) => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(e)),
         close: () => ws.close(1000),
@@ -120,7 +123,8 @@ function openCall(url: string): Promise<Inbox> {
           if (e.k === "err") throw new Error(wire.errors[e.e as keyof typeof wire.errors] ?? "Your fxbot stopped the call.");
           return e;
         },
-      });
+      })
+    );
   });
 }
 
@@ -140,6 +144,9 @@ export class Link {
   private callId = 0;
   private retry = 1000;
   private timer?: ReturnType<typeof setTimeout>;
+  // Each attempt's number, and when the newest began: an older attempt that ends late changes nothing.
+  private attempt = 0;
+  private since = 0;
   // What fxbot tells every connected device: that a device was added, and that the list changed.
   onEvent = (m: any) => {
     if (m.event === "added") announce(`${this.p.name}: ${m.name ?? "A device"}${m.platform ? ` (${m.platform})` : ""} was paired${m.how === "passkey" ? " with a passkey" : ""}. If that wasn't you, remove it under Devices.`);
@@ -158,7 +165,7 @@ export class Link {
   }
   async ready(ms = 20_000) {
     if (this.status === "connected") return;
-    if (this.status !== "connecting") void this.connect();
+    void this.connect();
     await new Promise<void>((resolve, reject) => {
       this.waiters.push(resolve);
       setTimeout(() => reject(new Error(this.why || "Not connected to your fxbot.")), ms);
@@ -172,12 +179,19 @@ export class Link {
     this.set("idle");
   }
   async connect(): Promise<void> {
-    if (this.status === "connecting") return;
+    // One attempt at a time, unless it has been going for 45 seconds: every step has its own limit, so one that old
+    // is stuck, as a computer waking up can leave one, and a new one takes its place.
+    if (this.status === "connecting" && Date.now() - this.since < 45_000) return;
+    const mine = ++this.attempt;
+    const stale = () => mine !== this.attempt;
     clearTimeout(this.timer);
     this.pc?.close();
+    this.pc = null;
+    this.since = Date.now();
     this.set("connecting");
     this.notice = null;
     let via: Inbox | null = null;
+    let pc: RTCPeerConnection | null = null;
     try {
       const seq = await nextSeq(this.p);
       via = await openCall(`${this.p.relay}/call/${this.p.rid}`);
@@ -185,6 +199,7 @@ export class Link {
       via.send(wire.envelope("k1", await hs.write(utf8(JSON.stringify({ seq, v: wire.VERSION })))));
       const k2 = await via.next(15_000);
       const info = JSON.parse(dec.decode(await hs.read(k2.bytes))) as { iceServers: wire.IceServer[]; reach: wire.Reach | null; name: string; reuse?: boolean };
+      if (stale()) throw new Error("A newer attempt took over.");
       this.reach = info.reach;
       this.reuse = info.reuse === true;
       this.idle = [];
@@ -195,10 +210,11 @@ export class Link {
       let out = Promise.resolve();
       const v = via;
       const sealed = (value: unknown) => (out = out.then(async () => v.send(await wire.seal(tx, value))));
-      const pc = new RTCPeerConnection({ iceServers: info.iceServers });
+      pc = new RTCPeerConnection({ iceServers: info.iceServers });
       this.pc = pc;
       const candidates: RTCIceCandidate[] = [];
-      pc.onicecandidate = (e) => {
+      const peer = pc;
+      peer.onicecandidate = (e) => {
         if (!e.candidate) return;
         candidates.push(e.candidate);
         void sealed({ candidate: e.candidate.toJSON() });
@@ -206,7 +222,7 @@ export class Link {
       const fxbotCheck = await wire.channelCheck(hash, "fxbot");
       const deviceCheck = await wire.channelCheck(hash, "device");
       const opened = new Promise<RTCDataChannel>((resolve, reject) => {
-        pc.ondatachannel = (e) => {
+        peer.ondatachannel = (e) => {
           const dc = e.channel;
           if (dc.label !== "control") return dc.close();
           let checked = false;
@@ -227,23 +243,27 @@ export class Link {
         };
       });
       const offer = await wire.unseal(rx, (await via.next(15_000)).bytes);
-      await pc.setRemoteDescription({ type: "offer", sdp: offer.offer });
-      await pc.setLocalDescription(await pc.createAnswer());
-      await sealed({ answer: pc.localDescription!.sdp });
-      pc.onconnectionstatechange = () => {
-        if (this.pc !== pc) return;
-        if (pc.connectionState === "failed" || pc.connectionState === "closed") this.lost("The connection to your fxbot dropped.");
-        if (pc.connectionState === "disconnected") this.timer = setTimeout(() => this.pc === pc && pc.connectionState === "disconnected" && this.lost("The connection to your fxbot dropped."), 5000);
+      await peer.setRemoteDescription({ type: "offer", sdp: offer.offer });
+      await peer.setLocalDescription(await peer.createAnswer());
+      await sealed({ answer: peer.localDescription!.sdp });
+      peer.onconnectionstatechange = () => {
+        if (this.pc !== peer) return;
+        if (peer.connectionState === "failed" || peer.connectionState === "closed") this.lost("The connection to your fxbot dropped.");
+        if (peer.connectionState === "disconnected") this.timer = setTimeout(() => this.pc === peer && peer.connectionState === "disconnected" && this.lost("The connection to your fxbot dropped."), 5000);
       };
       // No direct path within 15 seconds: say what each side found, and what would work.
       const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(Object.assign(new Error("no path"), { candidates })), 15_000));
-      this.control = await Promise.race([opened, timeout]);
+      const control = await Promise.race([opened, timeout]);
+      if (stale()) throw new Error("A newer attempt took over.");
+      this.control = control;
       via.close();
       this.retry = 1000;
       this.set("connected");
     } catch (error: any) {
       via?.close();
-      this.pc?.close();
+      pc?.close();
+      // A newer attempt is under way, and this one leaves it be.
+      if (stale()) return;
       this.pc = null;
       if (error?.candidates) {
         this.notice = { found: deviceFindings(error.candidates), reach: this.reach };
@@ -267,7 +287,7 @@ export class Link {
   // ping with no answer in 3 seconds means connect again. One at a time, however many ask.
   private probing: Promise<void> | null = null;
   probe() {
-    if (this.status !== "connected") return this.status === "connecting" ? Promise.resolve() : this.connect();
+    if (this.status !== "connected") return this.connect();
     return (this.probing ??= (async () => {
       const answered = await Promise.race([this.ask("ping").then(() => true, () => false), new Promise<boolean>((r) => setTimeout(() => r(false), 3000))]);
       if (!answered && this.status === "connected") this.lost("Your fxbot didn't answer, so the app is connecting again.");
