@@ -77,7 +77,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [herdr screen](docs/phases/herdr-screen.md) (plugin): the [herdr](https://herdr.dev) interface in the app, from a herdr plugin
 - [ ] [Remote control](docs/phases/remote-control.md) (plugin): heavy work handed to coding agents through herdr
 - [ ] [Web search](docs/phases/web-search.md) (plugin): bots search and read the web, and cite it
-- [ ] [X](docs/phases/x.md) (plugin): bots read X (Twitter) with tools of their own, a post, a person's latest, and search, read only, with the owner's key for a service that sells X's data
+- [ ] [X](docs/phases/x.md) (plugins): bots read X (Twitter) for free with tools of their own, a post, a person's latest, a list, and search, from X's public pages, its embeds, and FxTwitter, and through a signed-in tab on the bot's computer
 - [ ] [Vault](docs/phases/vault.md) (plugin): saved secrets and details bots use when allowed
 - [ ] [1Password](docs/phases/1password.md) (plugin): bots use stored logins and items from 1Password
 - [ ] [Local access](docs/phases/plugin-local-access.md) (plugin): bots reach folders the owner picks on the machine itself, off until the owner turns it on
