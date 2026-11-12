@@ -55,7 +55,7 @@ type Places = {
   botSettings: ComponentType<{ bot: Profile }>[];
   botPanel: ComponentType<{ bot: Profile }>[];
   libraryItem: ComponentType<{ item: LibraryItem }>[];
-  chat: ComponentType<{ bot: Profile }>[];
+  chat: ComponentType<{ bot: Profile; reload: () => void }>[];
   box: ComponentType<any>[];
   fold: Fold[];
   said: { pattern: RegExp; Component: ComponentType<{ match: RegExpMatchArray }> }[];
@@ -148,7 +148,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     botSettings: (Component: ComponentType<{ bot: Profile }>) => places.botSettings.push(Component),
     botPanel: (Component: ComponentType<{ bot: Profile }>) => places.botPanel.push(Component),
     libraryItem: (Component: ComponentType<{ item: LibraryItem }>) => places.libraryItem.push(Component),
-    chat: (Component: ComponentType<{ bot: Profile }>) => places.chat.push(Component),
+    chat: (Component: ComponentType<{ bot: Profile; reload: () => void }>) => places.chat.push(Component),
     box: (Component: ComponentType<any>) => places.box.push(Component),
     fold: (fold: Fold) => places.fold.push(fold),
     said: (pattern: RegExp, Component: ComponentType<{ match: RegExpMatchArray }>) => places.said.push({ pattern, Component }),

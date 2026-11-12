@@ -261,7 +261,7 @@ The computer and chat rooms provide objects of their own: see [the computer's](/
 | `app.route(path, Component)` | The screen at `/<plugin><path>`. `path` may have `:name` parts, which `Component` gets as `params`. |
 | `app.sidebar(Component)` | A group in the sidebar, after the bots |
 | `app.nav({ label, path, icon? })` | A button in the sidebar's footer row, to `/<plugin><path>`. `icon` is a component; without one, the button shows the plugin's icon. |
-| `app.chat(Component)` | Above the message box in a bot's chat. It gets `bot`. Since 0.6.0. |
+| `app.chat(Component)` | Above the message box in a bot's chat. It gets `bot`, and `reload()`, which reads the bot again, so the chat follows a session the plugin started, such as with `fx.chats.send` to a bot that had no chat. Since 0.6.0; `reload` since 0.10.0. |
 | `app.botPanel(Component)` | Above the tabs of a bot's panel, beside its chat. It gets `bot`. |
 | `app.libraryItem(Component)` | Beside **Download** in an item's preview, from the library or a bot's panel. It gets `item`. Since 0.7.0. |
 | `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. |
