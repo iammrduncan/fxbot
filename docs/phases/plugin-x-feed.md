@@ -1,15 +1,18 @@
-# X
+# X feed
 
-`x` lets a bot read X (Twitter) during a turn, with tools of its own, for free:
+`x-feed` lets a bot read X (Twitter) during a turn, with tools of its own, for free, and tells it when something happens there:
 - **Read a post** from its link or id, in full, with the post it quotes, the posts it answers, and its first replies.
 - **A person's latest posts,** newest first.
 - **Search,** newest or top, with X's own operators, such as `from:`, `since:`, and `min_faves:`.
+- **Mentions and replies:** who mentioned an account, who answered it, and who quoted or reposted a post.
+- **Followers and following,** of any public account.
 - **A list's feed:** the newest posts of every account on a public X list, in one read.
+- **Watches.** "Tell me when @someone posts", "when I'm mentioned", "when someone answers this post": the plugin checks on a timer, with no model running, and starts the bot's turn only when there's something new.
 - **No key, no account, and nothing to pay.** Each read tries X's own public pages first, then X's embeds, then FxTwitter, and takes the first that answers, in about half a second.
-- **Everything, with a sign-in.** `x-computer`, a second plugin, reads through a tab of the bot's own [computer](../_completed/phases/computer.md), signed in to X once by the owner: search that doesn't lean on anyone, whole threads, replies, and as far back as the owner asks. X's own page makes each request, and the plugin collects what the page receives.
+- **Everything, with a sign-in.** `x-feed-computer`, a second plugin, reads through a tab of the bot's own [computer](../_completed/phases/computer.md), signed in to X once by the owner: search that doesn't lean on anyone, whole threads, replies, and as far back as the owner asks. X's own page makes each request, and the plugin collects what the page receives.
 - **Read only.** It never posts, likes, or follows.
 
-Status: planned on 2026-11-11, not built. The owner ruled out every paid source the same day, so this plan has none. Researched against the [research directive](../research-directive.md)'s references, FxTwitter's source, the projects that read X from a signed-in tab, and X's public surfaces, which were called from this machine and from a home connection. Nothing was read with a signed-in X account, so every figure for the signed-in tab is from other projects' code.
+Status: planned on 2026-11-12, not built. The owner ruled out every paid source, so this plan has none, and then asked for mentions, followers, list feeds, and events. Researched against the [research directive](../research-directive.md)'s references, FxTwitter's source, the projects that read X from a signed-in tab, and X's public surfaces, which were called from this machine and from a home connection. Nothing was read with a signed-in X account, so every figure for the signed-in tab is from other projects' code. The research on events was still running when this was written: [Watches](#watches) rests on the reads checked here, and [open question 5](#5-open-questions) says what's still to come.
 
 ## What the owner asked
 
@@ -17,18 +20,20 @@ Status: planned on 2026-11-11, not built. The owner ruled out every paid source 
 
 On the first plan, which bought the data from a reseller with the owner's key: "nop dig deepr. No paid system. fxtwitter can be a good option I'll take a look at that, but dig deeper more planning, more thinking, more novel approaches."
 
+On the second, which had no mentions or followers: "no someone is able to see their mentions , their followers work, feed from lists, etc... without logins without paying for x api..." And then: "also look for thngs like events. Can I find events when certain people post or are mentioned etc? Or when I post or am mentioned? Or comments on my posts?" (2026-11-12)
+
 ## 0. Core or plugin
 
-**Two plugins,** `x` and `x-computer` ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Reading X isn't what every bot needs, what plugins plug into, or what fxbot needs to run.
+**Two plugins,** `x-feed` and `x-feed-computer` ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Reading X isn't what every bot needs, what plugins plug into, or what fxbot needs to run.
 
-- **`x`** has the tools and every source that needs nothing: an owner adds it and a bot reads X.
-- **`x-computer`** needs `x` and `computer`, and gives `x` one more source, the signed-in tab. It's a plugin of its own because a plugin's `needs` are required (`plugins.ts` refuses an add until each is there), and `x` has to work with no computer. `chat-rooms-computer` is the same shape.
+- **`x-feed`** has the tools, the watches, and every source that needs nothing: an owner adds it and a bot reads X.
+- **`x-feed-computer`** needs `x-feed` and `computer`, and gives `x-feed` one more source, the signed-in tab. It's a plugin of its own because a plugin's `needs` are required (`plugins.ts` refuses an add until each is there), and `x-feed` has to work with no computer. `chat-rooms-computer` is the same shape.
 
-**No core change.** `x` uses tools, settings, a skill, and `fx.dependents()`. `x-computer` uses `fx.provide` and `fx.need`.
+**No core change.** `x-feed` uses tools, settings, a skill, a table of its own for watches, `fx.chats.send` to start a turn, as [routines](../_completed/phases/routines.md) does, and `fx.dependents()`. `x-feed-computer` uses `fx.provide` and `fx.need`.
 
 **One addition to the computer plugin:** it provides `run`, a command on a bot's computer, to the plugins that need it. Today it provides nothing, and a plugin can't reach a bot's computer. That's a plugin offering another plugin a way in, which is what `fx.provide` is for.
 
-Neither plugin acts on the owner's machine: `x` fetches from the network, and `x-computer` works on the bot's computer ([Bots and the owner's machine](../../CONVENTIONS.md#bots-and-the-owners-machine)).
+Neither plugin acts on the owner's machine: `x-feed` fetches from the network, and `x-feed-computer` works on the bot's computer ([Bots and the owner's machine](../../CONVENTIONS.md#bots-and-the-owners-machine)).
 
 ## 1. Research
 
@@ -71,17 +76,43 @@ Called on 2026-11-11, from a home connection and from this machine, a cloud serv
 
 [FxEmbed](https://github.com/FxEmbed/FxEmbed) (MIT, 5,900 stars), read at `cdaa14f`, with 13 calls to `api.fxtwitter.com`.
 
-- **What it reads:** a post, a thread, a conversation, a person's posts with or without replies, search by `latest`, `top`, or `media`, and trends, as clean JSON, with a long post in full (`is_note_tweet`).
+- **What it reads:** a post, a thread, a conversation, a person's posts with or without replies, search by `latest`, `top`, or `media`, a person's followers and following, who quoted and who reposted a post, and trends, as clean JSON, with a long post in full (`is_note_tweet`).
+- **Mentions and list feeds come from its search,** with X's operators. Called on 2026-11-12, each answered:
+  - `@nasa`: posts that mention the account, the newest 10 minutes old
+  - `to:nasa`: replies to it
+  - `list:715919216927322112`: a public list's posts
+  - `/2/status/<id>/quotes`: quote posts, the newest 35 minutes old, which its source reads as a search for `quoted_tweet_id:<id>`
+  - `/2/profile/nasa/followers`: 70 accounts, the newest made minutes before, and `/following`, which answered an empty 404 once in three calls
+  - `/2/status/<id>/reposts`: 100 accounts
 - **How:** X's web GraphQL, with a pool of X accounts' cookies built into its worker, picked at random for each request. Only a single post works without the pool, on a guest token. From its docs: "A _lot_ of Twitter accounts", and "It is possible that Twitter can lock or suspend individual accounts."
 - **Search works today, and has been down for months this year.** It answered `from:nasa` newest first, across two pages. It needs `x-client-transaction-id`, the header X keeps changing:
   - July 27 to September 28: empty 404s for every query, then on and off. The maintainer on fixing it: "they changed the way they store the values for X-Client-Transaction-Id again… I imagine they will break it again though" ([#2303](https://github.com/FxEmbed/FxEmbed/issues/2303)).
   - October 9 to November 9: down again, fixed by a contributor ([#2598](https://github.com/FxEmbed/FxEmbed/issues/2598)).
 - **A person's posts fail often.** 4 of 6 calls here answered an empty 404 for accounts that exist, the same answer a missing account gets. An open pull request says why: these routes answer 404 "when X could not be reached or the account pool is rate limited… a retry of the same request often succeeds" ([#2668](https://github.com/FxEmbed/FxEmbed/pull/2668)). When it answered, the newest post was 25 minutes old.
 - **Who runs it:** one maintainer, on GitHub Sponsors, with `main` deployed as it's pushed. The docs: "API v2 has a rate limit of 1000 requests per minute (16.7 requests per second) per IP address… If you need more, it might be worth self-hosting your own instance." A `User-Agent` is required, and "you may be blocked if you send too many requests from an unidentifiable user agent." No terms were found, and a request for permission to build on the hosted API has had no answer since October 4 ([#2550](https://github.com/FxEmbed/FxEmbed/issues/2550)).
-- **Its contract:** `GET /2/status/{id}`, `/2/thread/{id}`, `/2/profile/{handle}/statuses?with_replies=&cursor=`, and `/2/search?q=&feed=latest|top&count=&cursor=`, each answering `{ code, results, cursor: { bottom } }` or `{ code, status, thread }`. The spec is at `/2/openapi.json`.
+- **Its contract:** `GET /2/status/{id}` with `/quotes` and `/reposts`, `/2/thread/{id}`, `/2/conversation/{id}`, `/2/profile/{handle}/statuses?with_replies=&since=&cursor=`, `/2/profile/{handle}/followers` and `/following`, and `/2/search?q=&feed=latest|top&count=&cursor=`, each answering `{ code, results, cursor: { bottom } }` or `{ code, status, thread }`. The spec is at `/2/openapi.json`.
 - **An instance of one's own** is a Cloudflare Worker, or a container of its runtime, with the owner's own X cookies built in. Its guide is thin, with open issues, and search breaks there when X changes the header too.
 
-FxTwitter is worth using, as one source of several and never the only one.
+FxTwitter is worth using, and for mentions, followers, quotes, and search it's the only source with no account. It's never the only rung where another exists.
+
+### What the owner saw
+
+The owner saw someone read mentions, followers, and list feeds with no login and no X API. What was found that does that, on 2026-11-12:
+- **FxTwitter, most likely.** It answers each of those reads, and "no login" is true for whoever calls it: its operator holds the accounts. Several 2026 agent tools are thin wrappers on `api.fxtwitter.com`: [x-research-mcp](https://github.com/FenChen0211/x-research-mcp), with `list_x_followers`, `list_x_following`, and `search_x_posts`, [fxtwitter-mcp](https://github.com/ogatomo21/fxtwitter-mcp), and OpenClaw-DeepReeder.
+- **Grok Bot** reads "an account's posts and mentions" and "who quoted or reposted a post" with no X account connected, on a paid X subscription. Its docs name no followers or lists, and it has no API another app can call.
+- **Hosted services that look free:** twitr.sh ("No X developer account, no API keys, no OAuth, no signup, no subscription") charges a crypto wallet for each call, after a signup bonus, and Xpoz and the resellers give free credits behind a signup. None is a way of reading X that the others don't have.
+- **X itself gives none of it signed out:** `x.com/<handle>/followers` and `x.com/i/lists/<id>` redirect to the sign-in, as search does.
+
+Which one the owner saw couldn't be confirmed.
+
+### Grok's own X tools
+
+Read from xAI's docs and from Grok Build's, libfx's, Hermes Agent's, and OpenClaw's source. No request was sent.
+- **xAI's `x_search`** answers in Grok's words with links to posts, never a post as written: "server-side tool call outputs are not returned in the API response." It has no function for followers, lists, or a timeline, and costs $5 for 1,000 posts with a key.
+- **A Grok plan's sign-in,** which fxbot has, might carry it at no charge: Grok Build sends `{"type":"x_search"}` to the same proxy libfx signs in to. Nothing documents another client doing so or what it draws from the plan, and one Hermes user got "a degraded Grok explanatory mode with no citations" ([#88040](https://github.com/NousResearch/hermes-agent/issues/88040)). libfx sends no hosted tool today.
+- **X's own MCP server** reads posts, mentions, and timelines, each billed to the owner's developer app, with no free tier.
+
+So Grok is no source for this plugin. A bot on a Grok plan may one day search X through its own model, which is libfx's to add.
 
 ### A signed-in tab
 
@@ -131,14 +162,16 @@ The projects that read X with an account are of three kinds:
 
 1. **No one free source is enough, and four together are.** X's page is fast and exact but shallow. The embeds go deeper but rank some accounts by likes. FxTwitter does everything but fails often. The signed-in tab does everything, and needs the computer and a sign-in. So each read goes down a ladder and takes the first good answer.
 2. **X's own public pages first.** They need nothing, answer in half a second, and lean on no volunteer. That is what "at scale" means here: each install reads from its own address, at one person's pace, and no two share a limit or an account.
-3. **FxTwitter is a rung, not the ground.** It's the only search with no account, so `x` uses it, with a `User-Agent` that names fxbot, one retry on its empty 404, and never a "no such account" from it alone.
+3. **FxTwitter is a rung, not the ground.** It's the only source of search, mentions, followers, and quotes with no account, so `x-feed` uses it, with a `User-Agent` that names fxbot, one retry on its empty 404, and never a "no such account" from it alone.
 4. **The signed-in tab is what makes search real.** Search with no account rests on one maintainer's pool and a header X breaks every few weeks. A tab where X's page makes its own requests has neither problem.
 5. **Read the page's answers, forge nothing.** No transaction id, no query ids, no cookies copied out of the browser. The sign-in stays in the bot's Chromium.
 6. **Check each answer before trusting it.** An embed's posts that aren't newest first are a ranking, so the ladder moves on. A tab on the sign-in page is "signed out", not "no posts".
 7. **Say what a read couldn't see.** A profile from X's page is 5 posts with no reposts or replies. The result says so, and what would show more, so a bot doesn't call 5 posts a person's week.
 8. **A list is the free way to follow accounts.** One request, 87 posts, newest first, with no account. A [routine](../_completed/phases/routines.md) that reads a list is a daily digest of whoever the owner puts on it.
 9. **Posts are other people's words.** A result says so, as untrusted text, and the tools aren't `safe`: they reach outside, and a search query can carry data out.
-10. **Text out, not JSON.** A post as a few short lines costs a bot far fewer tokens, and carries the link to cite.
+10. **A watch is a saved read, checked with no model.** The plugin runs the read on a timer, keeps the newest id it has seen, and starts the bot's turn only for what's new. A routine would run the whole bot every time to find nothing. One public list watches many accounts in one request.
+11. **Mentions, replies, and quotes are searches.** `@handle`, `to:handle`, and `quoted_tweet_id:` turn each into the same read as any other search, so they need no source of their own.
+12. **Text out, not JSON.** A post as a few short lines costs a bot far fewer tokens, and carries the link to cite.
 
 ## 3. Implementation
 
@@ -152,10 +185,12 @@ Each read tries its sources in order, and stops at the first that answers well.
 | A thread, or replies | X's page (the posts it answers, and 2 to 4 replies) | FxTwitter | the tab | |
 | A person's latest | X's page (5) | X's embed (20), unless ranked by likes | FxTwitter (20, one retry) | the tab |
 | A person's latest with replies, or more than 20 | the tab | FxTwitter | | |
-| Search | the tab | FxTwitter | | |
-| A list | X's embed | | | |
+| Search, mentions, replies to an account, and quotes | the tab | FxTwitter | | |
+| A list | X's embed | FxTwitter (`list:<id>`) | the tab | |
+| Followers, following, and who reposted | FxTwitter (one retry) | the tab | | |
 
-- **The tab is a rung only with `x-computer` added,** the bot's computer there, and X signed in. Otherwise the ladder skips it.
+- **The tab is a rung only with `x-feed-computer` added,** the bot's computer there, and X signed in. Otherwise the ladder skips it.
+- **Mentions, replies, and quotes are searches:** `@handle -from:handle`, `to:handle`, and `quoted_tweet_id:<id>`, down the search ladder.
 - **The tab goes first for search and for replies,** where it's the only dependable source, and last where X's public pages do the job in a tenth of the time.
 - **A rung fails** on a network error, a status that isn't 200, an answer with no posts where posts were expected, or an embed whose posts aren't newest first. A 429 from an embed rests that embed until its `x-rate-limit-reset`.
 - **`depth`,** a tool's input: a bot that needs more than the first good answer asks for `more`, which starts at the deepest rung there is. So "the 5 newest" costs half a second, and "everything this week" goes to the tab.
@@ -165,25 +200,27 @@ Each read tries its sources in order, and stops at the first that answers well.
 ### The plugins
 
 ```
-plugins/x/
+plugins/x-feed/
   plugin.json          name, version, minFxbot, server, settings
   package.json         "type": "module", as fresh's
   README.md
   fxbot/server.ts      the tools, the ladder, the cache, and how a post is written out
+  fxbot/watch.ts       watches: the timer, what's new, and the turn it starts
+  fxbot/migrations/0001_watches.sql
   fxbot/page.ts        X's own pages: a post, a profile
   fxbot/embed.ts       X's embeds: a post, a profile, a list
   fxbot/fxtwitter.ts   FxTwitter
   fxbot/graph.ts       posts from X's GraphQL JSON, which page.ts and the tab share
-  skills/x/SKILL.md
+  skills/x-feed/SKILL.md
 
-plugins/x-computer/
-  plugin.json          needs: { "x": {}, "computer": {} }
+plugins/x-feed-computer/
+  plugin.json          needs: { "x-feed": {}, "computer": {} }
   package.json
   README.md
   fxbot/server.ts      the tab: open, wait, collect, scroll
 ```
 
-No dependency: each file is `fetch` and plain TypeScript. `minFxbot` is the oldest fxbot with what each uses, which `scripts/check-plugins.mjs` checks. `x-computer` names the computer version that provides `run`.
+No dependency: each file is `fetch` and plain TypeScript. `minFxbot` is the oldest fxbot with what each uses, which `scripts/check-plugins.mjs` checks. `x-feed-computer` names the computer version that provides `run`.
 
 ### One shape
 
@@ -206,12 +243,14 @@ type Source = {
   latest?(handle: string, options: { replies: boolean; count: number }): Promise<Answer>;
   search?(query: string, options: { top: boolean; count: number }): Promise<Answer>;
   list?(id: string): Promise<Answer>;
+  people?(of: { handle?: string; post?: string }, kind: "followers" | "following" | "reposted"): Promise<{ people: Person[]; partial?: string }>;
 };
+type Person = { id: string; handle: string; name: string; bio?: string; followers?: number };
 ```
 
 Ids stay strings: a post's id doesn't fit a JavaScript number.
 
-`x-computer` provides `{ source(call): Source | null }`, where `call` is the tool call's bot and session, and `x` reads it from `fx.dependents()` at each call, as the computer reads a room's computer.
+`x-feed-computer` provides `{ source(call): Source | null }`, where `call` is the tool call's bot and session, and `x-feed` reads it from `fx.dependents()` at each call, as the computer reads a room's computer.
 
 ### Sources
 
@@ -223,14 +262,14 @@ Field names here are from answers read on 2026-11-11. The build checks each agai
 - a post: `tweet-result`, with the token `((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "")`. An empty object, a 404, or `TweetTombstone` is "no such post, or it isn't public". A post with a `note_tweet` is cut short, so its `partial` says so.
 - a profile and a list: the `__NEXT_DATA__` script's `props.pageProps.timeline.entries[].content.tweet`, with `id_str`, `created_at`, `full_text`, the counts, `retweeted_status`, and `user`. A profile's posts, the pinned one aside, must be newest first, or the rung fails.
 
-**FxTwitter** (`fxtwitter.ts`), base from the `fxtwitter` setting, with `User-Agent: fxbot-x/<version> (+https://fxbot.sh)`:
-- `/2/status/<id>`, `/2/thread/<id>`, `/2/profile/<handle>/statuses?with_replies=1`, and `/2/search?q=<q>&feed=latest|top&count=<n>`, with `cursor.bottom` for more, up to `count`.
-- An empty 404 from a profile or a search is tried once more after a second, and then fails the rung as "FxTwitter didn't answer", never as "no such account".
+**FxTwitter** (`fxtwitter.ts`), base from the `fxtwitter` setting, with `User-Agent: fxbot-x-feed/<version> (+https://fxbot.sh)`:
+- `/2/status/<id>`, `/2/thread/<id>`, `/2/profile/<handle>/statuses?with_replies=1`, `/2/search?q=<q>&feed=latest|top&count=<n>`, `/2/profile/<handle>/followers` and `/following`, and `/2/status/<id>/reposts`, with `cursor.bottom` for more, up to `count`.
+- An empty 404 from a profile, a search, or a list of people is tried once more after a second, and then fails the rung as "FxTwitter didn't answer", never as "no such account".
 - An empty `fxtwitter` setting takes the rung out.
 
 **GraphQL JSON** (`graph.ts`): the walk in [A signed-in tab](#a-signed-in-tab), for both shapes X sends: the public pages' (`details.full_text`, `counts`, `quoted_tweet_results`) and the signed-in app's (`legacy.full_text`, `legacy.favorite_count`, `quoted_status_result`). Posts come out ordered by `sortIndex`, newest first, each once.
 
-**The tab** (`x-computer`), through the computer's `run`, in a tab of its own (`AGENT_BROWSER_SESSION=fxbot-x`, `AGENT_BROWSER_PIN_TAB=1`):
+**The tab** (`x-feed-computer`), through the computer's `run`, in a tab of its own (`AGENT_BROWSER_SESSION=fxbot-x-feed`, `AGENT_BROWSER_PIN_TAB=1`):
 1. `agent-browser network requests`, which starts tracking.
 2. `agent-browser open <the real address>`.
 3. `agent-browser wait --fn` until a post shows (`article[data-testid="tweet"]`), the page is a sign-in page, or it says there are no results, for up to 15 seconds.
@@ -256,7 +295,7 @@ It's `computer_shell`'s own path: `ready`, `mark` with `what` (so the bot's scre
 
 ### Tools
 
-Bots see them as `x_post`, `x_latest`, `x_search`, and `x_list`. Each is `idempotent`, and none is `safe`.
+Six tools: `post`, `latest`, `search`, `list`, `people`, and `watch`, which a bot sees under the plugin's name. The reads are `idempotent`, and none is `safe`.
 
 | Tool | Input | Answers |
 | --- | --- | --- |
@@ -264,7 +303,10 @@ Bots see them as `x_post`, `x_latest`, `x_search`, and `x_list`. Each is `idempo
 | `latest` | `handle`, with or without `@`. `replies`: true to include replies. `count`, up to 100, 20 unless given. `depth` | the person's posts, newest first |
 | `search` | `query`, with X's operators. `sort`: `latest` (the default) or `top`. `count`, up to 100 | posts |
 | `list` | `list`: a list's link or id | the list's newest posts, up to about 90 |
+| `people` | `handle` with `kind`: `followers` or `following`, or `post` with `kind`: `reposted`. `count`, up to 100 | accounts, each a handle, a name, a bio, and a follower count |
+| `watch` | `add`: a read (`latest`, `search`, `list`, or `people`, with its input), `every` in minutes, and `note`, what the bot should do about it. Or `remove`: a watch's id. With neither, the bot's watches | the watch, or the list |
 
+- **`search`'s description gives the three searches a bot needs by name:** mentions of an account (`@handle -from:handle`), replies to it (`to:handle`), and quotes of a post (`quoted_tweet_id:<id>`).
 - **A link** is any `x.com`, `twitter.com`, or `mobile.twitter.com` address with `/status/<digits>`, or `/i/lists/<digits>` for a list. Anything else that isn't digits is refused. A handle is 1 to 15 letters, digits, or `_`.
 - **A result** opens with two lines, then each post:
 
@@ -280,86 +322,125 @@ Bots see them as `x_post`, `x_latest`, `x_search`, and `x_list`. Each is `idempo
     The quoted post's text.
   ```
 
-- **When `more` has nowhere to go,** the second line says what would: "Reading further needs X signed in on this bot's computer, with the x-computer plugin."
+- **When `more` has nowhere to go,** the second line says what would: "Reading further needs X signed in on this bot's computer, with the x-feed-computer plugin."
 - **Search with no tab and FxTwitter failing** answers that search isn't reachable now, and the same line.
+
+### Watches
+
+A watch is a read the plugin repeats: `{ bot, read, input, every, note, seen }`, in `plugin_x_feed.watches`.
+
+| The owner says | The watch |
+| --- | --- |
+| "Tell me when @NASA posts" | `latest` for `NASA` |
+| "…when any of these twenty post" | `list`, for a public list the owner makes of them |
+| "…when I'm mentioned" | `search` for `@me -from:me` |
+| "…when someone answers me" | `search` for `to:me` |
+| "…when someone answers or quotes this post" | `search` for `conversation_id:<id>` or `quoted_tweet_id:<id>` |
+| "…when @someone is mentioned with 'fxbot'" | `search` for `@someone fxbot` |
+| "…when I get a follower" | `people`, the followers of `me` |
+
+- **The timer.** One, every 60 seconds, runs the watches that are due, one at a time, each down the ladder as a tool's read is. It starts with the first watch and stops with the last, so a plugin with no watch has no timer.
+- **What's new.** A post's id grows with time, so new is every id above `seen`. For people it's the ids not in the last answer. The first check only sets `seen`, and starts no turn.
+- **The turn.** New items go to the bot's own chat with `fx.chats.send`, as from **X feed**: the watch's `note`, then the posts, written as a tool's result is, under the same line that marks them as other people's words. Several watches due at once make one message. A bot with a turn running gets it after.
+- **How often.** `every` is 15 minutes unless given, and no less than 5. A `latest` watch reads X's own page, which is the cheapest read there is. A `list` watch is one embed request for all its accounts, well inside the embed's 30 in 15 minutes. A search or a people watch leans on FxTwitter or the tab, so those are held to 12 checks an hour across all watches.
+- **When a source is down,** the watch waits and tries again at its next time. After a day of failures the bot is told once, in a line, and the watch goes on trying.
+- **What a watch can miss.** X's page shows a person's own posts, not their reposts or replies, and 5 at a time, so a person who posts more than 5 times between checks loses the oldest unless the read goes deeper. A watch's `partial` line says so when it's made.
+- **The owner sees them** in the plugin's tab in the bot's settings: each watch, when it last ran, what it last found, and **Remove**. That's `app.botSettings` and one route, the plugin's only page code.
+- **Limits:** 20 watches a bot.
 
 ### Settings
 
-`x` has one: `fxtwitter`, the address of FxTwitter's API, `https://api.fxtwitter.com` by default. An owner with an instance of their own puts its address there, and an empty value turns the rung off. `x-computer` has none.
+`x-feed` has one: `fxtwitter`, the address of FxTwitter's API, `https://api.fxtwitter.com` by default. An owner with an instance of their own puts its address there, and an empty value turns the rung off. `x-feed-computer` has none.
+
+The owner's own handle isn't a setting: the bot knows it from the owner, and keeps it as a memory.
 
 ### The skill
 
-`skills/x/SKILL.md`, read when a task calls for X:
+`skills/x-feed/SKILL.md`, read when a task calls for X:
 - which tool for what, and that the first answer is fast and may be partial, with `depth: "more"` for the rest
 - search operators that work: `from:`, `to:`, `since:` and `until:` dates, `min_faves:`, `filter:links`, `-filter:replies`, `lang:`, quotes for a phrase, and `OR`
-- to follow several accounts, ask the owner for a public list and read it with `x_list`
+- to follow several accounts, ask the owner for a public list and read it with `list`
+- when the owner says "tell me when", make a watch, with a `note` that says what they want done, and say how often it checks
 - give each post's link when quoting it, say when a read was partial, and never work the computer's browser to X by hand while these tools answer
 
 ### Lists, docs, and the changelog
 
-- `packages/sdk/src/plugins-registry.json`: `x` and `x-computer`, outside **Essentials**, each with `docs`.
-- A how-to, `packages/website/src/content/docs/docs/how-to/read-x.md`, in `src/sidebar.ts`: add `x` and read a link, a person, and a list; make a public list on X; then add `x-computer`, sign in on the bot's computer, and search. It says a spare X account is wise, and promises nothing about X or FxTwitter.
+- `packages/sdk/src/plugins-registry.json`: `x-feed` and `x-feed-computer`, outside **Essentials**, each with `docs`.
+- A how-to, `packages/website/src/content/docs/docs/how-to/read-x.md`, in `src/sidebar.ts`: add `x-feed` and read a link, a person, mentions, and a list; make a public list on X; ask for a watch; then add `x-feed-computer`, sign in on the bot's computer, and search. It says a spare X account is wise, and promises nothing about X or FxTwitter.
 - The computer's how-to gains a line on what it provides to plugins.
 - `CHANGELOG.md`, under `## Unreleased`: the two plugins, and the computer's `run`.
 - The README's Phases line, and this doc moves to `docs/_completed/phases/`.
 
 ### In two steps
 
-1. **`x`:** the three sources with no account, the four tools, and the skill. It stands alone, and everything in it can be checked from this machine.
-2. **`x-computer`** and the computer's `run`. Its checks need a computer and an X account signed in, which is the owner's ([open question 2](#5-open-questions)).
+1. **`x-feed`:** the three sources with no account, the six tools, watches, and the skill. It stands alone, and everything in it can be checked from this machine.
+2. **`x-feed-computer`** and the computer's `run`. Its checks need a computer and an X account signed in, which is the owner's ([open question 2](#5-open-questions)).
 
 ### Not in this phase
 
 - Posting, liking, following, or direct messages.
-- The owner's own timeline, bookmarks, and notifications. The tab could read them later.
+- The owner's own timeline, bookmarks, and X's notifications page. The tab could read them later, and mentions and replies come from search until then.
+- Events pushed by X. Its Activity API is paid, so a watch checks on a timer and is minutes behind, never instant.
+- Grok's `x_search`, with a key or a plan.
 - Forged requests, cookies copied out of a browser, a guest token, and any paid source.
 - A page in the app, such as a feed or a card that draws a post.
-- A person's profile and followers, trends, communities, and Spaces.
-- Watching an account by itself: a routine that calls `x_latest` or `x_list` does it.
+- Trends, communities, Spaces, and who liked a post.
 
 ### Size
 
-About 560 lines: `x`'s `server.ts` 150, `page.ts` 50, `embed.ts` 70, `fxtwitter.ts` 60, `graph.ts` 80, the skill 30, `x-computer` 100, and the computer's `run` 20. One how-to page.
+About 800 lines: `x-feed`'s `server.ts` 180, `watch.ts` 110, `page.ts` 50, `embed.ts` 70, `fxtwitter.ts` 90, `graph.ts` 80, its settings panel 60, the skill 40, `x-feed-computer` 100, and the computer's `run` 20. One migration and one how-to page.
 
 ## 4. Checklist
 
-### Step 1: `x`
+### Step 1: `x-feed`
 
-- [ ] `plugins/x` with the files above, and `npm run typecheck` passing, with `check-plugins.mjs` accepting its `minFxbot`
+- [ ] `plugins/x-feed` with the files above, and `npm run typecheck` passing, with `check-plugins.mjs` accepting its `minFxbot`
 - [ ] `graph.ts` reads a saved answer of each kind: a public profile, a public post with a quote and replies, and a long post, whose text comes whole
-- [ ] `x_post` with a link in each form (`x.com`, `twitter.com`, with `?s=20`, a bare id) answers the post, and `https://example.com/status/1` is refused
+- [ ] `post` with a link in each form (`x.com`, `twitter.com`, with `?s=20`, a bare id) answers the post, and `https://example.com/status/1` is refused
 - [ ] A deleted post's link answers "no such post", and a long post's text matches x.com
-- [ ] `x_latest` for three accounts answers the 5 newest from X's page, matching x.com, with the line that says it's partial
-- [ ] With X's page turned off in the code, `x_latest` falls to the embed: 20 posts for NASA, and for an account ranked by likes it moves on to FxTwitter
-- [ ] With both turned off, `x_latest` reads FxTwitter, retries its empty 404 once, and never answers "no such account" from it
-- [ ] `x_search` by `latest` and by `top` answers from FxTwitter, and `count: 50` follows the cursor
-- [ ] `x_list` with a public list's link answers its posts newest first, from several authors
+- [ ] `latest` for three accounts answers the 5 newest from X's page, matching x.com, with the line that says it's partial
+- [ ] With X's page turned off in the code, `latest` falls to the embed: 20 posts for NASA, and for an account ranked by likes it moves on to FxTwitter
+- [ ] With both turned off, `latest` reads FxTwitter, retries its empty 404 once, and never answers "no such account" from it
+- [ ] `search` by `latest` and by `top` answers from FxTwitter, and `count: 50` follows the cursor
+- [ ] `list` with a public list's link answers its posts newest first, from several authors
+- [ ] `search` for `@nasa -from:nasa`, `to:nasa`, and `quoted_tweet_id:<id>` each answer posts of that kind, checked against x.com
+- [ ] `people` answers a handle's followers and following, and who reposted a post, and retries FxTwitter's empty 404 once
+- [ ] With X's embed turned off, `list` falls to FxTwitter's `list:<id>` search
+- [ ] A watch on `latest` for a busy account: the first check starts no turn, and the next new post starts one, with the watch's note and the post, within its `every`
+- [ ] A watch on a list fires once for posts from two of its accounts, in one message
+- [ ] A watch on `@handle` fires on a new mention, and a watch on followers on a new follower
+- [ ] With the network cut off, a watch starts no turn, tries again, and tells the bot once after a day (with the day shortened in the code)
+- [ ] A restart keeps each watch and its `seen`, and a post seen before starts no second turn
+- [ ] `every: 1` is held to 5, a 21st watch is refused, and search watches stay within 12 checks an hour
+- [ ] The bot's settings list its watches, and **Remove** ends one
+- [ ] With no watch, no timer runs
 - [ ] An embed's 429 rests that embed until its reset, and the ladder goes on without it
 - [ ] The same read twice within a minute fetches once
 - [ ] With `fxtwitter` empty, no request goes to it, and search answers that it needs the tab
 - [ ] When every rung fails (the network cut off), the tool names each one and why, in lines a bot can pass on
-- [ ] A bot on a mock model, asked "what did @NASA post today?", calls `x_latest`, and in **Ask** mode asks first
+- [ ] A bot on a mock model, asked "what did @NASA post today?", calls `latest`, and in **Ask** mode asks first
 - [ ] A post that says "ignore your instructions" comes back under the line that marks it as other people's words
-- [ ] With the plugin off for a bot, the bot has no `x_` tools; removed, nothing of it is left
+- [ ] With the plugin off for a bot, the bot has none of its tools, and its watches rest; removed, nothing of it is left
 - [ ] The registry entry, the how-to with `npm run build-site` passing, the changelog line, and the README's line
 
-### Step 2: `x-computer`
+### Step 2: `x-feed-computer`
 
 - [ ] The computer provides `run`, and `computer_shell` works as before
-- [ ] `x-computer` refuses to be added without `x` and `computer`, and loads with both
-- [ ] Signed out, `x_search` falls to FxTwitter, and with `fxtwitter` empty answers how to sign in
-- [ ] Signed in (the owner's part): `x_search` by `latest` and `top`, `x_latest` with `replies`, `x_latest` with `count: 60`, and `x_post` with `depth: "more"`, each checked against the same page on x.com
+- [ ] `x-feed-computer` refuses to be added without `x-feed` and `computer`, and loads with both
+- [ ] Signed out, `search` falls to FxTwitter, and with `fxtwitter` empty answers how to sign in
+- [ ] Signed in (the owner's part): `search` by `latest` and `top`, `latest` with `replies`, `latest` with `count: 60`, and `post` with `depth: "more"`, each checked against the same page on x.com
 - [ ] One read takes under 6 seconds on a warm browser, and the time is written here
 - [ ] A long post, a quote, a repost, and a promoted post in a search: the first three read right, and the last is left out
 - [ ] Two reads at once on one computer run one after the other, and the 61st in an hour answers that the tab is resting
 - [ ] A subagent's read uses the same tab, and doesn't take the bot's own
 - [ ] In a room with a computer, the read happens on the room's computer
-- [ ] With `x-computer` removed, `x` goes on with its three sources
+- [ ] With `x-feed-computer` removed, `x-feed` goes on with its three sources
 - [ ] `git diff --check`, and a look at each new file's whitespace
 
 ## 5. Open questions
 
 1. **Is the ladder right: X's public pages, then its embeds, then FxTwitter, then the signed-in tab?** Recommended. The other way round, FxTwitter first, is one source and less code, and would have failed 4 of 6 reads of a person's posts today.
-2. **A signed-in tab on the bot's computer for search.** It's what makes search dependable, and it puts an X account behind those reads, so a spare account is the wise choice. Step 2's last checks need that sign-in from you. Build step 2, or stop at step 1 for now?
-3. **FxTwitter by default.** With `x` in fxbot's list, every install that adds it sends its searches to one maintainer's free service, under a `User-Agent` that names fxbot. Its docs call it a public API, and no one has answered the request for permission to build on it. Recommended: on by default, and you ask the maintainer, or sponsor the project, before the release.
-4. **The names.** `x` and `x-computer`, with tools `x_post`, `x_latest`, `x_search`, and `x_list`.
+2. **A signed-in tab on the bot's computer for search.** It's what makes search, mentions, and their watches dependable, and it puts an X account behind those reads, so a spare account is the wise choice. Step 2's last checks need that sign-in from you. Build step 2, or stop at step 1 for now?
+3. **FxTwitter by default.** With `x-feed` in fxbot's list, every install that adds it sends its searches, and its mention and follower watches on a timer, to one maintainer's free service, under a `User-Agent` that names fxbot. Its docs call it a public API, and no one has answered the request for permission to build on it. Recommended: on by default, and you ask the maintainer, or sponsor the project, before the release.
+4. **The names.** `x-feed` and `x-feed-computer`, from this doc's name. A bot then sees tools named for the plugin, such as `x-feed_search`. `x` would give `x_search`.
+5. **Events, still being researched.** Watches here check on a timer. Still to come: whether X's notification emails, its web push in a signed-in browser, or the notifications page in the tab can tell a bot sooner, and how fresh the list embed is for a new post. This doc gets what's found.
