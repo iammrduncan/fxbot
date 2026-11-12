@@ -1,3 +1,5 @@
 {
-  "breaks": []
+  "breaks": [
+    { "since": "0.10.0", "plugin": "fresh", "below": "1.0.0", "says": "/fresh is built in now. Remove this plugin in Plugins: nothing is lost." }
+  ]
 }

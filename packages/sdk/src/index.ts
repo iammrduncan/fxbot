@@ -1,7 +1,7 @@
 import type { FxAgentTool, FxResumeTurn, FxSessionPromptInput, FxTurn } from "libfx";
 import { createArchives } from "./archive.ts";
 import { createEmbeddings, type EmbeddingSettings } from "./embeddings.ts";
-import { createHistory, idleAsk, summarize, switchAsk } from "./history.ts";
+import { createHistory, freshAsk, freshCommand, idleAsk, summarize, switchAsk } from "./history.ts";
 import { createLibrary, pdf } from "./library.ts";
 import { createMcp } from "./mcp.ts";
 import { createMemories } from "./memories.ts";
@@ -298,6 +298,8 @@ export async function createFxbot(options: FxbotOptions) {
   mcp.connect();
   ready = true;
 
+  // The commands every bot's chat has, in the composer's / list, with the plugins'.
+  const coreCommands = [{ name: "fresh", description: "Start the chat over toward what you write next" }];
   // A switch's summary follows the bot's own instructions in every open of the chat it started.
   const instructionsFor = (profile: StoredProfile) =>
     [profile.instructions, profile.handoff ? `${profile.handoff}\n\nSearch earlier messages with chat_history.` : ""].filter(Boolean);
@@ -818,28 +820,36 @@ export async function createFxbot(options: FxbotOptions) {
     let sessionId = session ?? profile.sessionId!;
     const by = { ...(from ? { from } : {}), ...(asked?.trim() ? { asked } : {}) };
     let done: (() => void) | undefined;
-    // Plugins may change the message, or handle it themselves, and then no turn runs.
+    // /fresh at the start of the owner's message to the bot's own chat starts the chat over, aimed at the rest of it.
+    let startOverAsk: string | undefined;
+    if (!session && !from && freshCommand.test(text)) {
+      text = text.replace(freshCommand, "").trim();
+      startOverAsk = freshAsk(text.slice(0, 4000));
+    }
+    // Plugins may change the message, or handle it themselves, and then no turn runs. A plugin may start the bot's own
+    // chat over too, when /fresh didn't.
     if (packages.hooked("message")) {
       const event = { bot: id, session: sessionId, text, files, ...by };
       const answer = await packages.run("message", event);
       if (answer?.handled) return { messageId, sessionId, handled: true as const };
       ({ text, files } = event);
       if (typeof text !== "string" || !Array.isArray(files)) fail(400, "A plugin left this message without text or files.");
-      // Or start the bot's own chat over first: only a chat with messages, and only once for a message, so a retry of
-      // one that went through runs nothing new.
-      if (answer?.startOver && !session) {
-        done = await hold(id);
-        try {
-          profile = await get(id);
-          const [{ any, seen }] = await store.sql<{ any: boolean; seen: boolean }[]>`select
-            exists (select 1 from messages where profile_id = ${id} and session_id = ${profile.sessionId}) as any,
-            exists (select 1 from messages where profile_id = ${id} and message_id = ${messageId} and role = 'user') as seen`;
-          if (any && !seen) profile = await startOver(profile, { ask: answer.startOver.ask, heading: () => "Earlier conversation, summarized when the chat started over" });
-          sessionId = profile.sessionId!;
-        } catch (error) {
-          done();
-          throw error;
-        }
+      if (answer?.startOver && !session) startOverAsk ??= answer.startOver.ask;
+    }
+    // Starting over: only a chat with messages, and only once for a message, so a retry of one that went through runs
+    // nothing new.
+    if (startOverAsk !== undefined) {
+      done = await hold(id);
+      try {
+        profile = await get(id);
+        const [{ any, seen }] = await store.sql<{ any: boolean; seen: boolean }[]>`select
+          exists (select 1 from messages where profile_id = ${id} and session_id = ${profile.sessionId}) as any,
+          exists (select 1 from messages where profile_id = ${id} and message_id = ${messageId} and role = 'user') as seen`;
+        if (any && !seen) profile = await startOver(profile, { ask: startOverAsk, heading: () => "Earlier conversation, summarized when the chat started over" });
+        sessionId = profile.sessionId!;
+      } catch (error) {
+        done();
+        throw error;
       }
     }
     try {
@@ -977,7 +987,11 @@ export async function createFxbot(options: FxbotOptions) {
       },
       // The bot's skills, for the $ and / picker in its chat.
       // Its skills, then its plugins' commands, for the $ and / list.
-      skills: async (id: string): Promise<BotSkill[]> => (await get(id), [...skills.listFor(id), ...packages.commands(id).map((c) => ({ ...c, command: true as const }))]),
+      // Then the commands: core's, then the plugins', leaving out one that has a core command's name.
+      skills: async (id: string): Promise<BotSkill[]> => (
+        await get(id),
+        [...skills.listFor(id), ...[...coreCommands, ...packages.commands(id).filter((c) => !coreCommands.some((own) => own.name === c.name))].map((c) => ({ ...c, command: true as const }))]
+      ),
       // The bot's chats before its current one, which a provider switch leaves behind.
       async earlier(id: string) {
         const profile = await get(id);

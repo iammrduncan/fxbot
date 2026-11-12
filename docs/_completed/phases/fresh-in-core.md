@@ -5,7 +5,7 @@
 - **The plugin retires.** It leaves fxbot's list and **Essentials**. An install that has it sees it as **Unsupported**, with words to remove it. It keeps no data, so nothing is lost.
 - **Plugins keep what they have.** A message hook can still answer `{ startOver: { ask } }`, and `plugin.json` can still declare `commands`.
 
-Status: planned on 2026-11-12, at the owner's word. Researched the same day, against fxbot's code at `ff25241`, and from source at Pi `d78a75e`, Hermes Agent `e7212db`, and OpenClaw `56eb6f3`.
+Status: built on 2026-11-12, for 0.10.0, as planned the same day at the owner's word, with the open questions' recommendations: the name `/fresh`, a break line for an install that has the plugin, and the message hook's `startOver` kept. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. Researched the same day, against fxbot's code at `ff25241`, and from source at Pi `d78a75e`, Hermes Agent `e7212db`, and OpenClaw `56eb6f3`.
 
 ## What the owner asked
 
@@ -14,9 +14,9 @@ Status: planned on 2026-11-12, at the owner's word. Researched the same day, aga
 ## 0. Core or plugin
 
 **Core.**
-- **It's context that fits the model,** which is core ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). `/fresh` starts a chat over by hand. A provider switch and [idle compaction](../_completed/phases/idle-autocompaction.md) do the same on their own, and both are core.
+- **It's context that fits the model,** which is core ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). `/fresh` starts a chat over by hand. A provider switch and [idle compaction](idle-autocompaction.md) do the same on their own, and both are core.
 - **Core already does the work:** the summary, the new session, the card, and the page following the chat. The plugin only says when, and what to ask: 41 lines (`plugins/fresh/fxbot/server.ts`).
-- **This changes an earlier call.** On 2026-11-05, [fresh](../_completed/phases/fresh.md#0-core-or-plugin) made `/fresh` a plugin on two seams. Since then, idle compaction made starting over something core does by itself, and the command that does it by hand belongs beside it.
+- **This changes an earlier call.** On 2026-11-05, [fresh](fresh.md#0-core-or-plugin) made `/fresh` a plugin on two seams. Since then, idle compaction made starting over something core does by itself, and the command that does it by hand belongs beside it.
 - **The seams stay in the plugin API.** A message hook's `startOver` answer and `commands` in `plugin.json` cost nothing to keep, and another plugin may start a chat over its own way. Removing them would break plugins for nothing.
 - **Core still names no plugin.** Retiring fresh is data: a line in `plugin-breaks.json`, and fxbot's list.
 
@@ -71,7 +71,7 @@ Status: planned on 2026-11-12, at the owner's word. Researched the same day, aga
 - **`plugin-breaks.json`:** `{ "since": "0.10.0", "plugin": "fresh", "below": "1.0.0", "says": "/fresh is part of fxbot since 0.10.0. Remove this plugin in Plugins: nothing is lost." }`.
 - **The folder:** delete `plugins/fresh/`. An install that added it from GitHub keeps its own copy until the owner removes it.
 - **The dev app:** take `plugins/fresh` out of its `FXBOT_PLUGIN_DIRS` when this lands. A folder on that list that's gone is an error in the log.
-- **History:** [fresh](../_completed/phases/fresh.md) stays as it is. This doc says what replaced it.
+- **History:** [fresh](fresh.md) stays as it is. This doc says what replaced it.
 
 ### Docs
 
@@ -100,18 +100,18 @@ Status: planned on 2026-11-12, at the owner's word. Researched the same day, aga
 ## 4. Checklist
 
 Against a disposable fxbot and a mock model that logs each request:
-- [ ] With no fresh plugin, `/fresh plan the trip` in a bot's own chat starts it over:
+- [x] With no fresh plugin, `/fresh plan the trip` in a bot's own chat starts it over:
   - The mock gets one summary request, whose ask is the plugin's ask, word for word, aimed at "plan the trip".
   - The card says **Started over**.
   - "plan the trip" goes to the new chat, as the owner's.
-- [ ] `/fresh` alone starts over with the general ask, and sends nothing after.
-- [ ] `/fresh` in a room, in a routine's run, or in a plugin's message to the bot is sent as written.
-- [ ] A chat with no messages isn't summarized, and a message sent again doesn't start over twice.
-- [ ] The `/` list shows `/fresh` once for every bot, also with a local fresh plugin loaded.
-- [ ] A plugin's message hook sees the message without `/fresh`. A hook's own `startOver` answer still works on a message without `/fresh`.
-- [ ] fresh, added from a repository on the checks' stand-in for GitHub, shows **Unsupported** with the break line's words. Removing it changes nothing else.
-- [ ] **Essentials** and fxbot's list no longer have fresh.
-- [ ] Docs as above, `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
+- [x] `/fresh` alone starts over with the general ask, and sends nothing after.
+- [x] `/fresh` in a room, in a routine's run, or in a plugin's message to the bot is sent as written.
+- [x] A chat with no messages isn't summarized, and a message sent again doesn't start over twice.
+- [x] The `/` list shows `/fresh` once for every bot, also with a local fresh plugin loaded.
+- [x] A plugin's message hook sees the message without `/fresh`. A hook's own `startOver` answer still works on a message without `/fresh`.
+- [x] fresh, added from a repository on the checks' stand-in for GitHub, shows **Unsupported** with the break line's words. Removing it changes nothing else.
+- [x] **Essentials** and fxbot's list no longer have fresh.
+- [x] Docs as above, `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
 
 Only a person can check, with a real model:
 - [ ] `/fresh` with something to go on: the new chat keeps what bears on it, as before.
@@ -121,3 +121,20 @@ Only a person can check, with a real model:
 1. **Keep the name `/fresh`?** Recommended: yes. Owners know it, and it also says the summary aims at what comes next. Pi's `/compact` and Hermes's `/compress` compact in place.
 2. **An install that has the plugin:** **Unsupported** with words to remove it, through a break line? Recommended: yes. For fxbot to remove it itself, core would have to name a plugin.
 3. **Keep the message hook's `startOver` answer** in the plugin API? Recommended: yes. Removing it gains nothing, and would break a plugin that uses it.
+
+## What the build changed
+
+- **The break line's words** are "/fresh is built in now. Remove this plugin in Plugins: nothing is lost." Plugins puts "It doesn't work on fxbot 0.10.0." before them, so the planned "since 0.10.0" said the version twice.
+- **With `/fresh`, a hook's `startOver` doesn't count.** `/fresh` runs before the hooks, and a hook's answer starts a chat over only when `/fresh` didn't. The plugin API reference and the changelog's **For plugins** say so.
+- **The guide keeps a short section** for an owner who still has the plugin: it shows **Unsupported**, and removing it loses nothing.
+- **The screenshots' fresh scene stays,** on core's `/fresh`, and the plugin leaves their plugin list.
+- **The checks,** against a disposable fxbot, the mock model, a probe plugin with a message hook, and the plugin-compatibility checks' stand-in for GitHub:
+  - **On fxbot as 0.9.0,** fresh 0.1.0 was added from the stand-in. `/fresh plan the trip` ran one summary, whose ask matched the plugin's own `askFor`, word for word. The plugin's hook ran too, and the `/` list had `/fresh` once. That was fresh from the stand-in; a local copy goes through the same filter, by name, and wasn't run.
+  - **As 0.10.0,** fresh showed **Unsupported** with the break line's words. Then:
+    - `/fresh` alone used the general ask and sent nothing. A chat with no messages wasn't summarized, and a message sent again started over once.
+    - A room, a routine's run, and a plugin's message sent `/fresh` as written.
+    - The probe's hook saw the message without `/fresh`. Its own `startOver` worked without `/fresh`, and didn't count with it.
+    - Removing fresh left `/fresh` working. **Essentials** and fxbot's list had no fresh.
+  - **24 checks over two runs, 23 passed.** The one that failed compared the **Unsupported** text without the words Plugins puts first, and led to the rewording above. It passed after.
+  - **The page, in Chromium:** the `/` list offered `/fresh` once, and Plugins showed fresh **Unsupported** with the break line's words. No page errors.
+- **The dev app:** `plugins/fresh` leaves its `FXBOT_PLUGIN_DIRS` when this lands.

@@ -37,7 +37,7 @@ export function useSkillPicker(id: string, box: RefObject<HTMLTextAreaElement | 
   // Read when the chat opens, and again when the box gets focus, so skills added since show up.
   const load = () => client.profiles.skills(id).then(setSkills, () => {});
   useEffect(() => void (setPicked([]), load()), [id]);
-  // Plugins' commands, such as /fresh, are in the / list only.
+  // Commands, core's such as /fresh and the plugins', are in the / list only.
   const matches = token ? rank(token.trigger === "$" ? skills.filter((s) => !s.command) : skills, token.query) : [];
   // A $ that matches no skill is likely money, so the list stays shut; a / at the start says what there is.
   const open = Boolean(token) && (matches.length > 0 || token?.trigger === "/");

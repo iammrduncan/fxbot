@@ -52,7 +52,7 @@ async function main() {
 
   // Everything else, on an install with fxbot's plugins and the demo bots. The computer needs a container engine set
   // up for it, so it isn't here.
-  const plugins = ["pages", "chat-rooms", "messages", "permissions", "routines", "fresh", "dreams", "subagents", "mermaid"].map((name) => join(root, "plugins", name));
+  const plugins = ["pages", "chat-rooms", "messages", "permissions", "routines", "dreams", "subagents", "mermaid"].map((name) => join(root, "plugins", name));
   const fx = await fxbot(db, "world", key, plugins, model.embed);
   const w = await world(fx, model);
   // A page shows when it was saved: one fixed time, so a shot looks the same on every run.

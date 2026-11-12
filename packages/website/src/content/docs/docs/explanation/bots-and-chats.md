@@ -99,7 +99,7 @@ Vectors are kept in Postgres, with pgvector, beside the rows they belong to. A s
 
 A chat starts over three ways, and all work the same. A model writes a summary of the chat so far, and the bot starts a new chat from it. The earlier messages show above a card with the summary, and stay searchable with `chat_history`. Pages open on the chat follow it to the new one.
 - **Moving a bot to another provider.** A session can't move between agents, and fxbot runs one agent per provider, so a move starts a new chat. The old provider writes the summary, or the new one when the old can't. The card says **Continued from** the old provider.
-- **`/fresh`,** from the fresh plugin. A summary aimed at what you write next keeps what bears on it, and your message goes to the new chat. The card says **Started over**. See [Start a chat over with /fresh](/docs/how-to/start-fresh/).
+- **`/fresh`,** built in since 0.10.0. A summary aimed at what you write next keeps what bears on it, and your message goes to the new chat. The card says **Started over**. See [Start a chat over with /fresh](/docs/how-to/start-fresh/).
 - **Idle compaction,** since 0.10.0. A long chat that sits with no message for 30 minutes is summarized while you're away, so your next message starts fast: the bot reads the summary, not the whole chat again. The card says **Compacted while idle**, with a link to turn it off.
 
 ### Idle compaction

@@ -1,5 +1,5 @@
 {
-  "essentials": ["permissions", "fresh", "routines", "messages", "subagents", "pages", "soul", "chat-rooms", "computer", "chat-rooms-computer"],
+  "essentials": ["permissions", "routines", "messages", "subagents", "pages", "soul", "chat-rooms", "computer", "chat-rooms-computer"],
   "plugins": [
     {
       "name": "computer",
@@ -15,13 +15,6 @@
       "repo": "iammrduncan/fxbot",
       "path": "plugins/chat-rooms",
       "docs": "/docs/how-to/talk-in-a-room/"
-    },
-    {
-      "name": "fresh",
-      "description": "/fresh starts a bot's chat over toward what you write next, from a summary that keeps what matters.",
-      "repo": "iammrduncan/fxbot",
-      "path": "plugins/fresh",
-      "docs": "/docs/how-to/start-fresh/"
     },
     {
       "name": "chat-rooms-computer",
