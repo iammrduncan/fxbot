@@ -60,6 +60,15 @@ The section changes only when a memory is saved, changed, or removed, not when o
 
 You see a bot's memories under **Memories** on its edit screen, which **Edit** in its panel opens: newest first, each with its date, and **Saved by** the bot or **Added by you**. Search them there, add one with **Add a memory**, change one with its pencil button, or delete one. The bot sees your change on its next turn.
 
+## A soul, with the soul plugin
+
+With the [soul plugin](/docs/how-to/give-a-bot-a-soul/), each bot also has a soul: a few lines, in its own words, of who it is, how it sounds, and how it helps you. It writes it in a first meeting with you, and rewrites it when you ask.
+
+The soul goes first in the bot's instructions, in every chat: its own, a room, a routine's run, and a subagent. A line before it says your instructions come first where they differ, and that the soul never changes the bot's rules or what it may do. So the split is:
+- **Instructions** are yours: the rules, which the bot can't change.
+- **The soul** is the bot's: its voice and its idea of its job, which it keeps up with you, in its own chat only.
+- **Memories** are facts: about you, your work, and what was decided.
+
 ## Search by words and by meaning
 
 `memory_search` and `chat_history` find matches in two ways at once:

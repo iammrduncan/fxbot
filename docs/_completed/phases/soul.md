@@ -2,15 +2,15 @@
 
 Each bot gets a soul: a short brief, in its own words, of who it is, how it sounds, and how it helps its owner.
 - **A new bot gets to know its owner first.** The first time the owner opens a new bot's chat, the bot speaks before they type. From the name it was given, it guesses who it might be and what it could help with, and asks whether that fits and what the owner needs. With the owner's answers, it writes its soul, shows it, and offers to change it.
-- **The soul shapes every chat.** It goes in the bot's instructions, after the owner's own, which come first where they differ. It never changes the bot's rules or what it may do.
+- **The soul shapes every chat.** It goes first in the bot's instructions, with a line saying the owner's own come first where they differ. It never changes the bot's rules or what it may do.
 - **The bot keeps it up.** Asked to change how it is, the bot rewrites its soul and says what changed. The owner reads and edits it on the bot's edit screen, where each version is kept, to go back to.
 - **Bring a bot from elsewhere.** A skill, `import-profile`, brings in a soul and memories from a Hermes Agent profile or an OpenClaw agent, from files the owner attaches. For an assistant with no files to export, such as Grok Bot, ChatGPT, or Claude, it gives the owner a prompt to paste there, and reads the answer.
 
-Status: planned on 2026-11-12, at the owner's word. Researched the same day:
+Status: built on 2026-11-12, for 0.10.0, as planned the same day at the owner's word, with the open questions' recommendations. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. The checklist's boxes are what ran here, against a mock model and a browser; what only a person can check is listed there too. Researched the same day:
 - against the research directive's references: eve, OpenBot, OpenDuet, openmuse, OpenDots, Pi, and Grok Bot
 - against OpenClaw, Hermes Agent and its agent importers, Letta, and the GPT builder, from source at the commits in [Research](#1-research), and their docs
 
-It replaces the stub that was here.
+It replaced a stub.
 
 ## What the owner asked
 
@@ -18,7 +18,7 @@ It replaces the stub that was here.
 
 ## 0. Core or plugin
 
-**A plugin, `soul`,** as the stub said, with no change to fxbot's core. A soul isn't one of the things every bot needs ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)): a bot runs on its owner's instructions alone, as every bot does today. An owner who wants plain bots leaves it out. The plugin API already has every piece:
+**A plugin, `soul`,** as the stub said, with one small change to the page API: an `app.chat` part gets `reload()` ([What the build changed](#what-the-build-changed)). A soul isn't one of the things every bot needs ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)): a bot runs on its owner's instructions alone, as every bot does today. An owner who wants plain bots leaves it out. The plugin API already has every piece:
 - **The `instructions` hook** puts the soul in each chat, as chat rooms puts in who's in a room.
 - **A tool of its own,** `soul_save`, writes it.
 - **`app.chat`,** the plugin's part of a chat above the message box, starts a new bot's first meeting when the owner first opens its chat (`packages/ui/src/app.tsx:820-824`).
@@ -35,9 +35,9 @@ A core hook for a new bot (`bot.created`) was the other way to start the meeting
 
 - **A bot has a name, instructions, a provider and model, and a look** (`packages/sdk/src/index.ts:84-99`). The instructions are the owner's, at most 64 KiB, edited on the bot's edit screen (`packages/ui/src/app.tsx:555-556`). The new-bot form, which onboarding uses too, has no instructions: a new bot starts with none.
 - **Each chat's instructions,** in order: the bot's instructions, its memories, its skills' catalog, then the plugins' `instructions` hooks, which may add, change, or remove entries (`index.ts:309-324`).
-- **Onboarding** ends on the new bot: "Scout is ready", then **Start chatting** opens its chat ([onboarding](../_completed/phases/onboarding.md#the-flow)).
+- **Onboarding** ends on the new bot: "Scout is ready", then **Start chatting** opens its chat ([onboarding](onboarding.md#the-flow)).
 - **A file the owner sends** goes into the library: images, and Markdown, text, CSV, and JSON documents, which the bot reads (`packages/sdk/src/library.ts:21`).
-- **A bot's tools never reach the owner's machine** ([Bots and the owner's machine](../../CONVENTIONS.md#bots-and-the-owners-machine)). So an import can't open `~/.hermes` or `~/.openclaw`: it works from what the owner sends.
+- **A bot's tools never reach the owner's machine** ([Bots and the owner's machine](../../../CONVENTIONS.md#bots-and-the-owners-machine)). So an import can't open `~/.hermes` or `~/.openclaw`: it works from what the owner sends.
 - **Plugin sessions:** a room's turn, a routine's run, and a subagent are sessions of a plugin's own. A tool call knows its session, and each bot's own chat is its `sessionId`.
 
 ### The directive's references
@@ -273,19 +273,19 @@ An archive (`.tar.gz`) can't be attached: the library takes text and images. So 
 ## 4. Checklist
 
 Against a disposable fxbot and a mock model that logs each request, with the plugin added and on:
-- [ ] Making a bot and opening its chat starts one meeting: the chat shows "First meeting" from Soul, and the bot's answer. The mock's request carries the brief with the bot's name. A reload, a second tab, and opening the chat again send nothing more.
-- [ ] A bot that has chatted before the plugin was added, and a bot the plugin is off for, start no meeting.
-- [ ] `soul_save` in the bot's own chat saves the soul and a version, and the card shows **Updated its soul**. The next turn's instructions open with the soul and its framing line. A bot with no soul gets no such line.
-- [ ] `soul_save` refuses in a room, a routine's run, and a subagent, a text over 4,000 characters, and an empty one.
-- [ ] The Soul box shows the soul. The owner's edit saves a version by the owner, and the next turn carries it. **History** lists the versions, and **Restore** brings one back as a new version.
-- [ ] After 31 saves, a bot keeps 30 versions.
-- [ ] Removing the plugin removes its tables, and every bot's chat opens without a soul.
+- [x] Making a bot and opening its chat starts one meeting: the chat shows "First meeting" from Soul, and the bot's answer. The mock's request carries the brief with the bot's name. A reload, a second tab, and opening the chat again send nothing more.
+- [x] A bot that has chatted before the plugin was added, and a bot the plugin is off for, start no meeting.
+- [x] `soul_save` in the bot's own chat saves the soul and a version, and the card shows **Updated its soul**. The next turn's instructions open with the soul and its framing line. A bot with no soul gets no such line.
+- [x] `soul_save` refuses in a room, a routine's run, and a subagent, a text over 4,000 characters, and an empty one.
+- [x] The Soul box shows the soul. The owner's edit saves a version by the owner, and the next turn carries it. **History** lists the versions, and **Restore** brings one back as a new version.
+- [x] After 31 saves, a bot keeps 30 versions.
+- [x] Removing the plugin removes its tables, and every bot's chat opens without a soul.
 
 The skill, with the mock model scripted, and by reading:
-- [ ] `import-profile` reaches the bot's catalog, and its references name what to read and what never to read, for Hermes and OpenClaw, and hold the export prompt.
+- [x] `import-profile` reaches the bot's catalog, and its references name what to read and what never to read, for Hermes and OpenClaw, and hold the export prompt.
 
 The rest:
-- [ ] Docs as above, `npm run typecheck`, the plugin's page built with its README's command, `npm run build-site`, and `git diff --check`.
+- [x] Docs as above, `npm run typecheck`, the plugin's page built with its README's command, `npm run build-site`, and `git diff --check`.
 
 Only a person can check, with a real model:
 - [ ] A new bot named "Scout" guesses a role from the name, asks at most three questions, and after the owner answers writes a soul of a few lines and shows it.
@@ -295,7 +295,23 @@ Only a person can check, with a real model:
 
 ## 5. Open questions
 
+Taken as recommended at the build, on 2026-11-12: not in **Essentials** yet, the soul first, no archive upload, and the meeting saves to the bot's own memories, since team memories aren't built.
+
 1. **In Essentials?** A first meeting is a good first impression, and onboarding's first bot would start one. Recommended: yes, after it's been tried on a few new bots.
 2. **The soul first, or after the owner's instructions?** Hermes puts the soul first, and OpenClaw puts the rules before it. Recommended: first, with the line that the owner's instructions come first where they differ. The hook can't tell an empty instructions entry from the rest, so first is also the simplest.
 3. **An archive upload for Hermes's export?** The owner would send the `.tar.gz` from the Soul box, and the plugin would unpack only the files the skill reads, about 80 lines. Recommended: not at first. The skill takes the files, and asks for the archive's contents.
-4. **The owner's name, and other facts every bot needs.** The meeting saves what it learns to the bot's own memories. With [team memories](memories-v2.md), facts such as the owner's name could be the team's. Recommended: the bot asks before it saves one to the team.
+4. **The owner's name, and other facts every bot needs.** The meeting saves what it learns to the bot's own memories. With [team memories](../../phases/memories-v2.md), facts such as the owner's name could be the team's. Recommended: the bot asks before it saves one to the team.
+
+## What the build changed
+
+- **`app.chat` parts get `reload()`** (`packages/ui/src/app.tsx`, `plugins.tsx`). The plan said the plugin API had every piece. It didn't: a chat reads its bot once, and follows a stream only once the bot has a session, so a meeting the plugin started in a new bot's chat didn't show until a reload. `reload` reads the bot again, as the chat already does after a start-over, and the meeting's part calls it once the meeting has started. It's added, so `plugin-breaks.json` gets no line. The plugin's `minFxbot` is 0.10.0 for it.
+- **The card is a card of its own.** A plugin can't change a tool step's title, so the step still reads **Ran soul_save**. The plugin's view is open, `app.toolView("save", …, { open: true })`, so **Updated its soul** is a card under it, folded, opening to the new text. A refused call has no card: its step's result says why.
+- **The owner's button is Save soul.** The edit screen has its own **Save**, for the bot's form, so the box's own says what it saves. It's off until the text changes.
+- **The owner can clear the soul.** Saving the box empty leaves the bot with no soul, and no line in its instructions. The empty version is kept, as "(empty)", so it can be undone. The bot can't save an empty soul.
+- **A failed meeting tries again.** The bot is marked met before the brief is sent. When the send fails, such as on a provider with no model, it's unmarked, and the next open of the chat tries again. The page asks only for a bot with a provider and no chat yet, so a bot without a provider doesn't ask.
+- **Saving the same text adds no version.** Each save locks the bot's row, and compares, in one transaction.
+- **The checks:** 37 against the server and the scripted mock model, 16 in Chromium against the built page, and 5 for removing the plugin, all on a fresh check world.
+  - **Where `soul_save` was tried:** a room, a routine's run, and a subagent.
+  - **Turning the plugin off for one bot:** a plugin on for **all** bots can't be. That check set it to **Choose** first.
+  - **The check server said 0.9.0,** since `package.json` trails the release branch, and ran the plugin as a local one.
+- **Size:** 125 lines of server code, 118 of page code, a 7-line migration, 137 lines of skill and references, and 9 changed in the app. Under the plan's 340 and 150.

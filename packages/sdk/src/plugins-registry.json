@@ -59,6 +59,13 @@
       "docs": "/docs/how-to/hand-work-to-subagents/"
     },
     {
+      "name": "soul",
+      "description": "Each bot writes a short soul, who it is and how it helps you, in a first meeting with you, and keeps it up when you ask. Brings one in from Hermes Agent or OpenClaw.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/soul",
+      "docs": "/docs/how-to/give-a-bot-a-soul/"
+    },
+    {
       "name": "permissions",
       "description": "Decide what each bot can do on its own: ask, a reviewer model, or run everything.",
       "repo": "iammrduncan/fxbot",

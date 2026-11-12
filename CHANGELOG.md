@@ -4,6 +4,8 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
+- **Bots with a soul.** The new **soul** plugin gives each bot a soul: a few lines, in its own words, of who it is, how it sounds, and how it helps you. The first time you open a new bot's chat, it speaks first: it guesses who it might be from its name, asks what you'd like help with, and writes its soul from your answers. It rewrites it when you ask, in its own chat only, and **Soul** on its edit screen lets you edit it, with every version to go back to. Its skill, `import-profile`, brings a soul and memories over from a Hermes Agent profile or an OpenClaw agent, from files you send, or from Grok Bot, ChatGPT, or Claude through a prompt you paste there. Add it from **Plugins**. See [Give a bot a soul](https://fxbot.sh/docs/how-to/give-a-bot-a-soul/).
+- **For plugins:** an `app.chat` part gets `reload()`, which reads the bot again, so the chat follows a session the plugin started.
 - **No more box around a moving bot in Firefox.** With hardware acceleration on, a bot that leaned after the pointer, such as the one open in the sidebar, could show thin straight lines along its right and bottom edges. The home page's bots on fxbot.sh had them too ([#16](https://github.com/iammrduncan/fxbot/issues/16)).
 
 ## 0.9.0 (2026-11-10)

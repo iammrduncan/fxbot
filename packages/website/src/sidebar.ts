@@ -39,6 +39,7 @@ export const topics: Topic[] = [
           { slug: "how-to/draw-diagrams-in-chat", label: "Draw diagrams in chat" },
           { slug: "how-to/let-bots-work-together", label: "Let bots work together" },
           { slug: "how-to/hand-work-to-subagents", label: "Hand work to subagents" },
+          { slug: "how-to/give-a-bot-a-soul", label: "Give a bot a soul" },
           { slug: "how-to/choose-what-a-bot-can-do-alone", label: "Choose what a bot can do alone" },
           { slug: "how-to/memory-search", label: "Choose memory search's vectors" },
           { slug: "how-to/when-a-device-cant-connect", label: "When a device can't connect" },
