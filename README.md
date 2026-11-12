@@ -70,7 +70,10 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Distribution](docs/phases/distribution.md) (core; after 0.8.0): the main install, one download for Linux, macOS, and Windows that brings its own Postgres and embedder and a Linux machine for the computer, and later the desktop app; the container release is for hosting
 - [ ] [Mac support](docs/phases/mac-support.md) (core; after 0.8.0): one line installs fxbot on a Mac, as Distribution's macOS download built first, with only the computer in a Lima VM, and a handoff to check it on a real Mac
 - [ ] [Triggers](docs/phases/triggers.md) (plugins): webhooks and new email start a bot's turn
-- [ ] [Soul](docs/phases/soul.md) (plugin): a written persona behind each bot's system prompt
+- [ ] [Memories v2](docs/phases/memories-v2.md) (core, and the chat rooms plugin): team memories every bot reads, which the owner adds in Settings and a bot saves when asked, and a room's own memories, which every bot in that room reads
+- [ ] [Soul](docs/phases/soul.md) (plugin): each bot writes a short soul in a first meeting with its owner, guessing who it is from its name, keeps it up when asked, and can bring one in from Hermes Agent or OpenClaw
+- [ ] [Reasoning](docs/phases/reasoning.md) (core, and the subagents plugin): how hard a bot's model thinks, and its subagents', from the levels each model offers; AI Gateway, ChatGPT, and Grok now, every other provider with the next libfx release
+- [ ] [Idle compaction](docs/phases/idle-autocompaction.md) (core): a long chat left idle for 30 minutes is summarized, with a note in the chat, so the next message starts fast; off or another time and model in Settings
 - [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window, past the compaction libfx does
 - [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
 - [ ] [Knowledge base](docs/phases/knowledge-base.md) (plugin): knowledge the bots draw on
