@@ -6,7 +6,7 @@ A bot on Claude by key talks to Anthropic's own Messages API, so prompt caching 
 - **Cache counts in a turn's usage.** A caller on the SDK, such as Thermite, sees cache reads and writes on the turn, as libfx already defines them.
 - **What each provider caches.** A table in the docs says which of fxbot's providers cache by themselves, and what fxbot does to keep the cache warm.
 
-Status: planned on 2026-11-11, not built, from [issue #18](https://github.com/iammrduncan/fxbot/issues/18). The owner chose the plan the same day: AI Gateway as a stopgap at once, then this phase. The stopgap is done: the catalog's note on Anthropic and the Anthropic and Vercel provider pages send Claude by key through AI Gateway with the owner's own Anthropic key (`857bccc`). Researched the same day:
+Status: planned on 2026-11-11, from [issue #18](https://github.com/iammrduncan/fxbot/issues/18), and on hold. It isn't for 0.10.0: the owner wants it documented, and libfx checked again later for its own fix ([When to revisit](#when-to-revisit)). The stopgap the owner chose is in place meanwhile. The stopgap is done: the catalog's note on Anthropic and the Anthropic and Vercel provider pages send Claude by key through AI Gateway with the owner's own Anthropic key (`857bccc`). Researched the same day:
 - fxbot's providers and libfx 0.0.16, from fxbot's code and from libfx's source at `vercel-labs/fx` `8352e0c`
 - Anthropic's Messages API, from the Claude API reference skill (cached 2026-10-06)
 - how Pi, Hermes Agent, OpenClaw, and the Vercel AI SDK cache Claude and carry its thinking, from their source on 2026-11-11, and libfx's issues and pull requests on it
@@ -22,6 +22,8 @@ Issue #18, "Claude by key: speak Anthropic's Messages API, so prompt caching and
 - Not part of it: "A sign-in with a Claude plan."
 
 On the gap and the options: "yeah do that your recommendation". That was AI Gateway now, then a translator in fxbot, small asks of libfx, and the table, as one phase.
+
+On the plan: "its not something for v0.10.0 that we build right now we just want it documented atm, and for us to revisit libfx to see if it gets fixed in the future."
 
 ## 0. Core or plugin
 
@@ -257,8 +259,22 @@ Only a person can check, with a real key:
 
 ## 5. Open questions
 
-1. **Build the translator now, or wait for libfx?** libfx's own Messages route is a draft (#1803) or waiting since October (#1176), and nobody has said when either lands. Recommended: build it now, as a bridge to drop when libfx ships its own. Thermite is on AI Gateway meanwhile.
+1. **Build the translator now, or wait for libfx?** Answered on 2026-11-12: wait, and check libfx again ([When to revisit](#when-to-revisit)). The rest stay open until then.
 2. **Refusal fallbacks.** When Claude declines a request, Anthropic can run it again on another Claude model at that model's prices: `fallbacks: "default"`, which the Claude API reference advises turning on by default for Opus 5.5 and Sonnet 5.5. Turn it on, or let a refusal end the turn as now? Recommended: on, with a line in the log when it happens.
 3. **Cache counts before libfx reads them.** Fill a turn's usage from fxbot's own count until a libfx release does it? Recommended: yes, so #18's first "done when" holds without waiting.
 4. **The cache's TTL.** Five minutes is the default, and each read renews it. An owner who replies after 20 minutes pays a fresh write. An hour costs twice as much to write. Recommended: five minutes, as Pi, Hermes, and OpenClaw default to. Agent loops, like Thermite's, keep it warm. Hermes's `auto` is a third choice: an hour for a bot's own chat, where a person types, and five minutes for routines and subagents.
 5. **Effort for the SDK:** per bot only, as planned, or also per message? Recommended: per bot. Changing effort mid-chat costs the cache.
+
+## When to revisit
+
+Check libfx's releases after 0.0.16 (`npm view libfx versions`, its [changelog](https://github.com/vercel-labs/fx/blob/main/CHANGELOG.md), and the pull requests above). What each one would change here:
+
+| If a libfx release has... | Then fxbot... |
+| --- | --- |
+| A custom provider that takes `protocol: "anthropic-messages"` in `customProviderDefinition` ([#1803](https://github.com/vercel-labs/fx/pull/1803), [#1176](https://github.com/vercel-labs/fx/pull/1176)) | needs no translator. Anthropic's catalog entry names the protocol and fxbot passes it to libfx. Check that libfx sends cache breakpoints and adaptive thinking on it, as its gateway route does. If it doesn't, the request half of the translator is still needed. |
+| Cache reads from Chat Completions' `usage` ([#1043](https://github.com/vercel-labs/fx/pull/1043)) | gets cache counts for every custom provider, with no counting of its own. |
+| Efforts for a custom model ([#1803](https://github.com/vercel-labs/fx/pull/1803)) | passes a bot's effort to libfx on every route, with no session trick. |
+| [#1799](https://github.com/vercel-labs/fx/pull/1799), earlier turns sent unchanged | moves to it, for the thinking-signature 400 on Fable 5.1 and later through AI Gateway. |
+| None of these, and Claude by key still matters | builds this plan as written, or asks the owner whether AI Gateway is enough. |
+
+Whatever libfx does, two parts of the plan stand on their own and could come first: each provider's cache key or session id, and the docs' caching table. Neither waits on libfx.
