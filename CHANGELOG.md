@@ -2,6 +2,10 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
+## Unreleased
+
+- **No more box around a moving bot in Firefox.** With hardware acceleration on, a bot that leaned after the pointer, such as the one open in the sidebar, could show thin straight lines along its right and bottom edges. The home page's bots on fxbot.sh had them too ([#16](https://github.com/iammrduncan/fxbot/issues/16)).
+
 ## 0.9.0 (2026-11-10)
 
 **Before upgrading.** Migration `0015_session_labels` adds a `label` column to `plugin_sessions`, for the name a plugin gives a session of its own. Every session you have carries on as it is. Then update Computer from **Plugins**, if you have it.
