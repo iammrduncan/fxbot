@@ -138,6 +138,8 @@ export function parseManifest(text: string): Manifest {
   if (!isObject(needs) || Object.entries(needs).some(([other, block]) => !pluginName.test(other) || other === name || !isObject(block)))
     fail(400, "plugin.json's needs must map other plugins' names to an object each.");
   if (Buffer.byteLength(JSON.stringify(needs)) > 16 * 1024) fail(400, "plugin.json's needs must be at most 16 KiB.");
+  if (Object.values(needs as Record<string, Record<string, unknown>>).some((block) => block.optional !== undefined && typeof block.optional !== "boolean"))
+    fail(400, "A need's optional must be true or false.");
   const commands = (own.commands ?? []) as { name: string; description: string }[];
   if (!Array.isArray(commands) || commands.some((c) => typeof c?.name !== "string" || !pluginName.test(c.name) || c.name.length > 40 || typeof c.description !== "string" || c.description.length > 200))
     fail(400, "plugin.json's commands must each have a name of up to 40 lowercase letters, digits, and dashes, and a description of up to 200 characters.");
@@ -247,8 +249,11 @@ export async function createPlugins(options: {
   const applies = (plugin: Package, bot: string) => Boolean(plugin.loaded && plugin.record.enabled && (plugin.record.bots === "all" || on.get(plugin.record.id)?.has(bot)));
   const hooked = (event: keyof HookEvents) => [...plugins.values()].some((p) => p.loaded?.hooks.get(event)?.length);
   const named = (name: string) => [...plugins.values()].find((p) => p.record.name === name);
-  // A manifest stored before needs existed has none.
+  // A manifest stored before needs existed has none. A need marked optional lets the plugin load and run without the
+  // other, and the other be removed; fx.need answers null while it doesn't run. Since 0.10.0.
   const needsOf = (record: PackageRecord) => Object.keys(record.config.needs ?? {});
+  const optional = (record: PackageRecord, name: string) => record.config.needs?.[name]?.optional === true;
+  const requiredOf = (record: PackageRecord) => needsOf(record).filter((name) => !optional(record, name));
 
   // The added plugins that need `name`, each with its block for it, a copy, so a plugin can't change another's, and the
   // object it provides, its own.
@@ -386,7 +391,7 @@ export async function createPlugins(options: {
     }
     const owner = "repo" in source ? source.repo.split("/")[0] : "local";
     Object.assign(page, { name: manifest.name, iconKey: `${owner}/${manifest.name}`, version: manifest.version, description: manifest.description, settings: manifest.settings });
-    page.needs = Object.keys(manifest.needs).map((name) => ({ name, added: Boolean(named(name)) }));
+    page.needs = Object.keys(manifest.needs).map((name) => ({ name, added: Boolean(named(name)), ...(manifest.needs[name].optional === true ? { optional: true as const } : {}) }));
     page.code = [manifest.server, manifest.page].filter((p): p is string => Boolean(p));
     const missing = [...page.code, manifest.css].filter((p) => p && !byPath.has(p));
     if (missing.length) return { page: { ...page, error: `plugin.json names ${missing.join(" and ")}, which ${where} doesn't have.` } };
@@ -616,7 +621,7 @@ export async function createPlugins(options: {
     try {
       if ("local" in record.source && !folders.has(folderOf(record))) throw new Error("Its folder isn't in FXBOT_PLUGIN_DIRS any more.");
       if ([...reserved, ...taken()].includes(record.name)) throw new Error(`Its name, ${record.name}, is a prefix another plugin's tools use.`);
-      const missing = needsOf(record).filter((name) => !named(name));
+      const missing = requiredOf(record).filter((name) => !named(name));
       if (missing.length) throw new Error(`It needs ${missing.join(" and ")}. Add ${missing.length > 1 ? "them" : "it"} first.`);
       // Its own Postgres: two connections at most, in its schema.
       loaded.sql = api.sql = postgres(databaseUrl, { max: 2, onnotice: () => {}, connection: { search_path: schemaOf(record.name) } });
@@ -768,7 +773,8 @@ export async function createPlugins(options: {
       servers: record.config.servers ?? [],
       code: Boolean(record.config.server || record.config.page),
       skills: plugin.skills.map((row) => row.name),
-      needs: needsOf(record),
+      needs: requiredOf(record),
+      worksWith: needsOf(record).filter((name) => optional(record, name)),
       settings: record.config.settings.map((setting) => ({
         ...setting,
         set: setting.name in plugin.saved,
@@ -930,7 +936,7 @@ export async function createPlugins(options: {
     // Its cleanup runs, then its schema, its sessions, its settings, its switches, its servers, and its files go.
     async remove(id: string) {
       const plugin = get(id);
-      const needing = dependentsOf(plugin.record.name).map((d) => d.name);
+      const needing = dependentsOf(plugin.record.name).filter((d) => d.needs.optional !== true).map((d) => d.name);
       if (needing.length) fail(409, `${needing.join(" and ")} ${needing.length > 1 ? "need" : "needs"} ${plugin.record.name}. Remove ${needing.length > 1 ? "them" : "it"} first.`);
       await unload(plugin);
       plugins.delete(id);
@@ -970,7 +976,7 @@ export async function createPlugins(options: {
       if (page.hash !== hash) fail(409, "The plugin changed since its page was shown. Look at it again.");
       if ([...plugins.values()].some((p) => p.record.name === manifest.name)) fail(409, `A plugin named ${manifest.name} is added already.`);
       if ([...reserved, ...taken()].includes(manifest.name)) fail(400, `Its name, ${manifest.name}, is a prefix another plugin's tools use.`);
-      const missing = page.needs.filter((need) => !named(need.name)).map((need) => need.name);
+      const missing = page.needs.filter((need) => !need.optional && !named(need.name)).map((need) => need.name);
       if (missing.length) fail(400, `Add ${missing.join(" and ")} first.`);
       const record: PackageRecord = {
         id: newId(),
@@ -1003,7 +1009,7 @@ export async function createPlugins(options: {
       if (page.error || !manifest) return fail(400, page.error ?? "This version can't be added.");
       if (page.hash !== hash) fail(409, "The plugin changed since its page was shown. Look at it again.");
       if (manifest.name !== before.name) fail(400, `This version is named ${manifest.name}. Remove ${before.name} and add it instead.`);
-      const missing = page.needs.filter((need) => !named(need.name)).map((need) => need.name);
+      const missing = page.needs.filter((need) => !need.optional && !named(need.name)).map((need) => need.name);
       if (missing.length) fail(400, `This version needs ${missing.join(" and ")}. Add ${missing.length > 1 ? "them" : "it"} first.`);
       const next: PackageRecord = { ...before, source: page.source, config: { ...manifest, files: page.files, servers: before.config.servers }, approvedHash: page.hash };
       if (folderOf(next) !== folderOf(before)) await writeFiles(folderOf(next), files);

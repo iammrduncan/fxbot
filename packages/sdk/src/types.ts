@@ -292,6 +292,8 @@ export type PackagePlugin = PluginCommon & {
   skills: string[];
   /** The plugins it needs, which load before it and can't be removed while it's added. */
   needs: string[];
+  /** The plugins it works with when they're added, and runs without: needs marked optional. Since 0.10.0. */
+  worksWith: string[];
   /** Its settings, with each value but a secret's, which says only whether it is set. */
   settings: (PluginSetting & { value?: string; set: boolean })[];
   parts: PackageParts;
@@ -326,8 +328,8 @@ export type PackagePreview = {
   settings: PluginSetting[];
   migrations: string[];
   skills: string[];
-  /** The plugins it needs, and whether each is added. Add waits for them. */
-  needs: { name: string; added: boolean }[];
+  /** The plugins it needs, and whether each is added. Add waits for them, but not for one marked optional. */
+  needs: { name: string; added: boolean; optional?: true }[];
   /** Its MCP servers. Remote ones are added with it; one that runs a command isn't used yet. */
   servers: { name: string; url?: string; used: boolean }[];
   changed?: { path: string; change: "changed" | "added" | "removed" }[];

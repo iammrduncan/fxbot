@@ -93,7 +93,7 @@ function Contents({ page, added = false }: { page: PackagePreview; added?: boole
           {page.needs.map((need) => (
             <p key={need.name} className="text-sm">
               <span className="font-mono text-xs">{need.name}</span>
-              <span className="text-muted-foreground">{need.added ? ", added" : ", which isn't added yet. Add it first."}</span>
+              <span className="text-muted-foreground">{need.added ? ", added" : need.optional ? ", which isn't added. It works without it." : ", which isn't added yet. Add it first."}</span>
             </p>
           ))}
         </section>
@@ -227,7 +227,7 @@ export function PluginDialog({
         {installed && <AddedFooter onSettings={installed.onSettings} />}
         {!installed && page?.hash && (
           <div className="border-t pt-3">
-            <Button onClick={add} disabled={busy || page.unfit || page.needs.some((need) => !need.added)}>
+            <Button onClick={add} disabled={busy || page.unfit || page.needs.some((need) => !need.added && !need.optional)}>
               {busy && <LoaderCircleIcon className="animate-spin" />}
               Add {page.name}
             </Button>
@@ -346,11 +346,13 @@ export function PluginSettings({ addon, bots, servers, onChange, onRemoved }: { 
                   ["Version", addon.version],
                   ["Source", fromText[source.from]],
                   ["Needs", addon.needs.join(", ") || undefined],
+                  ["Works with", addon.worksWith?.join(", ") || undefined],
                 ]
               : [
                   ["Folder", <span key="folder" className="font-mono text-xs break-all">{source.local}</span>],
                   ["Version", addon.version],
                   ["Needs", addon.needs.join(", ") || undefined],
+                  ["Works with", addon.worksWith?.join(", ") || undefined],
                 ]
           }
         />

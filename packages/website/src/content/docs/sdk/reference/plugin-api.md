@@ -230,6 +230,7 @@ A plugin names the plugins it needs, and what it asks of each, under `needs`:
 
 - Its page says what it needs. Adding it is refused until those are added, and they can't be removed while it is.
 - It loads after the plugins it needs.
+- **`"optional": true`** in a need's object, since 0.10.0, makes it a plugin it works with: it loads and runs without it, Add doesn't wait for it, and it can be removed. `fx.need` answers null while it isn't running. Its page lists it under **Works with**. An older fxbot reads it as needed, so a plugin that uses it sets `minFxbot` to 0.10.0. The computer marks chat rooms so, for a room's computer.
 - What each object holds is up to the plugin it names, which reads them with `fx.dependents()` and hears a change with the `dependents` event.
 - A plugin with no code, only `needs` and skills, is a plugin too.
 

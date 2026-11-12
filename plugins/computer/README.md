@@ -18,11 +18,13 @@ A computer starts on its bot's first call and stops when it sits idle, unless so
 
 Plugins that need the computer add programs to every computer with setup steps, in `needs.computer.setup` in their `plugin.json`.
 
+With [chat rooms](../chat-rooms/) added too, since 0.5.0, a room can have a computer of its own, which its bots share in that room, taking turns, and their own computers in their own chats. The screen button at the top of a room, beside **Edit**, turns it on and off and opens it. A room's turns hear that the computer is shared, and with whom, and the skill `room-computer` goes with a bot's first turn there. Its key is `room-` and 8 hex characters, kept so turning it off and on finds the same home. Turning it off stops it and keeps its home, and deleting the room deletes both. The computer works with chat rooms without needing it: `chat-rooms` is under `needs`, with `"optional": true`. It replaces the chat-rooms-computer plugin, whose rooms' keys it copies once, so each room keeps its computer: update the computer first, then remove that plugin.
+
 Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. Like every plugin, it's on for every bot once added; choose its bots in **Settings** › **Computer**.
 
 ## Computers for other plugins
 
-Since 0.3.0, a plugin that needs the computer can name computers of its own, such as [chat-rooms-computer](../chat-rooms-computer/)'s, one for each room. It provides, with `fx.provide`:
+Since 0.3.0, a plugin that needs the computer can name computers of its own, as chat-rooms-computer did for rooms before 0.5.0. It provides, with `fx.provide`:
 
 ```ts
 type ComputerProvider = {

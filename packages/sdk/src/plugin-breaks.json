@@ -1,5 +1,6 @@
 {
   "breaks": [
-    { "since": "0.10.0", "plugin": "fresh", "below": "1.0.0", "says": "/fresh is built in now. Remove this plugin in Plugins: nothing is lost." }
+    { "since": "0.10.0", "plugin": "fresh", "below": "1.0.0", "says": "/fresh is built in now. Remove this plugin in Plugins: nothing is lost." },
+    { "since": "0.10.0", "plugin": "chat-rooms-computer", "below": "1.0.0", "says": "A room's computer is part of the computer plugin since its 0.5.0. Update Computer first, then remove this plugin: each room keeps its computer." }
   ]
 }

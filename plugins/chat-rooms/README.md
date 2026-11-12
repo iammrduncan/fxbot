@@ -36,7 +36,7 @@ Since 0.3.0, chat rooms provides, with `fx.provide`, for plugins that name it un
 - `roomOf(session)`: the room one of its sessions is for, `{ id, name, untagged, replies, members }`, or null
 - `rooms()`: every room
 
-The room's header leaves a place, `chat-rooms.room-header`, which a plugin fills with `app.slot`; each part gets `room`. [chat-rooms-computer](../chat-rooms-computer/) uses both. On fxbot 0.4, which has neither, the room works as in 0.2.0.
+The room's header leaves a place, `chat-rooms.room-header`, which a plugin fills with `app.slot`; each part gets `room`. The [computer](../computer/) uses both, for a room's computer. On fxbot 0.4, which has neither, the room works as in 0.2.0.
 
 ## Files
 

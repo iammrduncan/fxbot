@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { request, type IncomingHttpHeaders } from "node:http";
 import { userInfo } from "node:os";
@@ -78,6 +78,12 @@ const hostOf = (name: string, bot: string) =>
 // A computer: a bot's own, whose key is the bot's id, or one a plugin that needs the computer names (`by`), shared by the
 // bots it names it for. `name` makes its hostname and its title.
 type Computer = { key: string; name?: string; by: string | null };
+// What chat rooms provides, when it's added: the room a session is for, and every room.
+type Room = { id: number; name: string; members: string[] };
+type Rooms = { roomOf(session: string): Promise<Room | null>; rooms(): Promise<Room[]> };
+// A room's computer is labelled as chat rooms', and one chat-rooms-computer made, before 0.5.0, as that plugin's, until
+// it's made again.
+const roomsBy = ["chat-rooms", "chat-rooms-computer"];
 // What a plugin that needs the computer provides, to name computers of its own (docs: The computer).
 type ComputerProvider = {
   computerFor(call: { bot: string; session: string }): Promise<{ key: string; name: string } | null>;
@@ -389,9 +395,32 @@ export default async function setup(fx: PluginApi) {
   // The plugins that need the computer and name computers of their own, running now.
   const providers = () =>
     fx.dependents().flatMap(({ name, api }) => (typeof (api as Partial<ComputerProvider> | null)?.computerFor === "function" ? [{ name, api: api as unknown as ComputerProvider }] : []));
-  // The computer a call uses: the one a plugin that needs the computer names for its chat, such as a room's, or else the
-  // bot's own.
+  // A room's computer, with chat rooms added: one its bots share in that room, taking turns, as the room runs one turn at
+  // a time. A room's key is `room-` and 8 random hex characters, made when it's first turned on and kept, so turning it
+  // off and on again finds the same home. Since 0.5.0, in place of the chat-rooms-computer plugin.
+  const chatRooms = () => fx.need<Rooms>("chat-rooms");
+  async function roomComputer(session: string) {
+    const room = await chatRooms()?.roomOf(session).catch(() => null);
+    if (!room) return null;
+    const [row] = await fx.sql<{ key: string; enabled: boolean }[]>`select key, enabled from room_computers where room = ${room.id}`;
+    return row?.enabled ? { room, key: row.key } : null;
+  }
+  // Every room's computer, on or off, by key, with its room: null while chat rooms doesn't run, which can't tell. A
+  // deleted room's goes, and its computer on the next sweep.
+  async function roomComputers() {
+    const rooms = await chatRooms()?.rooms().catch(() => null);
+    if (!rooms) return null;
+    const byId = new Map(rooms.map((room) => [room.id, room]));
+    const rows = await fx.sql<{ room: number; key: string }[]>`select room, key from room_computers`;
+    const gone = rows.filter((row) => !byId.has(row.room)).map((row) => row.room);
+    if (gone.length) await fx.sql`delete from room_computers where room = any(${gone})`;
+    return new Map(rows.flatMap((row) => (byId.has(row.room) ? [[row.key, byId.get(row.room)!] as const] : [])));
+  }
+  // The computer a call uses: its room's, in a room with its computer on, or the one a plugin that needs the computer
+  // names for its chat, or else the bot's own.
   async function computerOf(bot: string, session: string): Promise<Computer> {
+    const inRoom = await roomComputer(session);
+    if (inRoom) return { key: inRoom.key, name: inRoom.room.name, by: "chat-rooms" };
     for (const { name: by, api } of providers()) {
       const found = await api.computerFor({ bot, session });
       if (!found) continue;
@@ -407,6 +436,8 @@ export default async function setup(fx: PluginApi) {
       return bot ? { key, name: bot.name, by: null } : null;
     }
     if (!isKey.test(key)) return null;
+    const room = (await roomComputers())?.get(key);
+    if (room) return { key, name: room.name, by: "chat-rooms" };
     for (const { name: by, api } of providers()) {
       const found = (await api.computers().catch(() => null))?.find((c) => c.key === key);
       if (found) return { key, name: String(found.name ?? key), by };
@@ -443,9 +474,16 @@ export default async function setup(fx: PluginApi) {
     const bots = new Set((await fx.bots.list()).map((bot) => bot.id));
     const added = new Map(fx.dependents().map((d) => [d.name, d.api as Partial<ComputerProvider> | null]));
     const listed = new Map<string, Set<string> | null>();
+    let rooms: Awaited<ReturnType<typeof roomComputers>> | undefined;
     for (const { key, by } of await computers()) {
       if (!by) {
         if (!bots.has(key)) await remove(key);
+        continue;
+      }
+      // A room's, while chat rooms lists its room. Kept while chat rooms doesn't run.
+      if (roomsBy.includes(by)) {
+        if (rooms === undefined) rooms = await roomComputers();
+        if (rooms && !rooms.has(key)) await remove(key);
         continue;
       }
       if (!added.has(by)) {
@@ -1048,6 +1086,7 @@ export default async function setup(fx: PluginApi) {
     answer.image = { tag, size: made.status === 200 ? JSON.parse(made.data.toString("utf8")).Size : null };
     const names = new Map((await fx.bots.list()).map((bot) => [bot.id, bot.name]));
     for (const { api } of providers()) for (const c of (await api.computers().catch(() => null)) ?? []) names.set(c.key, String(c.name ?? c.key));
+    for (const [key, room] of (await roomComputers()) ?? []) names.set(key, room.name);
     const homes = new Map<string, number>();
     try {
       for (const v of (await json("GET", "/system/df", undefined, 30_000)).Volumes ?? []) homes.set(v.Name, v.UsageData?.Size);
@@ -1129,6 +1168,45 @@ export default async function setup(fx: PluginApi) {
   });
   fx.route("POST", "/computers/:key/reset", (_, { key }) => one(key, () => remove(key)));
   fx.route("DELETE", "/computers", () => answer(async () => Promise.all((await computers()).map(({ key }) => remove(key)))));
+
+  // A room turn's instructions say the computer is shared, and with whom. The skill goes with a bot's first room turn
+  // after the room's computer is on, as chat rooms sends its own.
+  const taught = new Set<string>();
+  fx.on("instructions", async (event) => {
+    const found = await roomComputer(event.session);
+    if (!found) return;
+    const names = new Map((await fx.bots.list()).map((bot) => [bot.id, bot.name]));
+    const others = found.room.members.filter((bot) => bot !== event.bot).map((bot) => names.get(bot) ?? "another bot");
+    const withWhom = others.length ? `which you share with ${others.slice(0, -1).join(", ")}${others.length > 1 ? " and " : ""}${others.at(-1)}, taking turns` : "used in turns";
+    event.instructions.push(
+      `This room has a computer of its own, ${withWhom}: during your turns here, your computer tools reach it, not your own. ` +
+        "Someone may have changed it since your last turn, so look before you act. Your skill room-computer says how to share it.",
+    );
+  });
+  fx.on("message", async (event) => {
+    if (event.from !== "chat-rooms" || taught.has(event.session) || !(await roomComputer(event.session))) return;
+    taught.add(event.session);
+    event.text = `$room-computer ${event.text}`;
+  });
+  // A room's computer, on or off: { on, key }. The key is made the first time it's turned on.
+  const roomBy = async (id: string) => (await chatRooms()?.rooms().catch(() => null))?.find((room) => room.id === Number(id)) ?? null;
+  const roomState = async (id: number) => {
+    const [row] = await fx.sql<{ key: string; enabled: boolean }[]>`select key, enabled from room_computers where room = ${id}`;
+    return { on: Boolean(row?.enabled), key: row?.key ?? null };
+  };
+  fx.route("GET", "/rooms/:id", async (_request, { id }) => {
+    const room = await roomBy(id);
+    return room ? Response.json(await roomState(room.id)) : Response.json({ error: "No such room." }, { status: 404 });
+  });
+  fx.route("PUT", "/rooms/:id", async (request, { id }) => {
+    const room = await roomBy(id);
+    if (!room) return Response.json({ error: "No such room." }, { status: 404 });
+    const { on } = (await request.json().catch(() => ({}))) as { on?: unknown };
+    if (typeof on !== "boolean") return Response.json({ error: "on must be true or false" }, { status: 400 });
+    const key = `room-${randomBytes(4).toString("hex")}`;
+    await fx.sql`insert into room_computers (room, key, enabled) values (${room.id}, ${key}, ${on}) on conflict (room) do update set enabled = ${on}`;
+    return Response.json(await roomState(room.id));
+  });
 
   fx.on("settings", () => void check());
   // A plugin that needs the computer came, changed, or went: the image follows, in the background.

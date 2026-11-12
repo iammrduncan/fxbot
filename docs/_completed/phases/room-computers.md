@@ -6,7 +6,7 @@ The chat-rooms-computer plugin goes, and the computer plugin gives rooms their c
 - **Every room keeps its computer and its files** through the move.
 - **The plugin API gets one small addition:** a need that's optional.
 
-Status: planned on 2026-11-12, at the owner's word. Researched the same day, against fxbot's code at `ff25241`, OpenClaw's plugin manifest docs at `56eb6f3`, and Pi's extensions docs at `d78a75e`.
+Status: built on 2026-11-12, for 0.10.0, as planned the same day at the owner's word, with the open questions' recommendations, and the first settled by the owner. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. Researched the same day, against fxbot's code at `ff25241`, OpenClaw's plugin manifest docs at `56eb6f3`, and Pi's extensions docs at `d78a75e`.
 
 ## What the owner asked
 
@@ -17,7 +17,7 @@ Status: planned on 2026-11-12, at the owner's word. Researched the same day, aga
 **A plugin: computer 0.5.0, with one small addition to the plugin API.**
 - **Computers and rooms are plugins.** The core names neither.
 - **In the computer plugin, at the owner's word.** A room's computer is a computer: the computer plugin makes it, keeps its home, and decides which computer each call reaches. Today the last part goes through other plugins' `computerFor`, only because a room's computer lives in a plugin of its own.
-- **As [memories v2](../_completed/phases/memories-v2.md) did,** the feature goes in a plugin that's already added, and turns on when rooms exist. Memories v2 put a room's memories in chat rooms, which owns rooms. This puts a room's computer in computer, which owns computers. Either way there's no third plugin, and nothing in core looks for a plugin.
+- **As [memories v2](memories-v2.md) did,** the feature goes in a plugin that's already added, and turns on when rooms exist. Memories v2 put a room's memories in chat rooms, which owns rooms. This puts a room's computer in computer, which owns computers. Either way there's no third plugin, and nothing in core looks for a plugin.
 - **The addition: an optional need.** Computer reads the rooms from chat rooms (`roomOf`, `rooms`). `fx.need` gives that only to a plugin that names chat rooms under `needs`, and a need is required:
   - A plugin whose need is missing doesn't load (`packages/sdk/src/plugins.ts:619-620`).
   - A plugin another one needs can't be removed (`plugins.ts:933-934`).
@@ -137,23 +137,23 @@ Status: planned on 2026-11-12, at the owner's word. Researched the same day, aga
 ## 4. Checklist
 
 Against a disposable fxbot and the mock model, with the computer's engine as rootless podman, as the computer phase's checks ran. Never load the computer plugin in a check run as root.
-- [ ] **Optional needs:**
+- [x] **Optional needs:**
   - A plugin with an optional need loads without the other, and `fx.need` answers null.
   - Added after, the other is found.
   - Removing the needed plugin isn't refused. A required need still refuses.
-- [ ] **Computer 0.5.0 without chat rooms** loads. No room logic runs, its room routes answer "No such room.", and no button shows.
-- [ ] **With chat rooms:**
+- [x] **Computer 0.5.0 without chat rooms** loads. No room logic runs, its room routes answer "No such room.", and no button shows.
+- [x] **With chat rooms:**
   - The room's header has the computer button, and turning it on makes a `room-` key.
   - A room turn's computer calls reach the room's computer, and the bot's own chat reaches its own.
   - The instructions and the skill go as before.
-- [ ] **The move,** on a database where chat-rooms-computer 0.1.0 gave a room a computer, with a file in its home:
+- [x] **The move,** on a database where chat-rooms-computer 0.1.0 gave a room a computer, with a file in its home:
   - On fxbot 0.10.0, chat-rooms-computer shows **Unsupported**, and the room's computer is kept.
   - After Computer 0.5.0, the room's key is copied, and its computer and the file are there.
   - Removing chat-rooms-computer then keeps them.
-- [ ] **Deleting and turning off:** deleting a room deletes its computer on the next sweep. A room's computer turned off is stopped, and kept.
-- [ ] **Removing chat rooms** keeps the rooms' computers, and Computer runs on.
-- [ ] **Essentials** and fxbot's list no longer have chat-rooms-computer.
-- [ ] Docs as above, `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
+- [x] **Deleting and turning off:** deleting a room deletes its computer on the next sweep. A room's computer turned off is stopped, and kept.
+- [x] **Removing chat rooms** keeps the rooms' computers, and Computer runs on.
+- [x] **Essentials** and fxbot's list no longer have chat-rooms-computer.
+- [x] Docs as above, `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
 
 Only a person can check, on a real machine:
 - [ ] A room's bots share its computer with a real model, after the move, as before.
@@ -164,3 +164,26 @@ Only a person can check, on a real machine:
 2. **An optional need in `plugin.json`, or `fx.need` for any plugin without naming it?** Recommended: an optional need. It says what a plugin works with, where Plugins can show it.
 3. **The order of the move:** words in the break line and **Before upgrading**, which is all fxbot can do for an install still on Computer 0.4.0. Recommended: yes.
 4. **Computer's migration reads chat-rooms-computer's table,** another plugin's schema, once. Recommended: yes, once. Otherwise every room loses its computer's files.
+
+## What the build changed
+
+- **No list of reached sessions.** chat-rooms-computer kept which room sessions its `instructions` hook had reached, so a bot it was off for kept its own computer. In the computer plugin, a bot it's off for has no computer tools, so there's nothing to keep.
+- **A deleted room's row goes too,** when the computer next lists the rooms' computers, along with its computer on the next sweep.
+- **Turning a room's computer off** still stops it from the page, now through the computer's own stop route.
+- **The dialog is `sm:max-w-lg` wide.** It asked for `sm:max-w-md`, which isn't among the app's styles, and a plugin's page gets only those, so it filled the window, in chat-rooms-computer too.
+- **Optional needs on the page:** a preview says an optional plugin "isn't added. It works without it.", and **Add** doesn't wait for it. A plugin's details in Settings list it under **Works with**. The plugin list's `needs` keeps only the required ones, and `worksWith` lists the rest. A manifest whose `optional` isn't `true` or `false` is refused.
+- **The docs:** the plugin API reference, the computer's and chat rooms' READMEs, [Give a room a computer](../../../packages/website/src/content/docs/docs/how-to/give-bots-a-computer.md#give-a-room-a-computer), `AGENTS.md`, the changelog, and the release checks' note about running the computer as root.
+- **The checks,** against a disposable fxbot, the mock model, and the plugin-compatibility checks' stand-in for GitHub:
+  - **The engine** was the `agent` user's rootless podman 5.4.2, set as the computer's **engine** setting. The computer's image built in 72 seconds. It was removed after, and the user's podman units stopped.
+  - **The check server ran as root, against this checklist's own rule.** A plugin's settings are sealed with its record, which is made when it's first loaded, so the engine setting couldn't be in place before that.
+  - **A first try reached the engine through a socket path of about 130 characters,** which a Unix socket can't hold: 108 at most. The computer then started its setup script. The script stopped at its first check, on the user name, before changing anything. The machine has only the users and folders it had before.
+  - **32 checks over five phases, all passed:**
+    - **On fxbot as 0.9.0:** computer 0.4.0, chat rooms, and chat-rooms-computer 0.1.0 from the stand-in. A room's computer, labelled by chat-rooms-computer, got a file in its home.
+    - **As 0.10.0:** chat-rooms-computer showed **Unsupported** with the break line's words. The room's computer and home were kept, and the room used the bot's own computer meanwhile.
+    - **Computer 0.5.0, in the same folder:** it works with chat rooms. Its migration copied the room's key. A room turn read the file on the room's computer, `lab-computer`, and heard it was shared, with the skill. The bot's own chat reached its own.
+    - **chat-rooms-computer removed:** a restart's sweep kept the room's computer, and the room still read the file. Off, the room used the bot's own computer, and the room's was stopped and kept. On again, it found the same home. An unknown room was 404.
+    - **A deleted room:** its computer and home went on the next sweep.
+    - **Removing chat rooms:** a plugin with a required need on it refused the removal. The computer's optional one didn't. The computer then ran without chat rooms, kept the rooms' computers, and answered its room routes with "No such room." Chat rooms added again was found.
+  - **The page, in Chromium:** one computer button in a room's header, from the computer, with its dialog on and **Open**. The computer's Settings tab listed chat rooms under **Works with**. No page errors.
+  - **Without chat rooms there's no room screen,** so the slot that holds the button is never drawn. That wasn't looked at in a browser.
+- **The dev app:** chat-rooms-computer leaves its `FXBOT_PLUGIN_DIRS` when this lands. It's removed there once Computer 0.5.0 has copied the rooms' keys.

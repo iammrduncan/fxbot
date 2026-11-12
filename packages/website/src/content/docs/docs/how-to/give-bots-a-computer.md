@@ -27,7 +27,7 @@ When a bot needs you for something only you can do, such as a sign-in, a passkey
 
 ## Give a room a computer
 
-With [chat rooms](/docs/how-to/talk-in-a-room/), a room can have a computer of its own, which its bots share. Add **chat-rooms-computer** from **Plugins**: it needs the computer and chat rooms, version 0.3.0 of each.
+With [chat rooms](/docs/how-to/talk-in-a-room/) added too, a room can have a computer of its own, which its bots share. It's part of the computer since its 0.5.0, so there's nothing more to add. Before that, it was the chat-rooms-computer plugin: update the computer first, then remove chat-rooms-computer, and each room keeps its computer.
 
 1. In a room, choose the screen button at the top, beside **Edit**, and turn on **Computer**.
 2. The room's bots now use the room's computer in the room, taking turns, as they take turns talking, and their own computers in their own chats. Its hostname is the room's name and `-computer`.

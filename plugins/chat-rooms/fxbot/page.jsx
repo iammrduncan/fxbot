@@ -448,7 +448,7 @@ function RoomScreen({ params }) {
                 const bot = botOf(member);
                 return bot ? <ui.Blob key={member} {...bot} size={24} busy={state.replying?.bot === member} /> : null;
               })}
-              {/* A place for plugins that need chat rooms, such as chat-rooms-computer's button. fxbot 0.4 has no Slot. */}
+              {/* A place for plugins that need chat rooms, such as the computer's button. fxbot 0.4 has no Slot. */}
               {Slot && <Slot name="chat-rooms.room-header" props={{ room }} />}
               <ui.Button variant="ghost" size="sm" onClick={() => setRemembering(true)}>
                 Memories

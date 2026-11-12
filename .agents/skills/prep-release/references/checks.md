@@ -81,7 +81,7 @@ This one matters most. An owner's update runs this release's migrations on the d
 
 Changed plugins reach owners still on the last release as soon as `main` moves. So run them on both releases.
 
-- **Leave out `computer`, and `chat-rooms-computer`, which needs it, when the server runs as root.** With no engine set, `computer` runs its own engine-setup script, which changes the machine. Report them as not run, with that reason.
+- **Leave out `computer` when the server runs as root.** With no engine set, `computer` runs its own engine-setup script, which changes the machine. Report them as not run, with that reason.
 - On the new server, set `FXBOT_PLUGIN_DIRS` to the rest of `$T/new/plugins/*`, joined with `:`, on a fresh database. Run `npm ci` first in each one that has a lockfile and imports a package in its `server.ts`.
   - Every plugin starts, with no **Unsupported**.
   - Each plugin's tab in Settings loads without a page error.

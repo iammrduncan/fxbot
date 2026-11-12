@@ -1,5 +1,5 @@
 {
-  "essentials": ["permissions", "routines", "messages", "subagents", "pages", "soul", "chat-rooms", "computer", "chat-rooms-computer"],
+  "essentials": ["permissions", "routines", "messages", "subagents", "pages", "soul", "chat-rooms", "computer"],
   "plugins": [
     {
       "name": "computer",
@@ -15,13 +15,6 @@
       "repo": "iammrduncan/fxbot",
       "path": "plugins/chat-rooms",
       "docs": "/docs/how-to/talk-in-a-room/"
-    },
-    {
-      "name": "chat-rooms-computer",
-      "description": "A computer a chat room's bots share, taking turns, with an arrow where each one last pointed.",
-      "repo": "iammrduncan/fxbot",
-      "path": "plugins/chat-rooms-computer",
-      "docs": "/docs/how-to/give-bots-a-computer/#give-a-room-a-computer"
     },
     {
       "name": "dreams",
