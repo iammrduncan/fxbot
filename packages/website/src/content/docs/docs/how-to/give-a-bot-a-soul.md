@@ -5,7 +5,7 @@ description: "The soul plugin has each bot write a short brief of who it is, how
 
 The soul plugin gives each bot a soul: a few lines, in its own words, of who it is, how it sounds, and how it helps you. It goes first in every chat of the bot. Your instructions still come first where the two differ, and the soul never changes what the bot may do.
 
-1. Add **soul** from **Plugins**, on **Browse**. It needs fxbot 0.10.0 or newer.
+1. Add **soul** from **Plugins**, on **Browse**, or with **Essentials**, which has it. It needs fxbot 0.10.0 or newer.
 2. Make a bot, with **New bot** at the top of the sidebar, and open its chat.
 3. The bot speaks first. From its name, it guesses who it might be, and asks whether that fits and what you'd like help with.
 4. Answer it. It writes its soul, shows it to you, and offers to change it.

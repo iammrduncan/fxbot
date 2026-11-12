@@ -2,7 +2,7 @@
 
 A plugin for [fxbot](https://fxbot.sh): each bot writes a soul, a short brief in its own words of who it is, how it sounds, and how it helps you. A new bot writes it in a first meeting with you, and rewrites it when you ask. You read and edit it on the bot's edit screen, where every version is kept.
 
-Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.10.0 or newer, so a chat follows the meeting it starts. See [Give a bot a soul](https://fxbot.sh/docs/how-to/give-a-bot-a-soul/).
+Add it from **Plugins**, where fxbot's list has it, in **Essentials**. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.10.0 or newer, so a chat follows the meeting it starts. See [Give a bot a soul](https://fxbot.sh/docs/how-to/give-a-bot-a-soul/).
 
 ## The first meeting
 
