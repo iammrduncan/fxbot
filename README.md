@@ -74,6 +74,8 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Distribution](docs/phases/distribution.md) (core; after 0.8.0): the main install, one download for Linux, macOS, and Windows that brings its own Postgres and embedder and a Linux machine for the computer, and later the desktop app; the container release is for hosting
 - [ ] [Mac support](docs/phases/mac-support.md) (core; after 0.8.0): one line installs fxbot on a Mac, as Distribution's macOS download built first, with only the computer in a Lima VM, and a handoff to check it on a real Mac
 - [ ] [Triggers](docs/phases/triggers.md) (plugins): webhooks and new email start a bot's turn
+- [ ] [/fresh in core](docs/phases/fresh-in-core.md) (core): `/fresh` built into every bot's chat, and the fresh plugin retired, Unsupported with words to remove it
+- [ ] [A room's computer, in the computer plugin](docs/phases/room-computers.md) (plugin, with optional needs in the plugin API): computer gives rooms their computers when chat rooms is added, every room keeps its computer, and chat-rooms-computer retires
 - [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window, past the compaction libfx does
 - [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
 - [ ] [Knowledge base](docs/phases/knowledge-base.md) (plugin): knowledge the bots draw on
