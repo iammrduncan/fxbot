@@ -1,5 +1,5 @@
 {
-  "essentials": ["permissions", "fresh", "routines", "messages", "subagents", "pages", "chat-rooms", "computer", "chat-rooms-computer"],
+  "essentials": ["permissions", "fresh", "routines", "messages", "subagents", "pages", "soul", "chat-rooms", "computer", "chat-rooms-computer"],
   "plugins": [
     {
       "name": "computer",
