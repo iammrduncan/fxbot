@@ -1,11 +1,11 @@
 {
   "name": "subagents",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Bots hand work to subagents that run in the background, and report back together. The bot's panel lists them, each with its thread.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {
-      "minFxbot": "0.9.0",
+      "minFxbot": "0.10.0",
       "server": "./fxbot/server.ts",
       "page": "./fxbot/page.js",
       "css": "./fxbot/page.css",
@@ -16,6 +16,7 @@
         { "name": "minutes", "description": "The most minutes one subagent works, 1 to 240", "default": "60" },
         { "name": "calls", "description": "The most tool calls one subagent makes, 1 to 1000", "default": "100" },
         { "name": "handOff", "description": "on: your bot hands work that takes a lot of digging to subagents, and tells you it'll come back with the results. off: it starts one only when it decides to", "default": "on" },
+        { "name": "thinking", "description": "How hard subagents think: same, the bot's own level, or a level such as low, medium, high, xhigh, or max. A level the bot's model doesn't offer runs as the nearest lower one", "default": "same" },
         { "name": "keepDays", "description": "How many days an ended subagent is kept, 1 to 90", "default": "30" },
         { "name": "blocked", "description": "Tools a subagent can't call, comma-separated: its chat does these", "default": "memory_save, memory_forget, messages_send, routines_add, routines_change, routines_remove, computer_ask_owner" }
       ]

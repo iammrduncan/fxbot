@@ -8,12 +8,12 @@ The owner sets how hard a bot thinks:
   - **Now:** AI Gateway and Vercel, ChatGPT, and Grok, which libfx 0.0.16 already takes an effort for.
   - **With the next libfx release:** every other provider, by key or on the machine. Its custom models gain levels in [fx #1803](https://github.com/vercel-labs/fx/pull/1803), merged on 2026-11-12, and not yet released.
 
-Status: planned on 2026-11-12, at the owner's word. Researched the same day:
+Status: the first step built on 2026-11-12, for 0.10.0, as planned the same day at the owner's word, with the open questions' recommendations: **Thinking** on each bot, every model's levels, the level to libfx on AI Gateway, Vercel, ChatGPT, and Grok, and a subagent's own level. The second step, levels for every other provider, waits for a libfx release with fx #1803, as [Claude's own API](../../phases/claude-messages.md#when-to-revisit) does. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. Researched the same day:
 - against libfx 0.0.16 as installed, fx's source at `8352e0c`, and fx's `main` at `a6e4a946`, where #1803 merged
 - against models.dev, AI Gateway's catalog, and 21 providers' own docs
 - against Claude Code, Codex, OpenCode, OpenClaw, Hermes Agent, Pi, Gemini CLI, and the AI SDK
 
-It takes over **A bot's effort** from the on-hold [Claude's own API](claude-messages.md#a-bots-effort) plan, which stays about Anthropic's own API.
+It takes over **A bot's effort** from the on-hold [Claude's own API](../../phases/claude-messages.md#a-bots-effort) plan, which stays about Anthropic's own API.
 
 ## What the owner asked
 
@@ -22,10 +22,10 @@ It takes over **A bot's effort** from the on-hold [Claude's own API](claude-mess
 ## 0. Core or plugin
 
 **Core, with one small widening of the plugin API for subagents.**
-- **A bot's level is core.** "A model" is one of the things every bot needs ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)), and how hard it thinks is part of which model it runs. The level is passed where the model is, on each open of a chat (`packages/sdk/src/index.ts:323`), and lives with the bot's model in `profiles`.
+- **A bot's level is core.** "A model" is one of the things every bot needs ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)), and how hard it thinks is part of which model it runs. The level is passed where the model is, on each open of a chat (`packages/sdk/src/index.ts:323`), and lives with the bot's model in `profiles`.
 - **Subagents' level is the subagents plugin's setting.** A subagent is a session of the plugin's own, and every turn there opens with the bot's own model (`index.ts:309-323`). The plugin can't give it another level without core's help.
   - **The smallest widening:** `fx.chats.newSession(bot, { label, effort })`, kept with the session, and used when it opens. It's added, so nothing breaks.
-  - **Already foreseen:** the [subagents phase](../_completed/phases/subagents.md) named the same widening for a model: `newSession(bot, { model })`.
+  - **Already foreseen:** the [subagents phase](subagents.md) named the same widening for a model: `newSession(bot, { model })`.
 
 ## 1. Research
 
@@ -66,7 +66,7 @@ From the installed 0.0.16, and fx's source at `8352e0c` and `a6e4a946`.
 - **[#1803](https://github.com/vercel-labs/fx/pull/1803) gives custom models levels.** It merged into `main` on 2026-11-12, and isn't in a release yet: npm's newest is 0.0.16. A custom model gains `reasoningEfforts`: "The effort levels the model offers, in order, each with the request fields that choose it, such as `{ high: { reasoning_effort: "high" } }`. A level the model does not list is not sent" (`sdk/types/libfx.d.cts:667-694` at `a6e4a946`).
   - **The fields can be any JSON,** so `{ thinking: { type: "disabled" } }` and `{ chat_template_kwargs: { enable_thinking: false } }` fit.
   - **libfx's test** sends `reasoning_effort: "high"` for `high` (`sdk/tests/test-agent-custom.mjs:274-294`).
-  - **The same merge counts cached and reasoning tokens** in a turn's usage, which [Claude's own API](claude-messages.md#when-to-revisit) waits on too.
+  - **The same merge counts cached and reasoning tokens** in a turn's usage, which [Claude's own API](../../phases/claude-messages.md#when-to-revisit) waits on too.
 - **A host `fetch` could add the fields on 0.0.16.** The body reaches fxbot's `fetch` as bytes (`node.js:460-465`). But the request doesn't say whose it is: only `credentials({ sessionId })` sees the session, as `opencodeFetch` uses it (`providers.ts:193-199`). A server with no key has no `credentials()`, and the compactor's requests go through the same `fetch`.
 - **fx's own subagents take a level:** "Reasoning effort for a new child", and "Model and effort default to the profile's, then the parent's" (`src/builtins/tools.zig:201`, `src/core/subagent/model_contract.zig:130-142`).
 
@@ -189,7 +189,7 @@ A lowered level writes one line to fxbot's log per chat open, such as "Scout's M
   - **`*`** is every level, and `$level` becomes the level's name.
   - **A level's own key** overrides `*` for that level.
   - **An entry with no `efforts`** sends `reasoning_effort`, the common case.
-  - **`"efforts": null`** sends nothing. That's for Anthropic's compatible API, which ignores it, until [Claude's own API](claude-messages.md).
+  - **`"efforts": null`** sends nothing. That's for Anthropic's compatible API, which ignores it, until [Claude's own API](../../phases/claude-messages.md).
 - **Until that release,** a custom provider's models show the setting, marked "Takes effect with a coming update", and `effortFor` sends nothing for them, so no turn fails.
 
 ### The page
@@ -218,7 +218,7 @@ Thinking   [ Model's default ▾ ]   Off · Low · Medium · High · Extra high 
 - **`explanation/bots-and-chats.md`:** **Thinking**, its levels, why they differ by model, and what happens on a model change.
 - **`reference/providers.md`:** which providers take a level now and which with the coming update, and the `max` and `minimal` notes.
 - **The plugin API reference** for `newSession`'s `effort`, the subagents README for its setting, and `## Unreleased`, with the migration.
-- **[Claude's own API](claude-messages.md):** its **A bot's effort** points here.
+- **[Claude's own API](../../phases/claude-messages.md):** its **A bot's effort** points here.
 
 ### Not in this phase
 
@@ -226,7 +226,7 @@ Thinking   [ Model's default ▾ ]   Off · Low · Medium · High · Extra high 
 - **A level per message,** such as OpenClaw's `/think` or Claude Code's `ultrathink`. It costs Claude's cache.
 - **Hiding the thinking.** Its steps already fold, and showing it is a setting apart from this.
 - **A cap on levels,** such as Claude Code's `maxEffortLevel`.
-- **Anthropic by key,** which waits for [Claude's own API](claude-messages.md).
+- **Anthropic by key,** which waits for [Claude's own API](../../phases/claude-messages.md).
 
 ### Size
 
@@ -242,20 +242,20 @@ Thinking   [ Model's default ▾ ]   Off · Low · Medium · High · Extra high 
 ## 4. Checklist
 
 Now, against a disposable fxbot and a copy of a 0.9.0 database:
-- [ ] The migration runs on the copy. Every bot reads **Model's default**, and its chat sends what it did before.
-- [ ] `efforts` reads as models.dev, ChatGPT, Grok, AI Gateway, Ollama, LM Studio, and OpenRouter list them, from saved copies of each list. A model with none has no `efforts`.
-- [ ] `effortFor` keeps a listed level, lowers an unlisted one to the nearest lower listed one, and gives none when nothing is lower or the model lists none.
-- [ ] The edit screen shows **Thinking** with the model's levels, and none for a model with no list. Saving a level and clearing it both stick. A model change shows the level that will run.
-- [ ] A bot on AI Gateway at **High** opens its chat with `model: { id, effort: "high" }`, read from libfx's session options in a check. A bot at **Model's default** opens with the id alone.
-- [ ] A custom provider's bot at a level sends no level on 0.0.16, and its turn runs.
-- [ ] `newSession(bot, { effort: "high" })` saves the level with the session, and its turns open at it. The subagents setting at `high` makes each subagent's session `high`, and at `same`, the bot's.
+- [x] The migration runs on the copy. Every bot reads **Model's default**, and its chat sends what it did before.
+- [x] `efforts` reads as models.dev, ChatGPT, Grok, AI Gateway, Ollama, LM Studio, and OpenRouter list them, from saved copies of each list. A model with none has no `efforts`.
+- [x] `effortFor` keeps a listed level, lowers an unlisted one to the nearest lower listed one, and gives none when nothing is lower or the model lists none.
+- [x] The edit screen shows **Thinking** with the model's levels, and none for a model with no list. Saving a level and clearing it both stick. A model change shows the level that will run.
+- [x] A bot on AI Gateway at **High** opens its chat with `model: { id, effort: "high" }`, read from libfx's session options in a check. A bot at **Model's default** opens with the id alone.
+- [x] A custom provider's bot at a level sends no level on 0.0.16, and its turn runs.
+- [x] `newSession(bot, { effort: "high" })` saves the level with the session, and its turns open at it. The subagents setting at `high` makes each subagent's session `high`, and at `same`, the bot's.
 
 With the libfx release that has #1803, against a mock Chat Completions server that logs each request:
 - [ ] A bot at **High** on a keyed provider sends `reasoning_effort: "high"`. DeepSeek at **Off** sends `thinking: {type: "disabled"}`, as its entry says. An entry with `"efforts": null` sends nothing.
 - [ ] A level the model doesn't list is never sent, and the turn runs.
 
 The rest:
-- [ ] Docs as above, `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
+- [x] Docs as above, `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
 
 Only a person can check, with real accounts:
 - [ ] A ChatGPT sign-in, an AI Gateway key, and a Grok sign-in each run a bot at **High**, and the reply's thinking shows. A level change takes effect on the next message.
@@ -263,7 +263,34 @@ Only a person can check, with real accounts:
 
 ## 5. Open questions
 
+Taken as recommended at the build, on 2026-11-12: wait for the libfx release for keyed and local providers, show the setting for them meanwhile with a note, no level chosen by the bot when it starts a subagent, and the name **Thinking**.
+
 1. **Wait for the libfx release for keyed and local providers?** Recommended: yes. #1803 merged today, and the same release brings cache counts. A `fetch` wrapper on 0.0.16 needs a fake key on servers with none, and changes libfx's own summary requests too.
 2. **Show the setting on custom providers before the release?** Recommended: yes, marked "Takes effect with a coming update", so an owner can set it once. The other way is to hide it until the release.
 3. **Should a bot choose a level when it starts a subagent?** Claude Code, Codex, and OpenClaw let the spawning call name one. Recommended: not now. The owner's setting decides, and a bot raising its own subagents' level costs money the owner didn't choose.
 4. **What to call it.** The page already says **Thinking** for a reply's reasoning. Recommended: **Thinking**, with Off, Low, Medium, High, Extra high, and Max. Codex's apps say Light to Ultra, and the providers say "reasoning effort".
+
+## What the build changed
+
+- **A toggle isn't a level.** The plan had a model with only an on-off switch offer Off and High. libfx skips such a switch on AI Gateway, and what it means elsewhere waits for the libfx release, so a model offers only its `effort` values. One with a switch alone, or a token budget, offers none.
+- **Never lowered to Off.** `effortFor` lowers a level to the nearest lower one the model offers, as planned, but stops above Off, as Hermes and OpenClaw do: a bot asked to think a little never ends up not thinking. With nothing lower, the model's own default runs.
+- **The edit screen reads the model's levels itself.** The plan had `ModelField` pass them up. **Thinking** asks the provider's model list, which the server keeps, once per model change. `ModelField` and the plugins that use it are unchanged. Its hint says what the level does on the four providers that take one now, and that it takes effect with a coming update on the rest.
+- **A level the model lacks shows what runs,** in the select: "Max: runs as High on this model", or "High: not offered on this model" when nothing lower is offered, so the owner can see it and clear it.
+- **The log says it once,** for each bot, model, and level, not at each chat open: "Gwen's thinking level xhigh runs as high on openai/gpt-5, which offers minimal, low, medium, high."
+- **AI Gateway's levels come from its coding-agent catalog,** read at most once a day. libfx checks a level against the same catalog. If it can't be read, the models offer none.
+- **models.dev's copy is version 3.** It keeps each model's levels. A version 2 copy, from 0.9.0, still serves while models.dev can't be reached, without levels, until the next fetch.
+- **The docs are a how-to,** [Choose how hard a bot thinks](../../../packages/website/src/content/docs/docs/how-to/choose-how-hard-a-bot-thinks.md), which the explanation's bot section links to, and a **Thinking levels** section in the providers reference. That page is generated from `packages/website/src/providers-reference.md`, which is where it's written.
+- **Subagents 0.2.0 needs fxbot 0.10.0,** for `newSession`'s `effort`. Its `thinking` setting is `same` by default. A value that isn't a level's name is the bot's level, with one line in the plugin's log.
+- **The checks:**
+  - **The model readers, 18:** with a stand-in `fetch` for ChatGPT, Grok, AI Gateway, and an OpenRouter-shaped list, real models.dev data, and Ollama and LM Studio lists on a local stand-in.
+  - **The server, 22, through a libfx probe:** a check-only loader logs each session's model option, and answers a fixed AI Gateway list for a fake key.
+    - **The upgrade:** a database made by 0.9.0's code, at `8c81170`, with a bot that had chatted, migrated with a backup first, and the bot reads **Model's default**.
+    - **What libfx got:** `{ id, effort }` for AI Gateway at High, High for Extra high on gpt-5, with its log line, and the id alone at the default. A custom provider got the id alone, and its turn ran.
+    - **A plugin session's own level:** through a throwaway plugin, it took the bot's place, and a session without one followed the bot's.
+    - **The subagents setting:** at `high`, and at `same`.
+  - **The page, 8, in Chromium:** **Thinking** on Ollama, AI Gateway, a model with none, and a level a model lacks.
+- **The second step, still to build, with the libfx release:** the catalog's `efforts` mapping and `reasoningEfforts` in `agentFor`, and the checks against a mock that need them. Writing them now would be code nothing can run.
+
+### PDFs, at the owner's word
+
+"Also fix uploads to bots to allow pdfs... thats absolutely needed." (2026-11-12) It was built beside this phase, as a fix to what a message can carry, so it's recorded in the [library's](library.md#what-the-build-changed) build notes.

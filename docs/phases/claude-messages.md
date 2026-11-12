@@ -196,7 +196,7 @@ To settle in the build: whether libfx joins a `reasoning_details` entry's pieces
 
 ### A bot's effort
 
-The [reasoning](reasoning.md) plan (2026-11-12) owns this now: **Thinking** on each bot, stored in `profiles.effort`, with only the levels its model offers. When this plan is built, the translator reads the bot's level from there, and sends it as `output_config.effort`.
+The [reasoning](../_completed/phases/reasoning.md) plan (2026-11-12) owns this now: **Thinking** on each bot, stored in `profiles.effort`, with only the levels its model offers. When this plan is built, the translator reads the bot's level from there, and sends it as `output_config.effort`.
 
 ### Other providers
 
@@ -211,7 +211,7 @@ The [reasoning](reasoning.md) plan (2026-11-12) owns this now: **Thinking** on e
 
 - **`reference/providers.md`** gets a **Prompt caching** section: the table from the research, what fxbot sends to each provider, and where a hit shows.
 - **`providers/anthropic.md`**: its own Messages API, caching, thinking and effort, and what a dropped thinking block means. The quirks about the OpenAI-compatible API go.
-- **The bot's Thinking setting** is the [reasoning](reasoning.md) plan's docs. This plan adds what it does on Claude.
+- **The bot's Thinking setting** is the [reasoning](../_completed/phases/reasoning.md) plan's docs. This plan adds what it does on Claude.
 - **`providers/vercel.md`** keeps its BYOK section, as one way among two.
 
 ### Not in this phase
@@ -227,7 +227,7 @@ The [reasoning](reasoning.md) plan (2026-11-12) owns this now: **Thinking** on e
 | --- | --- |
 | `anthropic.ts`: the translator, both ways | 350 |
 | `providers.ts` and the catalog fields | 50 |
-| A bot's effort: the translator reads it ([reasoning](reasoning.md) builds the setting) | 10 |
+| A bot's effort: the translator reads it ([reasoning](../_completed/phases/reasoning.md) builds the setting) | 10 |
 | Counting cache hits until libfx does | 40 |
 | Docs | 150 |
 | libfx, upstream: comments on #1043 and #1803, for the owner to post | none here |
@@ -246,7 +246,7 @@ The translator, against a mock Anthropic server that records each request and st
 - [ ] The usage chunk carries the reads and writes, and the turn's `turn_end` usage shows `cacheReadTokens` and `cacheWriteTokens`: fxbot's count, or libfx's once it reads them.
 
 The rest:
-- [ ] A bot's **Thinking** level, from the [reasoning](reasoning.md) plan, reaches the translator as `output_config.effort`.
+- [ ] A bot's **Thinking** level, from the [reasoning](../_completed/phases/reasoning.md) plan, reaches the translator as `output_config.effort`.
 - [ ] xAI, OpenRouter, Fireworks, and a `prompt_cache_key` provider get the session id where their entry says, against a mock. OpenRouter's Claude gets `cache_control`.
 - [ ] The comments for libfx are written up for the owner to post: merge #1043 with cache writes, and a `protocol` and efforts on `customProviderDefinition` with #1803.
 - [ ] Docs as above, `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
@@ -272,7 +272,7 @@ Check libfx's releases after 0.0.16 (`npm view libfx versions`, its [changelog](
 | --- | --- |
 | A custom provider that takes `protocol: "anthropic-messages"` in `customProviderDefinition` ([#1803](https://github.com/vercel-labs/fx/pull/1803), [#1176](https://github.com/vercel-labs/fx/pull/1176)) | needs no translator. Anthropic's catalog entry names the protocol and fxbot passes it to libfx. Check that libfx sends cache breakpoints and adaptive thinking on it, as its gateway route does. If it doesn't, the request half of the translator is still needed. |
 | Cache reads from Chat Completions' `usage` ([#1043](https://github.com/vercel-labs/fx/pull/1043)) | gets cache counts for every custom provider, with no counting of its own. |
-| Efforts for a custom model ([#1803](https://github.com/vercel-labs/fx/pull/1803), merged into fx's `main` on 2026-11-12, not yet in a release) | passes a bot's effort to libfx on every route, with no session trick, as the [reasoning](reasoning.md) plan does. |
+| Efforts for a custom model ([#1803](https://github.com/vercel-labs/fx/pull/1803), merged into fx's `main` on 2026-11-12, not yet in a release) | passes a bot's effort to libfx on every route, with no session trick, as the [reasoning](../_completed/phases/reasoning.md) plan does. |
 | [#1799](https://github.com/vercel-labs/fx/pull/1799), earlier turns sent unchanged | moves to it, for the thinking-signature 400 on Fable 5.1 and later through AI Gateway. |
 | None of these, and Claude by key still matters | builds this plan as written, or asks the owner whether AI Gateway is enough. |
 

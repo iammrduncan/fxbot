@@ -41,7 +41,7 @@ import type {
 } from "./types.ts";
 
 export type * from "./types.ts";
-export { colors, embeddingKinds, faces, heads, itemKinds, kinds, maxPinned, moods, outfits, shapes, tints } from "./types.ts";
+export { colors, effortFor, effortKinds, effortLadder, embeddingKinds, faces, heads, itemKinds, kinds, maxPinned, moods, outfits, shapes, tints } from "./types.ts";
 export { iconSeed, pluginIcon, type PluginIcon, type Tones } from "./plugin-icon.ts";
 
 export const unreachable = "Cannot reach the server.";

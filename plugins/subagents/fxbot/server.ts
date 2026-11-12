@@ -105,6 +105,15 @@ export default async function setup(fx: PluginApi) {
     return fallback;
   }
   const blocked = () => new Set((fx.settings.blocked ?? blockedByDefault).split(",").map((name) => name.trim()).filter(Boolean));
+  // The thinking level subagents ask for, or none for the bot's own. One that isn't a level's name is the bot's, said once.
+  function thinking() {
+    const raw = (fx.settings.thinking ?? "").trim();
+    if (!raw || raw === "same") return undefined;
+    if (/^[A-Za-z0-9._-]{1,64}$/.test(raw)) return raw;
+    if (!warned.has(`thinking${raw}`)) fx.log(`thinking is ${raw}, which isn't a level's name, so subagents think as the bot does.`);
+    warned.add(`thinking${raw}`);
+    return undefined;
+  }
 
   // A restart, or this plugin's reload, cut off the ones that were working. They aren't run again: their tools may
   // have done half the work. Their batches report at the first sweep.
@@ -174,7 +183,8 @@ export default async function setup(fx: PluginApi) {
         run.done = done;
         timer = setTimeout(() => done({ late: true }), limit("minutes") * minute);
       });
-      session = await fx.chats.newSession(start.bot, { label: start.name });
+      const effort = thinking();
+      session = await fx.chats.newSession(start.bot, { label: start.name, ...(effort ? { effort } : {}) });
       run.session = session;
       sessions.set(session, run);
       await fx.sql`update subagents set session = ${session} where id = ${start.id}`;

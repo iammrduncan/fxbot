@@ -31,7 +31,8 @@ export const tints = ["own", "black", "white"] as const;
 export type Tint = (typeof tints)[number];
 
 // `provider` is a provider id, or empty for none. An empty model follows the provider's default model.
-export type Fields = { name: string; instructions: string; model: string; provider: string; shape: Shape; color: Color; mood: Mood; head: Head; face: Face; outfit: Outfit; tint: Tint };
+// `effort` is how hard the bot's model thinks: '' for the model's own default, else a level, such as 'high'.
+export type Fields = { name: string; instructions: string; model: string; provider: string; effort: string; shape: Shape; color: Color; mood: Mood; head: Head; face: Face; outfit: Outfit; tint: Tint };
 // `preview` is the start of the latest reply, for a list of bots. `handoff` is the summary a provider switch carried
 // over, which the current chat starts from. `busy` is true while a turn runs, and `waiting` while a plugin holds one of its calls. Pinned bots head the list.
 export type Profile = Fields & { id: string; sessionId: string | null; preview: string | null; handoff: string | null; busy: boolean; waiting: boolean; pinned: boolean; isDefault: boolean };
@@ -212,7 +213,22 @@ export type NewProvider = {
 export type ProviderUpdate = { name?: string; baseUrl?: string; apiKey?: string; serviceAccount?: string; modelIds?: string[]; model?: string; contextWindow?: number | null; teamId?: string };
 
 // What fxbot knows about a model. A field the provider does not report stays unset.
-export type Model = { id: string; name?: string; contextWindow?: number; maxOutputTokens?: number; supportsToolUse?: boolean; supportsVision?: boolean };
+// `efforts` are the thinking levels a model offers, low to high, from where its provider lists them.
+export type Model = { id: string; name?: string; contextWindow?: number; maxOutputTokens?: number; supportsToolUse?: boolean; supportsVision?: boolean; efforts?: string[] };
+
+// Thinking levels, low to high, as providers name them. A model offers some of them, or words of its own.
+export const effortLadder = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+// The level a bot's model runs at: the bot's when the model offers it, else the nearest lower one it offers, but never
+// none, which turns thinking off. Undefined is the model's own default, which sends nothing.
+export function effortFor(level: string, efforts: readonly string[] | undefined) {
+  if (!level || !efforts?.length) return undefined;
+  if (efforts.includes(level)) return level;
+  for (let i = effortLadder.indexOf(level as (typeof effortLadder)[number]) - 1; i > 0; i--) if (efforts.includes(effortLadder[i])) return effortLadder[i];
+  return undefined;
+}
+// The kinds of provider libfx sends a level for today. Every other provider waits for a libfx release that lets a custom
+// provider's models offer levels (fx #1803).
+export const effortKinds = ["gateway", "vercel", "chatgpt", "grok"];
 export type Team = { id: string; name: string };
 
 // A sign-in as the page sees it, never what claims the tokens. `device`: a link and a code to enter there. `redirect`: a

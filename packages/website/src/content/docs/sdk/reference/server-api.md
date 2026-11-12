@@ -29,6 +29,7 @@ The fields of a bot:
 | `instructions` | Up to 64 KiB | `""` |
 | `provider` | A provider id, or `""` for none. An unknown id fails with 404. | Settings' `defaultProvider` |
 | `model` | Trimmed, up to 200 characters. `""` follows the provider's default model. | `""` |
+| `effort` | How hard its model thinks: a level's name, such as `high`, letters, digits, `.`, `_`, or `-`, up to 64 characters, or `""` for the model's own default. A level the model doesn't offer runs as the nearest lower one. Since 0.10.0. | `""` |
 | `shape` | One of `shapes` | `circle` |
 | `color` | A key of `colors` | `brown` |
 | `mood` | One of `moods` | `bright` |
@@ -268,7 +269,7 @@ Every type the calls take or return is exported too, with `FxbotOptions` and `Fx
 ## Types
 
 ```ts
-type Fields = { name: string; instructions: string; model: string; provider: string; shape: Shape; color: Color; mood: Mood; head: Head; face: Face; outfit: Outfit; tint: Tint };
+type Fields = { name: string; instructions: string; model: string; provider: string; effort: string; shape: Shape; color: Color; mood: Mood; head: Head; face: Face; outfit: Outfit; tint: Tint };
 
 type Profile = Fields & {
   id: string;

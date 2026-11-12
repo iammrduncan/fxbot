@@ -15,11 +15,11 @@ import { openSessions } from "./sessions.ts";
 import { readKey } from "./secrets.ts";
 import { createSkills } from "./skills.ts";
 import { createStore, isId, type StoredProfile } from "./store.ts";
-import { colors, faces, heads, maxPinned, moods, outfits, shapes, tints, type BotSkill, type Plugin, type PluginRef, type RepoRef, type PluginSecrets, type Fields, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
+import { colors, effortFor, effortKinds, faces, heads, maxPinned, moods, outfits, shapes, tints, type BotSkill, type Plugin, type PluginRef, type RepoRef, type PluginSecrets, type Fields, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
 
 export type * from "./types.ts";
 export type * from "./plugin-api.ts";
-export { colors, embeddingKinds, faces, heads, itemKinds, kinds, maxPinned, moods, outfits, shapes, tints } from "./types.ts";
+export { colors, effortFor, effortKinds, effortLadder, embeddingKinds, faces, heads, itemKinds, kinds, maxPinned, moods, outfits, shapes, tints } from "./types.ts";
 export { readKey, rotateSecrets } from "./secrets.ts";
 export { compareVersions, isStable, isVersion, releasesUrlFor } from "./releases.ts";
 
@@ -91,7 +91,7 @@ const looks = { mood: moods, head: heads, face: faces, outfit: outfits, tint: ti
 // Create needs only a name; the rest start empty, and the look a brown circle. Update takes any of them. Other keys
 // are ignored.
 function fields(input: Partial<Fields>, create: boolean): Partial<Fields> {
-  const out: Partial<Fields> = create ? { instructions: "", model: "", provider: "", shape: "circle", color: "brown", mood: "bright", head: "none", face: "none", outfit: "none", tint: "own" } : {};
+  const out: Partial<Fields> = create ? { instructions: "", model: "", provider: "", effort: "", shape: "circle", color: "brown", mood: "bright", head: "none", face: "none", outfit: "none", tint: "own" } : {};
   for (const key of ["name", "instructions", "model", "provider"] as const) {
     const value: unknown = input[key];
     if (value === undefined) continue;
@@ -99,6 +99,7 @@ function fields(input: Partial<Fields>, create: boolean): Partial<Fields> {
     out[key] = key === "instructions" ? value : value.trim();
     if (key !== "instructions" && out[key]!.length > 200) fail(400, `${key} is over 200 characters`);
   }
+  if (input.effort !== undefined) out.effort = typeof input.effort === "string" && /^[A-Za-z0-9._-]{0,64}$/.test(input.effort.trim()) ? input.effort.trim() : fail(400, "effort must be a level's name, such as high, or empty for the model's own");
   if (input.shape !== undefined) out.shape = shapes.includes(input.shape) ? input.shape : fail(400, `shape must be one of ${shapes.join(", ")}`);
   if (input.color !== undefined) out.color = input.color in colors ? input.color : fail(400, `color must be one of ${Object.keys(colors).join(", ")}`);
   for (const [key, list] of Object.entries(looks) as [keyof typeof looks, readonly string[]][]) {
@@ -218,14 +219,16 @@ export async function createFxbot(options: FxbotOptions) {
       localUrl: options.localUrl ?? "http://127.0.0.1:8787",
       timeZone: () => timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       chats: {
-        async newSession(plugin, bot, { label } = {}) {
+        async newSession(plugin, bot, { label, effort } = {}) {
           started();
           const profile = await get(bot);
           if (!profile.provider) fail(400, "This bot has no provider.");
           if (label !== undefined && (typeof label !== "string" || !label.trim() || label.length > 80)) fail(400, "label must be 1 to 80 characters");
+          if (effort !== undefined && (typeof effort !== "string" || !/^[A-Za-z0-9._-]{1,64}$/.test(effort.trim()))) fail(400, "effort must be a level's name, such as high");
           const id = await (await providers.agentFor(profile.provider, "")).newSessionId();
-          await store.sql`insert into plugin_sessions (id, profile_id, provider, plugin, label) values (${id}, ${bot}, ${profile.provider}, ${plugin}, ${label?.trim() ?? null})`;
-          labels.set(id, label?.trim() ?? null);
+          const kept = { label: label?.trim() ?? null, effort: effort?.trim() ?? null };
+          await store.sql`insert into plugin_sessions (id, profile_id, provider, plugin, label, effort) values (${id}, ${bot}, ${profile.provider}, ${plugin}, ${kept.label}, ${kept.effort})`;
+          sessionsKept.set(id, kept);
           return id;
         },
         ownerSaid: async (bot, limit) => (await get(bot), history.ownerSaid(bot, limit)),
@@ -310,10 +313,29 @@ export async function createFxbot(options: FxbotOptions) {
   // memories get no more than what the rest leaves. They change only when a memory does, so the prompt cache holds.
   // Plugins' instructions hooks change the list last.
   // A plugin session's label, which each of its tool calls gets: read once, and null for a bot's own chat.
-  const labels = new Map<string, string | null>();
-  async function labelOf(sessionId: string) {
-    if (!labels.has(sessionId)) labels.set(sessionId, (await store.sql<{ label: string | null }[]>`select label from plugin_sessions where id = ${sessionId}`)[0]?.label ?? null);
-    return labels.get(sessionId)!;
+  // And its thinking level, which takes the bot's place there, or null for the bot's.
+  const sessionsKept = new Map<string, { label: string | null; effort: string | null }>();
+  async function sessionOf(sessionId: string) {
+    if (!sessionsKept.has(sessionId))
+      sessionsKept.set(sessionId, (await store.sql<{ label: string | null; effort: string | null }[]>`select label, effort from plugin_sessions where id = ${sessionId}`)[0] ?? { label: null, effort: null });
+    return sessionsKept.get(sessionId)!;
+  }
+
+  // The level a chat's model thinks at: the session's or the bot's, as the model offers it, on a provider libfx sends one
+  // for, else none, and the model's own default runs. One that's lowered says so in the log, once for each bot and model.
+  const lowered = new Set<string>();
+  async function effortOf(profile: StoredProfile, model: string, level: string) {
+    if (!level || !model) return undefined;
+    const record = await providers.get(profile.provider).catch(() => null);
+    if (!record || !effortKinds.includes(record.kind)) return undefined;
+    const efforts = (await providers.models(profile.provider).catch(() => [])).find((m) => m.id === model)?.efforts;
+    const runs = effortFor(level, efforts);
+    const key = `${profile.id} ${model} ${level}`;
+    if (runs !== level && !lowered.has(key)) {
+      lowered.add(key);
+      console.log(`${profile.name}'s thinking level ${level} runs as ${runs ?? "the model's own default"} on ${model}, which offers ${efforts?.length ? efforts.join(", ") : "no levels"}.`);
+    }
+    return runs;
   }
 
   async function open(profile: StoredProfile, sessionId: string, messageId?: string) {
@@ -330,7 +352,9 @@ export async function createFxbot(options: FxbotOptions) {
       await packages.run("instructions", event);
       instructions = (Array.isArray(event.instructions) ? event.instructions : []).filter((entry) => typeof entry === "string" && entry);
     }
-    return agent.session(sessionId, { model: model || undefined, instructions, context: { bot: profile.id, messageId, label: await labelOf(sessionId) } });
+    const session = await sessionOf(sessionId);
+    const effort = await effortOf(profile, model, session.effort ?? profile.effort);
+    return agent.session(sessionId, { model: effort ? { id: model, effort } : model || undefined, instructions, context: { bot: profile.id, messageId, label: session.label } });
   }
 
   async function get(id: string) {
@@ -991,6 +1015,7 @@ export async function createFxbot(options: FxbotOptions) {
       list: (query: LibraryQuery) => library.list(query),
       get: (id: string) => library.get(id),
       file: (id: string, ifNoneMatch?: string) => library.file(id, ifNoneMatch),
+      text: (id: string) => library.text(id),
       upload: (id: string, name: string, ifNoneMatch?: string) => (isId(id) ? library.upload(name, ifNoneMatch) : fail(404, "not found")),
       remove: async (id: string) => (await library.remove(id), packages.libraryRemoved(id)),
     },
@@ -1015,7 +1040,6 @@ export async function createFxbot(options: FxbotOptions) {
       update: (id: string, hash: unknown) => (packages.has(id) ? packages.update(id, hash) : skills.has(id) ? skills.update(id, hash) : mcp.update(id, hash)),
       change: (id: string, input: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) =>
         packages.has(id) ? packages.change(id, input) : skills.has(id) ? skills.change(id, input) : mcp.change(id, input),
-      text: (id: string) => library.text(id),
       remove: (id: string) => (packages.has(id) ? packages.remove(id) : skills.has(id) ? skills.remove(id) : mcp.remove(id)),
       setSecrets: (id: string, input: PluginSecrets) => mcp.setSecrets(id, input),
       // A bot's switch, read when the plugin is chosen bot by bot.

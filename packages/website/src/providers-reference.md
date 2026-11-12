@@ -35,13 +35,31 @@ When a provider keeps refusing, such as with a rate limit, libfx tries again by 
 
 ## Model lists
 
-- A provider's models come from its own list, with [models.dev](https://models.dev)'s context window, tool use, and images for each model it knows: by its id, then by its id without a vendor, then by models.dev's canonical id. A model models.dev doesn't know lists without them.
+- A provider's models come from its own list, with [models.dev](https://models.dev)'s context window, tool use, images, and [thinking levels](#thinking-levels) for each model it knows: by its id, then by its id without a vendor, then by models.dev's canonical id. A model models.dev doesn't know lists without them.
 - Where the provider has no list, its models are models.dev's, as the table says. Where you typed model ids, such as Azure's deployments, those are the list.
 - fxbot keeps each provider's model list in Postgres and answers with it at once. A list older than 5 minutes is fetched again behind that answer, and a failed fetch keeps the old list.
 - A list is dropped when its source changes: a new key, address, team, sign-in, or model ids.
 - models.dev is read at most once a day.
 - The model picker takes a model id that the list lacks.
 - A provider's **Context window**, on a server on your machine or **Custom**, overrides what the server reports, for every model it serves.
+
+## Thinking levels
+
+A model's thinking levels, which **Thinking** on a bot's edit screen offers, come from where its provider lists them:
+
+| Provider | Where its models' levels come from | A bot's level reaches the model |
+| --- | --- | --- |
+| AI Gateway, Vercel | AI Gateway's catalog, the one the agent checks a level against | Now. Max goes as Extra high, the most the gateway's route takes |
+| ChatGPT | ChatGPT's model list | Now. Minimal goes as Low |
+| Grok | Grok's model list | Now |
+| OpenRouter, and servers with OpenRouter's list | Each model's `supported_efforts` | With a coming update |
+| Ollama | Each model's `thinking` values | With a coming update |
+| LM Studio | Each model's reasoning options: its off is Off | With a coming update |
+| Every other provider by key | [models.dev](https://models.dev)'s reasoning options for each model | With a coming update |
+
+- **Model's default** sends no level, on every provider.
+- **A level the model doesn't offer** runs as the nearest lower one it offers, never as Off, and the server's log says so once. With no lower level, the model's own default runs.
+- **"With a coming update"** is libfx's: version 0.0.16 sends a level only for AI Gateway, ChatGPT, and Grok. Its next release lets a custom provider's models offer levels. Until then, fxbot sends none for them, so no turn fails for one.
 
 ## Embeddings
 

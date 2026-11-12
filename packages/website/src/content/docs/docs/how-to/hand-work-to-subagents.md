@@ -72,6 +72,7 @@ Open **Settings** › **Subagents**:
 | `calls` | The most tool calls one subagent makes, up to 1,000 | 100 |
 | `keepDays` | How many days an ended subagent is kept, up to 90 | 30 |
 | `handOff` | `on`: the bot hands work that takes a lot of digging to subagents, and tells you it'll come back with the results. `off`: it starts one only when it decides to | `on` |
+| `thinking` | How hard subagents think: `same`, the bot's own [level](/docs/how-to/choose-how-hard-a-bot-thinks/), or a level such as `low`, `medium`, `high`, `xhigh`, or `max` | `same` |
 | `blocked` | Tools a subagent can't call | its chat's: memories, messages, routines, and asking you for the computer |
 
 `perAsk` counts the subagents your message started, and those the bot starts from their reports. A bot can't change these.

@@ -37,6 +37,15 @@ const isChat = (m: any) =>
   !String(m.family ?? "").includes("embedding") &&
   !String(m.id).includes("embedding") &&
   [undefined, "@ai-sdk/openai", "@ai-sdk/openai-compatible"].includes(m.provider?.npm);
+// The thinking levels a model offers, low to high, from a list of options in models.dev's and AI Gateway's shape: the
+// values of its "effort" option. A model with only an on-off switch, or a token budget, offers none here.
+const effortsOf = (options: unknown) => {
+  const effort = Array.isArray(options) ? options.find((option) => option?.type === "effort") : undefined;
+  const values: string[] = Array.isArray(effort?.values) ? effort.values.filter((value: unknown) => typeof value === "string" && value !== "default") : [];
+  return values.length ? values : undefined;
+};
+const strings = (list: unknown) => (Array.isArray(list) ? list.filter((value): value is string => typeof value === "string") : []);
+const withEfforts = (efforts?: string[]) => (efforts?.length ? { efforts } : {});
 const fromModelsDev = (m: any): Model => ({
   id: m.id,
   name: m.name,
@@ -44,6 +53,7 @@ const fromModelsDev = (m: any): Model => ({
   maxOutputTokens: m.limit?.output,
   supportsToolUse: m.tool_call,
   supportsVision: m.modalities?.input?.includes("image"),
+  ...(m.reasoning ? withEfforts(effortsOf(m.reasoning_options)) : {}),
 });
 // What fxbot keeps of models.dev, for every host: what the long tail in search needs, each chat model's details, and the
 // ids it knows aren't chat models, so a host's own list can leave them out.
@@ -85,6 +95,7 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
   const generation = new Map<string, number>();
   let codex: { at: number; version: string } | undefined;
   let hosts: { at: number; data: Record<string, Host> } | undefined;
+  let gatewayLevels: { at: number; levels: Map<string, string[]> } | undefined;
 
   // Codex may hide newer models from an older client, so fx asks with the current Codex CLI version.
   async function codexVersion() {
@@ -94,12 +105,12 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
   }
 
   // models.dev, at most once a day with its ETag, trimmed to what fxbot uses. A stale copy beats none. A copy kept by an
-  // older fxbot, the four hosts it used, serves until the first fetch.
+  // older fxbot serves until the first fetch: version 2, without thinking levels, or the four hosts the first kept.
   async function modelsDev(): Promise<Record<string, Host>> {
     if (hosts && Date.now() - hosts.at < day) return hosts.data;
     const row = (await sql`select etag, data, fetched_at from models_dev`)[0];
-    const current = row?.data?.v === 2;
-    const kept = (): Record<string, Host> => (current ? row.data.hosts : trim(Object.fromEntries(Object.entries(row?.data ?? {}).filter(([, p]) => p))));
+    const current = row?.data?.v === 3;
+    const kept = (): Record<string, Host> => (row?.data?.v >= 2 ? row.data.hosts : trim(Object.fromEntries(Object.entries(row?.data ?? {}).filter(([, p]) => p))));
     if (current && Date.now() - row.fetchedAt < day) return (hosts = { at: new Date(row.fetchedAt).getTime(), data: row.data.hosts }).data;
     try {
       const response = await fetch("https://models.dev/api.json", { headers: current && row.etag ? { "if-none-match": row.etag } : {} });
@@ -109,7 +120,7 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
       }
       if (!response.ok) throw failed("models.dev", response.status);
       const data = trim(await response.json());
-      await sql`insert into models_dev values (1, ${response.headers.get("etag")}, ${sql.json({ v: 2, hosts: data } as unknown as postgres.JSONValue)}, now())
+      await sql`insert into models_dev values (1, ${response.headers.get("etag")}, ${sql.json({ v: 3, hosts: data } as unknown as postgres.JSONValue)}, now())
         on conflict (id) do update set etag = excluded.etag, data = excluded.data, fetched_at = excluded.fetched_at`;
       return (hosts = { at: Date.now(), data }).data;
     } catch (error) {
@@ -122,6 +133,22 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
   // one the catalog has since dropped. Either is a key at the address it was added with.
   const entryOf = (record: ProviderRecord): CatalogEntry =>
     catalog.get(record.kind) ?? { id: record.kind, name: record.name, about: "", group: "key", connect: "key", modelsDev: record.kind, docs: "" };
+
+  // AI Gateway's thinking levels for each model, from the catalog libfx checks a level against, at most once a day. libfx
+  // lists the ids alone. Without it, the models offer none.
+  async function gatewayEfforts() {
+    if (gatewayLevels && Date.now() - gatewayLevels.at < day) return gatewayLevels.levels;
+    try {
+      const body = await getJson(fetch, "https://ai-gateway.vercel.sh/coding-agent/v1/models", {}, "AI Gateway's model catalog");
+      const levels = new Map<string, string[]>((Array.isArray(body?.data) ? body.data : []).flatMap((m: any) => {
+        const efforts = effortsOf(m?.reasoning_options);
+        return typeof m?.id === "string" && efforts ? [[m.id, efforts]] : [];
+      }));
+      return (gatewayLevels = { at: Date.now(), levels }).levels;
+    } catch {
+      return gatewayLevels?.levels ?? new Map<string, string[]>();
+    }
+  }
 
   // models.dev's lists for an entry, and the ids it knows aren't chat models.
   async function hostsOf(entry: CatalogEntry) {
@@ -141,7 +168,9 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
       const context = m.context_length ?? m.context_window ?? m.max_model_len ?? (behind.length ? Math.max(0, ...behind.map((p) => Number(p.context_length) || 0)) || undefined : undefined);
       const tools = behind.length ? behind.some((p) => p.supports_tools) : Array.isArray(m.supported_parameters) ? m.supported_parameters.includes("tools") : undefined;
       const vision = Array.isArray(m.architecture?.input_modalities) ? m.architecture.input_modalities.includes("image") : undefined;
-      return [{ id: m.id, ...(typeof m.name === "string" ? { name: m.name } : {}), ...(Number.isFinite(context) ? { contextWindow: Number(context) } : {}), ...(tools === undefined ? {} : { supportsToolUse: tools }), ...(vision === undefined ? {} : { supportsVision: vision }) }];
+      // OpenRouter's levels, without none where thinking can't be turned off.
+      const efforts = strings(m.reasoning?.supported_efforts).filter((level) => !(m.reasoning?.mandatory && level === "none"));
+      return [{ id: m.id, ...(typeof m.name === "string" ? { name: m.name } : {}), ...(Number.isFinite(context) ? { contextWindow: Number(context) } : {}), ...(tools === undefined ? {} : { supportsToolUse: tools }), ...(vision === undefined ? {} : { supportsVision: vision }), ...withEfforts(efforts) }];
     });
   }
 
@@ -186,18 +215,19 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
         const body = await getJson(fetch, url, { headers: { ...bearer(access.accessToken), "chatgpt-account-id": access.accountId! } }, "The ChatGPT model list");
         return body.models
           .filter((m: any) => m.visibility === "list" && m.supported_in_api)
-          .map((m: any) => ({ id: m.slug, name: m.display_name, contextWindow: m.context_window, supportsVision: m.input_modalities?.includes("image") }));
+          .map((m: any) => ({ id: m.slug, name: m.display_name, contextWindow: m.context_window, supportsVision: m.input_modalities?.includes("image"), ...withEfforts(strings(m.supported_reasoning_levels?.map((level: any) => level?.effort))) }));
       }
       case "grok": {
         const body = await getJson(fetch, "https://cli-chat-proxy.grok.com/v1/models", { headers: { ...bearer(access.accessToken), "x-userid": access.accountId! } }, "The Grok model list");
         return body.data
           .filter((m: any) => m.api_backend === "responses")
-          .map((m: any) => ({ id: m.model ?? m.id, contextWindow: m.context_window, maxOutputTokens: m.max_completion_tokens }));
+          .map((m: any) => ({ id: m.model ?? m.id, contextWindow: m.context_window, maxOutputTokens: m.max_completion_tokens, ...withEfforts(m.supports_reasoning_effort ? strings(m.reasoning_efforts?.map((level: any) => level?.value)) : []) }));
       }
       case "gateway":
       case "vercel":
         try {
-          return (await listModels({ apiKey: access.apiKey ?? "vercel", fetch: access.fetch ?? fetch })).map((id) => ({ id }));
+          const [ids, levels] = await Promise.all([listModels({ apiKey: access.apiKey ?? "vercel", fetch: access.fetch ?? fetch }), gatewayEfforts()]);
+          return ids.map((id) => ({ id, ...withEfforts(levels.get(id)) }));
         } catch (error) {
           // libfx names only the HTTP status; anything else, such as a Vercel account with no team yet, keeps its own words.
           const upstream = Number(/HTTP (\d+)/.exec((error as Error).message)?.[1]);
@@ -218,6 +248,8 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
             supportsToolUse: show.capabilities.includes("tools"),
             supportsVision: show.capabilities.includes("vision"),
             contextWindow: Object.entries(show.model_info ?? {}).find(([key, value]) => key.endsWith(".context_length") && typeof value === "number")?.[1] as number | undefined,
+            // `[false]` is a model that doesn't think.
+            ...withEfforts(strings(show.thinking?.values)),
           }));
       }
       case "lmstudio": {
@@ -230,6 +262,8 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
             supportsToolUse: m.capabilities?.trained_for_tool_use,
             supportsVision: m.capabilities?.vision,
             contextWindow: m.loaded_instances?.length ? Math.min(...m.loaded_instances.map((i: any) => i.config.context_length)) : m.max_context_length,
+            // LM Studio's off is none, and its on isn't a level.
+            ...withEfforts(strings(m.capabilities?.reasoning?.allowed_options).flatMap((option) => (option === "on" ? [] : [option === "off" ? "none" : option]))),
           }));
       }
       case "custom":

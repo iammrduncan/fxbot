@@ -11,7 +11,7 @@ A plugin for [fxbot](https://fxbot.sh): a bot hands work to subagents, helpers t
 - **Its skill, `subagents`, says when to hand work off and when not,** how to split it and write a task a subagent can do alone, with an example, and what to do while they work and when they report.
 - **On the computer, they work together,** with the [computer](https://fxbot.sh/docs/how-to/give-bots-a-computer/) 0.4.0 or newer: each has its name and arrow on the computer's screen, such as "Ann · Curie", its own browser tab, and turns at the desktop and the terminal.
 
-Add it from **Plugins**, or with **Essentials**, which has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.9.0 or newer. See [Hand work to subagents](https://fxbot.sh/docs/how-to/hand-work-to-subagents/).
+Add it from **Plugins**, or with **Essentials**, which has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.10.0 or newer, for its `thinking` setting. See [Hand work to subagents](https://fxbot.sh/docs/how-to/hand-work-to-subagents/).
 
 ## The tools
 
@@ -38,6 +38,7 @@ In its tab in **Settings**. A bot can't change them.
 | `minutes` | The most minutes one subagent works, 1 to 240 | 60 |
 | `calls` | The most tool calls one subagent makes, 1 to 1,000 | 100 |
 | `handOff` | `on`: the bot hands work that takes a lot of digging to subagents, and tells you it'll come back with the results. `off`: it starts one only when it decides to | `on` |
+| `thinking` | How hard subagents think: `same`, the bot's own level, or a level such as `low`, `medium`, `high`, `xhigh`, or `max`. A level the bot's model doesn't offer runs as the nearest lower one, and some providers take a level only with a coming update ([Choose how hard a bot thinks](https://fxbot.sh/docs/how-to/choose-how-hard-a-bot-thinks/)) | `same` |
 | `keepDays` | How many days an ended subagent and its thread are kept before they're deleted, 1 to 90. The list shows those that ended in the last day. | 30 |
 | `blocked` | Tools a subagent can't call, comma-separated | as above |
 

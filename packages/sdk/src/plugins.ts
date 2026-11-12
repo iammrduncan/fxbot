@@ -182,7 +182,7 @@ export type PluginHost = {
   machine: PluginApi["machine"];
   localUrl: string;
   chats: {
-    newSession(plugin: string, bot: string, options?: { label?: string }): Promise<string>;
+    newSession(plugin: string, bot: string, options?: { label?: string; effort?: string }): Promise<string>;
     send(plugin: string, bot: string, message: Parameters<PluginApi["chats"]["send"]>[1]): Promise<{ messageId: string; sessionId: string; joined?: string }>;
     stream(plugin: string, bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
     ownerSaid: PluginApi["chats"]["ownerSaid"];

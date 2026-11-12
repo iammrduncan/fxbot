@@ -100,8 +100,9 @@ export type PluginApi = {
   };
   chats: {
     /** A session of the plugin's own for a bot, on its current provider. `label` names it, up to 80 characters, and
-     * each of its tool calls gets it. Since 0.9.0. */
-    newSession(bot: string, options?: { label?: string }): Promise<string>;
+     * each of its tool calls gets it. Since 0.9.0. `effort` is the thinking level its turns ask for, such as `high`, in
+     * place of the bot's: the model's nearest lower level when it doesn't offer that one. Since 0.10.0. */
+    newSession(bot: string, options?: { label?: string; effort?: string }): Promise<string>;
     /** A message, as the owner's are sent, marked as the plugin's. Without `session`, it goes to the bot's own chat.
      * `shown` is what the chat shows of it, when that isn't `text`, which the model gets, and `label` who it says it's
      * from, in place of the plugin. With `steer`, a message to the own chat joins a turn that's running, and answers

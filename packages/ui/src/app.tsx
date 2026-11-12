@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
+import { effortFor, effortKinds, maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { useReorder } from "./reorder.ts";
 import { maxFiles, readFile } from "./attachments.ts";
@@ -428,6 +428,46 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
 
 const label = "grid gap-1.5 text-sm font-medium";
 
+// Thinking levels in plain words. A model's own word for one shows as it is.
+const effortNames: Record<string, string> = { none: "Off", minimal: "Minimal", low: "Low", medium: "Medium", high: "High", xhigh: "Extra high", max: "Max" };
+const effortName = (level: string) => effortNames[level] ?? level;
+
+// How hard a bot's model thinks: the model's own default, or one of the levels the model offers, from its provider's
+// list. A model that offers none shows nothing here, unless the bot has a level from before, which can be cleared. A
+// level the model lacks says what runs instead, as the server lowers it.
+function ThinkingField({ provider, model, kind, value, onChange }: { provider: string; model: string; kind: string; value: string; onChange: (level: string) => void }) {
+  const [efforts, setEfforts] = useState<string[] | undefined>();
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    let gone = false;
+    setLoaded(false);
+    const found = !provider || !model ? Promise.resolve(undefined) : client.providers.models(provider).then((list) => list.find((m) => m.id === model)?.efforts, () => undefined);
+    found.then((list) => !gone && (setEfforts(list), setLoaded(true)));
+    return () => {
+      gone = true;
+    };
+  }, [provider, model]);
+  if (!loaded || (!efforts?.length && !value)) return null;
+  const runs = effortFor(value, efforts);
+  return (
+    <label className={label}>
+      Thinking
+      <NativeSelect className="w-full" value={value} onChange={(e) => onChange(e.target.value)}>
+        <NativeSelectOption value="">Model's default</NativeSelectOption>
+        {(efforts ?? []).map((level) => (
+          <NativeSelectOption key={level} value={level}>
+            {effortName(level)}
+          </NativeSelectOption>
+        ))}
+        {value && !efforts?.includes(value) && <NativeSelectOption value={value}>{`${effortName(value)}: ${runs ? `runs as ${effortName(runs)}` : "not offered"} on this model`}</NativeSelectOption>}
+      </NativeSelect>
+      <span className="font-normal text-muted-foreground">
+        {effortKinds.includes(kind) ? "How hard it thinks before it answers. Higher is slower, and costs more." : "How hard it thinks before it answers. For this provider, it takes effect with a coming update."}
+      </span>
+    </label>
+  );
+}
+
 const Problem = ({ children }: { children: ReactNode }) => (
   <p role="alert" className="mx-auto w-full max-w-3xl rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
     {children}
@@ -461,7 +501,7 @@ function Home({ profiles, offline, onNew }: { profiles: Profile[] | null; offlin
 }
 
 function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
-  const [fields, setFields] = useState<Fields>({ name: "", instructions: "", model: "", provider: "", shape: "circle", color: "brown", mood: "bright", head: "none", face: "none", outfit: "none", tint: "own" });
+  const [fields, setFields] = useState<Fields>({ name: "", instructions: "", model: "", provider: "", effort: "", shape: "circle", color: "brown", mood: "bright", head: "none", face: "none", outfit: "none", tint: "own" });
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -473,9 +513,9 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
     client.providers.list().then(setProviders, () => {});
     client.profiles.get(id).then(
       (profile) => {
-        const { name, instructions, model, provider, shape, color, mood, head, face, outfit, tint, sessionId } = profile;
+        const { name, instructions, model, provider, effort, shape, color, mood, head, face, outfit, tint, sessionId } = profile;
         setBot(profile);
-        setFields({ name, instructions, model, provider, shape, color, mood, head, face, outfit, tint });
+        setFields({ name, instructions, model, provider, effort, shape, color, mood, head, face, outfit, tint });
         setChat({ provider, sessionId });
         setLoaded(true);
       },
@@ -551,6 +591,13 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
             Model
             <ModelField id="bot" provider={fields.provider} value={fields.model} onChange={(model) => setFields({ ...fields, model })} placeholder={`Default: ${providerModel || "none set in Settings"}`} />
           </label>
+          <ThinkingField
+            provider={fields.provider}
+            model={fields.model || providerModel || ""}
+            kind={providers.find((p) => p.id === fields.provider)?.kind ?? ""}
+            value={fields.effort}
+            onChange={(effort) => setFields({ ...fields, effort })}
+          />
           <label className={label}>
             Instructions
             <Textarea rows={8} className="max-h-[50dvh]" value={fields.instructions} onChange={set("instructions")} disabled={!loaded} />
