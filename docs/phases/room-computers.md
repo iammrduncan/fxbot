@@ -160,7 +160,7 @@ Only a person can check, on a real machine:
 
 ## 5. Open questions
 
-1. **In computer, as asked, or in chat rooms,** as memories v2 put a room's memories? Recommended: computer, as asked. Most of a room's computer is computer work: its key, its home, and which computer a call reaches.
+1. **In computer, as asked.** Settled by the owner: "yes I expected it in the computer plugin not the chat rooms plugin, that's what I asked for." (2026-11-12)
 2. **An optional need in `plugin.json`, or `fx.need` for any plugin without naming it?** Recommended: an optional need. It says what a plugin works with, where Plugins can show it.
 3. **The order of the move:** words in the break line and **Before upgrading**, which is all fxbot can do for an install still on Computer 0.4.0. Recommended: yes.
 4. **Computer's migration reads chat-rooms-computer's table,** another plugin's schema, once. Recommended: yes, once. Otherwise every room loses its computer's files.
