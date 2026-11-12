@@ -11,6 +11,10 @@ const dataUrl = (blob: Blob) =>
     reader.readAsDataURL(blob);
   });
 
+// A PDF goes as it is, and the server reads its text. The server takes one of up to 8 MiB.
+const maxPdf = 8 * 2 ** 20;
+const isPdf = (bytes: ArrayBuffer) => new TextDecoder("latin1").decode(bytes.slice(0, 5)) === "%PDF-";
+
 function isText(bytes: ArrayBuffer) {
   try {
     return !new TextDecoder("utf-8", { fatal: true }).decode(bytes).includes("\0");
@@ -33,12 +37,16 @@ async function shrink(file: File): Promise<Blob> {
   return canvas.convertToBlob({ type: "image/jpeg", quality: 0.85 });
 }
 
-// An image or a UTF-8 text file, ready to send. An image's `url` is a data URL for its thumbnail.
+// An image, a PDF, or a UTF-8 text file, ready to send. An image's `url` is a data URL for its thumbnail.
 export async function readFile(file: File): Promise<Upload> {
   let blob: Blob = file;
+  let type = file.type || "text/plain";
   if (file.type.startsWith("image/")) blob = await shrink(file).catch(() => Promise.reject(new Error(`Cannot read ${file.name}.`)));
-  else if (!isText(await file.arrayBuffer())) throw new Error(`${file.name} is not an image or a text file.`);
+  else if (isPdf(await file.slice(0, 5).arrayBuffer())) {
+    if (file.size > maxPdf) throw new Error(`${file.name} is over 8 MiB: a PDF can be at most 8 MiB.`);
+    type = "application/pdf";
+  } else if (!isText(await file.arrayBuffer())) throw new Error(`${file.name} is not an image, a PDF, or a text file.`);
   const url = await dataUrl(blob);
   const data = url.slice(url.indexOf(",") + 1);
-  return blob.type.startsWith("image/") ? { name: file.name, type: blob.type, url, data } : { name: file.name, type: file.type || "text/plain", data };
+  return blob.type.startsWith("image/") ? { name: file.name, type: blob.type, url, data } : { name: file.name, type, data };
 }

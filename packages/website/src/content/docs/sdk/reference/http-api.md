@@ -126,18 +126,19 @@ OpenRouter comes back to `/api/sign-ins/<id>/callback` on the page's own origin,
 | `GET` | `/api/library/<id>` | | `LibraryItem` |
 | `DELETE` | `/api/library/<id>` | | `{ "ok": true }` |
 | `GET` | `/api/library/<id>/file` | `?download=1` | The file's bytes |
+| `GET` | `/api/library/<id>/text` | | A document's text, as `text/plain`: for a PDF, what fxbot read from it. Since 0.10.0. |
 | `GET` | `/api/profiles/<id>/uploads/<sha256>.<ext>` | | The bytes of an image, at its address from before the library |
 
 A file's answer has these headers:
 
 | Header | Value |
 | --- | --- |
-| `content-type` | An image's type, or `text/plain; charset=utf-8` for every document |
+| `content-type` | An image's type, `application/pdf` for a PDF, or `text/plain; charset=utf-8` for every other document |
 | `x-content-type-options` | `nosniff` |
 | `content-security-policy` | `default-src 'none'; style-src 'unsafe-inline'; sandbox` |
 | `cache-control` | `private, no-cache` |
 | `etag` | The SHA-256 of its bytes, in quotes. A matching `If-None-Match` gets 304 with no body. |
-| `content-disposition` | With `?download=1`: `attachment`, with the item's name |
+| `content-disposition` | With `?download=1`, and always for a PDF: `attachment`, with the item's name |
 
 ## Bots
 

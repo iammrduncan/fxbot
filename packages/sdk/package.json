@@ -15,6 +15,7 @@
     "@workflow/world-postgres": "5.1.0",
     "libfx": "0.0.16",
     "postgres": "3.4.9",
+    "unpdf": "1.9.1",
     "yaml": "2.9.1"
   }
 }

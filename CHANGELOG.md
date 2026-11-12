@@ -4,8 +4,9 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
+- **Send PDFs to a bot.** A PDF of up to 8 MiB attaches as an image or a text file does. The bot reads the text fxbot finds in it, page by page: up to 60,000 characters in your message, and the rest from the library, where `library_read` now reads a long document in parts. A PDF of scanned pages says it has no text. The library keeps the PDF itself, which downloads as it is, and its preview shows the text the bot reads. Search finds a PDF by its words.
 - **Bots with a soul.** The new **soul** plugin, in **Essentials**, gives each bot a soul: a few lines, in its own words, of who it is, how it sounds, and how it helps you. The first time you open a new bot's chat, it speaks first: it guesses who it might be from its name, asks what you'd like help with, and writes its soul from your answers. It rewrites it when you ask, in its own chat only, and **Soul** on its edit screen lets you edit it, with every version to go back to. Its skill, `import-profile`, brings a soul and memories over from a Hermes Agent profile or an OpenClaw agent, from files you send, or from Grok Bot, ChatGPT, or Claude through a prompt you paste there. Joining **Essentials** doesn't add it to an install that has fxbot already: add it from **Plugins**. See [Give a bot a soul](https://fxbot.sh/docs/how-to/give-a-bot-a-soul/).
-- **For plugins:** an `app.chat` part gets `reload()`, which reads the bot again, so the chat follows a session the plugin started.
+- **For plugins:** an `app.chat` part gets `reload()`, which reads the bot again, so the chat follows a session the plugin started. `fx.library.save` takes a PDF.
 - **No more box around a moving bot in Firefox.** With hardware acceleration on, a bot that leaned after the pointer, such as the one open in the sidebar, could show thin straight lines along its right and bottom edges. The home page's bots on fxbot.sh had them too ([#16](https://github.com/iammrduncan/fxbot/issues/16)).
 
 ## 0.9.0 (2026-11-10)

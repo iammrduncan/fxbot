@@ -581,3 +581,34 @@ Answered on 2026-11-01.
 Still open:
 - Whether a later save's name should be kept beside the first one, so each bot sees the name its own chat gave the file. The plan keeps only the first name.
 - What else belongs on the panel's Details tab. The plan shows the provider, the model, and the start of the instructions, with Edit opening today's settings page, and does not move that form into the panel.
+
+## What the build changed
+
+### PDFs (0.10.0)
+
+The owner, on 2026-11-12: "fix uploads to bots to allow pdfs... thats absolutely needed." A fix to what a message can carry, so it's recorded here ([Fixes need no phase doc](../../../AGENTS.md)).
+- **libfx takes text, images, and text resources in a prompt, and no PDF** (`FxPromptBlock`, libfx 0.0.16). So fxbot reads a PDF's text itself, and the model gets that.
+- **The text comes from pdf.js, through `unpdf` 1.9.1**, added to `@fxbot/sdk`. It's Mozilla's PDF reader built for servers, with no native parts. 2.x was under two weeks old. It loads the first time a PDF comes, so a fxbot that never gets one never loads it.
+- **What the model gets:** "File: report.pdf (library:<id>)", then each page with text, under "--- Page n ---", up to 60,000 characters. A longer PDF ends with "[The PDF goes on: this is 60,000 of 89,152 characters. Read the rest with library_read library:<id>, from 60000.]". A page with no text is left out. A PDF with none, such as scans, says "This PDF has no text fxbot could read: its pages may be scanned images."
+- **`library_read` reads in parts:** `from` starts at a character, and the note says where to read on. Long text files and saved documents gain it too.
+- **The library keeps the PDF itself,** as a document of type `application/pdf`, with its text for search, `library_read`, and the preview.
+  - **It downloads as itself,** `attachment`, from the chat or the library. Browsers don't run their PDF viewer in the sandbox every other document is served in, and fxbot doesn't open one in its own pages.
+  - **The preview** shows the text the bots read, from `GET /api/library/<id>/text`, and says so. **Download** gives the PDF.
+- **Checked at the edge,** in the page and in the SDK:
+  - **A PDF** starts with `%PDF-` and is at most 8 MiB, under the 12 MiB of a message.
+  - **One that only claims the type,** one pdf.js can't read, and one locked with a password are refused, each saying which.
+  - **Any other binary file** is refused as before, now saying "is not an image, a PDF, or a text file".
+- **The checks,** against the check server and the scripted mock:
+  - **The server, 18:**
+    - the text reaching the model page by page, with its id
+    - the library item, its download, and its text
+    - search finding a PDF by a word in it
+    - a scan saying it has no text
+    - a long PDF cut at 60,000 characters, and read to its last page with `from`
+    - the refusals: a false type, a broken file, over 8 MiB, and other binary files
+    - a text file going as before
+  - **The page, 9, in Chromium:**
+    - attaching a PDF from the message box, and the model getting its text
+    - refusing a binary file
+    - the library's preview of a PDF and of a scan, **Download**, and a text file's preview as before
+  - **Not checked:** a PDF locked with a password, which this box had nothing to make.

@@ -64,14 +64,16 @@ const json = (res: ServerResponse, status: number, body: unknown) =>
 // showing; the SHA-256 is the ETag, so an unchanged one costs a 304.
 async function file(req: IncomingMessage, res: ServerResponse, url: URL, read: (ifNoneMatch?: string) => Promise<{ name: string; kind: string; type: string; sha256: string; data: Buffer | null }>) {
   const { name, kind, type, sha256, data } = await read(req.headers["if-none-match"]);
+  // A PDF downloads as itself, never opened here: its viewer can't run in this page's sandbox, and its text is read apart.
+  const isPdf = type === "application/pdf";
   const headers: Record<string, string> = {
-    "content-type": kind === "image" ? type : "text/plain; charset=utf-8",
+    "content-type": kind === "image" || isPdf ? type : "text/plain; charset=utf-8",
     "x-content-type-options": "nosniff",
     "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
     "cache-control": "private, no-cache",
     etag: `"${sha256}"`,
   };
-  if (url.searchParams.get("download") === "1") headers["content-disposition"] = `attachment; filename*=UTF-8''${encodeURIComponent(name)}`;
+  if (isPdf || url.searchParams.get("download") === "1") headers["content-disposition"] = `attachment; filename*=UTF-8''${encodeURIComponent(name)}`;
   if (!data) return res.writeHead(304, headers).end();
   res.writeHead(200, headers).end(data);
 }
@@ -242,7 +244,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     if (id && !action && method === "GET") return json(res, 200, await fxbot.library.get(id));
     if (id && !action && method === "DELETE") return json(res, 200, (await fxbot.library.remove(id), ok));
     if (id && action === "file" && method === "GET") return file(req, res, url, (etag) => fxbot.library.file(id, etag));
-    return action && action !== "file" ? fail(404, "not found") : fail(405, "method not allowed");
+    // A document's text, as a bot reads it, for the library's preview of a PDF.
+    if (id && action === "text" && method === "GET") return res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "x-content-type-options": "nosniff", "cache-control": "private, no-cache" }).end(await fxbot.library.text(id));
+    return action && action !== "file" && action !== "text" ? fail(404, "not found") : fail(405, "method not allowed");
   }
   // An image's URL from before the library, kept in older chats.
   if (resource === "profiles" && action === "uploads" && method === "GET") return file(req, res, url, (etag) => fxbot.library.upload(id, extra ?? "", etag));

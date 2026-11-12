@@ -22,17 +22,45 @@ const documentTypes: Record<string, string> = { md: "text/markdown", txt: "text/
 
 export type NewItem = { profileId: string; sessionId: string; origin: "uploaded" | "generated"; name: string; type: string; bytes: Buffer };
 
-// A file as the library keeps it: an image whose bytes are its type, or a document of UTF-8 text with no NUL.
-export function check({ name, type, bytes }: Pick<NewItem, "name" | "type" | "bytes">) {
+export const pdf = "application/pdf";
+export const maxPdf = 8 * 2 ** 20;
+const isPdf = (bytes: Buffer) => bytes.subarray(0, 5).toString("latin1") === "%PDF-";
+
+// A PDF's text, page by page, read by pdf.js through unpdf, which loads the first time a PDF comes. A page with no text,
+// such as a scanned one, is left out, so a PDF of scans reads as "".
+async function pdfText(name: string, bytes: Buffer) {
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  let document: Awaited<ReturnType<typeof getDocumentProxy>>;
+  try {
+    document = await getDocumentProxy(new Uint8Array(bytes), { verbosity: 0 });
+  } catch (error) {
+    return fail(400, (error as Error).name === "PasswordException" ? `${name} is locked with a password` : `${name} is not a PDF fxbot can read`);
+  }
+  try {
+    const { text } = await extractText(document, { mergePages: false });
+    return text.flatMap((page, i) => (page.trim() ? [`--- Page ${i + 1} ---\n${page.trim()}`] : [])).join("\n\n");
+  } finally {
+    await document.cleanup().catch(() => {});
+  }
+}
+
+// A file as the library keeps it: an image whose bytes are its type, a PDF with the text read from it, or a document of
+// UTF-8 text with no NUL.
+export async function check({ name, type, bytes }: Pick<NewItem, "name" | "type" | "bytes">) {
   if (typeof name !== "string" || !name.trim() || name.length > 255) return fail(400, "a file name must be 1 to 255 characters");
   if (isImage(type)) return magic[type](bytes) ? { kind: "image" as const, type, text: "" } : fail(400, `${name} is not the ${type} it says it is`);
+  if (type === pdf || isPdf(bytes)) {
+    if (!isPdf(bytes)) fail(400, `${name} is not the PDF it says it is`);
+    if (bytes.length > maxPdf) fail(400, `${name} is over 8 MiB: a PDF can be at most 8 MiB`);
+    return { kind: "document" as const, type: pdf, text: await pdfText(name, bytes) };
+  }
   let text: string;
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
-    return fail(400, `${name} is not an image or a text file`);
+    return fail(400, `${name} is not an image, a PDF, or a text file`);
   }
-  if (text.includes("\0")) fail(400, `${name} is not an image or a text file`);
+  if (text.includes("\0")) fail(400, `${name} is not an image, a PDF, or a text file`);
   // Only checked images claim an image type, so an SVG, which is text, is kept as plain text.
   return { kind: "document" as const, type: /^(?!image\/)[\w.+-]{1,60}\/[\w.+-]{1,60}$/.test(type) ? type : "text/plain", text };
 }
@@ -69,7 +97,7 @@ export function createLibrary(sql: Sql) {
   // same bot and chat again adds no tag. The first save's name and type stay, and so does its origin, unless the owner
   // sends what a bot made: then it's theirs, so `replace` leaves it as they sent it.
   async function save(input: NewItem) {
-    const { kind, type, text } = check(input);
+    const { kind, type, text } = await check(input);
     const { profileId, sessionId, origin, bytes } = input;
     const sha256 = createHash("sha256").update(bytes).digest("hex");
     const [{ id }] = await sql<{ id: string }[]>`
@@ -86,7 +114,7 @@ export function createLibrary(sql: Sql) {
   // moves to now, which brings the item to the top. What the owner sent stays as they sent it, and so does what another
   // bot holds too, since one item serves every bot that saved the same text.
   async function replace({ profileId, sessionId, id, name, type, bytes }: Omit<NewItem, "origin"> & { id: string }) {
-    const { kind, type: kept, text } = check({ name, type, bytes });
+    const { kind, type: kept, text } = await check({ name, type, bytes });
     const [row] = isId(id) ? await sql<{ kind: string; origin: string; name: string; type: string; sha256: string; shared: boolean }[]>`
       select kind, origin, name, type, sha256, exists (select 1 from library_tags t where t.item_id = l.id and t.profile_id <> ${profileId}) as shared
       from library l where id = ${id} and exists (select 1 from library_tags t where t.item_id = l.id and t.profile_id = ${profileId})` : [];
@@ -174,23 +202,33 @@ export function createLibrary(sql: Sql) {
     },
     {
       name: "library_read",
-      description: "Open an item from this bot's library by its library:<id>: a document's text, or an image to look at.",
-      inputSchema: { type: "object", properties: { id: { type: "string", description: "library:<id>" } }, required: ["id"] },
+      description:
+        "Open an item from this bot's library by its library:<id>: a document's text, or an image to look at. A PDF reads as the text " +
+        "fxbot found in it, page by page. A long document comes in parts: with from, its text from that character on.",
+      inputSchema: {
+        type: "object",
+        properties: { id: { type: "string", description: "library:<id>" }, from: { type: "integer", minimum: 0, description: "The character to start at, for the next part" } },
+        required: ["id"],
+      },
       idempotent: true,
-      async execute(input: { id?: unknown }, call) {
+      async execute(input: { id?: unknown; from?: unknown }, call) {
         const bot = botOf(call);
         if (!bot) return unavailable;
         const id = String(input.id ?? "").trim().replace(/^library:/, "");
+        const from = Math.max(0, Math.trunc(Number(input.from) || 0));
         const [row] = isId(id)
           ? await sql<{ kind: string; name: string; type: string; chars: number; text: string; data: Buffer | null }[]>`
-              select kind, name, type, length(text) as chars, left(text, ${readBytes}) as text, case when kind = 'image' then data end as data
+              select kind, name, type, length(text) as chars, substr(text, ${from + 1}, ${readBytes}) as text, case when kind = 'image' then data end as data
               from library l where id = ${id} and exists (select 1 from library_tags t where t.item_id = l.id and t.profile_id = ${bot})`
           : [];
         if (!row) return `This bot's library has no item library:${id}.`;
         if (row.data) return { type: "libfx.tool-result", text: row.name, images: [{ type: "image", mimeType: row.type, data: row.data.toString("base64"), sourceRef: `library:${id}` }] } satisfies FxToolResult;
+        if (row.type === pdf && !row.chars) return `${row.name}\n\nThis PDF has no text fxbot could read: its pages may be scanned images.`;
+        if (from && from >= row.chars) return `${row.name} has ${row.chars.toLocaleString("en-US")} characters, so nothing starts at ${from.toLocaleString("en-US")}.`;
         const text = cutBytes(row.text, readBytes);
-        const kept = [...text].length;
-        const cut = kept < row.chars ? `\n\n[cut at ${kept.toLocaleString("en-US")} of ${row.chars.toLocaleString("en-US")} characters]` : "";
+        const to = from + [...text].length;
+        const part = from ? `characters ${from.toLocaleString("en-US")} to ${to.toLocaleString("en-US")}` : `cut at ${to.toLocaleString("en-US")}`;
+        const cut = from || to < row.chars ? `\n\n[${part} of ${row.chars.toLocaleString("en-US")} characters${to < row.chars ? `; read on with from ${to}` : ""}]` : "";
         return `${row.name}\n\n${text}${cut}`;
       },
     },
@@ -242,6 +280,11 @@ export function createLibrary(sql: Sql) {
     list,
     get,
     file: (id: string, ifNoneMatch?: string) => (isId(id) ? fileWhere("id", id, ifNoneMatch) : fail(404, "not found")),
+    // A document's text, as a bot reads it: for a PDF, the text fxbot read from it.
+    async text(id: string) {
+      const [row] = isId(id) ? await sql<{ text: string }[]>`select text from library where id = ${id} and kind = 'document'` : [];
+      return row ? row.text : fail(404, "not found");
+    },
     // The URL an image had before the library: the bot's id, then the SHA-256 and extension.
     upload(name: string, ifNoneMatch?: string) {
       const sha256 = /^([0-9a-f]{64})\.(png|jpg|gif|webp)$/.exec(name)?.[1];

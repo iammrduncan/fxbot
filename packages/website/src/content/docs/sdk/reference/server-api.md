@@ -67,7 +67,7 @@ Other keys are ignored. An update also takes `pinned`:
 
 - `text` is required, unless the message has files.
 - `messageId` is 1 to 128 letters, digits, `.`, `_`, or `-`. The same `messageId` again reaches the same turn and runs nothing new.
-- `files` is up to 8 `{ name, type, data }`, with `data` in base64. An image is PNG, JPEG, GIF, or WebP, checked by its bytes: at most 3.75 MiB each, and 6 MiB for a message's images together. Any other file must be UTF-8 text with no NUL. It goes to the model as text, under its name. Every file is saved to the library, tagged with the bot and its chat.
+- `files` is up to 8 `{ name, type, data }`, with `data` in base64. An image is PNG, JPEG, GIF, or WebP, checked by its bytes: at most 3.75 MiB each, and 6 MiB for a message's images together. A PDF, since 0.10.0, is at most 8 MiB, and goes to the model as the text fxbot reads from it, page by page, up to 60,000 characters, with its `library:<id>` to read the rest. Any other file must be UTF-8 text with no NUL. It goes to the model as text, under its name. Every file is saved to the library, tagged with the bot and its chat.
 - `$name` anywhere in the text, or `/name` at its start, names one of the bot's skills. That skill's instructions go with the message.
 - It fails with 400 when the bot has no provider, or no model of its own and no default model on its provider.
 - The first message starts the bot's chat and sets its `sessionId`.
@@ -233,7 +233,7 @@ Every agent has these tools. Each one acts for the bot whose chat runs it.
 | `memory_search` | Searches the bot's memories by words and, with an embedder, by meaning: up to 20 |
 | `memory_forget` | Removes a memory by its `mem:<id>` |
 | `library_search` | Searches the items tagged with the bot, by name and document text. An empty query lists the newest. |
-| `library_read` | Opens a `library:<id>`: a document's text, up to 60,000 bytes, or an image |
+| `library_read` | Opens a `library:<id>`: a document's text, up to 60,000 bytes, or an image. A PDF is its text. Since 0.10.0, `from` reads on from a character |
 | `library_save` | Saves a document the bot wrote. The name ends in `.md`, `.txt`, `.csv`, or `.json`, and the text is up to 1 MiB. |
 | `skill` | Present while a skill is on. Loads a skill by `name`, one of its files by `file`, in parts of 60 KB, or finds skills by `search`. |
 | `<prefix>_<tool>` | Each enabled MCP server's allowed tools. The prefix comes from the server's name or host, such as `linear` for `mcp.linear.app`, and is unique among plugins. For a server set to `each`, a call from a bot it isn't on for fails. |

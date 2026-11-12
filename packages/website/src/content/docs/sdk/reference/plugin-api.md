@@ -97,7 +97,7 @@ export default async function setup(fx: PluginApi) {
 | `fx.provide(api)` | Offers an object to the plugins that need this one, which get it with `fx.need`. Since 0.5.0. See [Plugins that need others](#plugins-that-need-others). |
 | `fx.need(name)` | What a plugin this one names under `needs` provides, or null while it isn't running. It throws for a plugin `needs` doesn't name. Since 0.5.0. |
 | `fx.library.read(bot, id)` | A library item's `name`, `type`, and `bytes`, if it's tagged for the bot; otherwise it throws |
-| `fx.library.save({ bot, session, name, type, bytes })` | Saves an image, or UTF-8 text, to the bot's library, tagged for the chat, through the library's checks. It answers the item. |
+| `fx.library.save({ bot, session, name, type, bytes })` | Saves an image, UTF-8 text, or since 0.10.0 a PDF, whose text fxbot reads, to the bot's library, tagged for the chat, through the library's checks. It answers the item. |
 | `fx.library.replace({ bot, session, id, name, type, bytes })` | Changes a document a bot made, in place: its id and tags stay, the chat gets a tag, and it comes to the top of the library. It refuses an image, an upload, an item not tagged for the bot, one another bot holds too, since one item serves every bot that saved the same text, and text another item holds. When the owner sends a bot's document in a chat, it becomes an upload. It answers the item. Since 0.7.0. |
 | `fx.library.list(bot, session)` | The items saved in one chat of the bot, newest first. Since 0.6.0. |
 | `fx.skills.files(bot, name)` | The files besides `SKILL.md` of the skill the bot sees by that name, as `{ path, text }`. None when it has no such skill. |

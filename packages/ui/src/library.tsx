@@ -170,8 +170,9 @@ export function Preview({ item, profiles, onClose, onRemoved }: { item: LibraryI
   const [error, setError] = useState("");
   useEffect(() => {
     client.library.get(item.id).then((full) => setTags(full.profileIds), (e: Error) => setError(e.message));
+    // A PDF previews as the text fxbot read from it, which is what its bots see. Download gives the PDF itself.
     if (item.kind === "document")
-      fetch(item.url)
+      fetch(item.type === "application/pdf" ? `/api/library/${item.id}/text` : item.url)
         .then((res) => (res.ok ? res.text() : Promise.reject(new Error("This file is gone."))))
         .then(setText, (e: Error) => setError(e.message));
   }, [item.id]);
@@ -202,6 +203,13 @@ export function Preview({ item, profiles, onClose, onRemoved }: { item: LibraryI
             <img src={item.url} alt={item.name} className="mx-auto max-h-[60dvh]" />
           ) : text === null ? (
             <p className="p-3 text-sm text-muted-foreground">{error ? "" : "Loading…"}</p>
+          ) : item.type === "application/pdf" ? (
+            <div className="grid gap-2 p-3">
+              <p className="text-sm text-muted-foreground">
+                {text.trim() ? "The text fxbot read from this PDF, which is what its bots see. Download it for the PDF itself." : "This PDF has no text fxbot could read: its pages may be scanned images. Download it to see it."}
+              </p>
+              {text.trim() && <pre className="text-xs break-words whitespace-pre-wrap">{text}</pre>}
+            </div>
           ) : markdown ? (
             <div className="p-4 text-sm">
               <Markdown>{text}</Markdown>

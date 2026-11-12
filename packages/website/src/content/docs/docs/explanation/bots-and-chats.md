@@ -90,7 +90,7 @@ A chat starts over two ways, and both work the same. The bot's model writes a su
 
 ## The library
 
-Chats hold files: images and text files you send, and documents bots save. The library keeps one copy of each, by the SHA-256 of its bytes, so the same file sent twice, or by two bots, is one item. Each item is tagged with every bot and chat that saved it, which leads it back to where it came from, and it outlives a deleted bot.
+Chats hold files: images, PDFs, and text files you send, and documents bots save. A bot reads a PDF as the text fxbot finds in it, page by page: up to 60,000 characters in your message, and the rest with `library_read`. A PDF of scanned pages has no text to read. The library keeps one copy of each, by the SHA-256 of its bytes, so the same file sent twice, or by two bots, is one item. Each item is tagged with every bot and chat that saved it, which leads it back to where it came from, and it outlives a deleted bot.
 
 You see it two ways: across every bot, from the button beside Settings, and per bot, in the panel beside its chat. Bots reach it through three tools, `library_search`, `library_read`, and `library_save`, and only items tagged for them. A bot is tagged onto an item only by saving its exact bytes, so nothing passes from one bot to another through the library.
 

@@ -2,7 +2,7 @@ import type { FxAgentTool, FxResumeTurn, FxSessionPromptInput, FxTurn } from "li
 import { createArchives } from "./archive.ts";
 import { createEmbeddings, type EmbeddingSettings } from "./embeddings.ts";
 import { createHistory, summarize, switchAsk } from "./history.ts";
-import { createLibrary } from "./library.ts";
+import { createLibrary, pdf } from "./library.ts";
 import { createMcp } from "./mcp.ts";
 import { createMemories } from "./memories.ts";
 import type { PluginMachine } from "./plugin-api.ts";
@@ -74,6 +74,16 @@ const isRepo = (ref: PluginRef): ref is RepoRef => typeof (ref as RepoRef | unde
 // libfx's limits for one prompt's images.
 const maxImage = 3.75 * 2 ** 20;
 const maxImages = 6 * 2 ** 20;
+// A PDF in a message is the text fxbot read from it, up to this many characters, then where to read the rest. The PDF
+// itself is in the library, and library_read reads on from a character, as Postgres counts them: by code point.
+const pdfShown = 60_000;
+function pdfBlock(name: string, text: string, id: string) {
+  if (!text) return `File: ${name} (library:${id})\nThis PDF has no text fxbot could read: its pages may be scanned images.`;
+  const points = [...text];
+  if (points.length <= pdfShown) return `File: ${name} (library:${id})\n${text}`;
+  const n = pdfShown.toLocaleString("en-US");
+  return `File: ${name} (library:${id})\n${points.slice(0, pdfShown).join("")}\n\n[The PDF goes on: this is ${n} of ${points.length.toLocaleString("en-US")} characters. Read the rest with library_read library:${id}, from ${pdfShown}.]`;
+}
 
 // What a bot feels and wears, each from its list.
 const looks = { mood: moods, head: heads, face: faces, outfit: outfits, tint: tints };
@@ -340,11 +350,13 @@ export async function createFxbot(options: FxbotOptions) {
   // A message with files or named skills is blocks: its text, each skill's instructions, then each file. What it sent
   // is kept, since libfx's stream shows only a plain-text prompt.
   async function attach(profile: StoredProfile, sessionId: string, text: string, messageId: string, files: Upload[], skilled: ReturnType<typeof skills.invoked>, from?: string, shown?: string): Promise<FxSessionPromptInput> {
-    const checked = files.map(({ name, type, data }) => {
-      if (typeof name !== "string" || typeof type !== "string" || typeof data !== "string") return fail(400, "each file needs a name, a type, and base64 data");
-      const bytes = Buffer.from(data, "base64");
-      return { name, bytes, ...library.check({ name, type, bytes }) };
-    });
+    const checked = await Promise.all(
+      files.map(async ({ name, type, data }) => {
+        if (typeof name !== "string" || typeof type !== "string" || typeof data !== "string") return fail(400, "each file needs a name, a type, and base64 data");
+        const bytes = Buffer.from(data, "base64");
+        return { name, bytes, ...(await library.check({ name, type, bytes })) };
+      }),
+    );
     const images = checked.filter((file) => file.kind === "image");
     if (images.some((file) => file.bytes.length > maxImage)) fail(400, "An image can be at most 3.75 MiB.");
     if (images.reduce((sum, file) => sum + file.bytes.length, 0) > maxImages) fail(400, "A message's images can be at most 6 MiB together.");
@@ -352,7 +364,7 @@ export async function createFxbot(options: FxbotOptions) {
     const sent: Upload[] = [];
     for (const { name, type, bytes, kind, text: content } of checked) {
       const item = await library.save({ profileId: profile.id, sessionId, origin: "uploaded", name, type, bytes });
-      blocks.push(kind === "image" ? { type: "image", mimeType: type, data: bytes.toString("base64"), sourceRef: `library:${item.id}` } : { type: "text", text: `File: ${name}\n${content}` });
+      blocks.push(kind === "image" ? { type: "image", mimeType: type, data: bytes.toString("base64"), sourceRef: `library:${item.id}` } : { type: "text", text: type === pdf ? pdfBlock(name, content, item.id) : `File: ${name}\n${content}` });
       sent.push({ name, type, url: item.url });
     }
     await store.sent.save(profile.id, messageId, { input: shown ?? text, files: sent, plugin: from });
@@ -1003,6 +1015,7 @@ export async function createFxbot(options: FxbotOptions) {
       update: (id: string, hash: unknown) => (packages.has(id) ? packages.update(id, hash) : skills.has(id) ? skills.update(id, hash) : mcp.update(id, hash)),
       change: (id: string, input: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) =>
         packages.has(id) ? packages.change(id, input) : skills.has(id) ? skills.change(id, input) : mcp.change(id, input),
+      text: (id: string) => library.text(id),
       remove: (id: string) => (packages.has(id) ? packages.remove(id) : skills.has(id) ? skills.remove(id) : mcp.remove(id)),
       setSecrets: (id: string, input: PluginSecrets) => mcp.setSecrets(id, input),
       // A bot's switch, read when the plugin is chosen bot by bot.
