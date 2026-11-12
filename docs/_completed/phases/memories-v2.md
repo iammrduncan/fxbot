@@ -5,7 +5,7 @@ Memories grow past one bot:
 - **A room's memories.** With the chat rooms plugin, each room keeps notes of its own: what the room is for, what was decided there, and who does what. Every bot in the room reads them, in that room only.
 - **The same memories underneath.** A team memory is a memory with no bot. It's saved, found, embedded, and shown as a bot's own are, and it sits in each bot's instructions after the bot's own.
 
-Status: planned on 2026-11-12, at the owner's word. Researched the same day:
+Status: built on 2026-11-12, for 0.10.0, as planned the same day at the owner's word, with the open questions' recommendations: team memories in core, a bot's team save that doesn't wait for the owner, no switch to keep a bot from them, and a room's memories written by the owner and the room's bots. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. Researched the same day:
 - against the research directive's references: eve, OpenBot, OpenDots, openmuse, Pi, and Grok Bot
 - against OpenClaw, Hermes Agent, Letta, Mem0, and the ChatGPT and Claude apps, from their source at the commits in [Research](#1-research), and their docs
 
@@ -17,13 +17,13 @@ Status: planned on 2026-11-12, at the owner's word. Researched the same day:
 
 **Team memories are core.** **A room's memories are the chat rooms plugin's.**
 
-- **Team memories, core.** "Its memory" is one of the things every bot needs ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). A team memory is the same thing as a bot's own, with a wider reach. It needs the same parts:
+- **Team memories, core.** "Its memory" is one of the things every bot needs ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). A team memory is the same thing as a bot's own, with a wider reach. It needs the same parts:
   - the table, and its check for a duplicate
   - the search by words and by meaning, and the embedder
   - the tools, and the place in the instructions
 
   As a plugin, it would copy `memories.ts`, or need hooks into each of those. In core, it's one migration and about 200 lines, most of them in the page.
-  - **This changes an earlier call.** On 2026-11-02, the [memories phase](../_completed/phases/memories.md#5-questions) decided "Memories shared by a team of bots are a later add-on." The owner now asks for them across fxbot. [Question 1](#5-open-questions) puts it to the owner.
+  - **This changes an earlier call.** On 2026-11-02, the [memories phase](memories.md#5-questions) decided "Memories shared by a team of bots are a later add-on." The owner now asks for them across fxbot. [Question 1](#5-open-questions) puts it to the owner.
 - **A room's memories, in the plugin.** Rooms are the chat rooms plugin's, and the core never names a plugin. So there's nothing for the core to detect. The plugin carries the room's memories itself:
   - **Added and on:** rooms have memories.
   - **Not added:** there are no rooms, and nothing to show.
@@ -230,23 +230,23 @@ Chat rooms goes to 0.4.0. Its `minFxbot` stays, since it uses nothing new.
 ## 4. Checklist
 
 Against a disposable fxbot, a mock model that logs each request, and a copy of a 0.9.0 database:
-- [ ] The migration runs on the copy. Every memory there is stays its bot's, and each bot's list reads as before.
-- [ ] The owner adds a team memory in **Settings** › **Memory**. The next turn of every bot carries it, after the bot's own, under the team's header. Adding the same text again answers with the one there.
-- [ ] A bot told "remember for all the bots that…" calls `memory_save` with `team`. The memory shows in the team list as saved by that bot, and the next turn of another bot carries it.
-- [ ] `memory_search` finds a bot's own and team memories, the team's marked. `memory_forget` removes a team memory.
-- [ ] **Share with every bot** moves one of a bot's memories to the team list, and it leaves that bot's own list.
-- [ ] Deleting a bot keeps the team memories it saved, as saved by **A removed bot**.
-- [ ] With more team memories than fit, the section stops at its budget, with the line that says how many more there are.
-- [ ] A routine's run and a subagent get the team's memories. A subagent's `memory_save` is still blocked, `team` or not.
+- [x] The migration runs on the copy. Every memory there is stays its bot's, and each bot's list reads as before.
+- [x] The owner adds a team memory in **Settings** › **Memory**. The next turn of every bot carries it, after the bot's own, under the team's header. Adding the same text again answers with the one there.
+- [x] A bot told "remember for all the bots that…" calls `memory_save` with `team`. The memory shows in the team list as saved by that bot, and the next turn of another bot carries it.
+- [x] `memory_search` finds a bot's own and team memories, the team's marked. `memory_forget` removes a team memory.
+- [x] **Share with every bot** moves one of a bot's memories to the team list, and it leaves that bot's own list.
+- [x] Deleting a bot keeps the team memories it saved, as saved by **A removed bot**.
+- [x] With more team memories than fit, the section stops at its budget, with the line that says how many more there are.
+- [x] A routine's run and a subagent get the team's memories. A subagent's `memory_save` is still blocked, `team` or not.
 
 Chat rooms 0.4.0:
-- [ ] The owner adds a room memory in the room's **Memories**. The next turn of each bot in that room carries it. A bot in another room, and the same bot in its own chat, don't get it.
-- [ ] A bot in a room saves with `chat-rooms_remember`, changes one with `replaces`, and removes one with `chat-rooms_forget`. Each shows in the dialog, saved by that bot. The tools answer "This works only in a chat room." in a bot's own chat.
-- [ ] A room's bot gets its own memories, the team's, and the room's, in that order.
-- [ ] Deleting the room deletes its memories. Removing the plugin removes them all, and fxbot runs on.
+- [x] The owner adds a room memory in the room's **Memories**. The next turn of each bot in that room carries it. A bot in another room, and the same bot in its own chat, don't get it.
+- [x] A bot in a room saves with `chat-rooms_remember`, changes one with `replaces`, and removes one with `chat-rooms_forget`. Each shows in the dialog, saved by that bot. The tools answer "This works only in a chat room." in a bot's own chat.
+- [x] A room's bot gets its own memories, the team's, and the room's, in that order.
+- [x] Deleting the room deletes its memories. Removing the plugin removes them all, and fxbot runs on.
 
 The rest:
-- [ ] Docs as above, `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
+- [x] Docs as above, `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
 
 Only a person can check, with a real model:
 - [ ] A bot saves to the team only when asked to, and to a room when a room settles something, not for what's only its own.
@@ -257,3 +257,22 @@ Only a person can check, with a real model:
 2. **Should a bot's team save wait for the owner?** Grok's Team Bot now waits for an owner or a Manager to approve. Recommended: no. A bot saves to the team only when the owner asks, and the owner sees who saved each one, and can edit or delete it.
 3. **A switch to keep a bot from team memories,** as OpenDots has per Dot? Recommended: not now. Add it when a bot needs it, such as one for a child.
 4. **Who writes a room's memories?** Hermes lets only the person write room notes. Recommended: both the owner and the room's bots, as with a bot's own, each marked with who saved it.
+
+## What the build changed
+
+- **No team section without team memories.** A bot's own section keeps its header when it has none, since that header says how to save one. The team's says nothing until there's one to read: `memory_save`'s `team` says when to save one. A room's memories work the same way.
+- **A team memory's message is for the bot that saved it.** `memory_search` names `from msg:<id>` on a team memory only for the bot that saved it, since that message is in its chat, which `chat_history` reads for it alone.
+- **`memory_forget` and `replaces` find the set themselves.** The bot gives only the `mem:<id>`: the tool looks for it in the bot's own and the team's, so the model never names a set to change one. A bot can't reach another bot's own memory.
+- **Sharing moves it to the top.** **Share with every bot** sets the memory's change date to now, so it comes first in the team's list and in the instructions. If the team already says the same, the bot's copy goes, and the team's answers. It asks first, since the memory leaves the bot's list.
+- **Share is a button,** the people icon beside the pencil and the bin. The list has no menu to put it in.
+- **Who saved it** reads **Added by you**, **Saved by** a bot's name, or **Saved by a removed bot**, as a bot's list words it.
+- **`team` takes `"true"` too,** since a model sometimes sends a boolean as text.
+- **Dreams keep to a bot's own,** as planned. A dream's `memory_search` now finds team memories too, but `dreams_remember` changes memories through `fx.memories`, so one that names a team memory is told the bot has no such memory.
+- **A room's memories** each carry their date in the instructions, as a bot's do. An edit changes the date, and keeps who saved it. The owner adding text that's already there gets the memory with 200, and a new one 201. `chat-rooms_forget` with an id from another room answers that this room has no such memory.
+- **The plugin's description,** in `plugin.json` and in fxbot's plugin list, now says each room keeps memories of its own.
+- **The docs:** the explanation got a **Team memories** section of its own, beside **Memories**, which the changelog and the rooms guide link to. The SDK's [Work with memories](../../../packages/website/src/content/docs/sdk/how-to/memories.md) got **Keep team memories**, which the plan didn't list, and the architecture and core-and-plugins pages name the team's memories.
+- **The checks,** against a disposable fxbot and the mock model:
+  - **The upgrade:** a database made by 0.9.0's code, at `8c81170`, with three bots, memories added by the owner and saved by a bot, and two rooms, was migrated with a backup first. The old constraint's name was `memories_profile_id_key_key`, as the migration expects. Every bot's list read as before, each memory still its own, and Chat rooms 0.4.0 ran its `0004_memories`.
+  - **The API and the model's requests, 66:** the checklist above, each step read from the requests the mock model logged, plus the edges: the same text again, a bot's memory under `/api/memories` (404), a bot sharing another's (404), an id from another room, text over 1,000 characters, and an unknown room. The team's section stopped at 3,808 bytes of its 4,000, with the line that says how many more there are.
+  - **One check failed, from the mock:** in a room, a bot is sent what was said since its last turn, and the mock runs the first command it finds, so it ran an older line. In a fresh room with one bot, `replaces` merged as it should.
+  - **The page, 18, in Chromium,** at desktop and phone sizes: the team's list first in **Settings** › **Memory**, with who saved each one, adding, editing, searching, and deleting; **Share with every bot** and the link to Settings on a bot's screen; and a room's **Memories** dialog, with adding, editing, and deleting. No page errors.

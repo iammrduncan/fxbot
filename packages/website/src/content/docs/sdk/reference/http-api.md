@@ -157,6 +157,11 @@ A file's answer has these headers:
 | `POST` | `/api/profiles/<id>/memories` | `{ "text": "<fact>" }` | 201 and `Memory` |
 | `PATCH` | `/api/profiles/<id>/memories/<memoryId>` | `{ "text": "<fact>" }` | `Memory` |
 | `DELETE` | `/api/profiles/<id>/memories/<memoryId>` | | `{ "ok": true }` |
+| `POST` | `/api/profiles/<id>/memories/<memoryId>/share` | | `Memory`, now the team's. Since 0.10.0. |
+| `GET` | `/api/memories` | `?query=&limit=` | `Memory[]`: the team's, which every bot reads. Since 0.10.0. |
+| `POST` | `/api/memories` | `{ "text": "<fact>" }` | 201 and `Memory` |
+| `PATCH` | `/api/memories/<memoryId>` | `{ "text": "<fact>" }` | `Memory` |
+| `DELETE` | `/api/memories/<memoryId>` | | `{ "ok": true }` |
 
 ## Chat
 

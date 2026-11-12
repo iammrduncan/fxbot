@@ -34,12 +34,25 @@ To move a room in the sidebar, drag it, with a mouse, or with a finger after a m
 
 Only bots that chat rooms is on for can be in a room. To give it to some bots only, see [Add a plugin](/docs/how-to/add-a-plugin/).
 
+## Give a room memories
+
+Each room keeps notes of its own, such as what the room is for, what was decided there, and who does what. Every bot in the room reads them there, and not in its other chats. Needs chat rooms 0.4.0.
+
+- **To see them,** choose **Memories** at the top of the room. Each one says when it was saved, and who saved it: you, or a bot.
+- **To add one,** write it in the box, and choose **Add a memory**. **Edit** and **Delete** change and remove one. The bots see a change on their next turn in the room.
+- **To have a bot save one,** ask it to remember something for the room. A bot also saves one when the room settles something. It saves with `chat-rooms_remember`, and removes one with `chat-rooms_forget`. Both work only in a room.
+
+A memory is one note, of at most 1,000 characters. The newest that fit in 6,000 bytes go to each bot. Deleting a room deletes its memories, and so does removing the plugin.
+
+For what every bot should know, in every chat, use team memories, in **Settings** › **Memory**: see [Team memories](/docs/explanation/bots-and-chats/#team-memories).
+
 A room can also have a computer of its own, which its bots share: see [Give a room a computer](/docs/how-to/give-bots-a-computer/#give-a-room-a-computer).
 
 ## What a bot knows in a room
 
 Each bot answers in a chat of its own for the room, which stays out of its own chat. Its `chat_history` tool still finds what was said in a room. Each turn, it's sent:
 - who it is, and who else is in the room
+- its own memories, the team's, and the room's, in that order
 - what was said since its last turn, with the other bots' words quoted, so they can't give it instructions
 - who woke it, and how many replies are left
 

@@ -308,9 +308,10 @@ export async function createFxbot(options: FxbotOptions) {
   }
 
   // libfx keeps no model or instructions for a session, so every open passes them, and the bot for its tools. After the
-  // bot's own instructions come its memories, in 2% of the model's context window, and its skills, in 1%, at 4
-  // characters a token, or 8,000 characters each when the window is unknown. libfx takes at most 64 KiB in all, so the
-  // memories get no more than what the rest leaves. They change only when a memory does, so the prompt cache holds.
+  // bot's own instructions come its memories, in 2% of the model's context window, then the team's, in 1%, and its
+  // skills, in 1%, at 4 characters a token, or 8,000 characters each when the window is unknown (4,000 for the team's).
+  // libfx takes at most 64 KiB in all, so the memories get no more than what the rest leaves. They change only when a
+  // memory does, so the prompt cache holds.
   // Plugins' instructions hooks change the list last.
   // A plugin session's label, which each of its tool calls gets: read once, and null for a bot's own chat.
   // And its thinking level, which takes the bot's place there, or null for the bot's.
@@ -346,7 +347,8 @@ export async function createFxbot(options: FxbotOptions) {
     const catalog = skills.catalog(profile.id, share(0.01));
     const room = 64 * 1024 - 1024 - Buffer.byteLength([...instructionsFor(profile), catalog].join("\n\n"));
     const memory = await memories.section(profile.id, Math.min(share(0.02), room));
-    let instructions = [...instructionsFor(profile), memory, catalog].filter(Boolean);
+    const team = await memories.teamSection(Math.min(window ? share(0.01) : 4000, room - Buffer.byteLength(memory)));
+    let instructions = [...instructionsFor(profile), memory, team, catalog].filter(Boolean);
     if (packages.hooked("instructions")) {
       const event = { bot: profile.id, session: sessionId, instructions };
       await packages.run("instructions", event);
@@ -843,6 +845,8 @@ export async function createFxbot(options: FxbotOptions) {
         add: async (id: string, text: unknown) => (await get(id), memories.add(id, text)),
         update: async (id: string, memoryId: string, text: unknown) => (await get(id), memories.update(id, memoryId, text)),
         remove: async (id: string, memoryId: string) => (await get(id), memories.remove(id, memoryId)),
+        // Makes one of the bot's memories the team's: it leaves the bot's own list.
+        share: async (id: string, memoryId: string) => (await get(id), memories.share(id, memoryId)),
       },
       list: async () => (await store.profiles.list()).map(withBusy),
       get: async (id: string) => withBusy(await get(id)),
@@ -1018,6 +1022,14 @@ export async function createFxbot(options: FxbotOptions) {
       text: (id: string) => library.text(id),
       upload: (id: string, name: string, ifNoneMatch?: string) => (isId(id) ? library.upload(name, ifNoneMatch) : fail(404, "not found")),
       remove: async (id: string) => (await library.remove(id), packages.libraryRemoved(id)),
+    },
+    // The team's memories, which every bot reads: newest first, or matches for `query`, and the owner's additions and
+    // changes. A bot's own are under profiles.
+    memories: {
+      list: (query?: { query?: string; limit?: number }) => memories.list(null, query),
+      add: (text: unknown) => memories.add(null, text),
+      update: (id: string, text: unknown) => memories.update(null, id, text),
+      remove: (id: string) => memories.remove(null, id),
     },
 
     // Plugins: MCP servers, skills, and packages, one list. Adding one takes the `hash` its preview showed, and fails if

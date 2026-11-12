@@ -7,6 +7,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import type { Plugin, Profile, Settings } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { Header } from "./header.tsx";
+import { TeamMemories } from "./memories.tsx";
 import { MemorySearch } from "./memory-search.tsx";
 import { follow } from "./nav.ts";
 import { PluginIcon } from "./plugin-icon.tsx";
@@ -112,7 +113,13 @@ export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profi
         <p className="text-sm text-muted-foreground">New bots start on the default provider, with its default model.</p>
       </>
     );
-  else if (tab === "memory") content = <MemorySearch />;
+  else if (tab === "memory")
+    content = (
+      <>
+        <TeamMemories profiles={profiles} />
+        <MemorySearch />
+      </>
+    );
   else if (tab === "plugins")
     content = settings && (
       <section className="grid gap-3" aria-label="Plugins">

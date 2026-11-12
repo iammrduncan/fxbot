@@ -26,7 +26,7 @@ Everything about bots lives in the SDK, so another server or UI could be built o
 ## A message, end to end
 
 1. The page sends a message with an id it made, to `/api/profiles/<bot>/messages`.
-2. The SDK hands it to the libfx agent of the bot's provider, with the bot's instructions, its newest memories, and its list of skills, and answers once libfx has stored the prompt. The same id sent again runs nothing new.
+2. The SDK hands it to the libfx agent of the bot's provider, with the bot's instructions, its newest memories and the team's, and its list of skills, and answers once libfx has stored the prompt. The same id sent again runs nothing new.
 3. The page reads the chat as a stream of lines, from the start and then as they come. After a dropped connection it picks up where it left off.
 4. libfx runs the turn, calling tools as the model asks, and writes each step to the session's files.
 

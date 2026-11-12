@@ -12,8 +12,14 @@ A plugin for [fxbot](https://fxbot.sh): rooms where several of your bots talk wi
   - **Stop**, which ends the reply being written and drops the rest
 - **What a bot is sent:** each bot answers in a session of its own for the room, so a room stays out of the bot's own chat. Each turn it's sent:
   - who it is, and who else is in the room
+  - the room's memories
   - what was said since its last turn, the other bots' words quoted
   - who woke it, and the replies left
+- **Memories,** since 0.4.0: each room keeps notes of its own, such as what the room is for, what was decided there, and who does what. Every bot in the room reads them there, after its own memories and the team's, and not in its other chats.
+  - **Memories,** on a room, lists them, newest first, with who saved each one, and adds, edits, and deletes them.
+  - **Bots** save one with `chat-rooms_remember` (with `replaces`, to change one) and remove one with `chat-rooms_forget`, by its `room-mem:<id>`. Each finds its room from the bot's session, so it works only in a room.
+  - **Limits:** a memory is at most 1,000 characters, and the newest that fit in 6,000 bytes go to each bot. Saving one that's there answers with it.
+  - **Deleting a room** deletes its memories, and removing the plugin removes them all.
 - **Skills:** three, `chat-room`, `room-handoff`, and `room-lead`, teach a bot how to work in a room. The room sends `chat-room` with a bot's first turn there, and `room-lead` with the lead's first untagged turn.
 - **Edit**, on a room, changes its name, its bots and their order, what an untagged message does, and its replies per message, or deletes it.
 - **Order:** drag a room in the sidebar to move it, with a mouse, or with a finger after a moment's hold. On fxbot before 0.7.0, rooms stay in the order they were made.

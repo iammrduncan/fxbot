@@ -66,7 +66,9 @@ export type EmbeddingStatus = {
 // The provider kinds that serve OpenAI's /embeddings.
 export const embeddingKinds = ["openai", "openrouter", "gateway", "vercel", "ollama", "lmstudio", "custom"] as const;
 // One fact a bot keeps: saved by the bot during a turn (with the message that started it), or added by the owner.
-export type Memory = { id: string; text: string; savedBy: "bot" | "owner"; messageId: string | null; createdAt: string; updatedAt: string };
+// `team`: it's the team's, which every bot reads, and `savedByBot` is the bot that saved it, or null for the owner, a
+// bot that's since deleted, or a bot's own memory. Both since 0.10.0.
+export type Memory = { id: string; text: string; savedBy: "bot" | "owner"; messageId: string | null; createdAt: string; updatedAt: string; team: boolean; savedByBot: string | null };
 
 // A release of fxbot: its version, its notes, and its page.
 export type Release = { version: string; notes: string; url: string };

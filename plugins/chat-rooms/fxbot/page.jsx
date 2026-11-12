@@ -227,6 +227,84 @@ function EditRoom({ room, onClose }) {
   );
 }
 
+// The room's memories, which every bot in it reads there: newest first, each with who saved it, and the owner's
+// additions, changes, and deletions. A change reaches each bot's next turn in the room.
+function RoomMemories({ room, onClose }) {
+  const bots = useBots() ?? [];
+  const [memories, setMemories] = useState(null);
+  const [draft, setDraft] = useState("");
+  const [editing, setEditing] = useState(null);
+  const [error, setError] = useState("");
+  const read = () => call(`/rooms/${room.id}/memories`, "GET").then(setMemories, (e) => setError(e.message));
+  useEffect(() => void read(), [room.id]);
+  const act = (run) => run().then(() => (setError(""), read()), (e) => setError(e.message));
+  const add = (event) => {
+    event.preventDefault();
+    act(() => call(`/rooms/${room.id}/memories`, "POST", { text: draft }).then(() => setDraft("")));
+  };
+  const save = () => act(() => call(`/rooms/${room.id}/memories/${editing.id}`, "PATCH", { text: editing.text }).then(() => setEditing(null)));
+  const remove = (memory) => confirm(`Delete this memory? The bots in ${room.name} won't know it any more.`) && act(() => call(`/rooms/${room.id}/memories/${memory.id}`, "DELETE"));
+  const by = (memory) => (memory.by === "owner" ? "Added by you" : `Saved by ${bots.find((bot) => bot.id === memory.by)?.name ?? "a removed bot"}`);
+  const day = (at) => new Date(at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  return (
+    <ui.Dialog open onOpenChange={(open) => !open && onClose()}>
+      <ui.DialogContent>
+        <ui.DialogHeader>
+          <ui.DialogTitle>Memories</ui.DialogTitle>
+          <ui.DialogDescription>Every bot in {room.name} reads these here: what the room is for, what was decided, and who does what. Bots save them too.</ui.DialogDescription>
+        </ui.DialogHeader>
+        <div className="grid max-h-[70dvh] gap-3 overflow-y-auto">
+          <form onSubmit={add} className="grid gap-2">
+            <ui.Textarea aria-label="Add a memory" placeholder="Something this room's bots should remember" value={draft} maxLength={1000} onChange={(e) => setDraft(e.target.value)} className="min-h-16" />
+            <ui.Button type="submit" size="sm" className="justify-self-start" disabled={!draft.trim()}>
+              Add a memory
+            </ui.Button>
+          </form>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          {!memories ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : !memories.length ? (
+            <p className="text-sm text-muted-foreground">Nothing yet. Add what this room's bots should know, or ask one to remember something for the room.</p>
+          ) : (
+            <ul className="grid gap-2" aria-label="Room memories">
+              {memories.map((memory) =>
+                editing?.id === memory.id ? (
+                  <li key={memory.id} className="grid gap-2 rounded-lg border p-2.5">
+                    <ui.Textarea aria-label="Memory" value={editing.text} maxLength={1000} onChange={(e) => setEditing({ ...editing, text: e.target.value })} className="min-h-20" autoFocus />
+                    <div className="flex gap-2">
+                      <ui.Button size="sm" onClick={save} disabled={!editing.text.trim() || editing.text === memory.text}>
+                        Save
+                      </ui.Button>
+                      <ui.Button size="sm" variant="outline" onClick={() => setEditing(null)}>
+                        Cancel
+                      </ui.Button>
+                    </div>
+                  </li>
+                ) : (
+                  <li key={memory.id} className="grid gap-1 rounded-lg border p-2.5 text-sm">
+                    <p className="whitespace-pre-line break-words">{memory.text}</p>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <span className="flex-1">
+                        {day(memory.at)} · {by(memory)}
+                      </span>
+                      <ui.Button variant="ghost" size="sm" onClick={() => setEditing({ id: memory.id, text: memory.text })}>
+                        Edit
+                      </ui.Button>
+                      <ui.Button variant="ghost" size="sm" className="text-destructive" onClick={() => remove(memory)}>
+                        Delete
+                      </ui.Button>
+                    </div>
+                  </li>
+                ),
+              )}
+            </ul>
+          )}
+        </div>
+      </ui.DialogContent>
+    </ui.Dialog>
+  );
+}
+
 // The room's events, as its stream sends them: the room, then each message, the reply being written, and who's next. A
 // dropped stream opens again.
 function useRoom(id) {
@@ -336,6 +414,7 @@ function RoomScreen({ params }) {
   const { state, error } = useRoom(id);
   const [problem, setProblem] = useState("");
   const [editing, setEditing] = useState(false);
+  const [remembering, setRemembering] = useState(false);
   const [empty, setEmpty] = useState(true);
   const submit = useRef(null);
   const end = useRef(null);
@@ -371,6 +450,9 @@ function RoomScreen({ params }) {
               })}
               {/* A place for plugins that need chat rooms, such as chat-rooms-computer's button. fxbot 0.4 has no Slot. */}
               {Slot && <Slot name="chat-rooms.room-header" props={{ room }} />}
+              <ui.Button variant="ghost" size="sm" onClick={() => setRemembering(true)}>
+                Memories
+              </ui.Button>
               <ui.Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
                 Edit
               </ui.Button>
@@ -419,6 +501,7 @@ function RoomScreen({ params }) {
         {problem && <p className="pt-2 text-center text-sm text-destructive">{problem}</p>}
       </div>
       {editing && room && <EditRoom room={room} onClose={() => setEditing(false)} />}
+      {remembering && room && <RoomMemories room={room} onClose={() => setRemembering(false)} />}
     </div>
   );
 }

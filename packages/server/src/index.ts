@@ -137,7 +137,7 @@ async function pluginRoute(req: IncomingMessage, res: ServerResponse, url: URL, 
 }
 
 async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
-  const [, , resource, id, action, extra] = url.pathname.split("/");
+  const [, , resource, id, action, extra, more] = url.pathname.split("/");
   const method = req.method;
   const ok = { ok: true };
   if (resource === "health" && !id && method === "GET") return json(res, 200, { ok: true, version });
@@ -250,7 +250,20 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   }
   // An image's URL from before the library, kept in older chats.
   if (resource === "profiles" && action === "uploads" && method === "GET") return file(req, res, url, (etag) => fxbot.library.upload(id, extra ?? "", etag));
-  if (resource === "profiles" && action === "memories" && extra) {
+  // The team's memories, which every bot reads. A bot's own are under its profile.
+  if (resource === "memories" && action === undefined) {
+    if (!id && method === "GET") return json(res, 200, await fxbot.memories.list({ query: url.searchParams.get("query") ?? undefined, limit: Number(url.searchParams.get("limit")) || undefined }));
+    if (!id && method === "POST") return json(res, 201, await fxbot.memories.add((await body<{ text?: unknown }>(req)).text));
+    if (id && method === "PATCH") return json(res, 200, await fxbot.memories.update(id, (await body<{ text?: unknown }>(req)).text));
+    if (id && method === "DELETE") return json(res, 200, (await fxbot.memories.remove(id), ok));
+    return fail(405, "method not allowed");
+  }
+  // One of a bot's memories, made the team's.
+  if (resource === "profiles" && action === "memories" && extra && more === "share") {
+    if (method === "POST") return json(res, 200, await fxbot.profiles.memories.share(id, extra));
+    return fail(405, "method not allowed");
+  }
+  if (resource === "profiles" && action === "memories" && extra && more === undefined) {
     if (method === "PATCH") return json(res, 200, await fxbot.profiles.memories.update(id, extra, (await body<{ text?: unknown }>(req)).text));
     if (method === "DELETE") return json(res, 200, (await fxbot.profiles.memories.remove(id, extra), ok));
     return fail(405, "method not allowed");

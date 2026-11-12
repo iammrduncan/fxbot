@@ -1,7 +1,7 @@
 {
   "name": "chat-rooms",
-  "version": "0.3.1",
-  "description": "Rooms where several of your bots talk with you: tag a bot with @, and bots hand work to each other.",
+  "version": "0.4.0",
+  "description": "Rooms where several of your bots talk with you: tag a bot with @, bots hand work to each other, and each room keeps memories of its own.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {

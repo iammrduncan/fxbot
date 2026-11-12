@@ -300,7 +300,7 @@ Taken as recommended at the build, on 2026-11-12: the soul first, no archive upl
 1. **In Essentials?** A first meeting is a good first impression, and onboarding's first bot would start one. Recommended: yes, after it's been tried on a few new bots. Answered on 2026-11-12: yes, it's in **Essentials**, so onboarding's first bot meets its owner.
 2. **The soul first, or after the owner's instructions?** Hermes puts the soul first, and OpenClaw puts the rules before it. Recommended: first, with the line that the owner's instructions come first where they differ. The hook can't tell an empty instructions entry from the rest, so first is also the simplest.
 3. **An archive upload for Hermes's export?** The owner would send the `.tar.gz` from the Soul box, and the plugin would unpack only the files the skill reads, about 80 lines. Recommended: not at first. The skill takes the files, and asks for the archive's contents.
-4. **The owner's name, and other facts every bot needs.** The meeting saves what it learns to the bot's own memories. With [team memories](../../phases/memories-v2.md), facts such as the owner's name could be the team's. Recommended: the bot asks before it saves one to the team.
+4. **The owner's name, and other facts every bot needs.** The meeting saves what it learns to the bot's own memories. With [team memories](memories-v2.md), facts such as the owner's name could be the team's. Recommended: the bot asks before it saves one to the team.
 
 ## What the build changed
 

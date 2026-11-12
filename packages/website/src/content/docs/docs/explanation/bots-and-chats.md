@@ -44,7 +44,7 @@ One bot can be the default, picked in **Settings** › **General**, or with **De
 
 ## Memories
 
-A bot keeps what it learns as memories: what you prefer, facts about you and your work, decisions, and corrections. Each memory is one fact, in a sentence that stands on its own, of at most 1,000 characters. Memories belong to one bot, not to a chat, so a new chat, or a move to another provider, keeps them. Deleting the bot deletes them.
+A bot keeps what it learns as memories: what you prefer, facts about you and your work, decisions, and corrections. Each memory is one fact, in a sentence that stands on its own, of at most 1,000 characters. Memories belong to one bot, not to a chat, so a new chat, or a move to another provider, keeps them. Deleting the bot deletes them. [Team memories](#team-memories) are every bot's.
 
 The bot saves them on its own, during its turns, with three tools. The chat shows each as a sentence:
 
@@ -59,6 +59,19 @@ The newest memories are in the bot's instructions, which fxbot sends on every tu
 The section changes only when a memory is saved, changed, or removed, not when one is searched, so the model's prompt cache holds between changes. And since the instructions go with every turn, a memory saved in a long chat reaches that chat on its next turn.
 
 You see a bot's memories under **Memories** on its edit screen, which **Edit** in its panel opens: newest first, each with its date, and **Saved by** the bot or **Added by you**. Search them there, add one with **Add a memory**, change one with its pencil button, or delete one. The bot sees your change on its next turn.
+
+## Team memories
+
+Team memories are notes every one of your bots reads: who you are, how you like things done, and what your household or business is. They work as a bot's own memories do, with a wider reach.
+
+- **You keep them** in **Settings** › **Memory**, under **Team memories**, to search, add, edit, and delete, as on a bot's screen. Each says who saved it: you, a bot, or **a removed bot**, once that bot is deleted. Deleting a bot keeps the team memories it saved.
+- **A bot saves one** with `memory_save` and `team`, when you ask it to remember something for all your bots. Its `memory_search` finds the team's with its own, marked `team`, and `memory_forget` removes one.
+- **To share one of a bot's own,** choose **Share with every bot**, the people button beside it on the bot's screen. It moves to the team's list.
+- **In the instructions,** the team's newest go after the bot's own, under a header that calls them notes, not instructions. They take up to 1% of the model's context window, or 4,000 characters when the window isn't known. A change reaches every bot on its next turn, and a room, a routine's run, and a subagent get them too.
+
+The same fact can be both a bot's own and the team's. Saving what the team already has answers with the one there.
+
+With the chat rooms plugin, each room keeps memories of its own as well: see [Give a room memories](/docs/how-to/talk-in-a-room/#give-a-room-memories).
 
 ## A soul, with the soul plugin
 

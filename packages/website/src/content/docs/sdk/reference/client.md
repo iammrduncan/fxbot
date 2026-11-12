@@ -58,8 +58,13 @@ Each call is one route of the [HTTP API](/sdk/reference/http-api/). They mirror 
 | `profiles.memories.add(id, text)` | `POST /api/profiles/<id>/memories` | `Memory` |
 | `profiles.memories.update(id, memoryId, text)` | `PATCH /api/profiles/<id>/memories/<memoryId>` | `Memory` |
 | `profiles.memories.remove(id, memoryId)` | `DELETE /api/profiles/<id>/memories/<memoryId>` | `{ ok: true }` |
+| `profiles.memories.share(id, memoryId)` | `POST /api/profiles/<id>/memories/<memoryId>/share` | `Memory`. Since 0.10.0 |
+| `memories.list(query?)` | `GET /api/memories?query=` | `Memory[]`: the team's. Since 0.10.0 |
+| `memories.add(text)` | `POST /api/memories` | `Memory`. Since 0.10.0 |
+| `memories.update(memoryId, text)` | `PATCH /api/memories/<memoryId>` | `Memory`. Since 0.10.0 |
+| `memories.remove(memoryId)` | `DELETE /api/memories/<memoryId>` | `{ ok: true }`. Since 0.10.0 |
 
-`profiles.memories.list` takes the search as a string. An empty one lists the newest.
+`profiles.memories.list` and `memories.list` take the search as a string. An empty one lists the newest.
 
 ### Chat
 

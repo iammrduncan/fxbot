@@ -53,8 +53,13 @@ Other keys are ignored. An update also takes `pinned`:
 | `profiles.memories.add(id, text)` | Adds a memory, saved by the owner. The text is trimmed, 1 to 1,000 characters. The same text again, ignoring case and extra spaces, returns the memory already there. | `Memory` |
 | `profiles.memories.update(id, memoryId, text)` | New text for a memory. If another memory already says it, the two merge: this one is removed, and the other is returned. | `Memory` |
 | `profiles.memories.remove(id, memoryId)` | Removes a memory | nothing |
+| `profiles.memories.share(id, memoryId)` | Makes one of the bot's memories the team's: it leaves the bot's list, and every bot reads it. A memory the bot saved keeps the bot as `savedByBot`. If the team already says the same, the bot's copy is removed, and the team's is returned. Since 0.10.0. | `Memory` |
+| `memories.list({ query?, limit? })` | The team's memories, which every bot reads, newest first. With `query`, the best matches. `limit` is 1 to 500, default 200. Since 0.10.0. | `Memory[]` |
+| `memories.add(text)` | Adds a team memory, saved by the owner, with the same checks as a bot's. The same text again returns the one already there. Since 0.10.0. | `Memory` |
+| `memories.update(memoryId, text)` | New text for a team memory. If another team memory already says it, the two merge. Since 0.10.0. | `Memory` |
+| `memories.remove(memoryId)` | Removes a team memory. Since 0.10.0. | nothing |
 
-`memoryId` is a memory's `id`, or `mem:<id>`. An unknown one fails with 404. See [Work with memories](/sdk/how-to/memories/).
+`memoryId` is a memory's `id`, or `mem:<id>`. An unknown one fails with 404, and so does a team memory under a bot, or a bot's under `memories`. A duplicate is the same text in the same set: a bot's own, or the team's. Deleting a bot removes its own memories, and keeps the team memories it saved, with `savedByBot` null. See [Work with memories](/sdk/how-to/memories/).
 
 ## Chat
 
@@ -230,16 +235,16 @@ Every agent has these tools. Each one acts for the bot whose chat runs it.
 | Tool | What it does |
 | --- | --- |
 | `chat_history` | Searches the bot's history in all of its chats: messages, thinking, and tool calls with their results, since 0.6.0, by words, and messages by meaning too when message vectors are on. With `around`, a `msg:<id>`, it reads that message and up to 6 on each side, in full. |
-| `memory_save` | Saves one fact, up to 1,000 characters. With `replaces`, a `mem:<id>`, it changes that memory instead. |
-| `memory_search` | Searches the bot's memories by words and, with an embedder, by meaning: up to 20 |
-| `memory_forget` | Removes a memory by its `mem:<id>` |
+| `memory_save` | Saves one fact, up to 1,000 characters. With `replaces`, a `mem:<id>`, it changes that memory instead, the bot's own or a team memory. With `team: true`, since 0.10.0, it saves a team memory, with the bot as `savedByBot`. |
+| `memory_search` | Searches the bot's memories and, since 0.10.0, the team's, marked `team`, by words and, with an embedder, by meaning: up to 20 |
+| `memory_forget` | Removes one of the bot's memories, or since 0.10.0 a team memory, by its `mem:<id>` |
 | `library_search` | Searches the items tagged with the bot, by name and document text. An empty query lists the newest. |
 | `library_read` | Opens a `library:<id>`: a document's text, up to 60,000 bytes, or an image. A PDF is its text. Since 0.10.0, `from` reads on from a character |
 | `library_save` | Saves a document the bot wrote. The name ends in `.md`, `.txt`, `.csv`, or `.json`, and the text is up to 1 MiB. |
 | `skill` | Present while a skill is on. Loads a skill by `name`, one of its files by `file`, in parts of 60 KB, or finds skills by `search`. |
 | `<prefix>_<tool>` | Each enabled MCP server's allowed tools. The prefix comes from the server's name or host, such as `linear` for `mcp.linear.app`, and is unique among plugins. For a server set to `each`, a call from a bot it isn't on for fails. |
 
-A bot's instructions on each turn are its own, then its `handoff`, its newest memories in up to 2% of the model's context window, and the list of its skills in up to 1%.
+A bot's instructions on each turn are its own, then its `handoff`, its newest memories in up to 2% of the model's context window, the team's newest in up to 1% (since 0.10.0, and only when there are some), and the list of its skills in up to 1%. When the window isn't known, that's 8,000 characters for each, and 4,000 for the team's.
 
 ## Exports
 
@@ -330,5 +335,7 @@ type Memory = {
   messageId: string | null; // the msg:<id> that chat_history knows, of the turn that saved it
   createdAt: string;
   updatedAt: string;
+  team: boolean; // since 0.10.0: a team memory, which every bot reads
+  savedByBot: string | null; // since 0.10.0: the bot that saved a team memory, or null for the owner or a deleted bot
 };
 ```

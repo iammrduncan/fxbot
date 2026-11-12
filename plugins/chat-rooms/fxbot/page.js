@@ -10178,6 +10178,134 @@ function EditRoom({ room, onClose }) {
 		})] })
 	});
 }
+function RoomMemories({ room, onClose }) {
+	const bots = (0, _fxbot_app.useBots)() ?? [];
+	const [memories, setMemories] = (0, react.useState)(null);
+	const [draft, setDraft] = (0, react.useState)("");
+	const [editing, setEditing] = (0, react.useState)(null);
+	const [error, setError] = (0, react.useState)("");
+	const read = () => call(`/rooms/${room.id}/memories`, "GET").then(setMemories, (e) => setError(e.message));
+	(0, react.useEffect)(() => void read(), [room.id]);
+	const act = (run) => run().then(() => (setError(""), read()), (e) => setError(e.message));
+	const add = (event) => {
+		event.preventDefault();
+		act(() => call(`/rooms/${room.id}/memories`, "POST", { text: draft }).then(() => setDraft("")));
+	};
+	const save = () => act(() => call(`/rooms/${room.id}/memories/${editing.id}`, "PATCH", { text: editing.text }).then(() => setEditing(null)));
+	const remove = (memory) => confirm(`Delete this memory? The bots in ${room.name} won't know it any more.`) && act(() => call(`/rooms/${room.id}/memories/${memory.id}`, "DELETE"));
+	const by = (memory) => memory.by === "owner" ? "Added by you" : `Saved by ${bots.find((bot) => bot.id === memory.by)?.name ?? "a removed bot"}`;
+	const day = (at) => new Date(at).toLocaleDateString(void 0, {
+		year: "numeric",
+		month: "short",
+		day: "numeric"
+	});
+	return (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Dialog, {
+		open: true,
+		onOpenChange: (open) => !open && onClose(),
+		children: (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.DialogContent, { children: [(0, react_jsx_runtime.jsxs)(_fxbot_app.ui.DialogHeader, { children: [(0, react_jsx_runtime.jsx)(_fxbot_app.ui.DialogTitle, { children: "Memories" }), (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.DialogDescription, { children: [
+			"Every bot in ",
+			room.name,
+			" reads these here: what the room is for, what was decided, and who does what. Bots save them too."
+		] })] }), (0, react_jsx_runtime.jsxs)("div", {
+			className: "grid max-h-[70dvh] gap-3 overflow-y-auto",
+			children: [
+				(0, react_jsx_runtime.jsxs)("form", {
+					onSubmit: add,
+					className: "grid gap-2",
+					children: [(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Textarea, {
+						"aria-label": "Add a memory",
+						placeholder: "Something this room's bots should remember",
+						value: draft,
+						maxLength: 1e3,
+						onChange: (e) => setDraft(e.target.value),
+						className: "min-h-16"
+					}), (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+						type: "submit",
+						size: "sm",
+						className: "justify-self-start",
+						disabled: !draft.trim(),
+						children: "Add a memory"
+					})]
+				}),
+				error && (0, react_jsx_runtime.jsx)("p", {
+					className: "text-sm text-destructive",
+					children: error
+				}),
+				!memories ? (0, react_jsx_runtime.jsx)("p", {
+					className: "text-sm text-muted-foreground",
+					children: "Loading…"
+				}) : !memories.length ? (0, react_jsx_runtime.jsx)("p", {
+					className: "text-sm text-muted-foreground",
+					children: "Nothing yet. Add what this room's bots should know, or ask one to remember something for the room."
+				}) : (0, react_jsx_runtime.jsx)("ul", {
+					className: "grid gap-2",
+					"aria-label": "Room memories",
+					children: memories.map((memory) => editing?.id === memory.id ? (0, react_jsx_runtime.jsxs)("li", {
+						className: "grid gap-2 rounded-lg border p-2.5",
+						children: [(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Textarea, {
+							"aria-label": "Memory",
+							value: editing.text,
+							maxLength: 1e3,
+							onChange: (e) => setEditing({
+								...editing,
+								text: e.target.value
+							}),
+							className: "min-h-20",
+							autoFocus: true
+						}), (0, react_jsx_runtime.jsxs)("div", {
+							className: "flex gap-2",
+							children: [(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+								size: "sm",
+								onClick: save,
+								disabled: !editing.text.trim() || editing.text === memory.text,
+								children: "Save"
+							}), (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+								size: "sm",
+								variant: "outline",
+								onClick: () => setEditing(null),
+								children: "Cancel"
+							})]
+						})]
+					}, memory.id) : (0, react_jsx_runtime.jsxs)("li", {
+						className: "grid gap-1 rounded-lg border p-2.5 text-sm",
+						children: [(0, react_jsx_runtime.jsx)("p", {
+							className: "whitespace-pre-line break-words",
+							children: memory.text
+						}), (0, react_jsx_runtime.jsxs)("div", {
+							className: "flex items-center gap-1 text-xs text-muted-foreground",
+							children: [
+								(0, react_jsx_runtime.jsxs)("span", {
+									className: "flex-1",
+									children: [
+										day(memory.at),
+										" · ",
+										by(memory)
+									]
+								}),
+								(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+									variant: "ghost",
+									size: "sm",
+									onClick: () => setEditing({
+										id: memory.id,
+										text: memory.text
+									}),
+									children: "Edit"
+								}),
+								(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+									variant: "ghost",
+									size: "sm",
+									className: "text-destructive",
+									onClick: () => remove(memory),
+									children: "Delete"
+								})
+							]
+						})]
+					}, memory.id))
+				})
+			]
+		})] })
+	});
+}
 function useRoom(id) {
 	const [state, setState] = (0, react.useState)(null);
 	const [error, setError] = (0, react.useState)("");
@@ -10309,6 +10437,7 @@ function RoomScreen({ params }) {
 	const { state, error } = useRoom(id);
 	const [problem, setProblem] = (0, react.useState)("");
 	const [editing, setEditing] = (0, react.useState)(false);
+	const [remembering, setRemembering] = (0, react.useState)(false);
 	const [empty, setEmpty] = (0, react.useState)(true);
 	const submit = (0, react.useRef)(null);
 	const end = (0, react.useRef)(null);
@@ -10345,6 +10474,12 @@ function RoomScreen({ params }) {
 						_fxbot_app.Slot && (0, react_jsx_runtime.jsx)(_fxbot_app.Slot, {
 							name: "chat-rooms.room-header",
 							props: { room }
+						}),
+						(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+							variant: "ghost",
+							size: "sm",
+							onClick: () => setRemembering(true),
+							children: "Memories"
 						}),
 						(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
 							variant: "ghost",
@@ -10436,6 +10571,10 @@ function RoomScreen({ params }) {
 			editing && room && (0, react_jsx_runtime.jsx)(EditRoom, {
 				room,
 				onClose: () => setEditing(false)
+			}),
+			remembering && room && (0, react_jsx_runtime.jsx)(RoomMemories, {
+				room,
+				onClose: () => setRemembering(false)
 			})
 		]
 	});

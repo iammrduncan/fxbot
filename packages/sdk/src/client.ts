@@ -164,7 +164,16 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
         add: (id: string, text: string) => call<Memory>(`/profiles/${id}/memories`, "POST", { text }),
         update: (id: string, memoryId: string, text: string) => call<Memory>(`/profiles/${id}/memories/${memoryId}`, "PATCH", { text }),
         remove: (id: string, memoryId: string) => call<{ ok: true }>(`/profiles/${id}/memories/${memoryId}`, "DELETE"),
+        // Makes one the team's: it leaves the bot's list, and every bot reads it. Since 0.10.0.
+        share: (id: string, memoryId: string) => call<Memory>(`/profiles/${id}/memories/${memoryId}/share`, "POST"),
       },
+    },
+    // The team's memories, which every bot reads: newest first, or the matches for a search. Since 0.10.0.
+    memories: {
+      list: (query = "") => call<Memory[]>(`/memories${query.trim() ? `?query=${encodeURIComponent(query.trim())}` : ""}`),
+      add: (text: string) => call<Memory>("/memories", "POST", { text }),
+      update: (id: string, text: string) => call<Memory>(`/memories/${id}`, "PATCH", { text }),
+      remove: (id: string) => call<{ ok: true }>(`/memories/${id}`, "DELETE"),
     },
     settings: {
       get: () => call<Settings>("/settings"),
