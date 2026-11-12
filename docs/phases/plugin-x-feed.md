@@ -12,7 +12,7 @@
 - **Everything, with a sign-in.** `x-feed-computer`, a second plugin, reads through a tab of the bot's own [computer](../_completed/phases/computer.md), signed in to X once by the owner: search that doesn't lean on anyone, whole threads, replies, and as far back as the owner asks. X's own page makes each request, and the plugin collects what the page receives.
 - **Read only.** It never posts, likes, or follows.
 
-Status: planned on 2026-11-12, not built. The owner ruled out every paid source, so this plan has none, and then asked for mentions, followers, list feeds, and events. Researched against the [research directive](../research-directive.md)'s references, FxTwitter's source, the projects that read X from a signed-in tab, and X's public surfaces, which were called from this machine and from a home connection. Nothing was read with a signed-in X account, so every figure for the signed-in tab is from other projects' code. The research on events was still running when this was written: [Watches](#watches) rests on the reads checked here, and [open question 5](#5-open-questions) says what's still to come.
+Status: planned on 2026-11-12, not built. The owner ruled out every paid source, so this plan has none, and then asked for mentions, followers, list feeds, and events. Researched against the [research directive](../research-directive.md)'s references, FxTwitter's source, the projects that read X from a signed-in tab, and X's public surfaces, which were called from this machine and from a home connection. Nothing was read with a signed-in X account, so every figure for the signed-in tab is from other projects' code.
 
 ## What the owner asked
 
@@ -104,6 +104,35 @@ The owner saw someone read mentions, followers, and list feeds with no login and
 - **X itself gives none of it signed out:** `x.com/<handle>/followers` and `x.com/i/lists/<id>` redirect to the sign-in, as search does.
 
 Which one the owner saw couldn't be confirmed.
+
+### Events
+
+Ten requests on 2026-11-12, and other projects' source. Nothing signed in was run.
+
+**What X sells.** Its Activity API has the events asked for, `post.create`, `post.mention.create`, `post.reply.create`, `post.quote.create`, and `follow.follow`, by webhook or a stream, at $0.005 an event. Nothing in it is free.
+
+**What polling sees,** from the free reads:
+
+| Event | Read | What it catches | How far behind |
+| --- | --- | --- | --- |
+| Chosen people post | a public list's embed | their posts, quotes, and reposts, and no replies (0 of 121 entries in two lists) | the check's interval, and under 2 minutes: a post 93 seconds old was there |
+| A person's replies too | FxTwitter's posts with replies, or the tab | everything, when it answers | the interval |
+| I post | X's page for the owner's handle, or the owner on their own list | own posts | the interval |
+| A person or I am mentioned | FxTwitter search, `@handle -from:handle` | what X's search holds, with no promise it's all | the interval, and search's own lag, not measured |
+| Replies to me | `to:handle since_id:<id>`, or `conversation_id:<id>` for one post | `to:` also catches a post that only starts with the handle | the same |
+| Quotes of a post | `quoted_tweet_id:<id>` | 20 of 20 quoted the post | the same |
+
+- **Each of those searches answered** through FxTwitter, `since_id:` included, which keeps a check to what's new.
+- **A list's embed has nothing to make a check cheap:** no `ETag`, and a conditional request got the whole 200 to 475 KB again and spent one of the 30. So a list is checked no more than every 2 minutes, a quarter of the limit.
+- **X's page** is 31 KB gzipped a check, with no limit shown.
+- **FxTwitter's `since=`** on a person's posts answers 204 when nothing is newer, and answered an empty 404 for a `since` of now. So a 404 there is "unknown", never "nothing new".
+
+**What a signed-in session adds,** read from source:
+- **X's notifications,** which are exactly "I'm mentioned" and "someone answered me". The page at `/notifications/mentions` asks for `NotificationsTimeline` itself, whose items carry the post, who it's from, and a time, so a tab that reads what the page receives gets them ([twitter-openapi](https://github.com/fa0311/twitter-openapi), Rettiwt-API, which checks it every 60 seconds).
+- **X's web push, the one free push.** [xnotif](https://github.com/yutakobayashidev/xnotif) (MIT, last changed 2026-03-06) registers a push address at Mozilla's push service with X, over one request made with the account's cookies, then holds an outgoing WebSocket and decrypts what X sends: a mention or a post from an account with the bell on, with its text and link. It needs no public address. It also needs the cookies copied out of a browser and a forged `x-client-transaction-id`, the two things this plan avoids, and it wasn't run.
+- **X's live pipeline** streams a post's counts, never who or what.
+
+**What doesn't work:** X's emails are a digest, not one for each event. IFTTT's free plan checks hourly, rss.app daily, and Grok's scheduled tasks once a day, as prose by email. bird.makeup pushes only to a public inbox. Every open-source agent project either pays for X's API or checks on a timer with the owner's session, every 1 to 30 minutes.
 
 ### Grok's own X tools
 
@@ -338,13 +367,15 @@ A watch is a read the plugin repeats: `{ bot, read, input, every, note, seen }`,
 | "…when someone answers or quotes this post" | `search` for `conversation_id:<id>` or `quoted_tweet_id:<id>` |
 | "…when @someone is mentioned with 'fxbot'" | `search` for `@someone fxbot` |
 | "…when I get a follower" | `people`, the followers of `me` |
+| "…when anything happens to me" | `notifications`, with `x-feed-computer` and X signed in |
 
+- **`notifications`** is a read only the tab has: `/notifications/mentions` in the signed-in tab, and the `NotificationsTimeline` answer the page receives. It's X's own account of who mentioned and answered the owner, where a search is a best guess. A bot reads it with `search`'s `mine: true`, and with no tab that answers the mention and reply searches for the owner's handle instead.
 - **The timer.** One, every 60 seconds, runs the watches that are due, one at a time, each down the ladder as a tool's read is. It starts with the first watch and stops with the last, so a plugin with no watch has no timer.
-- **What's new.** A post's id grows with time, so new is every id above `seen`. For people it's the ids not in the last answer. The first check only sets `seen`, and starts no turn.
+- **What's new.** A post's id grows with time, so new is every id above `seen`, and a search watch adds `since_id:<seen>` to its query. For people it's the ids not in the last answer. The first check only sets `seen`, and starts no turn.
 - **The turn.** New items go to the bot's own chat with `fx.chats.send`, as from **X feed**: the watch's `note`, then the posts, written as a tool's result is, under the same line that marks them as other people's words. Several watches due at once make one message. A bot with a turn running gets it after.
-- **How often.** `every` is 15 minutes unless given, and no less than 5. A `latest` watch reads X's own page, which is the cheapest read there is. A `list` watch is one embed request for all its accounts, well inside the embed's 30 in 15 minutes. A search or a people watch leans on FxTwitter or the tab, so those are held to 12 checks an hour across all watches.
+- **How often.** `every` is 15 minutes unless given, and no less than 5, or 2 for a list. A `latest` watch reads X's own page, which is the cheapest read there is. A `list` watch is one embed request for all its accounts, well inside the embed's 30 in 15 minutes. A search or a people watch leans on FxTwitter or the tab, so those are held to 12 checks an hour across all watches.
 - **When a source is down,** the watch waits and tries again at its next time. After a day of failures the bot is told once, in a line, and the watch goes on trying.
-- **What a watch can miss.** X's page shows a person's own posts, not their reposts or replies, and 5 at a time, so a person who posts more than 5 times between checks loses the oldest unless the read goes deeper. A watch's `partial` line says so when it's made.
+- **What a watch can miss.** A list has no replies. X's page shows a person's own posts, not their reposts or replies, and 5 at a time, so a person who posts more than 5 times between checks loses the oldest unless the read goes deeper. A watch's `partial` line says so when it's made.
 - **The owner sees them** in the plugin's tab in the bot's settings: each watch, when it last ran, what it last found, and **Remove**. That's `app.botSettings` and one route, the plugin's only page code.
 - **Limits:** 20 watches a bot.
 
@@ -379,8 +410,8 @@ The owner's own handle isn't a setting: the bot knows it from the owner, and kee
 ### Not in this phase
 
 - Posting, liking, following, or direct messages.
-- The owner's own timeline, bookmarks, and X's notifications page. The tab could read them later, and mentions and replies come from search until then.
-- Events pushed by X. Its Activity API is paid, so a watch checks on a timer and is minutes behind, never instant.
+- The owner's own timeline and bookmarks. The tab could read them later.
+- Events pushed by X. Its Activity API is paid, and its web push needs cookies copied out of a browser and a forged header ([Events](#events)). So a watch checks on a timer and is minutes behind, never instant.
 - Grok's `x_search`, with a key or a plan.
 - Forged requests, cookies copied out of a browser, a guest token, and any paid source.
 - A page in the app, such as a feed or a card that draws a post.
@@ -429,6 +460,7 @@ About 800 lines: `x-feed`'s `server.ts` 180, `watch.ts` 110, `page.ts` 50, `embe
 - [ ] `x-feed-computer` refuses to be added without `x-feed` and `computer`, and loads with both
 - [ ] Signed out, `search` falls to FxTwitter, and with `fxtwitter` empty answers how to sign in
 - [ ] Signed in (the owner's part): `search` by `latest` and `top`, `latest` with `replies`, `latest` with `count: 60`, and `post` with `depth: "more"`, each checked against the same page on x.com
+- [ ] Signed in, `search` with `mine: true` answers the owner's mentions and replies from X's notifications, and a `notifications` watch fires on a new one
 - [ ] One read takes under 6 seconds on a warm browser, and the time is written here
 - [ ] A long post, a quote, a repost, and a promoted post in a search: the first three read right, and the last is left out
 - [ ] Two reads at once on one computer run one after the other, and the 61st in an hour answers that the tab is resting
@@ -443,4 +475,4 @@ About 800 lines: `x-feed`'s `server.ts` 180, `watch.ts` 110, `page.ts` 50, `embe
 2. **A signed-in tab on the bot's computer for search.** It's what makes search, mentions, and their watches dependable, and it puts an X account behind those reads, so a spare account is the wise choice. Step 2's last checks need that sign-in from you. Build step 2, or stop at step 1 for now?
 3. **FxTwitter by default.** With `x-feed` in fxbot's list, every install that adds it sends its searches, and its mention and follower watches on a timer, to one maintainer's free service, under a `User-Agent` that names fxbot. Its docs call it a public API, and no one has answered the request for permission to build on it. Recommended: on by default, and you ask the maintainer, or sponsor the project, before the release.
 4. **The names.** `x-feed` and `x-feed-computer`, from this doc's name. A bot then sees tools named for the plugin, such as `x-feed_search`. `x` would give `x_search`.
-5. **Events, still being researched.** Watches here check on a timer. Still to come: whether X's notification emails, its web push in a signed-in browser, or the notifications page in the tab can tell a bot sooner, and how fresh the list embed is for a new post. This doc gets what's found.
+5. **Minutes behind, or instant?** Watches check on a timer: 2 minutes at best for a list, 5 for the rest. The one free way to hear at once is X's web push, which means copying your X cookies into fxbot and forging a header X changes. Recommended: the timer. Say if instant matters enough for that, as a later phase.
