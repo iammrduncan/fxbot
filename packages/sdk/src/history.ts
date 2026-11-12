@@ -8,6 +8,10 @@ import type { Upload } from "./types.ts";
 export const switchAsk =
   "Write a handoff summary of this conversation so far, for the assistant that continues it on another model. " +
   "Keep the user's requests in order, summarize the replies, decisions, and facts, and list open tasks. At most 1,500 words.";
+// What a chat that sat idle is summarized for: the same assistant, carrying on after a break.
+export const idleAsk =
+  "Write a summary of this conversation so far, for yourself, to carry on after a break. Keep the user's requests and instructions in their own words, " +
+  "then what was decided and why, facts about the user and their work, and each open task and where it stands. At most 1,500 words.";
 
 // Search words for a bot's tools: runs of letters and digits, at most 8, each matching as a prefix. Any of them
 // matches, and more of them rank higher, since a bot guesses at words. They need no escaping.
@@ -165,6 +169,25 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
         order by m.id desc limit ${limit}`;
       return rows.map((row) => row.text).reverse();
     },
+    // A session's last messages, word for word, oldest first, as many of the newest as fit `maxChars`: the owner's as
+    // Owner, a plugin's under its name, and the bot's as You. One that doesn't fit alone keeps its end.
+    async lastWords(bot: string, sessionId: string, maxChars: number) {
+      const rows = await sql<{ role: string; text: string; plugin: string | null }[]>`select m.role, m.text, s.plugin from messages m
+        left join sent s on s.profile_id = m.profile_id and s.message_id = m.message_id and m.role = 'user'
+        where m.profile_id = ${bot} and m.session_id = ${sessionId} and m.role in ${sql(said)} order by m.id desc limit 40`;
+      const kept: string[] = [];
+      let size = 0;
+      for (const { role, text, plugin } of rows) {
+        const line = `${role === "assistant" ? "You" : (plugin ?? "Owner")}: ${text.trim()}`;
+        if (size + line.length > maxChars) {
+          if (!kept.length) kept.push(`…${line.slice(-maxChars)}`);
+          break;
+        }
+        kept.unshift(line);
+        size += line.length + 1;
+      }
+      return kept.join("\n");
+    },
     // A session's messages, oldest first, as many of the newest as fit `maxChars`, or the last 100.
     async transcript(bot: string, sessionId: string, maxChars: number) {
       const rows = await sql<{ role: string; text: string }[]>`
@@ -184,19 +207,20 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
 
 // One tool-free request to a throwaway engine, asking `ask`. With `checkpoint`, the engine starts from the old
 // session's own history; without it, `input` carries the transcript. Gives up after 2 minutes, or `timeoutMs`.
-export async function summarize(options: Record<string, unknown>, model: string, instructions: string[], ask: string, checkpoint?: Uint8Array, transcript?: string, timeoutMs = 120_000) {
+export async function summarize(options: Record<string, unknown>, model: string, instructions: string[], ask: string, checkpoint?: Uint8Array, transcript?: string, timeoutMs = 120_000, signal?: AbortSignal) {
   // The provider options come from the same code that makes the provider's agent.
   const engine = await createFxEngine({ ...options, model, instructions, ...(checkpoint ? { checkpoint } : {}) } as unknown as Parameters<typeof createFxEngine>[0]);
   try {
     // A failed request rejects here; a refusal or a cut-off ends the turn with another stop reason.
-    const turn = engine.prompt(transcript ? `${transcript}\n\n---\n\n${ask}` : ask, { signal: AbortSignal.timeout(timeoutMs) });
+    const turn = engine.prompt(transcript ? `${transcript}\n\n---\n\n${ask}` : ask, { signal: signal ? AbortSignal.any([AbortSignal.timeout(timeoutMs), signal]) : AbortSignal.timeout(timeoutMs) });
     let text = "";
     for await (const event of turn) if (event.type === "text_delta") text += event.delta;
     const { stopReason } = await turn.result;
     // libfx retries a failing provider until the time runs out, which ends the turn cancelled.
-    if (stopReason === "cancelled") throw new Error(`the model didn't answer within ${Math.round(timeoutMs / 1000)} seconds.`);
+    if (stopReason === "cancelled") throw new Error(signal?.aborted ? "it was called off." : `the model didn't answer within ${Math.round(timeoutMs / 1000)} seconds.`);
     if (stopReason !== "end_turn") throw new Error(`The request stopped: ${stopReason}.`);
-    if (!text.trim()) throw new Error("The answer came back empty.");
+    // libfx ends a turn that has no text with "Done.", which summarizes nothing.
+    if (!text.trim() || text.trim() === "Done.") throw new Error("The answer came back empty.");
     return text.trim();
   } finally {
     await engine.close();

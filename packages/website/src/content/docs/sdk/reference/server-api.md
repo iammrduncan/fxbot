@@ -141,6 +141,9 @@ A new Vercel account with one team gets that team. Vercel's and Hugging Face's s
 | `defaultProvider` | `string` | `""` | The provider new bots start on, or `""` for none |
 | `timeZone` | `string` | `""` | The owner's time zone, such as `Europe/Berlin`, which plugins read. `""` is the machine's. Since 0.6.0. |
 | `turnsAtOnce` | `number` | `32` | How many turns run at once, across every bot and chat, from 4 to 100. Read when fxbot starts. Since 0.6.0. |
+| `idleCompactMinutes` | `number` | `30` | How long a bot's own chat sits with no message before it's compacted: `0` for off, or 5 to 1,440. Since 0.10.0. |
+| `compactProvider` | `string` | `""` | The provider whose model writes an idle chat's summary, or `""` for each bot's own model. Removing the provider sets it back to `""`. Since 0.10.0. |
+| `compactModel` | `string` | `""` | That model's id, up to 200 characters. A new `compactProvider` without one takes the provider's default model. Since 0.10.0. |
 | `defaultProfile` | `string` | `""` | The bot whose chat a launch at `/` opens, or `""` for none. A bot's id: an id of another shape fails with 400, and an unknown one with 404. Deleting the bot clears it. Since 0.5.0. |
 | `onboarded` | `boolean` | `false` | Whether first-run setup is finished or skipped. Only `true` can be set. An install from before 0.7.0 with a bot, a plugin, or a provider starts `true`. Since 0.7.0. |
 | `onboardingStep` | `string` | `""` | Where first-run setup is up to, so a reload or a restart comes back to it. Since 0.7.0. |
@@ -314,7 +317,7 @@ type SignIn = { id: string; way: "device" | "redirect" | "paste"; verificationUr
 // What there is to add. Each entry's fields are described in packages/sdk/src/types.ts.
 type Catalog = { providers: CatalogEntry[]; more: CatalogEntry[]; container: boolean };
 
-type Settings = { defaultProvider: string; defaultProfile: string; unvetted: boolean; timeZone: string; onboarded: boolean; onboardingStep: string; turnsAtOnce: number; embedder: "local" | "remote" | "off"; embeddingProvider: string; embeddingModel: string; messageVectors: number };
+type Settings = { defaultProvider: string; defaultProfile: string; unvetted: boolean; timeZone: string; onboarded: boolean; onboardingStep: string; turnsAtOnce: number; idleCompactMinutes: number; compactProvider: string; compactModel: string; embedder: "local" | "remote" | "off"; embeddingProvider: string; embeddingModel: string; messageVectors: number };
 
 type EmbeddingStatus = {
   model: string | null;

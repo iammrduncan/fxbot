@@ -4,7 +4,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import type { Plugin, Profile, Settings } from "@fxbot/sdk/client";
+import type { Plugin, Profile, Provider, Settings } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { Header } from "./header.tsx";
 import { TeamMemories } from "./memories.tsx";
@@ -13,7 +13,7 @@ import { follow } from "./nav.ts";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { PluginPart, usePluginSettings } from "./plugins.tsx";
 import { PluginTab, pluginTab, useInstalled } from "./plugins-page.tsx";
-import { Providers } from "./providers.tsx";
+import { ModelField, Providers } from "./providers.tsx";
 import { install, standalone, useInstall } from "./pwa.ts";
 import { Version } from "./release.tsx";
 
@@ -26,6 +26,13 @@ const core: Tab[] = [
   { tab: "plugins", label: "Plugins", Icon: PuzzleIcon },
 ];
 const about: Tab = { tab: "about", label: "About", Icon: InfoIcon };
+const idleChoices: [number, string][] = [
+  [0, "Off"],
+  [15, "After 15 minutes"],
+  [30, "After 30 minutes"],
+  [60, "After 1 hour"],
+  [120, "After 2 hours"],
+];
 // A plugin's tab is named for it: computer is Computer, and chat-rooms is Chat rooms. A server's name is its address.
 const labelOf = (addon: Plugin) => (addon.kind === "mcp" ? addon.name : addon.name.charAt(0).toUpperCase() + addon.name.slice(1).replace(/-/g, " "));
 // Every zone the browser knows, and the one set, should the browser not list it.
@@ -104,6 +111,7 @@ export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profi
             <span className="font-normal text-muted-foreground">How many bots can work at the same time. One waiting on a long command holds its place. This takes effect the next time fxbot starts.</span>
           </label>
         )}
+        {settings && <IdleCompaction settings={settings} save={save} />}
       </>
     );
   else if (tab === "providers")
@@ -215,5 +223,49 @@ function About() {
         </a>
       </p>
     </>
+  );
+}
+
+// Idle compaction: how long a bot's chat sits idle before it's summarized, and the model that writes the summary,
+// each bot's own or one the owner picks. A time set some other way shows as itself.
+function IdleCompaction({ settings, save }: { settings: Settings; save: (fields: Partial<Settings>) => Promise<unknown> }) {
+  const [providers, setProviders] = useState<Provider[]>([]);
+  useEffect(() => void client.providers.list().then(setProviders, () => {}), []);
+  const minutes = settings.idleCompactMinutes;
+  const choices = idleChoices.some(([m]) => m === minutes) ? idleChoices : [...idleChoices, [minutes, `After ${minutes} minutes`] as [number, string]];
+  return (
+    <div className="grid gap-3">
+      <label className="grid gap-1.5 text-sm font-medium">
+        Idle compaction
+        <NativeSelect value={String(minutes)} onChange={(e) => save({ idleCompactMinutes: Number(e.target.value) })} className="w-full">
+          {choices.map(([value, label]) => (
+            <NativeSelectOption key={value} value={String(value)}>
+              {label}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+        <span className="font-normal text-muted-foreground">A long chat that sits idle is summarized, so your next message starts fast. The chat shows where it happened.</span>
+      </label>
+      {minutes > 0 && (
+        <label className="grid gap-1.5 text-sm font-medium">
+          Summarize with
+          <NativeSelect value={settings.compactProvider} onChange={(e) => save({ compactProvider: e.target.value })} className="w-full">
+            <NativeSelectOption value="">Each bot's own model</NativeSelectOption>
+            {providers.map((p) => (
+              <NativeSelectOption key={p.id} value={p.id}>
+                {p.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </label>
+      )}
+      {minutes > 0 && settings.compactProvider && (
+        <label className="grid gap-1.5 text-sm font-medium">
+          Model
+          <ModelField id="compact" provider={settings.compactProvider} value={settings.compactModel} onChange={(compactModel) => void save({ compactModel })} />
+          <span className="font-normal text-muted-foreground">A cheaper model saves money. When a chat is longer than it takes, the bot's own model writes the summary.</span>
+        </label>
+      )}
+    </div>
   );
 }

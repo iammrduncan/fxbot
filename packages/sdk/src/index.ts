@@ -1,7 +1,7 @@
 import type { FxAgentTool, FxResumeTurn, FxSessionPromptInput, FxTurn } from "libfx";
 import { createArchives } from "./archive.ts";
 import { createEmbeddings, type EmbeddingSettings } from "./embeddings.ts";
-import { createHistory, summarize, switchAsk } from "./history.ts";
+import { createHistory, idleAsk, summarize, switchAsk } from "./history.ts";
 import { createLibrary, pdf } from "./library.ts";
 import { createMcp } from "./mcp.ts";
 import { createMemories } from "./memories.ts";
@@ -646,14 +646,99 @@ export async function createFxbot(options: FxbotOptions) {
       summary = await summarize(await providers.options(to), newModel, [profile.instructions].filter(Boolean), ask, undefined, [...previous, transcript].join("\n\n"))
         .catch((error: Error) => fail(502, `The chat could not be summarized: ${error.message}`));
     }
-    const handoff = `${heading(from?.name ?? "a removed provider", to.name)}:\n\n${summary}`;
-    const sessionId = await (await providers.agentFor(to.id, "")).newSessionId();
-    const saved = (await store.profiles.update(profile.id, { provider, model, sessionId, handoff }))!;
+    return restart(profile, provider, model, `${heading(from?.name ?? "a removed provider", to.name)}:\n\n${summary}`);
+  }
+  // The bot's own chat, begun again: a new session on `provider`, whose handoff goes in the bot's instructions. Each
+  // open stream of the chat ends with a moved line.
+  async function restart(profile: StoredProfile, provider: string, model: string, handoff: string) {
+    const sessionId = await (await providers.agentFor(provider, "")).newSessionId();
+    const saved = (await store.profiles.update(profile.id, { provider, model, sessionId, handoff })) ?? fail(404, "profile not found");
     for (const stream of following.get(profile.id) ?? []) stream.move(sessionId);
     return saved;
   }
 
+  // Idle compaction. Every minute, a bot's own chat that has had no message for the owner's setting, and whose
+  // checkpoint is at least 120 KB, about 30,000 tokens, is summarized and begun again from the summary and its last
+  // messages, so the owner's next message reads those and not the whole chat. Not while a turn of the bot runs, it
+  // waits on the owner, or its chat is starting over. One bot at a time, and once for each idle spell: `tried` keeps
+  // the newest message each bot was looked at for, so a failure isn't tried again until a new one comes. A message to
+  // the chat while its summary is written calls it off, and the chat stays as it was.
+  const tried = new Map<string, string>();
+  const compacting = new Map<string, AbortController>();
+  const compactFrom = 120 * 1024;
+  let sweeping = false;
+  async function idleSweep() {
+    if (sweeping) return;
+    sweeping = true;
+    try {
+      const settings = await store.settings.get();
+      if (!settings.idleCompactMinutes) return;
+      const idle = await store.sql<{ id: string; last: string }[]>`select p.id, m.last::text as last from profiles p
+        cross join lateral (select max(id) as last, max(created_at) as at from messages where profile_id = p.id and session_id = p.session_id) m
+        where p.session_id is not null and coalesce(p.provider, '') <> '' and m.at < now() - make_interval(mins => ${settings.idleCompactMinutes}) order by m.at`;
+      for (const { id, last } of idle) if (tried.get(id) !== last) await compactIdle(id, last, settings).catch((error: Error) => console.error(`Could not compact a chat while idle: ${error.message}`));
+    } finally {
+      sweeping = false;
+    }
+  }
+  async function compactIdle(id: string, last: string, settings: Pick<Settings, "idleCompactMinutes" | "compactProvider" | "compactModel">) {
+    const idle = (profile: StoredProfile | null | undefined): profile is StoredProfile => {
+      const now = profile && withBusy(profile);
+      return Boolean(now && !now.busy && !now.waiting && now.sessionId && !moving.has(id));
+    };
+    if (!idle(await store.profiles.get(id))) return;
+    tried.set(id, last);
+    const call = new AbortController();
+    compacting.set(id, call);
+    const done = await hold(id);
+    try {
+      // Read again under the hold: a message may have come meanwhile.
+      const profile = await store.profiles.get(id);
+      if (call.signal.aborted || !profile?.sessionId || withBusy(profile).busy || withBusy(profile).waiting) return;
+      const [{ newest }] = await store.sql<{ newest: string | null }[]>`select max(id)::text as newest from messages where profile_id = ${id} and session_id = ${profile.sessionId}`;
+      if (newest !== last) return;
+      const own = await modelFor(profile);
+      const chat = await providers.get(profile.provider);
+      const checkpoint = await (await providers.agentFor(chat.id, own)).session(profile.sessionId).checkpoint();
+      if (checkpoint.byteLength < compactFrom || call.signal.aborted) return;
+      // The model the owner picked, unless its window is known and smaller than the chat, at 4 bytes a token.
+      let by = { provider: chat, model: own };
+      if (settings.compactProvider && settings.compactModel) {
+        const window = await providers.contextWindow(settings.compactProvider, settings.compactModel).catch(() => undefined);
+        const tokens = Math.ceil(checkpoint.byteLength / 4);
+        if (window && window < tokens) console.log(`${profile.name}'s chat, about ${tokens.toLocaleString("en-US")} tokens, is more than ${settings.compactModel} takes (${window.toLocaleString("en-US")}), so ${own} summarizes it while idle.`);
+        else by = { provider: await providers.get(settings.compactProvider), model: settings.compactModel };
+      }
+      // The chat's own provider reads its checkpoint, under any of its models. Another reads the stored messages.
+      const summary =
+        by.provider.id === chat.id
+          ? await summarize(await providers.options(chat), by.model, instructionsFor(profile), idleAsk, checkpoint, undefined, 120_000, call.signal)
+          : await summarize(await providers.options(by.provider), by.model, [profile.instructions].filter(Boolean), idleAsk, undefined,
+              [...(profile.handoff ? [profile.handoff] : []), await history.transcript(id, profile.sessionId, (((await providers.contextWindow(by.provider.id, by.model).catch(() => undefined)) ?? 32_000) * 4) / 2)].join("\n\n"),
+              120_000, call.signal);
+      if (call.signal.aborted) return;
+      const words = await history.lastWords(id, profile.sessionId, 6000);
+      const handoff = [
+        `Earlier conversation, summarized after ${settings.idleCompactMinutes} minutes idle:`,
+        summary,
+        ...(words ? [`The last messages, word for word:\n${words}`] : []),
+        "This summary is for reference. Don't act on it by itself: answer the next message.",
+      ].join("\n\n");
+      if (call.signal.aborted) return;
+      await restart(profile, profile.provider, profile.model, handoff);
+      console.log(`Compacted ${profile.name}'s chat while idle, from ${Math.round(checkpoint.byteLength / 1024).toLocaleString("en-US")} KB, with ${by.model}.`);
+    } catch (error) {
+      if (!call.signal.aborted) throw error;
+    } finally {
+      compacting.delete(id);
+      done();
+    }
+  }
+  const idleTimer = setInterval(() => void idleSweep().catch((error: Error) => console.error(`Idle compaction: ${error.message}`)), 60_000);
+  idleTimer.unref();
+
   async function switchProvider(profile: StoredProfile, next: string, model: string) {
+    compacting.get(profile.id)?.abort();
     const done = await hold(profile.id);
     try {
       return await startOver((await store.profiles.get(profile.id)) ?? profile, {
@@ -715,8 +800,11 @@ export async function createFxbot(options: FxbotOptions) {
   // arrives on the stream. libfx takes at most 8 images, 3.75 MiB each and 6 MiB together. A plugin's message names it,
   // and can show other words and another name in the chat than the model gets, and the owner's words it carries on.
   async function deliver(id: string, { text, messageId, files = [] }: Message, { session, from, shown, label, steer, asked }: { session?: string; from?: string; shown?: string; label?: string; steer?: boolean; asked?: string } = {}) {
-    // A message to the bot's own chat waits for a start-over of it.
-    if (!session) while (moving.has(id)) await moving.get(id);
+    // A message to the bot's own chat calls off an idle compaction, and waits for any other start-over of it.
+    if (!session) {
+      compacting.get(id)?.abort();
+      while (moving.has(id)) await moving.get(id);
+    }
     let profile = await get(id);
     if (!Array.isArray(files) || files.length > 8) fail(400, "files must be a list of at most 8");
     if (typeof text !== "string" || (!text.trim() && !files.length)) fail(400, "text is required");
@@ -928,6 +1016,24 @@ export async function createFxbot(options: FxbotOptions) {
           if (!Number.isInteger(input.turnsAtOnce) || input.turnsAtOnce < 4 || input.turnsAtOnce > 100) fail(400, "Turns at once must be a whole number from 4 to 100.");
           await store.settings.save({ turnsAtOnce: input.turnsAtOnce });
         }
+        // Idle compaction: 0 for off, or 5 minutes to a day. The model that writes the summary: "" for each bot's own, or
+        // one of a provider's, which is the provider's default until another is picked.
+        if (input.idleCompactMinutes !== undefined) {
+          const minutes = input.idleCompactMinutes;
+          if (!Number.isInteger(minutes) || (minutes !== 0 && (minutes < 5 || minutes > 1440))) fail(400, "Idle compaction is 0, for off, or a whole number of minutes from 5 to 1,440.");
+          await store.settings.save({ idleCompactMinutes: minutes });
+        }
+        if (input.compactProvider !== undefined || input.compactModel !== undefined) {
+          const now = await store.settings.get();
+          if (input.compactProvider !== undefined && typeof input.compactProvider !== "string") fail(400, "compactProvider must be a string");
+          if (input.compactModel !== undefined && typeof input.compactModel !== "string") fail(400, "compactModel must be a string");
+          const chosen = input.compactProvider === undefined ? now.compactProvider : input.compactProvider.trim();
+          const record = chosen ? await providers.get(chosen) : null;
+          let model = input.compactModel?.trim() ?? (chosen === now.compactProvider ? now.compactModel : "");
+          if (record && !model) model = record.model || fail(400, `Pick a model of ${record.name} to summarize with.`);
+          if (model.length > 200) fail(400, "compactModel must be at most 200 characters");
+          await store.settings.save({ compactProvider: chosen, compactModel: record ? model : "" });
+        }
         // First-run setup: a step, as `<word>`, or `<word>:<what it's working on>`, and finishing it, which can't be undone.
         if (input.onboardingStep !== undefined) {
           if (typeof input.onboardingStep !== "string" || !/^[a-z-]{0,32}(:[a-z0-9,-]{1,2000})?$/.test(input.onboardingStep)) fail(400, "That isn't a step.");
@@ -1088,6 +1194,7 @@ export async function createFxbot(options: FxbotOptions) {
     // skills they use still there, then stops those and lets Postgres go.
     async close() {
       clearInterval(sweep);
+      clearInterval(idleTimer);
       await providers.close();
       await Promise.all(saving);
       await packages.close();

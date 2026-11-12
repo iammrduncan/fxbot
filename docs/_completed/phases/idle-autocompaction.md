@@ -6,7 +6,7 @@ When a bot's chat has sat idle for a while, fxbot compacts it, so the owner's ne
 - **The owner chooses.** **Settings** › **General** has **Idle compaction**: off, or after 15 minutes, 30, an hour, or 2 hours. Beside it is the model that writes the summary: the bot's own, or a cheaper one the owner picks.
 - **Only when it's worth it.** A short chat isn't compacted, a chat is compacted once per idle spell, and a message that comes in while the summary is being written goes ahead without it.
 
-Status: planned on 2026-11-12, at the owner's word. Researched the same day:
+Status: built on 2026-11-12, for 0.10.0, as planned the same day at the owner's word, with the open questions' recommendations: each bot's own model by default, 120 KB of checkpoint, one setting in **Settings** › **General**, on at 30 minutes, and the comment for libfx written for the owner to post. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. Researched the same day:
 - against libfx 0.0.16 as installed, and fx's source at `v0.0.16` and `8352e0c`
 - against Claude Code, Hermes Agent, OpenClaw, Pi, Codex, and eve, from source and changelogs at the commits in [Research](#1-research)
 - against the providers' documentation on how long their prompt caches last
@@ -17,12 +17,12 @@ Status: planned on 2026-11-12, at the owner's word. Researched the same day:
 
 ## 0. Core or plugin
 
-**Core,** as the owner said. "Context that fits the model" is one of the things every bot needs ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)), and this is the context's size over time. It's built on what core already has:
+**Core,** as the owner said. "Context that fits the model" is one of the things every bot needs ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)), and this is the context's size over time. It's built on what core already has:
 - `startOver`, which summarizes a chat and starts it again from the summary (`packages/sdk/src/index.ts:587`)
 - the page's card for a chat that started over
 - the settings row
 
-The [context management](context-management.md) stub, compaction as a chat nears its model's window, stays a phase of its own. It will use the same pieces.
+The [context management](../../phases/context-management.md) stub, compaction as a chat nears its model's window, stays a phase of its own. It will use the same pieces.
 
 Nothing changes in the plugin API. A plugin's sessions aren't compacted here ([Not in this phase](#not-in-this-phase)).
 
@@ -37,7 +37,7 @@ Nothing changes in the plugin API. A plugin's sessions aren't compacted here ([N
   4. It moves every open stream of the chat to the new session.
 
   The handoff goes in the bot's instructions on every open, with "Search earlier messages with chat_history." (`index.ts:288-290`). A provider switch uses it, and so does fresh's `{ startOver: { ask } }` (`index.ts:701-720`).
-- **While it runs, the chat is held** (`hold`, `index.ts:576`): a message sent meanwhile waits for it. Fresh found a summary takes 10 to 60 seconds ([fresh](../_completed/phases/fresh.md#0-core-or-plugin)).
+- **While it runs, the chat is held** (`hold`, `index.ts:576`): a message sent meanwhile waits for it. Fresh found a summary takes 10 to 60 seconds ([fresh](fresh.md#0-core-or-plugin)).
 - **The page shows the handoff** as a folded card at the top of the new chat, **Started over** or **Continued from** a provider (`Handoff`, `packages/ui/src/app.tsx:1086`).
 - **Core already sweeps on a timer:** every 30 seconds for turns stuck on a refusing provider (`index.ts:413`). The catalog and the registry are read hourly.
 - **What's running is known:** `withBusy` marks a bot `busy` while a turn runs and `waiting` while it waits on the owner (`index.ts:118`).
@@ -218,7 +218,7 @@ Comments for the owner to post on vercel-labs/fx, since this shell can't post to
 
 ### Not in this phase
 
-- **Compaction near the model's window,** in [context management](context-management.md). Showing libfx's own compactions in the chat, through its hooks, belongs there too.
+- **Compaction near the model's window,** in [context management](../../phases/context-management.md). Showing libfx's own compactions in the chat, through its hooks, belongs there too.
 - **A plugin's sessions,** such as rooms: a plugin would need a start-over of its own session in the plugin API.
 - **A setting for each bot.** One setting serves every bot ([Question 3](#5-open-questions)).
 - **Keeping the cache warm,** as Pi and fx do. It pays only for returns within minutes, and libfx sends no requests of its own.
@@ -238,20 +238,20 @@ Comments for the owner to post on vercel-labs/fx, since this shell can't post to
 ## 4. Checklist
 
 Against a disposable fxbot and a mock model that logs each request and can answer slowly, with the idle time set to 5 minutes, or the sweep's clock moved, for the checks:
-- [ ] The migration runs on a copy of a 0.9.0 database. **Settings** › **General** shows **Idle compaction**, after 30 minutes, and **Each bot's own model**.
-- [ ] A bot whose chat's checkpoint is over 120 KB, idle past the setting, is compacted once. The mock gets one summary request. The bot's `handoff` starts "Earlier conversation, summarized after", and the chat's top card reads **Compacted while idle**. The bot's next turn sends the handoff, not the old chat.
-- [ ] The handoff ends with the last messages word for word, within 6,000 characters, and the line about reference.
-- [ ] A chat under 120 KB, a bot whose turn is running, and a bot waiting on the owner aren't compacted. A compacted chat with no new message isn't compacted again.
-- [ ] Activity in a room, a routine, or a subagent doesn't count as the bot's chat being active, and doesn't get those sessions compacted.
-- [ ] A summary that fails isn't tried again until a new message arrives, and the chat is as it was.
-- [ ] A message sent while the summary is being written cancels it. The message goes to the old chat at once, and there's no card.
-- [ ] With a model picked on the bot's provider, that model writes the summary from the checkpoint. With one on another provider, it writes it from the transcript. With one whose window is smaller than the chat, the bot's own model writes it, and the log says why.
-- [ ] Two bots idle at once are compacted one after the other.
-- [ ] **Off** stops it. Removing the picked model's provider sets **Summarize with** back to each bot's own.
+- [x] The migration runs on a copy of a 0.9.0 database. **Settings** › **General** shows **Idle compaction**, after 30 minutes, and **Each bot's own model**.
+- [x] A bot whose chat's checkpoint is over 120 KB, idle past the setting, is compacted once. The mock gets one summary request. The bot's `handoff` starts "Earlier conversation, summarized after", and the chat's top card reads **Compacted while idle**. The bot's next turn sends the handoff, not the old chat.
+- [x] The handoff ends with the last messages word for word, within 6,000 characters, and the line about reference.
+- [x] A chat under 120 KB, a bot whose turn is running, and a bot waiting on the owner aren't compacted. A compacted chat with no new message isn't compacted again.
+- [x] Activity in a room, a routine, or a subagent doesn't count as the bot's chat being active, and doesn't get those sessions compacted.
+- [x] A summary that fails isn't tried again until a new message arrives, and the chat is as it was.
+- [x] A message sent while the summary is being written cancels it. The message goes to the old chat at once, and there's no card.
+- [x] With a model picked on the bot's provider, that model writes the summary from the checkpoint. With one on another provider, it writes it from the transcript. With one whose window is smaller than the chat, the bot's own model writes it, and the log says why.
+- [x] Two bots idle at once are compacted one after the other.
+- [x] **Off** stops it. Removing the picked model's provider sets **Summarize with** back to each bot's own.
 
 The rest:
-- [ ] Docs as above, `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
-- [ ] The upstream comment is written for the owner to post.
+- [x] Docs as above, `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
+- [x] The upstream comment is written for the owner to post.
 
 Only a person can check, with a real model:
 - [ ] A long chat with a real model, compacted while idle: the next message answers fast, and the bot knows what was going on.
@@ -263,3 +263,43 @@ Only a person can check, with a real model:
 3. **One setting, or one per bot?** Recommended: one, in **Settings** › **General**. Add a bot's own when one needs it.
 4. **Default on, at 30 minutes?** The owner suggested it. Claude Code's users objected to compaction they didn't know about. The card, and **Off** beside the setting, answer that. Recommended: on, at 30 minutes, with the card saying where to turn it off.
 5. **Ask libfx for `session.compact`?** Recommended: yes. Hand the owner the comment to post.
+
+## What the build changed
+
+- **`startOver` is as it was, and ends in `restart`.** The plan gave `startOver` a `using` and a `signal`, but its fallbacks are a provider switch's. Idle compaction writes its own summary with `summarize`, which gained `signal`, then calls `restart`, the step that begins the chat again, which `startOver` now ends with too.
+- **The hold comes first.** The sweep takes the bot's start-over hold before it reads the checkpoint, and reads the bot again under it, so a message that came meanwhile runs, and a message after that calls the summary off. A provider switch calls it off too.
+- **What counts as activity** is any row in the bot's own session, its thinking and tool steps too. The routines plugin passes a run's result into the bot's own chat, so that counts, as the owner sees it there. The run's own session doesn't.
+- **The last messages say who:** **Owner**, a plugin's message under the plugin's name, such as `routines`, and the bot's own as **You**. A newest message longer than 6,000 characters keeps its last 6,000, after "…".
+- **Summarize with picks a provider, then Model.** Picking a provider takes its default model, and **Model**, the app's model picker, changes it. The API does the same: `compactProvider` without `compactModel` takes the provider's default, and fails when the provider has none.
+- **The page offers Off, 15, 30, 60, and 120 minutes.** A time set through the API, from 5 to 1,440, shows as itself, such as "After 45 minutes".
+- **The card's link sits beside its title,** **Turn off in Settings**, since a link can't be inside the button that opens the card. It opens **Settings** › **General**.
+- **An empty summary fails.** libfx ends a turn that has no text with "Done.", which `summarize` took as a summary: a check's empty answer compacted a chat into "Done.". It now counts as empty, for a provider switch and `/fresh` too, and the changelog says so.
+- **The sweep starts a minute after fxbot does,** and takes the longest-idle chat first. A summary that hangs holds the sweep for up to its 2 minutes, then the next bot goes. After a restart, a chat may be tried once more, as planned.
+- **The docs:** an **Idle compaction** section in the explanation, under **Starting a chat over**, and the three settings in the SDK's settings table and the HTTP API's list. `reference/configuration.mdx` lists environment variables, not settings, so it's unchanged.
+- **The checks,** against a disposable fxbot, the mock model, and messages backdated past the 5 minutes set for them:
+  - **The upgrade:** a database made by 0.9.0's code, at `8c81170`, with a bot that had chatted, migrated with a backup first, and read 30 minutes and each bot's own model.
+  - **The checklist, 52 checks over three runs, 45 passed:**
+    - **One sweep:** four chats compacted, and a short one, one with a turn running, and one waiting on the owner left alone.
+    - **The handoff:** its heading, its last messages, and its line about reference. The next turn sent 1,481 characters, not the old chat.
+    - **Gus's chat** compacted just after a routine's run and a room, whose sessions stayed. A subagent's session is a plugin's session as theirs are, and wasn't run here.
+    - **Two summaries of 4 seconds each,** 4,028 ms apart, and none again for an unchanged chat.
+    - **A message during a summary** went to the old chat in 42 ms, with no card.
+    - **A refused summary and an empty one** changed nothing, and the refused one wasn't tried again until a new message.
+    - **The models:** a model on the bot's provider read the checkpoint, one on another provider the transcript, and one with too small a window gave way to the bot's own, with the log line. **Off**, a removed provider, and the edges of the setting.
+  - **The other 7 failed from their setup:** an empty reply and a failed turn didn't make a summary fail, since libfx answers "Done." and leaves a failed turn out of its history; a bot kept busy with a slow command was compacted once its turn stopped, and its slow summary held the sweep; and a chat whose newest message was short didn't test the long-message case. Each case was checked again on its own, as above.
+  - **The page, 15, in Chromium,** at desktop and phone sizes: the setting's choices and what each saves, **Model** after a provider, and the card, its link, and what it opens to. No page errors.
+
+### Upstream
+
+For the owner to post on vercel-labs/fx, as a new issue:
+
+> **Hosts can't compact a session between turns: could `FxSession` get `compact({ model? })`?**
+>
+> fxbot runs libfx as a host, one long session per bot. When a long chat sits idle, we compact it, so the owner's next message doesn't wait for the provider to read the whole context again. libfx 0.0.16 compacts only inside a turn, near 80% of the model's usable input, and the CLI's `/compact` isn't reachable from `FxSession` or ACP. So we send a separate tool-free summary request and start a new session from it. That loses what libfx's compactor keeps: the user messages and final replies word for word, and the newest turns whole.
+>
+> What would let a host do it with libfx's own compactor:
+> - `session.compact({ model? })` on `FxSession`, between turns, rejecting while a turn runs, on the same path as the CLI's manual compaction.
+> - `model`, to summarize with a cheaper model of the same provider, as the compactor's text completion can already call another model.
+> - A stream line, or a hook event, whenever a session compacts, automatic or manual, so the host can show it in the chat.
+>
+> With these, a host could also compact just before a provider's prompt cache expires, on the bot's own model, reading the cached prefix.

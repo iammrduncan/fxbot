@@ -1135,12 +1135,23 @@ function Handoff({ text }: { text: string }) {
   const [first, ...summary] = text.split("\n\n");
   const from = /moved from (.+) to .+:$/.exec(first)?.[1];
   const startedOver = /started over:$/.test(first);
+  const idle = /summarized after \d+ minutes idle:$/.test(first);
   return (
     <Collapsible className="mx-auto w-full max-w-3xl rounded-xl border px-3 py-2 text-sm">
-      <CollapsibleTrigger className="group flex w-full items-center gap-2 font-medium">
-        <ChevronRightIcon className="size-4 transition-transform group-data-[state=open]:rotate-90" />
-        {startedOver ? "Started over" : `Continued from ${from ?? "an earlier chat"}`}
-      </CollapsibleTrigger>
+      <div className="flex items-center gap-2">
+        <CollapsibleTrigger className="group flex flex-1 items-center gap-2 text-left font-medium">
+          <ChevronRightIcon className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+          {idle ? "Compacted while idle" : startedOver ? "Started over" : `Continued from ${from ?? "an earlier chat"}`}
+        </CollapsibleTrigger>
+        {idle && (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            Turn off in{" "}
+            <a href="/settings" onClick={follow} className="underline underline-offset-4">
+              Settings
+            </a>
+          </span>
+        )}
+      </div>
       <CollapsibleContent className="pt-2 whitespace-pre-wrap text-muted-foreground">{summary.join("\n\n")}</CollapsibleContent>
     </Collapsible>
   );

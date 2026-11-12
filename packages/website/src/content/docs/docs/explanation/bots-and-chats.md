@@ -97,9 +97,28 @@ Vectors are kept in Postgres, with pgvector, beside the rows they belong to. A s
 
 ## Starting a chat over
 
-A chat starts over two ways, and both work the same. The bot's model writes a summary of the chat so far, and the bot starts a new chat from it. The earlier messages show above a card with the summary, and stay searchable with `chat_history`. Pages open on the chat follow it to the new one.
+A chat starts over three ways, and all work the same. A model writes a summary of the chat so far, and the bot starts a new chat from it. The earlier messages show above a card with the summary, and stay searchable with `chat_history`. Pages open on the chat follow it to the new one.
 - **Moving a bot to another provider.** A session can't move between agents, and fxbot runs one agent per provider, so a move starts a new chat. The old provider writes the summary, or the new one when the old can't. The card says **Continued from** the old provider.
 - **`/fresh`,** from the fresh plugin. A summary aimed at what you write next keeps what bears on it, and your message goes to the new chat. The card says **Started over**. See [Start a chat over with /fresh](/docs/how-to/start-fresh/).
+- **Idle compaction,** since 0.10.0. A long chat that sits with no message for 30 minutes is summarized while you're away, so your next message starts fast: the bot reads the summary, not the whole chat again. The card says **Compacted while idle**, with a link to turn it off.
+
+### Idle compaction
+
+Every minute, fxbot looks for a bot whose own chat has had no message for the time set in **Settings** › **General** › **Idle compaction**: 30 minutes, unless you choose 15, an hour, 2 hours, or **Off**. It compacts that chat only when all of these are true:
+- **It's long:** its stored session is at least 120 KB, about 30,000 tokens. A short chat starts fast anyway.
+- **Nothing runs:** no turn of the bot's is running, and it isn't waiting on you.
+- **It's new since:** it hasn't been tried since its last message. A summary that failed isn't tried again until a new message comes, and a compacted chat isn't compacted again until it grows.
+
+Only the bot's own chat counts and is compacted. A room, a routine's run, or a subagent doesn't keep it awake, and isn't compacted. fxbot compacts one bot at a time, so many idle bots don't send a burst of requests.
+
+What the bot keeps, in its instructions, in place of the chat:
+- the summary, which keeps your requests and instructions in your words, what was decided and why, facts about you and your work, and each open task
+- the last messages word for word, up to 6,000 characters
+- a line that says the summary is for reference, and not to act on it alone
+
+**Summarize with**, under it, picks the model that writes the summary: each bot's own, or a cheaper one you choose. A model on the bot's provider reads the chat as the bot does; one on another provider reads its stored messages. When the model you chose has a window smaller than the chat, the bot's own model writes the summary, and fxbot's log says so.
+
+A message you send while a summary is being written calls it off, and goes to the chat as it was. A summary that fails changes nothing.
 
 ## The library
 

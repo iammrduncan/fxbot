@@ -46,7 +46,9 @@ export type Embedder = "local" | "remote" | "off";
 // `unvetted` shows plugins fxbot doesn't vet: the public registries, and adding by address or repository.
 // `defaultProfile` is the bot whose chat a launch at / opens, or "" for none. `turnsAtOnce` is how many turns run at
 // once, read when fxbot starts. `onboarded` says first-run setup is finished or skipped, and `onboardingStep` is where it's up to.
-export type Settings = { defaultProvider: string; defaultProfile: string; unvetted: boolean; timeZone: string; turnsAtOnce: number; onboarded: boolean; onboardingStep: string; embedder: Embedder; embeddingProvider: string; embeddingModel: string; messageVectors: number };
+// `idleCompactMinutes` is how long a bot's own chat sits idle before it's compacted, 0 for off, and `compactProvider`
+// and `compactModel` the model that writes the summary, or "" for each bot's own. All three since 0.10.0.
+export type Settings = { defaultProvider: string; defaultProfile: string; unvetted: boolean; timeZone: string; turnsAtOnce: number; onboarded: boolean; onboardingStep: string; idleCompactMinutes: number; compactProvider: string; compactModel: string; embedder: Embedder; embeddingProvider: string; embeddingModel: string; messageVectors: number };
 // What the machine runs as its local embedder, in an install made by setup.sh.
 export type LocalEmbedder = "cpu" | "gpu" | "off";
 // How far memory search's vectors have got: the model in use, or null when it's off or not answering, the counts, and

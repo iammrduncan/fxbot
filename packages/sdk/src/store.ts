@@ -3,6 +3,9 @@ import postgres from "postgres";
 import { migrate, type MigrateOptions } from "./migrate.ts";
 import { maxPinned, type Fields, type Profile, type Sent, type Settings } from "./types.ts";
 
+// The settings the settings row keeps itself. Memory search's are embeddings.ts's.
+type Kept = "defaultProvider" | "defaultProfile" | "unvetted" | "timeZone" | "turnsAtOnce" | "onboarded" | "onboardingStep" | "idleCompactMinutes" | "compactProvider" | "compactModel";
+
 export const isId = (id: string) => /^[0-9a-f]{12}$/.test(id);
 export const newId = () => randomBytes(6).toString("hex");
 
@@ -84,11 +87,24 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
     },
     // The default provider and bot. Memory search's fields are embeddings.ts's.
     settings: {
-      get: async (): Promise<Pick<Settings, "defaultProvider" | "defaultProfile" | "unvetted" | "timeZone" | "turnsAtOnce" | "onboarded" | "onboardingStep">> => {
-        const row = one(await sql<{ defaultProvider: string | null; defaultProfile: string | null; unvetted: boolean; timeZone: string | null; turnsAtOnce: number; onboardingStep: string | null; onboardedAt: Date | null }[]>`select default_provider, default_profile, unvetted, time_zone, turns_at_once, onboarding_step, onboarded_at from settings`);
-        return { defaultProvider: row?.defaultProvider ?? "", defaultProfile: row?.defaultProfile ?? "", unvetted: row?.unvetted ?? false, timeZone: row?.timeZone ?? "", turnsAtOnce: row?.turnsAtOnce ?? 32, onboarded: Boolean(row?.onboardedAt), onboardingStep: row?.onboardingStep ?? "" };
+      // A summary model whose provider was removed is gone with it: each bot's own writes the summary.
+      get: async (): Promise<Pick<Settings, Kept>> => {
+        const row = one(await sql<{ defaultProvider: string | null; defaultProfile: string | null; unvetted: boolean; timeZone: string | null; turnsAtOnce: number; onboardingStep: string | null; onboardedAt: Date | null; idleCompactMinutes: number; compactProvider: string | null; compactModel: string }[]>`
+          select default_provider, default_profile, unvetted, time_zone, turns_at_once, onboarding_step, onboarded_at, idle_compact_minutes, compact_provider, compact_model from settings`);
+        return {
+          defaultProvider: row?.defaultProvider ?? "",
+          defaultProfile: row?.defaultProfile ?? "",
+          unvetted: row?.unvetted ?? false,
+          timeZone: row?.timeZone ?? "",
+          turnsAtOnce: row?.turnsAtOnce ?? 32,
+          onboarded: Boolean(row?.onboardedAt),
+          onboardingStep: row?.onboardingStep ?? "",
+          idleCompactMinutes: row?.idleCompactMinutes ?? 30,
+          compactProvider: row?.compactProvider ?? "",
+          compactModel: row?.compactProvider ? row.compactModel : "",
+        };
       },
-      save: async (fields: Partial<Pick<Settings, "defaultProvider" | "defaultProfile" | "unvetted" | "timeZone" | "turnsAtOnce" | "onboarded" | "onboardingStep">>) => {
+      save: async (fields: Partial<Pick<Settings, Kept>>) => {
         const values = {
           ...(fields.defaultProvider !== undefined ? { defaultProvider: fields.defaultProvider || null } : {}),
           ...(fields.defaultProfile !== undefined ? { defaultProfile: fields.defaultProfile || null } : {}),
@@ -96,6 +112,9 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
           ...(fields.timeZone !== undefined ? { timeZone: fields.timeZone || null } : {}),
           ...(fields.turnsAtOnce !== undefined ? { turnsAtOnce: fields.turnsAtOnce } : {}),
           ...(fields.onboardingStep !== undefined ? { onboardingStep: fields.onboardingStep || null } : {}),
+          ...(fields.idleCompactMinutes !== undefined ? { idleCompactMinutes: fields.idleCompactMinutes } : {}),
+          ...(fields.compactProvider !== undefined ? { compactProvider: fields.compactProvider || null } : {}),
+          ...(fields.compactModel !== undefined ? { compactModel: fields.compactModel } : {}),
           ...(fields.onboarded ? { onboardedAt: new Date() } : {}),
         };
         await sql`insert into settings ${sql({ id: 1, ...values })} on conflict (id) do update set ${sql(values)}`;
