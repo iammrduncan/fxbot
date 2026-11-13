@@ -174,6 +174,9 @@ Built with the recommendations, for the owner to revisit:
 - **An empty room starts over with no summary:** `/fresh` there drops the room's sessions, and the next message starts each bot afresh.
 - **The list under the message box spans it.** The app's styles have `right-0` but not `left-0`, so the list of bots or commands was as wide as its longest line, from the right edge. `/fresh`'s description pushed it off the screen on a phone. `page.css` sets it, for both lists.
 - **No migration:** a summary is a message, with `summary` for its author, and its heading says which kind it is.
+- **Fixed before the release,** from the release review:
+  - **Deleting a room while its `/fresh` summary was written, or while a bot replied, ended fxbot.** What the turn or the summary saved, and the note saying it failed, had no room to go in, and the failure was left unhandled, which ends Node. That was true of a reply in 0.9.0 too. Now the room's background work logs a failure, and deleting a room stops its turns first. Reproduced on the code before the fix, where the process ended; with it, fxbot ran on, and a new room answered.
+  - **`/fresh` during an idle summary made two summaries.** The idle one now gives way to a `/fresh` that started meanwhile. With the mock holding the idle summary 10 seconds and `/fresh`'s 20, the code before the fix kept both, and with it, only **Started over**.
 - **The checks,** against a disposable fxbot built from this branch, chat rooms 0.5.0, the mock model, and a probe plugin that reads `fx.compaction()`:
   - **`fx.compaction()`** answered 30 minutes and each bot's own model, 0 with **Off**, and the picked provider and model.
   - **`chat_history`,** from a room, marked Ann's own chat "(your own chat)", and from her own chat, the room's matches "(in chat-rooms)".

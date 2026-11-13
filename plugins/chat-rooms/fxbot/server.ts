@@ -435,7 +435,8 @@ export default async function setup(fx: PluginApi) {
     }
     summary = summary.trim();
     if (!summary || summary === "Done.") refused(502, "The summary came back empty.");
-    if (newest !== undefined && (await newestId(found.id)) !== newest) return false;
+    // An idle summary gives way to the owner: a message since, or a /fresh, which writes its own.
+    if (newest !== undefined && (pending.has(found.id) || (await newestId(found.id)) !== newest)) return false;
     const words: string[] = [];
     let size = 0;
     for (const m of kind === "idle" ? rows : []) {
@@ -490,7 +491,8 @@ export default async function setup(fx: PluginApi) {
       );
     queues.set(found.id, steps);
     emit(found.id, { type: "queue", bots: queued(found.id) });
-    void drain(found.id);
+    // Unhandled, a failure would end fxbot itself.
+    void drain(found.id).catch((error) => fx.log(`Room ${found.id}: ${said(error)}`));
     return message;
   }
 
@@ -536,7 +538,8 @@ export default async function setup(fx: PluginApi) {
         if (!found?.members.includes(step.bot)) continue;
         await answer(found, step).catch(async (error) => {
           fx.log(`${step.bot} in room ${id}: ${said(error)}`);
-          await say(id, "note", `${(await names()).get(step.bot) ?? "A bot"} couldn't answer: ${said(error)}`);
+          // A room deleted meanwhile has nowhere to put it.
+          await say(id, "note", `${(await names()).get(step.bot) ?? "A bot"} couldn't answer: ${said(error)}`).catch(() => {});
         });
       }
     } finally {
@@ -604,7 +607,10 @@ export default async function setup(fx: PluginApi) {
       return failure(error);
     }
   });
+  // A room's turns stop first: what they'd save has nowhere to go.
   fx.route("DELETE", "/rooms/:id", async (_request, { id }) => {
+    const found = await room(Number(id));
+    if (found) await halt(found);
     queues.delete(Number(id));
     await fx.sql`delete from rooms where id = ${Number(id)}`;
     return json({ ok: true });
@@ -659,12 +665,12 @@ export default async function setup(fx: PluginApi) {
         await startOver((await room(found.id)) ?? found, "fresh", roomFreshAsk(next.slice(0, 4000)));
       } catch (error) {
         fx.log(`Room ${found.id} couldn't start over: ${said(error)}`);
-        await say(found.id, "note", `The room couldn't be summarized, so it goes on as it was: ${said(error)}`);
+        await say(found.id, "note", `The room couldn't be summarized, so it goes on as it was: ${said(error)}`).catch(() => {});
       } finally {
         emit(found.id, { type: "starting", on: false });
       }
       if (next) await post((await room(found.id)) ?? found, next);
-    })();
+    })().catch((error) => fx.log(`Room ${found.id}'s /fresh: ${said(error)}`));
     pending.set(found.id, job);
     void job.finally(() => pending.delete(found.id));
     return json({ starting: true }, 202);
