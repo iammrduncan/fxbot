@@ -40,7 +40,8 @@ async function pdfText(name: string, bytes: Buffer) {
     const { text } = await extractText(document, { mergePages: false });
     return text.flatMap((page, i) => (page.trim() ? [`--- Page ${i + 1} ---\n${page.trim()}`] : [])).join("\n\n");
   } finally {
-    await document.cleanup().catch(() => {});
+    // Its pages, fonts, and worker go with it: unpdf leaves a document made here for its maker to end.
+    await document.loadingTask.destroy().catch(() => {});
   }
 }
 
@@ -96,8 +97,9 @@ export function createLibrary(sql: Sql) {
   // Inserts the bytes, or finds the item that holds them, and tags it for the bot and chat, in one statement. The
   // same bot and chat again adds no tag. The first save's name and type stay, and so does its origin, unless the owner
   // sends what a bot made: then it's theirs, so `replace` leaves it as they sent it.
-  async function save(input: NewItem) {
-    const { kind, type, text } = await check(input);
+  // `checked` is what `check` found for these bytes already, so a PDF a message sends is read once.
+  async function save(input: NewItem, checked?: Awaited<ReturnType<typeof check>>) {
+    const { kind, type, text } = checked ?? (await check(input));
     const { profileId, sessionId, origin, bytes } = input;
     const sha256 = createHash("sha256").update(bytes).digest("hex");
     const [{ id }] = await sql<{ id: string }[]>`

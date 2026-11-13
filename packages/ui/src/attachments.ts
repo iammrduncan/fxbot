@@ -3,6 +3,11 @@ import type { Upload } from "@fxbot/sdk/client";
 // libfx's limit for one prompt.
 export const maxFiles = 8;
 
+// The server takes a message of up to 12 MiB, and base64 makes files a third bigger, so a message's files can be at
+// most 8.5 MiB together, which leaves room for its words. One PDF of 8 MiB fits.
+export const maxTogether = 8.5 * 2 ** 20;
+export const sizeOf = (file: Upload) => Math.floor(((file.data?.length ?? 0) * 3) / 4);
+
 const dataUrl = (blob: Blob) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();

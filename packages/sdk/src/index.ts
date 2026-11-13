@@ -391,7 +391,7 @@ export async function createFxbot(options: FxbotOptions) {
     const blocks: Exclude<FxSessionPromptInput, string>[number][] = [...(text.trim() ? [{ type: "text" as const, text }] : []), ...skilled];
     const sent: Upload[] = [];
     for (const { name, type, bytes, kind, text: content } of checked) {
-      const item = await library.save({ profileId: profile.id, sessionId, origin: "uploaded", name, type, bytes });
+      const item = await library.save({ profileId: profile.id, sessionId, origin: "uploaded", name, type, bytes }, { kind, type, text: content });
       blocks.push(kind === "image" ? { type: "image", mimeType: type, data: bytes.toString("base64"), sourceRef: `library:${item.id}` } : { type: "text", text: type === pdf ? pdfBlock(name, content, item.id) : `File: ${name}\n${content}` });
       sent.push({ name, type, url: item.url });
     }

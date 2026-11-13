@@ -38,7 +38,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { effortFor, effortKinds, maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { useReorder } from "./reorder.ts";
-import { maxFiles, readFile } from "./attachments.ts";
+import { maxFiles, maxTogether, readFile, sizeOf } from "./attachments.ts";
 import { Blob } from "./blob.tsx";
 import { BotForm } from "./bot-form.tsx";
 import { LookDialog, type BotLook } from "./look-picker.tsx";
@@ -778,8 +778,18 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   // From the picker, a paste, or a drop. The list is copied first, since the browser empties it after the event.
   async function attach(files: File[]) {
     const read = await Promise.allSettled(files.map(readFile));
-    const added = read.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
     const problems = read.flatMap((result) => (result.status === "rejected" ? [(result.reason as Error).message] : []));
+    // What fits beside what's attached already, in the order they came.
+    let total = attached.reduce((sum, file) => sum + sizeOf(file), 0);
+    const left: string[] = [];
+    const added = read.flatMap((result) => {
+      if (result.status !== "fulfilled") return [];
+      if (total + sizeOf(result.value) > maxTogether) return (left.push(result.value.name), []);
+      total += sizeOf(result.value);
+      return [result.value];
+    });
+    if (left.length)
+      problems.push(`A message's files can be at most 8.5 MiB together, so ${left.join(", ")} ${left.length === 1 ? "wasn't added. Send it" : "weren't added. Send them"} in another message.`);
     if (attached.length + added.length > maxFiles) problems.push(`A message takes at most ${maxFiles} files.`);
     setAttached((all) => [...all, ...added].slice(0, maxFiles));
     setNotice(problems.join(" "));
