@@ -237,7 +237,7 @@ Every agent has these tools. Each one acts for the bot whose chat runs it.
 
 | Tool | What it does |
 | --- | --- |
-| `chat_history` | Searches the bot's history in all of its chats: messages, thinking, and tool calls with their results, since 0.6.0, by words, and messages by meaning too when message vectors are on. With `around`, a `msg:<id>`, it reads that message and up to 6 on each side, in full. |
+| `chat_history` | Searches the bot's history in all of its chats: messages, thinking, and tool calls with their results, since 0.6.0, by words, and messages by meaning too when message vectors are on. Since 0.10.0, a match from another chat says where it's from: "(earlier chat)", "(your own chat)" from a plugin's session, or "(in <plugin>)", such as "(in chat-rooms)". With `around`, a `msg:<id>`, it reads that message and up to 6 on each side, in full. |
 | `memory_save` | Saves one fact, up to 1,000 characters. With `replaces`, a `mem:<id>`, it changes that memory instead, the bot's own or a team memory. With `team: true`, since 0.10.0, it saves a team memory, with the bot as `savedByBot`. |
 | `memory_search` | Searches the bot's memories and, since 0.10.0, the team's, marked `team`, by words and, with an embedder, by meaning: up to 20 |
 | `memory_forget` | Removes one of the bot's memories, or since 0.10.0 a team memory, by its `mem:<id>` |
