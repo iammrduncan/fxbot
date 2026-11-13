@@ -1,7 +1,7 @@
 {
   "name": "computer",
   "version": "0.5.0",
-  "description": "A Linux computer for each bot: a desktop you watch and take over, a terminal, a browser, and files.",
+  "description": "A Linux computer for each bot, and one each chat room's bots share: a desktop you watch and take over, a terminal, a browser, and files.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {

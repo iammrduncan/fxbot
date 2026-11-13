@@ -7,7 +7,7 @@ Each bot can have a Linux computer of its own: a Debian machine where it is root
 
 You need fxbot on a Linux machine with cgroups v2, as every distro `setup.sh` installs on has by default. The computer runs on podman 4.9 or newer where the distribution has it, beside whichever engine fxbot runs on, or else on the machine's own Docker, run rootless, as on Debian 12 and Ubuntu 22.04 with Docker's own `docker-ce`.
 
-1. Open **Plugins**, choose **Browse**, and choose **computer**. Read what runs inside fxbot, then choose **Add computer**.
+1. Open **Plugins**, choose **Browse**, and choose **computer**. Read what runs inside fxbot, then choose **Add computer**. Its latest needs fxbot 0.10.0 or newer.
 2. The machine sets up the computer's engine by itself, in a minute or two: podman, or the machine's own Docker, run rootless for a user of its own, `fxbot-computer`, with a firewall that keeps its computers to the internet. fxbot starts again when it's done. **Settings** › **Computer** shows it working, then names the engine, such as `podman 5.4.2, rootless`.
 3. The computer is on for every bot once added. To give it to some bots only, open **Settings** › **Computer**, and under **Bots** choose **Choose**, then switch it on for each bot that should have one.
 4. Ask a bot to do something on its computer, such as "make a chart of these numbers with Python and save it to the library", or "find the opening hours on the library's site". To point it at the computer, choose the screen button beside the message box, which adds `$computer` to the message.
