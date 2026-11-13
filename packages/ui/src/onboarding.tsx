@@ -112,7 +112,8 @@ function Custom({ cards, pack, onAdd, onBack }: { cards: PackageCard[]; pack: Pa
   useEffect(() => {
     void Promise.all(cards.map((card) => client.plugins.preview({ repo: card.ref, from: card.from }).then((page) => [card.name, page] as const, () => [card.name, undefined] as const))).then((all) => setPages(Object.fromEntries(all)));
   }, []);
-  const needs = (name: string) => pages[name]?.needs.map((need) => need.name) ?? [];
+  // Only what a plugin can't run without: Computer works with chat rooms, and runs without them.
+  const needs = (name: string) => pages[name]?.needs.filter((need) => !need.optional).map((need) => need.name) ?? [];
   function toggle(name: string, on: boolean) {
     const next = new Set(ticked);
     const walk = (each: string) => {
