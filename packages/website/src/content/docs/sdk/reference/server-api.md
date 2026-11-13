@@ -99,7 +99,7 @@ A provider's `kind` is the `id` of its entry in fxbot's list of providers, `prov
 | `providers.add(input)` | A provider from an entry that takes a key, an address, or a service account. A key is checked with the provider first. | `Provider` |
 | `providers.update(id, input)` | Changes `name`, `model`, `apiKey`, `serviceAccount` (Vertex AI), `modelIds`, `baseUrl` (a server's), `contextWindow` (a server's), or `teamId` (a Vercel account) | `Provider` |
 | `providers.remove(id)` | Removes the provider. It fails with 400 while bots use it. When it was Settings' `defaultProvider` or `embeddingProvider`, that becomes `""`. | nothing |
-| `providers.models(id)` | The provider's models, and what fxbot knows of each | `Model[]` |
+| `providers.models(id)` | The provider's models, and what fxbot knows of each: since 0.10.0, `efforts`, the thinking levels a model offers, low to high, where its provider lists them | `Model[]` |
 | `providers.teams(id)` | A Vercel account's teams. Other kinds fail with 400. | `Team[]` |
 
 `providers.add` takes a `NewProvider`:
@@ -260,6 +260,7 @@ From `@fxbot/sdk`, besides `createFxbot`:
 | `compareVersions(a, b)` | `number` | Below zero when `a` is older than `b`. A prerelease comes before its release. It throws for a string that isn't a version. |
 | `isVersion(version)` | `boolean` | Whether it is `x.y.z`, with an optional `v` before it and an optional prerelease after a dash, such as `0.4.0-rc.1` |
 | `isStable(version)` | `boolean` | Whether it is a version with no prerelease |
+| `effortFor(level, efforts)` | `string` or `undefined` | The level a model runs a bot's `effort` at: the level itself when `efforts`, the model's levels, has it, else the nearest lower one there, never `none`. `undefined` for `""`, for a model that lists no levels, or when none is lower: the model's own default, which sends nothing. Since 0.10.0. |
 | `releasesUrlFor(repository)` | `string` or `undefined` | GitHub's `releases/latest` API address for a `https://github.com/<owner>/<repo>` URL |
 
 | Table | What it holds |
@@ -271,6 +272,8 @@ From `@fxbot/sdk`, besides `createFxbot`:
 | `itemKinds` | `image`, `document` |
 | `embeddingKinds` | The provider kinds that serve `/embeddings`: `openai`, `openrouter`, `gateway`, `vercel`, `ollama`, `lmstudio`, `custom` |
 | `maxPinned` | 3 |
+| `effortLadder` | Thinking levels, low to high, as providers name them: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. A model's `efforts` in `providers.models(id)` are some of them, or words of its own. Since 0.10.0. |
+| `effortKinds` | The provider kinds a level reaches the model through today: `gateway`, `vercel`, `chatgpt`, `grok`. Since 0.10.0. |
 
 Every type the calls take or return is exported too, with `FxbotOptions` and `Fxbot`, the type of this object. `Turn` and `Part` come from `@fxbot/sdk/client`.
 
