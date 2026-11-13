@@ -289,6 +289,9 @@ Only a person can check, with a real model:
   - **The other 7 failed from their setup:** an empty reply and a failed turn didn't make a summary fail, since libfx answers "Done." and leaves a failed turn out of its history; a bot kept busy with a slow command was compacted once its turn stopped, and its slow summary held the sweep; and a chat whose newest message was short didn't test the long-message case. Each case was checked again on its own, as above.
   - **The page, 15, in Chromium,** at desktop and phone sizes: the setting's choices and what each saves, **Model** after a provider, and the card, its link, and what it opens to. No page errors.
 
+- **Fixed before the release,** from the release review:
+  - **A chat's length is its text, not its checkpoint.** A checkpoint carries its images' bytes, so a short chat with one photo or a few screenshots counted as long, and was compacted after 30 minutes. The sweep now adds up the text history keeps for the session, thinking and tool steps too, and the documents the owner sent in it, a PDF as the 60,000 characters its message carried. Against the mock: a chat with a 2 MiB photo and 47 bytes of text wasn't compacted, one of 135 KB of text was, and one of a few words, a long PDF, and a 70 KB text file was, at 129 KB.
+  - **Summarize with, on a provider with no default model,** waits on the page for its model, then saves both together. It saved the provider alone, which the server refuses, and the **Model** picker that the error asked for only showed after a save that worked. A save that works now clears an earlier error in Settings. Checked in Chromium.
 ### Upstream
 
 For the owner to post on vercel-labs/fx, as a new issue:

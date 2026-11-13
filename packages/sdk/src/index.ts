@@ -659,8 +659,8 @@ export async function createFxbot(options: FxbotOptions) {
     return saved;
   }
 
-  // Idle compaction. Every minute, a bot's own chat that has had no message for the owner's setting, and whose
-  // checkpoint is at least 120 KB, about 30,000 tokens, is summarized and begun again from the summary and its last
+  // Idle compaction. Every minute, a bot's own chat that has had no message for the owner's setting, and whose text is
+  // at least 120 KB, about 30,000 tokens, is summarized and begun again from the summary and its last
   // messages, so the owner's next message reads those and not the whole chat. Not while a turn of the bot runs, it
   // waits on the owner, or its chat is starting over. One bot at a time, and once for each idle spell: `tried` keeps
   // the newest message each bot was looked at for, so a failure isn't tried again until a new one comes. A message to
@@ -699,15 +699,25 @@ export async function createFxbot(options: FxbotOptions) {
       if (call.signal.aborted || !profile?.sessionId || withBusy(profile).busy || withBusy(profile).waiting) return;
       const [{ newest }] = await store.sql<{ newest: string | null }[]>`select max(id)::text as newest from messages where profile_id = ${id} and session_id = ${profile.sessionId}`;
       if (newest !== last) return;
+      // The chat's length is its text: what was said, thought, and called, as history keeps it, and the documents the
+      // owner sent in it, as the messages carried them. A checkpoint carries the bytes of its images too, so a short chat
+      // with a photo or a few screenshots would count as long.
+      const [{ size }] = await store.sql<{ size: number }[]>`select (
+          (select coalesce(sum(octet_length(text)), 0) from messages where profile_id = ${id} and session_id = ${profile.sessionId})
+          + (select coalesce(sum(octet_length(case when l.type = ${pdf} then left(l.text, ${pdfShown}) else l.text end)), 0)
+             from library l join library_tags t on t.item_id = l.id
+             where t.profile_id = ${id} and t.session_id = ${profile.sessionId} and l.kind = 'document' and l.origin = 'uploaded')
+        )::int as size`;
+      if (size < compactFrom) return;
       const own = await modelFor(profile);
       const chat = await providers.get(profile.provider);
       const checkpoint = await (await providers.agentFor(chat.id, own)).session(profile.sessionId).checkpoint();
-      if (checkpoint.byteLength < compactFrom || call.signal.aborted) return;
+      if (call.signal.aborted) return;
       // The model the owner picked, unless its window is known and smaller than the chat, at 4 bytes a token.
       let by = { provider: chat, model: own };
       if (settings.compactProvider && settings.compactModel) {
         const window = await providers.contextWindow(settings.compactProvider, settings.compactModel).catch(() => undefined);
-        const tokens = Math.ceil(checkpoint.byteLength / 4);
+        const tokens = Math.ceil(size / 4);
         if (window && window < tokens) console.log(`${profile.name}'s chat, about ${tokens.toLocaleString("en-US")} tokens, is more than ${settings.compactModel} takes (${window.toLocaleString("en-US")}), so ${own} summarizes it while idle.`);
         else by = { provider: await providers.get(settings.compactProvider), model: settings.compactModel };
       }
@@ -728,7 +738,7 @@ export async function createFxbot(options: FxbotOptions) {
       ].join("\n\n");
       if (call.signal.aborted) return;
       await restart(profile, profile.provider, profile.model, handoff);
-      console.log(`Compacted ${profile.name}'s chat while idle, from ${Math.round(checkpoint.byteLength / 1024).toLocaleString("en-US")} KB, with ${by.model}.`);
+      console.log(`Compacted ${profile.name}'s chat while idle, from ${Math.round(size / 1024).toLocaleString("en-US")} KB of text, with ${by.model}.`);
     } catch (error) {
       if (!call.signal.aborted) throw error;
     } finally {

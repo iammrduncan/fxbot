@@ -52,7 +52,11 @@ export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profi
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState("");
   useEffect(() => void client.settings.get().then(setSettings, (e: Error) => setError(e.message)), []);
-  const save = (fields: Partial<Settings>) => client.settings.update(fields).then(setSettings, (e: Error) => setError(e.message));
+  const save = (fields: Partial<Settings>) =>
+    client.settings.update(fields).then(
+      (saved) => (setSettings(saved), setError("")),
+      (e: Error) => setError(e.message),
+    );
   const installed = useInstalled();
   const drawn = usePluginSettings();
   const plugins = (installed.addons ?? []).filter((addon) => !installed.owned.has(addon.id));
@@ -231,6 +235,14 @@ function About() {
 function IdleCompaction({ settings, save }: { settings: Settings; save: (fields: Partial<Settings>) => Promise<unknown> }) {
   const [providers, setProviders] = useState<Provider[]>([]);
   useEffect(() => void client.providers.list().then(setProviders, () => {}), []);
+  // A provider with no default model waits here for its model, and the two are saved together.
+  const [picked, setPicked] = useState("");
+  const shown = picked || settings.compactProvider;
+  function pick(id: string) {
+    if (id && !providers.find((p) => p.id === id)?.model) return setPicked(id);
+    setPicked("");
+    void save({ compactProvider: id });
+  }
   const minutes = settings.idleCompactMinutes;
   const choices = idleChoices.some(([m]) => m === minutes) ? idleChoices : [...idleChoices, [minutes, `After ${minutes} minutes`] as [number, string]];
   return (
@@ -249,7 +261,7 @@ function IdleCompaction({ settings, save }: { settings: Settings; save: (fields:
       {minutes > 0 && (
         <label className="grid gap-1.5 text-sm font-medium">
           Summarize with
-          <NativeSelect value={settings.compactProvider} onChange={(e) => save({ compactProvider: e.target.value })} className="w-full">
+          <NativeSelect value={shown} onChange={(e) => pick(e.target.value)} className="w-full">
             <NativeSelectOption value="">Each bot's own model</NativeSelectOption>
             {providers.map((p) => (
               <NativeSelectOption key={p.id} value={p.id}>
@@ -259,11 +271,18 @@ function IdleCompaction({ settings, save }: { settings: Settings; save: (fields:
           </NativeSelect>
         </label>
       )}
-      {minutes > 0 && settings.compactProvider && (
+      {minutes > 0 && shown && (
         <label className="grid gap-1.5 text-sm font-medium">
           Model
-          <ModelField id="compact" provider={settings.compactProvider} value={settings.compactModel} onChange={(compactModel) => void save({ compactModel })} />
-          <span className="font-normal text-muted-foreground">A cheaper model saves money. When a chat is longer than it takes, the bot's own model writes the summary.</span>
+          <ModelField
+            id="compact"
+            provider={shown}
+            value={picked ? "" : settings.compactModel}
+            onChange={(compactModel) => void (picked ? save({ compactProvider: picked, compactModel }).then(() => setPicked("")) : save({ compactModel }))}
+          />
+          <span className="font-normal text-muted-foreground">
+            {picked ? "Pick the model that writes the summary. " : ""}A cheaper model saves money. When a chat is longer than it takes, the bot's own model writes the summary.
+          </span>
         </label>
       )}
     </div>
