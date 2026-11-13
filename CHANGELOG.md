@@ -2,7 +2,7 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
-## Unreleased
+## 0.10.0 (2026-11-13)
 
 **Before upgrading.** Migration `0016_effort` adds an `effort` column to `profiles`, for how hard a bot's model thinks, and to `plugin_sessions`, for a plugin's session that thinks at its own level. Every bot starts at its model's own default, as before. Migration `0017_team_memories` lets a memory have no bot, which makes it the team's, and adds `by_bot`, the bot that saved one. Every memory there is stays its bot's own. Migration `0018_idle_compaction` adds idle compaction's settings to `settings`: on, after 30 minutes, with each bot's own model. So in the first minutes after the update, each bot's long chat that has sat idle for 30 minutes or more, however long ago, is summarized once, with that bot's own model, one bot after another, and so is each long room once Chat rooms is 0.5.0, by its lead. To skip that, turn **Idle compaction** off in **Settings** › **General** as soon as fxbot is back. Update Computer, then remove chat-rooms-computer, in that order: Computer 0.5.0 takes over each room's computer, while removing chat-rooms-computer first, on Computer 0.4.0, deletes the rooms' computers and their files. Remove the fresh plugin from **Plugins**, where it shows **Unsupported**: `/fresh` is built in now. Then update Subagents from **Plugins**, for its `thinking` setting, and Chat rooms, to 0.5.0, for a room's memories and its starting over.
 
