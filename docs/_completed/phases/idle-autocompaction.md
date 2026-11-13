@@ -291,6 +291,7 @@ Only a person can check, with a real model:
 
 - **Fixed before the release,** from the release review:
   - **A chat's length is its text, not its checkpoint.** A checkpoint carries its images' bytes, so a short chat with one photo or a few screenshots counted as long, and was compacted after 30 minutes. The sweep now adds up the text history keeps for the session, thinking and tool steps too, and the documents the owner sent in it, a PDF as the 60,000 characters its message carried. Against the mock: a chat with a 2 MiB photo and 47 bytes of text wasn't compacted, one of 135 KB of text was, and one of a few words, a long PDF, and a 70 KB text file was, at 129 KB.
+  - **The summary goes only to the bot's own chat.** `open()` put the bot's handoff in every session's instructions, a room's, a routine run's, and a subagent's too, since provider switches made handoffs. Idle compaction makes them common, so each room got a summary of the bot's private chat, and read its whole context again whenever it changed. Against the mock, after a handoff: the bot's own chat sent it, and its room session sent its instructions without it.
   - **Summarize with, on a provider with no default model,** waits on the page for its model, then saves both together. It saved the provider alone, which the server refuses, and the **Model** picker that the error asked for only showed after a save that worked. A save that works now clears an earlier error in Settings. Checked in Chromium.
 ### Upstream
 

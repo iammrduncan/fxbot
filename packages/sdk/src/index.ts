@@ -300,9 +300,10 @@ export async function createFxbot(options: FxbotOptions) {
 
   // The commands every bot's chat has, in the composer's / list, with the plugins'.
   const coreCommands = [{ name: "fresh", description: "Start the chat over toward what you write next" }];
-  // A switch's summary follows the bot's own instructions in every open of the chat it started.
-  const instructionsFor = (profile: StoredProfile) =>
-    [profile.instructions, profile.handoff ? `${profile.handoff}\n\nSearch earlier messages with chat_history.` : ""].filter(Boolean);
+  // A start-over's summary, a switch's, idle compaction's, or /fresh's, follows the bot's own instructions in the chat it
+  // began, the bot's own: not in a room's session, a subagent's, or another plugin's, which never had that chat.
+  const instructionsFor = (profile: StoredProfile, sessionId = profile.sessionId) =>
+    [profile.instructions, profile.handoff && sessionId === profile.sessionId ? `${profile.handoff}\n\nSearch earlier messages with chat_history.` : ""].filter(Boolean);
 
   async function modelFor(profile: StoredProfile) {
     if (!profile.provider) return fail(400, "This bot has no provider. Add one in Settings, then pick it in the bot's settings.");
@@ -347,10 +348,10 @@ export async function createFxbot(options: FxbotOptions) {
     const window = await providers.contextWindow(profile.provider, model).catch(() => undefined);
     const share = (part: number) => (window ? Math.floor(window * part * 4) : 8000);
     const catalog = skills.catalog(profile.id, share(0.01));
-    const room = 64 * 1024 - 1024 - Buffer.byteLength([...instructionsFor(profile), catalog].join("\n\n"));
+    const room = 64 * 1024 - 1024 - Buffer.byteLength([...instructionsFor(profile, sessionId), catalog].join("\n\n"));
     const memory = await memories.section(profile.id, Math.min(share(0.02), room));
     const team = await memories.teamSection(Math.min(window ? share(0.01) : 4000, room - Buffer.byteLength(memory)));
-    let instructions = [...instructionsFor(profile), memory, team, catalog].filter(Boolean);
+    let instructions = [...instructionsFor(profile, sessionId), memory, team, catalog].filter(Boolean);
     if (packages.hooked("instructions")) {
       const event = { bot: profile.id, session: sessionId, instructions };
       await packages.run("instructions", event);

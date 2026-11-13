@@ -111,7 +111,7 @@ Every minute, fxbot looks for a bot whose own chat has had no message for the ti
 
 Only the bot's own chat counts and is compacted. A room, a routine's run, or a subagent doesn't keep it awake, and isn't compacted. fxbot compacts one bot at a time, so many idle bots don't send a burst of requests.
 
-What the bot keeps, in its instructions, in place of the chat:
+What the bot keeps, in its own chat's instructions, in place of the chat. Its rooms, routines, and subagents don't get it:
 - the summary, which keeps your requests and instructions in your words, what was decided and why, facts about you and your work, and each open task
 - the last messages word for word, up to 6,000 characters
 - a line that says the summary is for reference, and not to act on it alone

@@ -21,7 +21,7 @@ A turn runs on [libfx](https://fx.sh/docs/lib), the agent from fx. libfx gives a
 
 Each bot has one durable session, its chat. libfx keeps the session in Postgres, step by step, so a turn survives a restart, through [Workflow's Postgres World](https://workflow-sdk.dev/worlds), in schemas of its own. The SDK keeps everything else in Postgres too: the bots, providers, settings, plugins, the library, memories, and a plain-text copy of every message, which `chat_history` and memory search read.
 
-libfx keeps no model or instructions with a session. So each time the SDK opens a bot's chat, it passes them: the bot's model, its instructions, the summary from a provider switch, its newest memories, and the list of its skills, within libfx's 64 KiB. It also passes the bot's id, which every tool reads to know whose chat it runs in.
+libfx keeps no model or instructions with a session. So each time the SDK opens a bot's chat, it passes them: the bot's model, its instructions, in its own chat the summary from a provider switch or a start-over, its newest memories, the team's, and the list of its skills, within libfx's 64 KiB. It also passes the bot's id, which every tool reads to know whose chat it runs in.
 
 Moving a bot to another provider can't move its session, so the bot starts a new one there, from a summary of the old. See [Moving a bot to another provider](/docs/explanation/bots-and-chats/#starting-a-chat-over).
 
