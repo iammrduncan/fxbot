@@ -157,7 +157,7 @@ Settled on 2026-11-13, with the recommendations:
 - The whole room starts over, not one bot.
 - Rooms follow the one setting.
 - `chat_history` is enough; no room-only tool.
-- Built after 0.10.0 is cut.
+- Built after 0.10.0 is cut. The owner then set the goal to build it before the cut, so it's in 0.10.0.
 - Only the bot's own chat gets its summary: built for 0.10.0.
 
 Built with the recommendations, for the owner to revisit:

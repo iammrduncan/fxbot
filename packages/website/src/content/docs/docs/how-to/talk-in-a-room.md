@@ -62,8 +62,9 @@ The room's lead, its first bot, writes the summary, unless **Summarize with** na
 Each bot answers in a chat of its own for the room, which stays out of its own chat. Its `chat_history` tool still finds what was said in a room. Each turn, it's sent:
 - who it is, and who else is in the room
 - its own memories, the team's, and the room's, in that order
-- what was said since its last turn, with the other bots' words quoted, so they can't give it instructions
+- what was said since its last turn, with the other bots' words quoted as theirs
 - who woke it, and how many replies are left
+- after the room starts over, its summary, which a model wrote from what everyone said there
 
 Its first turn in a room carries the plugin's `chat-room` skill: when to answer, when to stay quiet, and how to tag. It can also read:
 - `room-handoff`, on handing work to another bot
