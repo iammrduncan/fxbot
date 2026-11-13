@@ -14,8 +14,8 @@ Bots find their memories and earlier chats by words, and by meaning with vectors
 
 The local choices need an install made by `setup.sh`, which runs `embed` as one of its containers. **Off** and a provider leave `embed` out, so it uses nothing. A checkout's local embedder is the one `deploy/compose.dev.yaml` runs, on the CPU, and Settings can't move it.
 
-<img class="shot dark:sl-hidden" src="/shots/memory-desktop-light.png" width="832" height="744" alt="Settings, on the Memory tab" />
-<img class="shot light:sl-hidden" src="/shots/memory-desktop-dark.png" width="832" height="744" alt="Settings, on the Memory tab" />
+<img class="shot dark:sl-hidden" src="/shots/memory-desktop-light.png" width="832" height="664" alt="Settings, on the Memory tab: team memories, then memory search" />
+<img class="shot light:sl-hidden" src="/shots/memory-desktop-dark.png" width="832" height="664" alt="Settings, on the Memory tab: team memories, then memory search" />
 
 ## Pick one
 

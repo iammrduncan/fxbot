@@ -57,6 +57,7 @@ async function main() {
   const w = await world(fx, model);
   // A page shows when it was saved: one fixed time, so a shot looks the same on every run.
   db.sql("shots_world", "update plugin_pages.versions set at = '2026-11-08 19:45:00 America/New_York'");
+  db.sql("shots_world", "update memories set created_at = '2026-11-08 19:45:00 America/New_York', updated_at = '2026-11-08 19:45:00 America/New_York'");
   const at = (bot) => `/profiles/${w[bot].id}`;
   await shoot("hero", fx, at("Juniper"), { devices: ["desktop", "phone"], scale: 2 });
   await shoot("look", fx, at("Juniper"), { devices: ["desktop", "phone"], scale: 2, async then(pg) {
@@ -95,7 +96,8 @@ async function main() {
     await pg.getByRole("button", { name: "Add provider" }).click();
     await pg.getByRole("dialog").getByRole("region", { name: "Sign in" }).waitFor();
   } });
-  await shoot("memory", fx, "/settings/memory", { main: true, height: 440 });
+  // Team memories, then Memory search below them.
+  await shoot("memory", fx, "/settings/memory", { main: true, height: 720 });
   // Atlas's subagents at work, and a diagram from Pixel. Shot last, so the scenes above stay as they were. Subagents
   // get scientists' names at random, so theirs are set here, for a shot that's the same on every run.
   await w.say("Atlas", "Compare the three hosting offers for our little database, and what each says about backups.");
@@ -284,6 +286,9 @@ async function world(fx, model) {
   w.lisbon = items.find((i) => i.name.startsWith("A slow weekend"))?.id;
   w.chart = items.find((i) => i.name.startsWith("Spending this month"))?.id;
   w.room = room.id;
+  // What every bot reads, in Settings › Memory.
+  await fx.api("/api/memories", "POST", { text: "I like short answers, with the main point first." });
+  await fx.api("/api/memories", "POST", { text: "We live in Porto, with our dog Biscuit. Weekends are for the garden." });
   w.say = say;
   if (!w.lisbon || !w.chart) throw new Error(`The pages weren't written: ${items.map((i) => i.name).join(", ")}`);
   return w;
