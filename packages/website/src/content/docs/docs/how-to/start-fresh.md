@@ -26,7 +26,7 @@ It leaves out the threads that don't bear on your words, in at most 600 words. `
 ## When it doesn't start over
 
 - **A chat with no messages yet:** your words go to it as they are.
-- **A room, or any plugin's chat:** `/fresh` is ordinary text there.
+- **A plugin's chat,** such as a routine's run: `/fresh` is ordinary text there. A chat room starts over as a whole, with chat rooms 0.5.0: see [Start a room over](/docs/how-to/talk-in-a-room/#start-a-room-over).
 
 ## When you still have the fresh plugin
 

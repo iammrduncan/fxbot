@@ -71,6 +71,8 @@ const speaker = (row: Row) => (row.role === "user" && row.plugin ? `from ${row.p
 // embedder and message vectors on, a search also finds messages by meaning.
 export function createHistory(sql: Sql, embeddings?: Embeddings) {
   const pluginOf = sql`(select s.plugin from sent s where s.profile_id = m.profile_id and s.message_id = m.message_id and m.role = 'user') as plugin`;
+  // The plugin whose session a message is in, such as a room's, or null for the bot's own chats.
+  const sourceOf = sql`(select p.plugin from plugin_sessions p where p.id = m.session_id) as source`;
   // A message and its neighbours in the same chat, in full, oldest first. It reads 6 more on each side than it shows,
   // so the ids it names to page on give windows that meet this one end to end.
   async function around(bot: string, ref: string) {
@@ -105,7 +107,7 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
     description:
       "Search this bot's history across all of its chats, or read it in full: what the owner and other bots said, its replies, its thinking, and its tool calls with their results. With query: a message matching any of the words counts, " +
       "more matches rank higher, a word also matches longer words it starts, and, with meaning search on, messages close in meaning count too. Returns the best matches oldest first, each with its date, " +
-      "msg:<id>, and whether it is from an earlier chat. With around: a msg:<id>, reads that message and the ones before and after it in " +
+      "msg:<id>, and where it is from: an earlier chat, your own chat, or a plugin's session, such as a chat room's. With around: a msg:<id>, reads that message and the ones before and after it in " +
       "its chat, in full; call again with the first or last id to page.",
     inputSchema: {
       type: "object",
@@ -127,32 +129,36 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
       // The message that started this turn is already saved, and is left out: it is the search itself. The word
       // matches and the nearest vectors are fused, best first.
       const [byWords, byMeaning] = await Promise.all([
-        sql<(Row & { here: boolean })[]>`
-          select m.id, m.created_at, m.role, ${pluginOf}, m.session_id = ${call.sessionId} as here, ts_headline('simple', m.text, q, 'MaxWords=40, MinWords=15') as text
+        sql<(Row & { here: boolean; source: string | null })[]>`
+          select m.id, m.created_at, m.role, ${pluginOf}, ${sourceOf}, m.session_id = ${call.sessionId} as here, ts_headline('simple', m.text, q, 'MaxWords=40, MinWords=15') as text
           from messages m, to_tsquery('simple', ${words}) q
           where m.profile_id = ${bot} and m.tsv @@ q
             and m.id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
           order by ts_rank_cd(m.tsv, q) desc, m.created_at desc limit 40`,
         (async () => {
           const close = embeddings && (await embeddings.messagesOn()) ? await embeddings.query(String(input.query)) : null;
-          if (!close) return [] as (Row & { here: boolean })[];
-          return sql<(Row & { here: boolean })[]>`
+          if (!close) return [] as (Row & { here: boolean; source: string | null })[];
+          return sql<(Row & { here: boolean; source: string | null })[]>`
             with nearest as (
-              select m.id, m.created_at, m.role, ${pluginOf}, m.session_id = ${call.sessionId} as here, m.text, m.embedding <=> ${close.vector}::vector as distance
+              select m.id, m.created_at, m.role, ${pluginOf}, ${sourceOf}, m.session_id = ${call.sessionId} as here, m.text, m.embedding <=> ${close.vector}::vector as distance
               from messages m
               where m.profile_id = ${bot} and m.embedded_with = ${close.model} and m.embedding is not null
                 and m.id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
               order by distance limit 40)
-            select id, created_at, role, plugin, here, ts_headline('simple', text, to_tsquery('simple', ${words}), 'MaxWords=40, MinWords=15') as text
+            select id, created_at, role, plugin, source, here, ts_headline('simple', text, to_tsquery('simple', ${words}), 'MaxWords=40, MinWords=15') as text
             from nearest where distance <= (select min(distance) from nearest) + ${near} order by distance`;
         })(),
       ]);
       const rows = fuse([byWords, byMeaning]).slice(0, limit);
       if (!rows.length) return "No earlier messages match.";
+      // Where each match is from, when not this chat: a plugin's session, such as a room's, or the bot's own chat,
+      // which from a plugin's session is "your own chat", and from the bot's own is an earlier one.
+      const inPlugin = (await sql`select 1 from plugin_sessions where id = ${call.sessionId}`).length > 0;
+      const where = (r: { here: boolean; source: string | null }) => (r.here ? "" : r.source ? ` (in ${r.source})` : inPlugin ? " (your own chat)" : " (earlier chat)");
       // The best matches, in the order they were written.
       return rows
         .sort((a, b) => Number(a.id) - Number(b.id))
-        .map((r) => `[${stamp(r.createdAt)}] msg:${r.id} ${speaker(r)}${r.here ? "" : " (earlier chat)"}: ${r.text.replace(/\s+/g, " ")}`)
+        .map((r) => `[${stamp(r.createdAt)}] msg:${r.id} ${speaker(r)}${where(r)}: ${r.text.replace(/\s+/g, " ")}`)
         .join("\n");
     },
   };

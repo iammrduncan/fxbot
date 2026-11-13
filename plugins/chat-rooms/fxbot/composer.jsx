@@ -1,6 +1,7 @@
 // The room's message box. It's ProseMirror, so a bot you tag is a chip with its avatar, which deletes as one piece. `@`
 // at the start of a line or after a space lists the room's bots, then Everyone, filtered by what follows, and the pick
-// replaces what was typed. Enter sends, and Shift+Enter starts a new line. Sending writes each chip as its token.
+// replaces what was typed. `/` at the start of the message lists the room's commands, /fresh. Enter sends, and
+// Shift+Enter starts a new line. Sending writes each chip as its token.
 import { useEffect, useRef, useState } from "react";
 import * as app from "@fxbot/app";
 import { baseKeymap, splitBlock } from "prosemirror-commands";
@@ -54,13 +55,18 @@ function docOf(text) {
   };
   return schema.node("doc", null, text.split("\n").map(paragraph));
 }
+// The room's commands, for `/` at the start of the message.
+const commands = [{ id: "/fresh", name: "/fresh", description: "Start the room over toward what you write next", command: true }];
 const fresh = (doc) => EditorState.create({ schema, doc, plugins: [history(), keymap({ "Mod-z": undo, "Shift-Mod-z": redo, "Mod-y": redo, "Shift-Enter": splitBlock }), keymap(baseKeymap)] });
 
-// The @ being typed before the caret, and what follows it: at the start of a line or after a space.
+// The @ being typed before the caret, and what follows it: at the start of a line or after a space. Or a / at the
+// start of the message, and the letters after it.
 function typing(state) {
   const { $from, empty } = state.selection;
   if (!empty) return null;
   const before = $from.parent.textBetween(0, $from.parentOffset, null, "￼");
+  const command = state.doc.firstChild === $from.parent && /^\/([a-z]{0,10})$/.exec(before);
+  if (command) return { from: $from.pos - command[0].length, to: $from.pos, query: command[1], command: true };
   const m = /(?:^|\s)@([^@\n￼]{0,30})$/.exec(before);
   return m ? { from: $from.pos - m[1].length - 1, to: $from.pos, query: m[1] } : null;
 }
@@ -102,7 +108,7 @@ export function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmp
     setEmpty(state.doc.childCount === 1 && first.childCount === 0);
     const at = typing(state);
     if (!at || at.from !== dismissed.current) dismissed.current = -1;
-    const matches = at && at.from !== dismissed.current ? rank(choices.current, at.query) : [];
+    const matches = !at || at.from === dismissed.current ? [] : at.command ? commands.filter((c) => c.name.startsWith(`/${at.query}`)) : rank(choices.current, at.query);
     const next = matches.length ? { ...at, matches, active: shown.current && shown.current.from === at.from && shown.current.query === at.query ? shown.current.active : 0 } : null;
     if (next && (!shown.current || shown.current.matches.length !== matches.length)) setSaid(`${matches.length} ${matches.length === 1 ? "match" : "matches"}`);
     setList(next);
@@ -112,6 +118,12 @@ export function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmp
     const v = view.current;
     const at = shown.current;
     if (!v || !at) return;
+    if (choice.command) {
+      v.dispatch(v.state.tr.insertText(`${choice.name} `, at.from, at.to));
+      v.focus();
+      setSaid(`${choice.name}: ${choice.description}`);
+      return;
+    }
     const tr = v.state.tr.replaceWith(at.from, at.to, [schema.nodes.mention.create({ bot: choice.id }), schema.text(" ")]);
     v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at.from + 2)));
     v.focus();
@@ -204,7 +216,7 @@ export function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmp
   return (
     <div className="cr-box">
       {list && (
-        <div id="cr-mentions" role="listbox" aria-label="Bots" className="absolute right-0 bottom-full left-0 z-10 mb-2 max-h-72 overflow-y-auto rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md">
+        <div id="cr-mentions" role="listbox" aria-label={list.command ? "Commands" : "Bots"} className="absolute right-0 bottom-full left-0 z-10 mb-2 max-h-72 overflow-y-auto rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md">
           {list.matches.map((choice, i) => (
             <button
               key={choice.id}
@@ -217,8 +229,9 @@ export function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmp
               onClick={() => pick(choice)}
               className={`flex w-full min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm ${i === list.active ? "bg-accent text-accent-foreground" : ""}`}
             >
-              {choice.bot ? <app.ui.Blob {...choice.bot} size={24} /> : <Stack ids={bots.map((bot) => bot.id)} size={16} />}
-              <span className="min-w-0 flex-1 truncate font-medium">{choice.name}</span>
+              {choice.command ? null : choice.bot ? <app.ui.Blob {...choice.bot} size={24} /> : <Stack ids={bots.map((bot) => bot.id)} size={16} />}
+              <span className={choice.command ? "shrink-0 font-medium" : "min-w-0 flex-1 truncate font-medium"}>{choice.name}</span>
+              {choice.command && <span className="min-w-0 flex-1 truncate text-muted-foreground">{choice.description}</span>}
             </button>
           ))}
         </div>

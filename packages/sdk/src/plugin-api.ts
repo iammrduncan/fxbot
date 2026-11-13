@@ -165,6 +165,10 @@ export type PluginApi = {
   };
   /** The owner's time zone, such as Europe/Berlin: Settings › General's, or the machine's. Read it at each use. Since 0.6.0. */
   timeZone(): string;
+  /** Idle compaction's setting, from Settings › General: `idleMinutes` a chat sits idle before it's compacted, 0 when
+   * it's off, and the model that writes a summary, `provider` and `model`, or "" for each bot's own. Read it at each
+   * use. Since 0.10.0. */
+  compaction(): Promise<{ idleMinutes: number; provider: string; model: string }>;
   /** The machine's fxbot command, for a job only root can do; null in a checkout, which has none. */
   machine: PluginMachine | null;
   /** Values the plugin makes itself, such as keys of its own, sealed beside its settings and never shown. `get` answers

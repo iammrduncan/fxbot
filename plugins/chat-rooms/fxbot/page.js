@@ -9670,6 +9670,12 @@ function docOf(text) {
 	};
 	return schema.node("doc", null, text.split("\n").map(paragraph));
 }
+const commands = [{
+	id: "/fresh",
+	name: "/fresh",
+	description: "Start the room over toward what you write next",
+	command: true
+}];
 const fresh = (doc) => EditorState.create({
 	schema,
 	doc,
@@ -9688,6 +9694,13 @@ function typing(state) {
 	const { $from, empty } = state.selection;
 	if (!empty) return null;
 	const before = $from.parent.textBetween(0, $from.parentOffset, null, "￼");
+	const command = state.doc.firstChild === $from.parent && /^\/([a-z]{0,10})$/.exec(before);
+	if (command) return {
+		from: $from.pos - command[0].length,
+		to: $from.pos,
+		query: command[1],
+		command: true
+	};
 	const m = /(?:^|\s)@([^@\n￼]{0,30})$/.exec(before);
 	return m ? {
 		from: $from.pos - m[1].length - 1,
@@ -9733,7 +9746,7 @@ function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmpty }) {
 		setEmpty(state.doc.childCount === 1 && first.childCount === 0);
 		const at = typing(state);
 		if (!at || at.from !== dismissed.current) dismissed.current = -1;
-		const matches = at && at.from !== dismissed.current ? rank(choices.current, at.query) : [];
+		const matches = !at || at.from === dismissed.current ? [] : at.command ? commands.filter((c) => c.name.startsWith(`/${at.query}`)) : rank(choices.current, at.query);
 		const next = matches.length ? {
 			...at,
 			matches,
@@ -9746,6 +9759,12 @@ function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmpty }) {
 		const v = view.current;
 		const at = shown.current;
 		if (!v || !at) return;
+		if (choice.command) {
+			v.dispatch(v.state.tr.insertText(`${choice.name} `, at.from, at.to));
+			v.focus();
+			setSaid(`${choice.name}: ${choice.description}`);
+			return;
+		}
 		const tr = v.state.tr.replaceWith(at.from, at.to, [schema.nodes.mention.create({ bot: choice.id }), schema.text(" ")]);
 		v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at.from + 2)));
 		v.focus();
@@ -9841,7 +9860,7 @@ function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmpty }) {
 			list && (0, react_jsx_runtime.jsx)("div", {
 				id: "cr-mentions",
 				role: "listbox",
-				"aria-label": "Bots",
+				"aria-label": list.command ? "Commands" : "Bots",
 				className: "absolute right-0 bottom-full left-0 z-10 mb-2 max-h-72 overflow-y-auto rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md",
 				children: list.matches.map((choice, i) => (0, react_jsx_runtime.jsxs)("button", {
 					id: `cr-mention-${i}`,
@@ -9851,16 +9870,23 @@ function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmpty }) {
 					onMouseDown: (e) => e.preventDefault(),
 					onClick: () => pick(choice),
 					className: `flex w-full min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm ${i === list.active ? "bg-accent text-accent-foreground" : ""}`,
-					children: [choice.bot ? (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-						...choice.bot,
-						size: 24
-					}) : (0, react_jsx_runtime.jsx)(Stack, {
-						ids: bots.map((bot) => bot.id),
-						size: 16
-					}), (0, react_jsx_runtime.jsx)("span", {
-						className: "min-w-0 flex-1 truncate font-medium",
-						children: choice.name
-					})]
+					children: [
+						choice.command ? null : choice.bot ? (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
+							...choice.bot,
+							size: 24
+						}) : (0, react_jsx_runtime.jsx)(Stack, {
+							ids: bots.map((bot) => bot.id),
+							size: 16
+						}),
+						(0, react_jsx_runtime.jsx)("span", {
+							className: choice.command ? "shrink-0 font-medium" : "min-w-0 flex-1 truncate font-medium",
+							children: choice.name
+						}),
+						choice.command && (0, react_jsx_runtime.jsx)("span", {
+							className: "min-w-0 flex-1 truncate text-muted-foreground",
+							children: choice.description
+						})
+					]
 				}, choice.id))
 			}),
 			(0, react_jsx_runtime.jsx)("div", { ref: box }),
@@ -10320,7 +10346,8 @@ function useRoom(id) {
 					room: event.room,
 					messages: event.messages,
 					replying: event.replying,
-					queue: event.queue ?? []
+					queue: event.queue ?? [],
+					starting: event.starting === true
 				};
 				if (!now) return now;
 				if (event.type === "message") {
@@ -10341,6 +10368,10 @@ function useRoom(id) {
 				if (event.type === "queue") return {
 					...now,
 					queue: event.bots
+				};
+				if (event.type === "starting") return {
+					...now,
+					starting: event.on
 				};
 				if (event.type === "idle") return {
 					...now,
@@ -10399,11 +10430,39 @@ const Markdown = ({ text }) => (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Streamdo
 	components: chips,
 	children: tagged(text)
 });
+function Summary({ text }) {
+	const [first, ...rest] = text.split("\n\n");
+	const idle = /summarized after \d+ minutes idle:$/.test(first);
+	const settings = (e) => (e.preventDefault(), (0, _fxbot_app.go)("/settings"));
+	return (0, react_jsx_runtime.jsxs)("details", {
+		className: "w-full rounded-xl border px-3 py-2 text-sm",
+		children: [(0, react_jsx_runtime.jsxs)("summary", {
+			className: "cursor-pointer font-medium",
+			children: [idle ? "Compacted while idle" : "Started over", idle && (0, react_jsx_runtime.jsxs)("span", {
+				className: "pl-2 text-xs font-normal text-muted-foreground",
+				children: [
+					"Turn off in",
+					" ",
+					(0, react_jsx_runtime.jsx)("a", {
+						href: "/settings",
+						onClick: settings,
+						className: "underline underline-offset-4",
+						children: "Settings"
+					})
+				]
+			})]
+		}), (0, react_jsx_runtime.jsx)("p", {
+			className: "pt-2 whitespace-pre-wrap text-muted-foreground",
+			children: rest.join("\n\n")
+		})]
+	});
+}
 function Said({ message, bot }) {
 	if (message.author === "note") return (0, react_jsx_runtime.jsx)("p", {
 		className: "text-center text-xs text-muted-foreground",
 		children: message.text
 	});
+	if (message.author === "summary") return (0, react_jsx_runtime.jsx)(Summary, { text: message.text });
 	if (message.author === "owner") return (0, react_jsx_runtime.jsx)("div", {
 		className: "flex justify-end",
 		children: (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Bubble, {
@@ -10507,6 +10566,10 @@ function RoomScreen({ params }) {
 							message,
 							bot: botOf(message.author)
 						}, message.id)),
+						state?.starting && (0, react_jsx_runtime.jsx)("p", {
+							className: "animate-pulse text-center text-xs text-muted-foreground",
+							children: "Starting the room over…"
+						}),
 						state?.replying && (0, react_jsx_runtime.jsxs)("div", {
 							className: "flex items-start gap-3",
 							"data-replying": true,

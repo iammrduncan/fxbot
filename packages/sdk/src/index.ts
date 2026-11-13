@@ -218,6 +218,10 @@ export async function createFxbot(options: FxbotOptions) {
       machine: options.machine ?? null,
       localUrl: options.localUrl ?? "http://127.0.0.1:8787",
       timeZone: () => timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+      async compaction() {
+        const { idleCompactMinutes: idleMinutes, compactProvider: provider, compactModel: model } = await store.settings.get();
+        return { idleMinutes, provider, model };
+      },
       chats: {
         async newSession(plugin, bot, { label, effort } = {}) {
           started();

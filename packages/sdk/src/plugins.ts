@@ -177,6 +177,7 @@ type Wait = (call: { input: unknown }) => Promise<{ block: string } | void>;
 export type PluginHost = {
   bots: Omit<PluginApi["bots"], "on">;
   timeZone: PluginApi["timeZone"];
+  compaction: PluginApi["compaction"];
   library: PluginApi["library"];
   skills: Pick<PluginApi["skills"], "files">;
   memories: PluginApi["memories"];
@@ -558,6 +559,7 @@ export async function createPlugins(options: {
       settings: plugin.settings,
       bots: { ...host.bots, on: (bot) => applies(plugin, bot) },
       timeZone: host.timeZone,
+      compaction: host.compaction,
       dependents: () => dependentsOf(record.name),
       provide(offer) {
         if (!offer || typeof offer !== "object") throw new Error("provide takes an object.");

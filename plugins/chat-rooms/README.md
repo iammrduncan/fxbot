@@ -20,6 +20,11 @@ A plugin for [fxbot](https://fxbot.sh): rooms where several of your bots talk wi
   - **Bots** save one with `chat-rooms_remember` (with `replaces`, to change one) and remove one with `chat-rooms_forget`, by its `room-mem:<id>`. Each finds its room from the bot's session, so it works only in a room.
   - **Limits:** a memory is at most 1,000 characters, and the newest that fit in 6,000 bytes go to each bot. Saving one that's there answers with it.
   - **Deleting a room** deletes its memories, and removing the plugin removes them all.
+- **Starting over,** since 0.5.0, as a bot's own chat does:
+  - **Idle compaction:** a room that sits idle past **Settings** › **General** › **Idle compaction**, with at least 120 KB of text since its last summary, is summarized while you're away. Its lead writes the summary, on **Summarize with**'s model when you pick one. The room shows **Compacted while idle**, which opens to the summary. A message you send meanwhile calls it off.
+  - **`/fresh`:** start a message with `/fresh`, and the room stops its turns, is summarized toward what you wrote next, shows **Started over**, then posts the rest. `/` at the start of the message box lists it.
+  - **Then** each bot's next turn there starts a new session, sent the room since the summary, with the summary in its instructions. Its earlier sessions stay, and `chat_history` finds them.
+  - On fxbot before 0.10.0, which has no idle compaction setting for plugins, rooms aren't compacted while idle. Before 0.6.0, `/fresh` says the room can't be summarized.
 - **Skills:** three, `chat-room`, `room-handoff`, and `room-lead`, teach a bot how to work in a room. The room sends `chat-room` with a bot's first turn there, and `room-lead` with the lead's first untagged turn.
 - **Edit**, on a room, changes its name, its bots and their order, what an untagged message does, and its replies per message, or deletes it.
 - **Order:** drag a room in the sidebar to move it, with a mouse, or with a finger after a moment's hold. On fxbot before 0.7.0, rooms stay in the order they were made.

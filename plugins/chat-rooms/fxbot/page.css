@@ -6,6 +6,10 @@
   min-width: 0;
   flex: 1;
 }
+/* The list of bots or commands spans the box. The app's styles hold right-0 but not left-0. */
+#cr-mentions {
+  left: 0;
+}
 .cr-editor {
   min-height: 2.5rem;
   max-height: 12rem;

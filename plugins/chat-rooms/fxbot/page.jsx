@@ -318,7 +318,7 @@ function useRoom(id) {
       if (event.type === "reply") writes(id, event.bot);
       if (event.type === "idle" || (event.type === "message" && writing.get(id) === event.message.author)) writes(id, null);
       setState((now) => {
-        if (event.type === "room") return { room: event.room, messages: event.messages, replying: event.replying, queue: event.queue ?? [] };
+        if (event.type === "room") return { room: event.room, messages: event.messages, replying: event.replying, queue: event.queue ?? [], starting: event.starting === true };
         if (!now) return now;
         if (event.type === "message") {
           const messages = now.messages.some((m) => m.id === event.message.id) ? now.messages : [...now.messages, event.message];
@@ -326,6 +326,7 @@ function useRoom(id) {
         }
         if (event.type === "reply") return { ...now, replying: { bot: event.bot, text: event.text } };
         if (event.type === "queue") return { ...now, queue: event.bots };
+        if (event.type === "starting") return { ...now, starting: event.on };
         if (event.type === "idle") return { ...now, replying: null, queue: [] };
         return now;
       });
@@ -384,8 +385,32 @@ const Markdown = ({ text }) => (
   </ui.Streamdown>
 );
 
+// A summary the room started over from, folded: Compacted while idle, or Started over. It opens to the summary.
+function Summary({ text }) {
+  const [first, ...rest] = text.split("\n\n");
+  const idle = /summarized after \d+ minutes idle:$/.test(first);
+  const settings = (e) => (e.preventDefault(), go("/settings"));
+  return (
+    <details className="w-full rounded-xl border px-3 py-2 text-sm">
+      <summary className="cursor-pointer font-medium">
+        {idle ? "Compacted while idle" : "Started over"}
+        {idle && (
+          <span className="pl-2 text-xs font-normal text-muted-foreground">
+            Turn off in{" "}
+            <a href="/settings" onClick={settings} className="underline underline-offset-4">
+              Settings
+            </a>
+          </span>
+        )}
+      </summary>
+      <p className="pt-2 whitespace-pre-wrap text-muted-foreground">{rest.join("\n\n")}</p>
+    </details>
+  );
+}
+
 function Said({ message, bot }) {
   if (message.author === "note") return <p className="text-center text-xs text-muted-foreground">{message.text}</p>;
+  if (message.author === "summary") return <Summary text={message.text} />;
   if (message.author === "owner")
     return (
       <div className="flex justify-end">
@@ -471,6 +496,7 @@ function RoomScreen({ params }) {
           {state?.messages.map((message) => (
             <Said key={message.id} message={message} bot={botOf(message.author)} />
           ))}
+          {state?.starting && <p className="animate-pulse text-center text-xs text-muted-foreground">Starting the room over…</p>}
           {state?.replying && (
             <div className="flex items-start gap-3" data-replying>
               {writer ? <ui.Blob {...writer} size={28} busy className="shrink-0" /> : null}

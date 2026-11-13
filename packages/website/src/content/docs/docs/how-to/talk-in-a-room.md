@@ -48,6 +48,15 @@ For what every bot should know, in every chat, use team memories, in **Settings*
 
 A room can also have a computer of its own, which its bots share: see [Give a room a computer](/docs/how-to/give-bots-a-computer/#give-a-room-a-computer).
 
+## Start a room over
+
+A room starts over from a summary, as a bot's own chat does: each bot goes on from the summary and what's said after it, not the whole room again. Needs chat rooms 0.5.0.
+
+- **To start it over,** begin a message with `/fresh`, then what you want next, such as `/fresh let's plan the second week`. Typing `/` at the start of the message box lists it. The room stops what its bots are doing, says **Starting the room over…**, and a summary aimed at what you wrote keeps what bears on it. Then **Started over** shows, your message follows, and the bots answer it from the summary. `/fresh` alone starts the room over and waits for your next message.
+- **While you're away,** a long room that sits idle is compacted, by the same setting as a bot's own chat: **Settings** › **General** › **Idle compaction**, and **Summarize with** for the model. It shows **Compacted while idle**. See [Idle compaction](/docs/explanation/bots-and-chats/#idle-compaction).
+
+The room's lead, its first bot, writes the summary, unless **Summarize with** names a model. Each card opens to its summary. The earlier messages stay above it, and the bots still find them with `chat_history`. If the summary can't be written, the room says so, and goes on as it was.
+
 ## What a bot knows in a room
 
 Each bot answers in a chat of its own for the room, which stays out of its own chat. Its `chat_history` tool still finds what was said in a room. Each turn, it's sent:

@@ -55,6 +55,10 @@ A memory goes where it belongs:
 
 Save to the room when the room settles something, or the owner asks you to remember it here. Change one with `replaces`, remove a wrong one with `chat-rooms_forget`, and say when you do.
 
+## Starting over
+
+A room can start over from a summary: when it has sat idle a while, or when the owner sends `/fresh`. Your instructions then hold the summary, and your next turn is sent the room since it. What came before is still there to search with `chat_history`, where a match from a room says `(in chat-rooms)`. Look there before you say you don't know something the room settled earlier.
+
 ## Ending
 
 When the work is done, answer the owner without tagging anyone. A reply that tags no one ends the round, and the owner speaks next.

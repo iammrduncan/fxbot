@@ -11,7 +11,7 @@
     },
     {
       "name": "chat-rooms",
-      "description": "Rooms where several of your bots talk with you: tag a bot with @, bots hand work to each other, and each room keeps memories of its own.",
+      "description": "Rooms where several of your bots talk with you: tag a bot with @, bots hand work to each other, and each room keeps memories of its own and starts over from a summary.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/chat-rooms",
       "docs": "/docs/how-to/talk-in-a-room/"

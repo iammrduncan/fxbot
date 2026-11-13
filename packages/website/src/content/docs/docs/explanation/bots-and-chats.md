@@ -109,7 +109,9 @@ Every minute, fxbot looks for a bot whose own chat has had no message for the ti
 - **Nothing runs:** no turn of the bot's is running, and it isn't waiting on you.
 - **It's new since:** it hasn't been tried since its last message. A summary that failed isn't tried again until a new message comes, and a compacted chat isn't compacted again until it grows.
 
-Only the bot's own chat counts and is compacted. A room, a routine's run, or a subagent doesn't keep it awake, and isn't compacted. fxbot compacts one bot at a time, so many idle bots don't send a burst of requests.
+Only the bot's own chat counts and is compacted here. A room, a routine's run, or a subagent doesn't keep it awake, and isn't compacted with it. fxbot compacts one bot at a time, so many idle bots don't send a burst of requests.
+
+A chat room is compacted too, with chat rooms 0.5.0, by the same setting and the same rules, as a whole: one summary for the room, which its lead writes, unless **Summarize with** names a model. Each bot's next turn there starts from it. See [Start a room over](/docs/how-to/talk-in-a-room/#start-a-room-over).
 
 What the bot keeps, in its own chat's instructions, in place of the chat. Its rooms, routines, and subagents don't get it:
 - the summary, which keeps your requests and instructions in your words, what was decided and why, facts about you and your work, and each open task
