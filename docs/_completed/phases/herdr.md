@@ -11,7 +11,7 @@ Status: built on 2026-11-14, for 0.11.0, as planned the same day at the owner's 
 
 ## What the owner asked
 
-"I want to get these two things launched on fxbot such that the bot is able to make outgoing phone calls when asked and approved (to my phone) and the agent is able to use herdr to see agent activity and access the rest of my ai lab." (2026-11-14; the phone half is [Phone call](../../phases/phone-call.md).)
+"I want to get these two things launched on fxbot such that the bot is able to make outgoing phone calls when asked and approved (to my phone) and the agent is able to use herdr to see agent activity and access the rest of my ai lab." (2026-11-14; the phone half is [Phone: SignalWire](../../phases/phone-signalwire.md).)
 
 With notes from the agent that runs the owner's lab:
 - herdr's socket is herdr's user's own, `~/.config/herdr/herdr.sock`, and `herdr agent list|read|prompt|send-keys|start|wait` works there and, with `--machine`, on the 10 lab machines. `herdr --skill` prints herdr's own guide for agents.
@@ -218,7 +218,7 @@ A watch is one prompt, from the call to the agent's settled state:
 - **After a load,** 10 seconds on, since fxbot takes no turns while it starts: each watch from before the load still working runs `agent get` first, and settled means tell, working means wait again, gone means say so. One that ended and wasn't told is told. Nothing is sent to an agent again.
 - **At most `watches` at once,** 8 by default. A prompt past that refuses: "8 agents are working on your prompts already, the most at once. Wait for an answer first."
 
-A bot can do something with the answer: tell the owner, prompt again, or call them with [Phone call](../../phases/phone-call.md), which is how "call me when the run on lab-2 finishes" works.
+A bot can do something with the answer: tell the owner, prompt again, or call them with [Phone: SignalWire](../../phases/phone-signalwire.md), which is how "call me when the run on lab-2 finishes" works.
 
 ### The page
 

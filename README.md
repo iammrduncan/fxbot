@@ -32,7 +32,7 @@ Records live in Postgres, and so do libfx's sessions, each chat's. No Next.js, a
 
 ## Phases
 
-In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Distribution, Mac support, Phone call, hc, and Embedded links are.
+In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Distribution, Mac support, Phone: SignalWire, hc, and Embedded links are.
 
 - [x] [v1](docs/_completed/v1-plan.md) (core): bot profiles and a streaming chat
 - [x] [Provider logins](docs/_completed/phases/provider-logins.md) (core): ChatGPT, Grok, and Vercel accounts, API keys, and local model servers
@@ -91,7 +91,8 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Local access](docs/phases/plugin-local-access.md) (plugin): bots reach folders the owner picks on the machine itself, off until the owner turns it on
 - [ ] [Image and video generation](docs/phases/media-generation.md) (plugin): bots create images and video
 - [ ] [Voice memos](docs/phases/voice-memos.md) (plugin): send a bot a recorded voice memo
-- [ ] [Phone call](docs/phases/phone-call.md) (plugin): press Call me and the bot rings your phone, greets you, and talks with you, hands-free, with its own model, memory, and tools, on Twilio first and more phone and voice providers after
+- [ ] [Phone: SignalWire](docs/phases/phone-signalwire.md) (plugin): press Call me and the bot rings your phone, greets you, and talks with you, hands-free, with its own model, memory, and tools, and nothing reaching fxbot
+- [ ] [Phone: Telnyx](docs/phases/phone-telnyx.md) (plugin): the same call for about a third of the price, with fxbot as a softphone and speech providers of the owner's own
 - [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): talk with a bot by voice, in the app or over a phone line
 
 The previous design and spike are in [archive/](archive/README.md). The git host may still use the old repository name until the owner renames it.
