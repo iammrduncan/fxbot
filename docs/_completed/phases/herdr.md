@@ -369,6 +369,7 @@ Each was taken as recommended, at the owner's /goal to build the doc.
 - **A bug the checks found:** `fxbot herdr on` for a user that doesn't exist, or one without herdr, ended silently under `set -euo pipefail`. Each lookup now says what's wrong.
 - **A race the checks found:** in the 10 seconds after a load, the pick-up could follow a watch that a prompt had just made, which then followed it too: the pick-up's `agent get` could end it early, and both told the bot. The pick-up now takes only watches from before the load, and a message libfx refuses as already sent counts as told.
 - **The how-to** is [Work with your herdr agents](../../../packages/website/src/content/docs/docs/how-to/work-with-herdr-agents.md), since bots send work as well as look. **Add a plugin** no longer lists plugins one by one, so fxbot's list entry, with its docs link, puts herdr in the plugin directory.
+- **A watched agent's news folds into a pill,** at the owner's word on 2026-11-14: "I don't want a herdr message looking like it is one of my messages. We should show a chip from herdr in the center like we do on the bots messages plugin." With `app.fold`, a `herdr-watch-<id>` message, alone or joined to a running turn, shows as **1 received · herdr** in the middle of the chat, and opens to the message in grey, on the bot's side. What the bot says about it stays in view, since it's for the owner. The chat shows the message without its `herdr:` prefix, which the bot still reads. No new API: `app.fold` is from 0.6.0.
 
 ## After the build
 

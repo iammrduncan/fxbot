@@ -300,6 +300,7 @@ function BotMachines({ bot }) {
 	});
 }
 function setup(app) {
+	app.fold({ message: (id) => /^herdr-watch-\d+$/.test(id) ? { fold: "message" } : void 0 });
 	app.botSettings(BotMachines);
 	app.toolView("agents", Agents, { open: true });
 	app.toolView("prompt", Sent, { open: true });

@@ -328,7 +328,8 @@ export default async function setup(fx: PluginApi) {
                 : `herdr: ${name} finished after ${after}.`;
     const text = [head, asked, lines, w.state === "blocked" ? "You can't answer it yourself: tell the owner, who answers in herdr." : ""].filter(Boolean).join("\n\n");
     try {
-      await fx.chats.send(w.bot, { messageId: `herdr-watch-${w.id}`, label: "herdr", steer: true, text, shown: head, ...(w.asked ? { asked: w.asked } : {}) });
+      // The chat folds it into a pill that says it's from herdr, so what it shows drops the prefix the bot reads.
+      await fx.chats.send(w.bot, { messageId: `herdr-watch-${w.id}`, label: "herdr", steer: true, text, shown: head.replace(/^herdr: /, ""), ...(w.asked ? { asked: w.asked } : {}) });
       await fx.sql`update watches set told = true where id = ${w.id}`;
     } catch (error) {
       // libfx refuses a message id it has seen: the message went, and only its row wasn't marked.
