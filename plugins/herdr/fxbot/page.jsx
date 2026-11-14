@@ -15,13 +15,13 @@ const statusText = { working: "Working", blocked: "Waiting for you", done: "Done
 const dot = { working: "bg-primary", blocked: "bg-destructive", done: "bg-muted-foreground", idle: "bg-muted-foreground", unknown: "bg-border" };
 const firstLine = (text) => (text ?? "").split("\n")[0];
 
-function Table({ rows }) {
+function Table({ rows, here }) {
   const machines = [...new Set(rows.map((r) => r.machine))];
   return (
     <div className="grid gap-3">
       {machines.map((machine) => (
         <div key={machine} className="grid gap-1">
-          <p className="text-xs font-medium text-muted-foreground">{machine}</p>
+          <p className="text-xs font-medium text-muted-foreground">{machine === "here" && here ? `${here} (this machine)` : machine}</p>
           {rows
             .filter((r) => r.machine === machine)
             .map((r, i) =>
@@ -61,7 +61,7 @@ function Agents({ call: tool }) {
       {now ? (
         <>
           <p className="text-xs text-muted-foreground">Now: {now.summary}</p>
-          <Table rows={now.rows} />
+          <Table rows={now.rows} here={now.here} />
         </>
       ) : (
         !tool.error && (
@@ -144,9 +144,14 @@ function Tab() {
           </p>
         )}
       </div>
-      {state.machines.length > 0 && (
+      {(state.here || state.machines.length > 0) && (
         <div className="grid gap-1">
-          <p className="font-medium">Saved machines</p>
+          <p className="font-medium">Machines</p>
+          {state.here && (
+            <p className="text-muted-foreground">
+              <span className="text-foreground">{state.here}</span> (this machine, where fxbot runs): {how ? "answers" : "doesn't answer"}
+            </p>
+          )}
           {state.machines.map((m) => (
             <p key={m.label} className="text-muted-foreground">
               <span className="text-foreground">{m.label}</span>: {m.status === "reachable" ? "answers" : (m.error ?? m.status)}
@@ -196,7 +201,7 @@ function BotMachines({ bot }) {
           {data.available.map((machine) => (
             <label key={machine || "here"} className="flex items-center gap-2">
               <ui.Checkbox checked={data.machines.includes(machine)} onCheckedChange={(on) => toggle(machine, on === true)} />
-              {machine || "This machine, where fxbot runs"}
+              {machine || `This machine${data.here ? `, ${data.here}` : ""}, where fxbot runs`}
             </label>
           ))}
         </div>

@@ -20,7 +20,7 @@ The plugin runs only herdr's CLI:
 
 ## Each bot's machines
 
-A bot reaches every machine herdr has, and any it adds later, until you pick its machines under **herdr** in its settings, **This machine, where fxbot runs** among them.
+A bot reaches every machine herdr has, and any it adds later, until you pick its machines under **herdr** in its settings, this machine among them, by its name. The door gives that name in a release, and a checkout uses its own.
 
 ## Settings
 

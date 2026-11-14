@@ -46,7 +46,7 @@ n=${#words[@]}
 case "${w[0]} ${w[1]}" in
   "door ")
     [ "$n" = 1 ] && [ ${#machine[@]} = 0 ] || refuse "door takes nothing more"
-    printf '{"door":{"readOnly":%s,"user":"%s"}}\n' "$([ "$read_only" = 1 ] && echo true || echo false)" "$(id -un)"
+    printf '{"door":{"readOnly":%s,"user":"%s","host":"%s"}}\n' "$([ "$read_only" = 1 ] && echo true || echo false)" "$(id -un)" "$(uname -n)"
     exit 0
     ;;
   "status server") [ "$n" = 3 ] && [ "${w[2]}" = --json ] || refuse "status server --json only" ;;

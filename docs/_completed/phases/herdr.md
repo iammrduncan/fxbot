@@ -161,7 +161,7 @@ The socket is in the control folder, which the container already mounts, so the 
 
 | Command | Its other words | `--read-only` |
 | --- | --- | --- |
-| `door`, only without `--machine`: the door's own answer, whether it's read-only and as whom, for the plugin's tab | none | yes |
+| `door`, only without `--machine`: the door's own answer, whether it's read-only, as whom, and the machine's name, for the plugin's tab | none | yes |
 | `status server --json` | none | yes |
 | `machine list --json`, `machine status --json`, only without `--machine`, since herdr doesn't forward them | none | yes |
 | `agent list` | none | yes |
@@ -348,6 +348,7 @@ Each was taken as recommended, at the owner's /goal to build the doc.
 - **A chat's stream carries only the start of a tool's result,** so the agents card shows the first line and loads the agents on **Show agents now**, and there's no card for `herdr_read`.
 - **fxbot takes no turns while it starts.** A watch is picked up 10 seconds after a load, as routines and subagents wait, and a message that fails to send tries again every 30 seconds, up to 20 times. Those are the plugin's only timers, and run only while an answer waits to be told.
 - **Full-screen agents leave runs of empty rows,** about 20 under Claude Code's answer, so a read keeps one blank line in place of a run.
+- **The machine fxbot runs on, by its name,** after the owner saw it missing from the tab. herdr has no name for it, so the door says it, `uname -n`, in its `door` answer, since fxbot's container has a hostname of its own, and a checkout uses its own. The tab lists it first, as "agent-vm (this machine, where fxbot runs)", a bot's settings name it, the agents table heads its group with it, and the tools take it in place of `here`, saying which machine "here" is.
 - **The summary counts machines asked,** and names those with no agents, since a machine with none adds no rows: "1 agent on 10 machines asked: 1 done. No agents on lab-1, lab-2."
 - **The door:**
   - It answers `door`, with whether it's read-only and as whom, for the plugin's tab. herdr's version comes from `status server --json`.
