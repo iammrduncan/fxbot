@@ -32,7 +32,7 @@ Records live in Postgres, and so do libfx's sessions, each chat's. No Next.js, a
 
 ## Phases
 
-In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Distribution and Mac support are.
+In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Distribution, Mac support, herdr, and Phone call are.
 
 - [x] [v1](docs/_completed/v1-plan.md) (core): bot profiles and a streaming chat
 - [x] [Provider logins](docs/_completed/phases/provider-logins.md) (core): ChatGPT, Grok, and Vercel accounts, API keys, and local model servers
@@ -44,7 +44,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Skills](docs/_completed/phases/skills.md) (core seam): instructions bots read when a task needs them, from fxbot's list and skills.sh
 - [x] [Containers](docs/_completed/phases/containers.md) (core): podman or docker, one compose file for fxbot and its database with pgvector, and updates through the machine's `fxbot` command
 - [x] [Memories](docs/_completed/phases/memories.md) (core): each bot keeps what it has learned, and search by meaning from a local or remote embedder
-- [x] [Plugins](docs/_completed/phases/plugins.md) (core: the plugin API): plugins that change the app, with hooks, tools, data, and screens of their own; fxbot's first two were chat rooms and herdr: [chat rooms](plugins/chat-rooms/README.md) is in `plugins/`, and herdr left in 0.4.1, to be planned again
+- [x] [Plugins](docs/_completed/phases/plugins.md) (core: the plugin API): plugins that change the app, with hooks, tools, data, and screens of their own; fxbot's first two were chat rooms and herdr: [chat rooms](plugins/chat-rooms/README.md) is in `plugins/`, and herdr left in 0.4.1, planned again as [herdr](docs/phases/herdr.md)
 - [x] [One kind of plugin](docs/_completed/phases/one-kind-of-plugin.md) (core seam): one name and one list. A plugin carries any mix of code, MCP servers, and skills, and only the ones fxbot vets show until a switch in Settings
 - [x] [Agent computer](docs/_completed/phases/computer.md) (plugin, one others build on): a Linux computer for each bot, in the machine's own podman or docker, run rootless; the [computer](plugins/computer/README.md) is in `plugins/`
 - [x] [Streams](docs/_completed/phases/streams.md) (core): chats in the Postgres fxbot already runs, so an open chat costs nothing while idle and a long one is as quick to send to as a new one
@@ -80,8 +80,8 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window, past the compaction libfx does
 - [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
 - [ ] [Knowledge base](docs/phases/knowledge-base.md) (plugin): knowledge the bots draw on
+- [ ] [herdr](docs/phases/herdr.md) (plugin, with a door on the machine that `sudo fxbot herdr on` opens): bots see the coding agents [herdr](https://herdr.dev) runs, here and on every machine it reaches, read them, prompt them, start new ones, and hear back when one is done
 - [ ] [herdr screen](docs/phases/herdr-screen.md) (plugin): the [herdr](https://herdr.dev) interface in the app, from a herdr plugin
-- [ ] [Remote control](docs/phases/remote-control.md) (plugin): heavy work handed to coding agents through herdr
 - [ ] [Web search](docs/phases/web-search.md) (plugin): bots search and read the web, and cite it
 - [ ] [X feed](docs/phases/plugin-x-feed.md) (plugins): bots read X (Twitter) for free with tools of their own, posts, search, mentions, followers, and lists, from X's public pages, its embeds, and FxTwitter, or through a signed-in tab on the bot's computer, and watches start a turn when someone posts or the owner is mentioned
 - [ ] [Vault](docs/phases/vault.md) (plugin): saved secrets and details bots use when allowed
@@ -89,6 +89,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Local access](docs/phases/plugin-local-access.md) (plugin): bots reach folders the owner picks on the machine itself, off until the owner turns it on
 - [ ] [Image and video generation](docs/phases/media-generation.md) (plugin): bots create images and video
 - [ ] [Voice memos](docs/phases/voice-memos.md) (plugin): send a bot a recorded voice memo
+- [ ] [Phone call](docs/phases/phone-call.md) (plugin, with a word on a tool in core): a bot calls the owner's own phone and says what it has to say, only with a yes the owner gave first
 - [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): talk with a bot by voice, in the app or over a phone line
 
 The previous design and spike are in [archive/](archive/README.md). The git host may still use the old repository name until the owner renames it.
