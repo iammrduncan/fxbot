@@ -1,6 +1,6 @@
 {
   "name": "chat-rooms",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Rooms where several of your bots talk with you: tag a bot with @, bots hand work to each other, and each room keeps memories of its own and starts over from a summary.",
   "license": "Apache-2.0",
   "extensions": {

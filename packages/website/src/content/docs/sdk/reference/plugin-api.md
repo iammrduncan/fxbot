@@ -92,7 +92,7 @@ export default async function setup(fx: PluginApi) {
 | `fx.bots.on(id)` | Whether this plugin is on for the bot. Since 0.6.0. |
 | `fx.localUrl` | The server's own address on its machine, such as `http://127.0.0.1:8787`, for requests to fxbot's own API. Since 0.8.0. |
 | `fx.timeZone()` | The owner's time zone, such as `Europe/Berlin`: **Settings** › **General**'s, or the machine's. Read it at each use. Since 0.6.0. |
-| `fx.compaction()` | Idle compaction's setting, from **Settings** › **General**: `{ idleMinutes, provider, model }`. `idleMinutes` is how long a chat sits idle before it's compacted, 0 when it's off, and `provider` and `model` the model that writes a summary, or `""` for each bot's own. Chat rooms compacts its rooms by it. Read it at each use. Since 0.10.0. |
+| `fx.compaction()` | Idle compaction's setting, from **Settings** › **General**: `{ idleMinutes, minTokens, provider, model }`. `idleMinutes` is how long a chat sits idle before it's compacted, 0 when it's off, `minTokens` how long it must be, in tokens at 4 bytes of text each (since 0.11.0; undefined before), and `provider` and `model` the model that writes a summary, or `""` for each bot's own. Chat rooms compacts its rooms by it. Read it at each use. Since 0.10.0. |
 | `fx.chats` | Sessions and turns of its own. See [Turns](#turns). |
 | `fx.dependents()` | The added plugins that need this one: `{ name, version, needs, api }` each, where `needs` is its object for this plugin, and `api` what it provides, or null while it isn't running |
 | `fx.provide(api)` | Offers an object to the plugins that need this one, which get it with `fx.need`. Since 0.5.0. See [Plugins that need others](#plugins-that-need-others). |

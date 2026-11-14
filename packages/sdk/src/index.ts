@@ -219,8 +219,8 @@ export async function createFxbot(options: FxbotOptions) {
       localUrl: options.localUrl ?? "http://127.0.0.1:8787",
       timeZone: () => timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       async compaction() {
-        const { idleCompactMinutes: idleMinutes, compactProvider: provider, compactModel: model } = await store.settings.get();
-        return { idleMinutes, provider, model };
+        const { idleCompactMinutes: idleMinutes, idleCompactTokens: minTokens, compactProvider: provider, compactModel: model } = await store.settings.get();
+        return { idleMinutes, minTokens, provider, model };
       },
       chats: {
         async newSession(plugin, bot, { label, effort } = {}) {
@@ -665,14 +665,14 @@ export async function createFxbot(options: FxbotOptions) {
   }
 
   // Idle compaction. Every minute, a bot's own chat that has had no message for the owner's setting, and whose text is
-  // at least 120 KB, about 30,000 tokens, is summarized and begun again from the summary and its last
-  // messages, so the owner's next message reads those and not the whole chat. Not while a turn of the bot runs, it
-  // waits on the owner, or its chat is starting over. One bot at a time, and once for each idle spell: `tried` keeps
-  // the newest message each bot was looked at for, so a failure isn't tried again until a new one comes. A message to
+  // at least the owner's size, 30,000 tokens unless set, at 4 bytes a token, is summarized and begun again from the
+  // summary and its last messages, so the owner's next message reads those and not the whole chat. Not while a turn of
+  // the bot runs, it waits on the owner, or its chat is starting over. One bot at a time, and once for each idle spell:
+  // `tried` keeps the newest message each bot was looked at for, and the size it was held to, so a failure isn't tried
+  // again until a new one comes, and a chat too short is looked at again when the owner lowers the size. A message to
   // the chat while its summary is written calls it off, and the chat stays as it was.
   const tried = new Map<string, string>();
   const compacting = new Map<string, AbortController>();
-  const compactFrom = 120 * 1024;
   let sweeping = false;
   async function idleSweep() {
     if (sweeping) return;
@@ -683,18 +683,18 @@ export async function createFxbot(options: FxbotOptions) {
       const idle = await store.sql<{ id: string; last: string }[]>`select p.id, m.last::text as last from profiles p
         cross join lateral (select max(id) as last, max(created_at) as at from messages where profile_id = p.id and session_id = p.session_id) m
         where p.session_id is not null and coalesce(p.provider, '') <> '' and m.at < now() - make_interval(mins => ${settings.idleCompactMinutes}) order by m.at`;
-      for (const { id, last } of idle) if (tried.get(id) !== last) await compactIdle(id, last, settings).catch((error: Error) => console.error(`Could not compact a chat while idle: ${error.message}`));
+      for (const { id, last } of idle) if (tried.get(id) !== `${last}@${settings.idleCompactTokens}`) await compactIdle(id, last, settings).catch((error: Error) => console.error(`Could not compact a chat while idle: ${error.message}`));
     } finally {
       sweeping = false;
     }
   }
-  async function compactIdle(id: string, last: string, settings: Pick<Settings, "idleCompactMinutes" | "compactProvider" | "compactModel">) {
+  async function compactIdle(id: string, last: string, settings: Pick<Settings, "idleCompactMinutes" | "idleCompactTokens" | "compactProvider" | "compactModel">) {
     const idle = (profile: StoredProfile | null | undefined): profile is StoredProfile => {
       const now = profile && withBusy(profile);
       return Boolean(now && !now.busy && !now.waiting && now.sessionId && !moving.has(id));
     };
     if (!idle(await store.profiles.get(id))) return;
-    tried.set(id, last);
+    tried.set(id, `${last}@${settings.idleCompactTokens}`);
     const call = new AbortController();
     compacting.set(id, call);
     const done = await hold(id);
@@ -713,7 +713,7 @@ export async function createFxbot(options: FxbotOptions) {
              from library l join library_tags t on t.item_id = l.id
              where t.profile_id = ${id} and t.session_id = ${profile.sessionId} and l.kind = 'document' and l.origin = 'uploaded')
         )::int as size`;
-      if (size < compactFrom) return;
+      if (size < settings.idleCompactTokens * 4) return;
       const own = await modelFor(profile);
       const chat = await providers.get(profile.provider);
       const checkpoint = await (await providers.agentFor(chat.id, own)).session(profile.sessionId).checkpoint();
@@ -1051,6 +1051,12 @@ export async function createFxbot(options: FxbotOptions) {
           const minutes = input.idleCompactMinutes;
           if (!Number.isInteger(minutes) || (minutes !== 0 && (minutes < 5 || minutes > 1440))) fail(400, "Idle compaction is 0, for off, or a whole number of minutes from 5 to 1,440.");
           await store.settings.save({ idleCompactMinutes: minutes });
+        }
+        // How long a chat must be before it's compacted while idle: 1,000 to 1,000,000 tokens.
+        if (input.idleCompactTokens !== undefined) {
+          const tokens = input.idleCompactTokens;
+          if (!Number.isInteger(tokens) || tokens < 1000 || tokens > 1_000_000) fail(400, "Idle compaction's size is a whole number of tokens from 1,000 to 1,000,000.");
+          await store.settings.save({ idleCompactTokens: tokens });
         }
         if (input.compactProvider !== undefined || input.compactModel !== undefined) {
           const now = await store.settings.get();

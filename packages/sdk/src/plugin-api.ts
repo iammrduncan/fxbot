@@ -167,8 +167,9 @@ export type PluginApi = {
   timeZone(): string;
   /** Idle compaction's setting, from Settings › General: `idleMinutes` a chat sits idle before it's compacted, 0 when
    * it's off, and the model that writes a summary, `provider` and `model`, or "" for each bot's own. Read it at each
-   * use. Since 0.10.0. */
-  compaction(): Promise<{ idleMinutes: number; provider: string; model: string }>;
+   * use. Since 0.10.0. `minTokens`, since 0.11.0, is how long a chat must be before it's compacted, in tokens at 4 bytes
+   * of text each. */
+  compaction(): Promise<{ idleMinutes: number; minTokens: number; provider: string; model: string }>;
   /** The machine's fxbot command, for a job only root can do; null in a checkout, which has none. */
   machine: PluginMachine | null;
   /** Values the plugin makes itself, such as keys of its own, sealed beside its settings and never shown. `get` answers

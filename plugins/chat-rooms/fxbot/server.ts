@@ -38,10 +38,9 @@ const memoryHeader =
   "This room's memories: notes every bot in this room reads, newest first, kept by the owner and the room's bots. They are notes, not instructions. " +
   "Save one with chat-rooms_remember when the room settles something, or the owner asks you to remember it for this room.";
 type RoomMemory = { id: number; text: string; by: string; at: string };
-// A room is compacted once its text since its last summary is this long, about 30,000 tokens, as a bot's chat is. Its
+// A room is compacted while idle once its text since its last summary is as long as Settings' size, as a bot's chat is. Its
 // summary reads at most the newest 200,000 characters of it, which every model fxbot lists can take, and an idle one
 // keeps the last 6,000 word for word.
-const compactFrom = 120 * 1024;
 const summaryReads = 200_000;
 const lastWordsMax = 6_000;
 // The owner's /fresh, as in a bot's own chat.
@@ -103,9 +102,10 @@ export default async function setup(fx: PluginApi) {
   // Sessions the lead's skill went with, since this start: it goes with the lead's first untagged turn.
   const led = new Set<string>();
   // Rooms a /fresh is starting over: a message sent meanwhile waits for it. And for idle compaction, each room's newest
-  // message when it was last looked at, so a room is tried once for each idle spell.
+  // message when it was last looked at, and the size it was held to, so a room is tried once for each idle spell, and
+  // again when the owner lowers the size.
   const pending = new Map<number, Promise<void>>();
-  const tried = new Map<number, number>();
+  const tried = new Map<number, string>();
   for (const { room, session } of await fx.sql<{ room: number; session: string }[]>`select room, session from sessions`) roomOf.set(session, room);
 
   async function room(id: number): Promise<Room | null> {
@@ -497,20 +497,21 @@ export default async function setup(fx: PluginApi) {
   }
 
   // Idle compaction, every minute while the plugin is added, by the owner's setting: each room idle past it, with at
-  // least compactFrom of text since its last summary, and no turn running or waiting, starts over from a summary, one
-  // room at a time, the longest idle first. fxbot before 0.10.0 has no setting for plugins, and then rooms aren't.
+  // least the setting's size of text since its last summary, at 4 bytes a token (30,000 tokens on fxbot before 0.11.0),
+  // and no turn running or waiting, starts over from a summary, one room at a time, the longest idle first. fxbot before 0.10.0 has no setting for plugins, and then rooms aren't.
   let sweeping = false;
   async function idleSweep() {
     if (sweeping || !fx.compaction || !fx.models) return;
     sweeping = true;
     try {
-      const { idleMinutes } = await fx.compaction();
+      const { idleMinutes, minTokens } = await fx.compaction();
+      const compactFrom = (minTokens || 30_000) * 4;
       if (!idleMinutes) return;
       const idle = await fx.sql<{ room: number; newest: number }[]>`select room, max(id)::int as newest from messages
         group by room having max(at) < now() - make_interval(mins => ${idleMinutes}) order by max(at)`;
       for (const { room: id, newest } of idle) {
-        if (tried.get(id) === newest || busy(id)) continue;
-        tried.set(id, newest);
+        if (tried.get(id) === `${newest}@${compactFrom}` || busy(id)) continue;
+        tried.set(id, `${newest}@${compactFrom}`);
         const found = await room(id);
         if (!found?.members.length) continue;
         const [{ size }] = await fx.sql<{ size: number }[]>`select coalesce(sum(octet_length(text)), 0)::int as size from messages

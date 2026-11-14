@@ -105,7 +105,7 @@ A chat starts over three ways, and all work the same. A model writes a summary o
 ### Idle compaction
 
 Every minute, fxbot looks for a bot whose own chat has had no message for the time set in **Settings** › **General** › **Idle compaction**: 30 minutes, unless you choose 15, an hour, 2 hours, or **Off**. It compacts that chat only when all of these are true:
-- **It's long:** its text is at least 120 KB, about 30,000 tokens: what was said, thought, and called, and the documents you sent. Images don't count. A short chat starts fast anyway.
+- **It's long:** its text is at least the size under **Idle compaction** › **Only chats**: over 30,000 tokens, about 120 KB, unless you pick another, from 5,000 to 100,000. It counts what was said, thought, and called, and the documents you sent, at about 4 characters a token. Images don't count. A short chat starts fast anyway.
 - **Nothing runs:** no turn of the bot's is running, and it isn't waiting on you.
 - **It's new since:** it hasn't been tried since its last message. A summary that failed isn't tried again until a new message comes, and a compacted chat isn't compacted again until it grows.
 

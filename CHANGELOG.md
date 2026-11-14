@@ -4,9 +4,13 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
+**Before upgrading.** Migration `0019_idle_compact_tokens` adds `idle_compact_tokens` to `settings`, how long a chat must be before it's compacted while idle: 30,000 tokens, as before. Then update Chat rooms, to 0.5.1, so rooms follow it too.
+
+- **Choose how long a chat must be before it's compacted while idle.** **Only chats**, under **Idle compaction** in **Settings** › **General**, offers 5,000 to 100,000 tokens. It was fixed at about 30,000, so a shorter chat that sat idle was left as it was, with nothing to say why. Chat rooms 0.5.1 compacts rooms by it too. See [Idle compaction](https://fxbot.sh/docs/explanation/bots-and-chats/#idle-compaction).
 - **Baseten, by key.** **Add provider** has a card for Baseten's Model APIs, open models such as GLM, Kimi, and DeepSeek, which walks you through a team key that doesn't stop after 90 days. See [Baseten](https://fxbot.sh/docs/providers/baseten/).
 - **herdr is back, as a plugin that hands work on.** Bots see the coding agents [herdr](https://herdr.dev) runs, on fxbot's machine and on herdr's saved machines, read what they show, send them work, start new ones in a workspace of their own, and hear back when one finishes or waits for you, in a message from **herdr** that wakes them. An agent's approvals stay yours, in herdr. Each bot's settings say which machines it reaches. Add it from **Plugins**: an install that kept herdr 0.1.0 updates it to 0.2.0. See [Work with your herdr agents](https://fxbot.sh/docs/how-to/work-with-herdr-agents/).
 - **`sudo fxbot herdr on`** opens the plugin's door to herdr on a release install: a socket in fxbot's control folder that runs a short list of herdr's commands as herdr's user. `--user` names herdr's user, `--read-only` lets bots only look, `sudo fxbot herdr off` closes it, and `fxbot status` says whether it's open.
+- **For plugins:** `fx.compaction()` answers `minTokens`, the size **Only chats** sets.
 
 ## 0.10.0 (2026-11-13)
 

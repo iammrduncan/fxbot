@@ -33,6 +33,15 @@ const idleChoices: [number, string][] = [
   [60, "After 1 hour"],
   [120, "After 2 hours"],
 ];
+const sizeChoices: [number, string][] = [
+  [5_000, "Over 5,000 tokens"],
+  [10_000, "Over 10,000 tokens"],
+  [20_000, "Over 20,000 tokens"],
+  [30_000, "Over 30,000 tokens"],
+  [50_000, "Over 50,000 tokens"],
+  [100_000, "Over 100,000 tokens"],
+];
+const tokensLabel = (n: number) => `Over ${n.toLocaleString("en-US")} tokens`;
 // A plugin's tab is named for it: computer is Computer, and chat-rooms is Chat rooms. A server's name is its address.
 const labelOf = (addon: Plugin) => (addon.kind === "mcp" ? addon.name : addon.name.charAt(0).toUpperCase() + addon.name.slice(1).replace(/-/g, " "));
 // Every zone the browser knows, and the one set, should the browser not list it.
@@ -230,8 +239,8 @@ function About() {
   );
 }
 
-// Idle compaction: how long a bot's chat sits idle before it's summarized, and the model that writes the summary,
-// each bot's own or one the owner picks. A time set some other way shows as itself.
+// Idle compaction: how long a bot's chat sits idle before it's summarized, how long it must be, and the model that
+// writes the summary, each bot's own or one the owner picks. A time or size set some other way shows as itself.
 function IdleCompaction({ settings, save }: { settings: Settings; save: (fields: Partial<Settings>) => Promise<unknown> }) {
   const [providers, setProviders] = useState<Provider[]>([]);
   useEffect(() => void client.providers.list().then(setProviders, () => {}), []);
@@ -245,6 +254,8 @@ function IdleCompaction({ settings, save }: { settings: Settings; save: (fields:
   }
   const minutes = settings.idleCompactMinutes;
   const choices = idleChoices.some(([m]) => m === minutes) ? idleChoices : [...idleChoices, [minutes, `After ${minutes} minutes`] as [number, string]];
+  const tokens = settings.idleCompactTokens;
+  const sizes = sizeChoices.some(([n]) => n === tokens) ? sizeChoices : [...sizeChoices, [tokens, tokensLabel(tokens)] as [number, string]].sort((a, b) => a[0] - b[0]);
   return (
     <div className="grid gap-3">
       <label className="grid gap-1.5 text-sm font-medium">
@@ -258,6 +269,19 @@ function IdleCompaction({ settings, save }: { settings: Settings; save: (fields:
         </NativeSelect>
         <span className="font-normal text-muted-foreground">A long chat that sits idle is summarized, so your next message starts fast. The chat shows where it happened.</span>
       </label>
+      {minutes > 0 && (
+        <label className="grid gap-1.5 text-sm font-medium">
+          Only chats
+          <NativeSelect value={String(tokens)} onChange={(e) => save({ idleCompactTokens: Number(e.target.value) })} className="w-full">
+            {sizes.map(([value, label]) => (
+              <NativeSelectOption key={value} value={String(value)}>
+                {label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <span className="font-normal text-muted-foreground">A shorter chat is left as it is, since it starts fast anyway. Counted from its text, at about 4 characters a token.</span>
+        </label>
+      )}
       {minutes > 0 && (
         <label className="grid gap-1.5 text-sm font-medium">
           Summarize with
