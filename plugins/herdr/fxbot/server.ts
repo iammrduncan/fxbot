@@ -11,7 +11,7 @@ import type { PluginApi } from "@fxbot/sdk";
 
 type Said = { ok: true; result: any; text: string } | { ok: false; code: string; message: string };
 type Watch = { id: number; bot: string; machine: string; agent: string; shown: string | null; prompt: string; asked: string | null; state: string; started_at: Date; told: boolean };
-type Row = { machine: string; workspace: string; tab: string; target: string; kind: string; status: string; folder: string; title: string } | { machine: string; unreachable: string };
+type Row = { machine: string; workspace: string; tab: string; label: string; target: string; kind: string; status: string; folder: string; title: string } | { machine: string; unreachable: string };
 
 // Each setting's lowest, highest, and default. The owner sets them, and no tool can.
 const limits = { hours: [1, 24, 4], lines: [20, 400, 80], watches: [1, 16, 8] } as const;
@@ -156,10 +156,13 @@ export default async function setup(fx: PluginApi) {
     if (!said.ok) return [{ machine: where(machine), unreachable: said.message }];
     const snapshot = said.result?.snapshot ?? {};
     const labels = new Map<string, string>([...(snapshot.workspaces ?? []), ...(snapshot.tabs ?? [])].map((x: any) => [x.tab_id ?? x.workspace_id, x.label ?? ""]));
+    // A pane's label is what the owner calls the agent in it, such as "patcher", given in herdr with pane rename.
+    const paneLabels = new Map<string, string>((snapshot.panes ?? []).map((p: any) => [p.pane_id, p.label ?? ""]));
     return (snapshot.agents ?? []).map((a: any) => ({
       machine: where(machine),
       workspace: labels.get(a.workspace_id) ?? "",
       tab: labels.get(a.tab_id) ?? "",
+      label: paneLabels.get(a.pane_id) ?? "",
       target: a.name || a.pane_id,
       kind: a.agent ?? "",
       status: a.agent_status ?? "unknown",
@@ -177,15 +180,16 @@ export default async function setup(fx: PluginApi) {
     const rows = (await agentsOn(machine)).filter((r): r is Extract<Row, { tab: string }> => "tab" in r);
     const row = rows.find((r) => r.target === agent);
     if (!row) return null;
-    const twin = rows.some((r) => r !== row && r.workspace === row.workspace && r.tab === row.tab);
-    return inWords(row.kind, machine, row.workspace, row.tab, twin || !(row.tab || row.workspace) ? agent : "");
+    const twin = rows.some((r) => r !== row && r.workspace === row.workspace && r.tab === row.tab && r.label === row.label);
+    return inWords(row.kind, machine, row.workspace, row.tab, twin || !(row.tab || row.workspace) ? agent : "", row.label);
   }
-  // "Claude in the thermite tab of fxbot on Local", with the pane id after the kind when it's given.
-  function inWords(kind: string, machine: string, workspace: string, tab: string, id = "") {
+  // "Claude in the thermite tab of fxbot on Local", or with its pane's label, 'Claude "patcher" in…', and the pane id
+  // after the kind when it's given.
+  function inWords(kind: string, machine: string, workspace: string, tab: string, id = "", label = "") {
     const named = kind === "opencode" ? "OpenCode" : kind ? kind[0].toUpperCase() + kind.slice(1) : "An agent";
     const tabWords = /^\d+$/.test(tab) ? `tab ${tab}` : tab ? `the ${tab} tab` : "";
     const where = [tabWords, /^\d+$/.test(workspace) ? `workspace ${workspace}` : workspace].filter(Boolean).join(" of ");
-    return `${named}${id ? ` (${id})` : ""}${where ? ` in ${where}` : ""} on ${machine || "Local"}`;
+    return `${named}${label ? ` "${label}"` : ""}${id ? ` (${id})` : ""}${where ? ` in ${where}` : ""} on ${machine || "Local"}`;
   }
   function summary(rows: Row[], asked: string[]) {
     const found = rows.filter((r): r is Row & { status: string } => "status" in r);
@@ -194,10 +198,11 @@ export default async function setup(fx: PluginApi) {
     for (const r of found) counts.set(r.status, (counts.get(r.status) ?? 0) + 1);
     const parts = ["blocked", "working", "done", "idle", "unknown"].filter((s) => counts.get(s)).map((s) => `${counts.get(s)} ${statusWords[s]}`);
     const none = asked.map(where).filter((m) => !down.includes(m) && !found.some((r) => r.machine === m));
+    const answered = asked.length - down.length;
     return [
-      `${plural(found.length, "agent")} on ${plural(asked.length, "machine")} asked${parts.length ? `: ${parts.join(", ")}` : ""}.`,
-      none.length ? `No agents on ${none.join(", ")}.` : "",
-      down.length ? `${down.join(", ")} didn't answer.` : "",
+      down.length ? `${answered} of ${plural(asked.length, "machine")} answered; ${down.join(", ")} didn't.` : `${asked.length === 1 ? "The machine" : `All ${asked.length} machines`} answered.`,
+      `${plural(found.length, "agent")}${parts.length ? `: ${parts.join(", ")}` : ""}.`,
+      none.length ? `None on ${none.join(", ")}.` : "",
     ].filter(Boolean).join(" ");
   }
 
@@ -342,6 +347,8 @@ export default async function setup(fx: PluginApi) {
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (!agentName.test(name)) return "A name is a lowercase letter, then up to 31 lowercase letters, digits, - or _.";
     const folder = folderOf(input.folder);
+    const label = typeof input.label === "string" ? input.label.trim() : "";
+    if (label.length > 60 || control.test(label) || label.startsWith("-")) return "A label is a few words, up to 60 characters.";
     const text = typeof input.prompt === "string" ? input.prompt.trim() : "";
     if (Buffer.byteLength(text) > most.text) return "A prompt is up to 16 KiB.";
 
@@ -366,6 +373,7 @@ export default async function setup(fx: PluginApi) {
       if (workspace) await fx.sql`insert into workspaces (machine, workspace) values (${machine}, ${workspace}) on conflict (machine) do update set workspace = excluded.workspace, made_at = now()`;
     }
     if (!target.test(pane)) return "herdr gave no pane for it.";
+    if (label) await herdr(on(machine, "pane", "rename", pane, label));
 
     const words = on(machine, "agent", "start", name, "--kind", kind, "--pane", pane, "--timeout", "60000");
     let started = await herdr(words, 90_000);
@@ -374,7 +382,7 @@ export default async function setup(fx: PluginApi) {
       await sleep(1000);
       started = await herdr(words, 90_000);
     }
-    const there = `${inWords(kind, machine, workspaceLabel, name)}, in ${folder}`;
+    const there = `${inWords(kind, machine, workspaceLabel, name, "", label)}, in ${folder}`;
     if (!started.ok && started.code === "agent_not_ready")
       return `Started ${there}, but it stopped at startup waiting for the owner, such as a question about trusting the folder. The owner answers it in herdr.${text ? " Its prompt wasn't sent: send it with herdr_prompt once it's ready." : ""}`;
     if (!started.ok) return `${inWords(kind, machine, workspaceLabel, name)} didn't start: ${failed(started)} Its tab stays, for the owner to close in herdr.`;
@@ -396,7 +404,7 @@ export default async function setup(fx: PluginApi) {
   fx.tool({
     name: "agents",
     description:
-      "List the coding agents herdr runs, on the machine fxbot runs on (local) and on herdr's saved machines: each one's machine, workspace, and tab, as herdr names them, the target to use in calls (its name or pane id), kind, status (working; blocked, which means waiting for the owner; done or idle, which mean ready; unknown), folder, and title. Leave out machine to list every machine at once. Tell the owner about an agent in a sentence, with herdr's names: \"Claude in the thermite tab of fxbot on Local is idle.\" A target is for calls: say it only to tell apart two agents in one tab.",
+      "List the coding agents herdr runs, on the machine fxbot runs on (local) and on herdr's saved machines: each one's machine, workspace, and tab, as herdr names them, the target to use in calls (its name or pane id), kind, status (working; blocked, which means waiting for the owner; done or idle, which mean ready; unknown), folder, and title. Leave out machine to list every machine at once. Tell the owner about an agent in a sentence, with herdr's names: \"Claude in the thermite tab of fxbot on Local is idle.\" When the owner gave a pane a label, it's the agent's name to them, as in: Claude \"patcher\" in the thermite tab of fxbot on Local is working. A target is for calls: say it only to tell apart two agents in one tab that have no labels.",
     inputSchema: { type: "object", properties: { machine: machineProp } },
     idempotent: true,
     safe: true,
@@ -457,6 +465,7 @@ export default async function setup(fx: PluginApi) {
         kind: { type: "string", description: "Which agent, such as claude or codex" },
         folder: { type: "string", description: "Where it works: a full path, or one under ~/" },
         name: { type: "string", description: "A name for it: a lowercase letter, then up to 31 lowercase letters, digits, - or _, not one another agent there has" },
+        label: { type: "string", description: "A few words for what it's for, which herdr shows on its pane and you can call it by, such as patcher, up to 60 characters" },
         prompt: { type: "string", description: "Work to send it once it's ready, up to 16 KiB" },
       },
       required: ["kind", "folder", "name"],

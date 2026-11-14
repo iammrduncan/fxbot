@@ -5,8 +5,8 @@ A plugin for [fxbot](https://fxbot.sh): bots see the coding agents [herdr](https
 - `herdr_agents` lists the agents on a bot's machines: each one's machine, workspace, and tab, as herdr names them, its name or pane id for calls, kind, status, folder, and title. The chat shows how many, and **Show agents now** lists them.
 - `herdr_read` reads an agent's recent lines.
 - `herdr_prompt` sends a ready agent work and answers at once. When the agent finishes or stops to wait for you, its last lines reach the bot's own chat, from **herdr**, which wakes it.
-- `herdr_start` starts an agent in a folder, in a tab of its own in herdr's **fxbot bots** workspace on that machine, and with a prompt, sends it work.
-- The `herdr` skill tells bots how to use them. A bot says where an agent is in a sentence, with herdr's names: \"Claude in the thermite tab of fxbot on Local is idle.\"
+- `herdr_start` starts an agent in a folder, in a tab of its own in herdr's **fxbot bots** workspace on that machine, with a label on its pane if the bot gives one, and with a prompt, sends it work.
+- The `herdr` skill tells bots how to use them, and how to answer what the agents are doing. A bot says where an agent is in a sentence, with herdr's names: \"Claude in the thermite tab of fxbot on Local is idle.\"
 
 The two that read are safe, so [Permissions](https://fxbot.sh/docs/how-to/choose-what-a-bot-can-do-alone/) runs them without asking. Sending work and starting agents go through the bot's mode. No tool presses keys, answers an agent's approval, interrupts an agent, or closes anything: you do those in herdr.
 

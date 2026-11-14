@@ -83,6 +83,10 @@ case "${w[0]} ${w[1]}" in
     writes
     [ "$n" = 4 ] && [[ ${w[2]} =~ $tab ]] && [[ ${w[3]} =~ $name ]] || refuse "tab rename <tab id> <name>"
     ;;
+  "pane rename")
+    writes
+    [ "$n" = 4 ] && [[ ${w[2]} =~ $pane ]] && plain "${w[3]}" 60 || refuse "pane rename <pane id> <label of up to 60 characters>"
+    ;;
   "agent start")
     writes
     [ "$n" = 9 ] && [[ ${w[2]} =~ $name ]] && [ "${w[3]}" = --kind ] && [[ $kinds == *" ${w[4]} "* ]] && [ "${w[5]}" = --pane ] &&

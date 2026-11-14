@@ -32,7 +32,7 @@ function Table({ rows }) {
               ) : (
                 <div key={r.target} className="flex min-w-0 items-center gap-2 text-xs">
                   <span className={`size-2 shrink-0 rounded-full ${dot[r.status] ?? dot.unknown}`} />
-                  <span className="shrink-0">{[r.workspace, r.tab].filter(Boolean).join(" · ") || r.target}</span>
+                  <span className="shrink-0">{[r.workspace, r.tab].filter(Boolean).join(" · ") || r.target}{r.label ? ` "${r.label}"` : ""}</span>
                   <span className="shrink-0 text-muted-foreground">{r.kind}</span>
                   <span className={`shrink-0 ${r.status === "blocked" ? "font-medium text-destructive" : ""}`}>{statusText[r.status] ?? r.status}</span>
                   <span className="min-w-0 truncate text-muted-foreground" title={r.folder}>

@@ -7,8 +7,8 @@ description: Work with the coding agents herdr runs, on this machine and the own
 
 herdr runs coding agents, such as Claude Code and Codex, in terminal panes, on this machine and on the owner's saved machines. Four tools work with them.
 
-1. **`herdr_agents` first.** Each agent has a machine, a workspace and a tab, as herdr names them, a target (its name or pane id), a kind, a status, a folder, and a title. A target means something only with its machine.
-   - Tell the owner about agents in sentences, with herdr's names, so they can find them in herdr: "Claude in the thermite tab of fxbot on Local is idle." Local is the machine fxbot runs on. Say a target only to tell apart two agents in one tab: "Claude (w1:p9) in the thermite tab…"
+1. **`herdr_agents` first.** Each agent has a machine, a workspace and a tab, as herdr names them, the label the owner gave its pane if any, a target (its name or pane id), a kind, a status, a folder, and a title. A target means something only with its machine. The list's first line says which machines answered: don't ask them one by one again.
+   - Tell the owner about agents in sentences, with herdr's names, so they can find them in herdr: "Claude in the thermite tab of fxbot on Local is idle." A pane's label is the agent's name to the owner: 'Claude "patcher" in the thermite tab of fxbot on Local is working.' Local is the machine fxbot runs on. Say a target only to tell apart two agents in one tab with no labels.
    - `blocked`: it waits for the owner, often for an approval. Say so first.
    - `working`: it's busy.
    - `done` or `idle`: it's ready for work.
@@ -18,7 +18,13 @@ herdr runs coding agents, such as Claude Code and Codex, in terminal panes, on t
    - Write the prompt so it stands alone: the agent hasn't seen this chat.
    - End it by asking for a short answer, since only the last lines come back.
    - Tell the owner what you sent, and to whom.
-4. **`herdr_start`** starts a new agent in a folder, in herdr's "fxbot bots" workspace on that machine. Start one only when the owner asked for a new agent, or no ready one fits. Give it a short, plain name.
+4. **`herdr_start`** starts a new agent in a folder, in herdr's "fxbot bots" workspace on that machine. Start one only when the owner asked for a new agent, or no ready one fits. Give it a short, plain name, and a label of a few words for what it's for, which herdr shows on its pane.
+
+When the owner asks what's going on, or what the agents are doing:
+1. `herdr_agents` once.
+2. Read the agents worth it, all in one go: those working, waiting for the owner (`blocked`), or just done. Leave ones that have sat idle unless asked.
+3. Answer with what needs the owner first, then what's working, then what's done. For each, in two or three sentences: what it's for (its label, or its title), what it's doing now or what it finished, and what it needs from the owner, if anything.
+4. A read is the bottom of the agent's screen, not its whole session: say so when it may not show the whole story, and don't guess past it.
 
 Rules:
 - Never send a prompt again because nothing came back yet: herdr can't always tell whether one arrived. Read the agent first.

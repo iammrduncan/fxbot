@@ -38,6 +38,16 @@ Each bot reaches every machine, with any herdr adds later, until you choose. In 
 
 So one bot can work on every machine but this one, and a bot you keep for the machines' own upkeep can reach this one too. How careful each one is is up to its instructions and its [Permissions](/docs/how-to/choose-what-a-bot-can-do-alone/) mode: a bot on **Ask** asks you before every prompt and every start.
 
+## Name your agents
+
+Give an agent's pane a label in herdr, and bots call the agent by it. From any pane on that machine:
+
+```sh
+herdr pane rename w1:p8 patcher
+```
+
+Then a bot says: Claude "patcher" in the thermite tab of fxbot on Local is working. A label stays with the pane, so a new agent there keeps it. A bot that starts an agent gives its pane a label of its own, saying what it's for.
+
 ## Work it hands on
 
 A bot says where an agent is in a sentence, with herdr's names, so you can find it in herdr: "Claude in the thermite tab of fxbot on Local is idle." Local is the machine fxbot runs on.

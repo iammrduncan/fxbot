@@ -45,9 +45,9 @@ function Table({ rows }) {
 				className: "flex min-w-0 items-center gap-2 text-xs",
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: `size-2 shrink-0 rounded-full ${dot[r.status] ?? dot.unknown}` }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 						className: "shrink-0",
-						children: [r.workspace, r.tab].filter(Boolean).join(" · ") || r.target
+						children: [[r.workspace, r.tab].filter(Boolean).join(" · ") || r.target, r.label ? ` "${r.label}"` : ""]
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 						className: "shrink-0 text-muted-foreground",
