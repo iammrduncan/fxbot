@@ -7,7 +7,7 @@
 - **The owner watches them live.** A bot's panel lists its agents by what they need, as herdr's own apps do: needs you, working, done, idle. One opens to the agent's terminal, live, in fxbot's page.
 - **Only fxbot's own agents.** fxbot names what it starts `fxbot-…` and touches nothing else in herdr-core. The owner's herdr TUI, and the agents it runs, are the [herdr](../_completed/phases/herdr.md) plugin's, and stay as they are.
 
-Status: planned on 2026-11-14 at the owner's word, not built. Researched against the research directive's references, with herdr-core, the Herdr apps, and the herdr TUI among them since the same day, from herdr-core's docs and source and the Herdr app's docs, read on 2026-11-14. Nothing of herdr-core ran here: installing it, even in a disposable container, waits for the owner's go-ahead, so the checklist starts with that check, and every claim about herdr-core below is from its docs or source unless it says otherwise. One thing did run: Claude Code 2.1.325, installed here, speaks herdr-core's status protocol.
+Status: **deferred.** Planned on 2026-11-14 at the owner's word, and not started: the owner will revisit it after 0.11.0. Nothing is built until the owner approves installing herdr-core and the hands-on check in the [checklist](#4-checklist) has run. Until then, this plan is unverified against herdr-core. Researched against the research directive's references, with herdr-core, the Herdr apps, and the herdr TUI among them since the same day, from herdr-core's docs and source and the Herdr app's docs, read on 2026-11-14. Nothing of herdr-core ran here: installing it, even in a disposable container, waits for the owner's go-ahead, so the checklist starts with that check, and every claim about herdr-core below is from its docs or source unless it says otherwise. One thing did run: Claude Code 2.1.325, installed here, speaks herdr-core's status protocol.
 
 ## What the owner asked
 
@@ -224,7 +224,7 @@ create table bots (bot text primary key, machines text[] not null);
 
 Checks run against a herdr-core of their own, never one the owner uses, and the door's in a disposable systemd machine, as herdr's were.
 
-**First: herdr-core, by hand,** with the owner's go-ahead to install it, in a disposable container and, for Claude Code, as a user of its own on this machine
+**First: herdr-core, by hand,** with the owner's go-ahead to install it, in a disposable container and, for Claude Code, as a user of its own on this machine. **Waiting on the owner:** on 2026-11-14 they chose not to install herdr-core yet, so none of this has run, and the plan stays unverified against herdr-core until it does.
 - [ ] Install it, and `hc server status --json` answers.
 - [ ] A program that prints OSC 7501 reports `working`, then `done`: `get`, `ls --label`, and `events --json --label` show each, and a `turn` event comes with the word.
 - [ ] Claude Code, started with `hc run --bg --name fxbot-check claude`, reports `idle` with no help, and `working`, then `done`, after a send.
@@ -257,7 +257,7 @@ Checks run against a herdr-core of their own, never one the owner uses, and the 
 
 ## 5. Open questions
 
-1. **Installing herdr-core here, for the checks.** The first check needs it, in a disposable container and as a user of its own on this machine, for Claude Code. Recommended: yes, with the owner's go-ahead.
+1. **Installing herdr-core here, for the checks.** The first check needs it, in a disposable container and as a user of its own on this machine, for Claude Code. **The owner's answer, 2026-11-14: not now.** No install, no check, and no build until they revisit it after 0.11.0.
 2. **Which user runs herdr-core for fxbot:** root, as herdr does here, or a user of its own? Recommended: the owner's choice at `fxbot hc on --user`, root by default, as herdr.
 3. **The plugin's name:** `hc`, as the owner calls it, or `herdr-core`? Recommended: `hc`. Its tools read `hc_start`.
 4. **Taking over from fxbot's page:** typing into an agent's terminal from the live view. Recommended: later, once a door can allow watching and not typing.

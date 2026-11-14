@@ -81,7 +81,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window, past the compaction libfx does
 - [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
 - [ ] [Knowledge base](docs/phases/knowledge-base.md) (plugin): knowledge the bots draw on
-- [ ] [hc](docs/phases/hc.md) (plugin, with a second door on the machine): bots run coding agents of their own, such as Claude Code, in terminals that stay alive on any of the owner's machines, through herdr-core, hear back when one's turn ends, and the owner watches them live in fxbot
+- [ ] [hc](docs/phases/hc.md) (plugin, with a second door on the machine; deferred until after 0.11.0): bots run coding agents of their own, such as Claude Code, in terminals that stay alive on any of the owner's machines, through herdr-core, hear back when one's turn ends, and the owner watches them live in fxbot
 - [ ] [herdr screen](docs/phases/herdr-screen.md) (plugin): the [herdr](https://herdr.dev) interface in the app, from a herdr plugin
 - [ ] [Web search](docs/phases/web-search.md) (plugin): bots search and read the web, and cite it
 - [ ] [X feed](docs/phases/plugin-x-feed.md) (plugins): bots read X (Twitter) for free with tools of their own, posts, search, mentions, followers, and lists, from X's public pages, its embeds, and FxTwitter, or through a signed-in tab on the bot's computer, and watches start a turn when someone posts or the owner is mentioned
