@@ -9,7 +9,7 @@
 
 It's the first of two phone plugins. [Phone: Telnyx](../../phases/phone-telnyx.md), later, is a softphone with speech providers of the owner's own: more code, a third of the price, and better speech.
 
-Status: built on 2026-11-14 on `release/0.11.0`, at the owner's /goal, and checked against a fake RELAY, a mock model, and Chromium, not yet on a real SignalWire call ([What the build changed](#what-the-build-changed)). Planned the same day at the owner's word, it replaces the same day's plans for a call that only read a message out, and then for Twilio's ConversationRelay through a public path, which the owner ruled out: fxbot has no public endpoint. Researched against the research directive's references, OpenClaw, Hermes Agent and its phone plugins, Twring, the coding-agent phone projects, ChatGPT, Home Assistant, the phone services, ElevenLabs, xAI, Cartesia, the other speech providers, and the realtime voice models, read on 2026-11-14. It needs no change to the plugin API.
+Status: built on 2026-11-14 on `release/0.11.0`, at the owner's /goal, and checked against a fake RELAY, a mock model, and Chromium. The same day, on the owner's own SignalWire account, the confirming call went through after three fixes, and a conversation hasn't been tried yet ([What the build changed](#what-the-build-changed), [First real calls](#first-real-calls)). Planned the same day at the owner's word, it replaces the same day's plans for a call that only read a message out, and then for Twilio's ConversationRelay through a public path, which the owner ruled out: fxbot has no public endpoint. Researched against the research directive's references, OpenClaw, Hermes Agent and its phone plugins, Twring, the coding-agent phone projects, ChatGPT, Home Assistant, the phone services, ElevenLabs, xAI, Cartesia, the other speech providers, and the realtime voice models, read on 2026-11-14. It needed no change to the plugin API, and its first real calls added one: a setting's `options`, for the voice list.
 
 ## What the owner asked
 
@@ -242,7 +242,7 @@ The directive's references:
 ### The line
 
 A **line** is what `call.ts` holds a call through, in text:
-- **`place({ to, greeting, voicemail?, seconds, hints?, quiet?, kept? })`** rings the owner, and answers once they answer, or don't, with how it went: `answered`, `voicemail`, `missed`, `busy`, `declined`, or `failed`.
+- **`place({ to, greeting, voicemail?, hints?, quiet?, kept? })`** rings the owner, and answers once they answer, or don't, with how it went: `answered`, `voicemail`, `missed`, `busy`, `declined`, or `failed`.
   - `voicemail` is for a call the bot makes: a machine gets that line instead.
   - `quiet` speaks and doesn't listen, for the call that confirms a number.
   - `kept` is given what a restart needs to end the call, once the service names it.
@@ -416,7 +416,7 @@ The confirmed number, and a code waiting to be typed, for 10 minutes, are kept w
 
 | Setting | What it is | Default |
 | --- | --- | --- |
-| `project` | Its project id | |
+| `project` | The SignalWire project id | |
 | `token` | An API token with the Voice scope, sealed (`isSecret`) | |
 | `from` | The account's number calls come from, such as +15551234567 | |
 | `to` | The owner's phone, the only number called | |
@@ -439,9 +439,9 @@ The confirmed number, and a code waiting to be typed, for 10 minutes, are kept w
   | Listening, at $0.015 for 15 seconds | $0.60 |
   | Polly Neural speech | $0.11 |
   | **All, with Polly Neural** | **$0.79** |
-  | **All, with ElevenLabs Flash or Cartesia** | **$1.01** |
+  | **All, with ElevenLabs Flash or Cartesia** | **$1.02** |
 
-  That's $85 to $109 for 18 hours. A bot's call adds $0.006 for voicemail detection, and the number is $0.50 a month. Each thing the owner says is also a turn on the bot's own model, with the chat's context, cached.
+  That's $85 to $110 for 18 hours. A bot's call adds $0.006 for voicemail detection, and the number is $0.50 a month. Each thing the owner says is also a turn on the bot's own model, with the chat's context, cached.
 - **fxbot:** one connection while a call is on, and none between.
 - **Idle:** nothing on the server: no process, no timer, and no connection. A call-back ends by its time, read when a call asks. The page reads `/calls/live` every 15 seconds while a chat is open.
 
@@ -469,7 +469,7 @@ Plus the skill, the README, and a how-to. OpenClaw's voice-call plugin is about 
 ### What changes
 
 - `plugins/phone-signalwire/` (new, 0.1.0), and its entry in `packages/sdk/src/plugins-registry.json`.
-- No change to the core or the plugin API, so no line in `plugin-breaks.json`.
+- No change to the core or the plugin API, so no line in `plugin-breaks.json`. The first real calls added `options` to a plugin's settings, which breaks nothing ([First real calls](#first-real-calls)).
 - The docs:
   - a how-to, **Talk with a bot on the phone**, covering:
     - SignalWire's project and a Voice token, and a number
@@ -482,14 +482,14 @@ Plus the skill, the README, and a how-to. OpenClaw's voice-call plugin is about 
 
 **First, with the owner's go-ahead,** since it uses their SignalWire account, rings their phone, and spends trial credit: a short script on this machine, through RELAY, before the plugin. Each answer goes into this doc, and a "no" changes the plan before more is built.
 
-Not run: there's no SignalWire account here, and the owner set the /goal to build. The plugin was built against the fake below, and its log says what the first real calls need to show: when the owner began to speak during a line, and how long a line took to stop.
+The script wasn't run: there's no SignalWire account here, and the owner set the /goal to build. The owner's own account ran the first item through the plugin. The plugin was built against the fake below, and its log says what the first real calls need to show: when the owner began to speak during a line, and how long a line took to stop.
 - [x] It signs in with the project and token, and dials the owner's number from the account's number: the confirm call, 2026-11-14, after the fixes in [First real calls](#first-real-calls). Whether the caller ID showed as that number wasn't noted.
 - [ ] A greeting plays on `answered`, and the time from answer to sound is noted.
 - [ ] A continuous `calling.collect` runs while a `calling.play` runs, and `start_of_input` and partials arrive during the play. `calling.play.stop` cuts the sound, in how many milliseconds.
 - [ ] A second `calling.play` sent during one: whether it queues, mixes, or replaces. The gap between back-to-back sentences.
 - [ ] On speaker and in a car, the bot's voice and road noise don't set off `start_of_input` or a partial of two words.
 - [ ] From the owner's last word to the final result, with `end_silence_timeout` at 1.0 and at 0.8, on Deepgram and on Google.
-- [ ] `max_duration`'s unit, a dropped connection connecting again mid-call, `calling.end`, and the owner hanging up.
+- [ ] A dropped connection connecting again mid-call, `calling.end`, and the owner hanging up. `max_duration` isn't sent since the first real calls, so its unit no longer matters.
 - [ ] After the script quits mid-call, a new connection with the old `protocol` can end the call. If it can't, say how long the call stays up.
 - [ ] The voice strings for Polly Neural, ElevenLabs Flash, and Cartesia Sonic.
 - [ ] The invoice: how the listening charge is rounded, and the characters spoken.
@@ -561,13 +561,13 @@ Not run: there's no SignalWire account here, and the owner set the /goal to buil
 
 ## What the build changed
 
-Built on 2026-11-14, on `release/0.11.0`, at the owner's /goal. The checks ran against a fake RELAY, a mock model, and Chromium, on a disposable fxbot with this branch's subagents plugin and a check-only plugin with a slow tool and a message route. No real SignalWire call was placed: there's no account here.
+Built on 2026-11-14, on `release/0.11.0`, at the owner's /goal. The checks ran against a fake RELAY, a mock model, and Chromium, on a disposable fxbot with this branch's subagents plugin and a check-only plugin with a slow tool and a message route. No real SignalWire call was placed here, with no account: the owner's first calls are [below](#first-real-calls).
 
 - **The bot's own chat comes through fxbot's own API.** The plan named `fx.chats.stream`, which reads only a plugin's own sessions and answered "session not found" for the bot's chat. The call follows `/api/profiles/<bot>/stream` at `fx.localUrl`, which the plugin API offers for requests to fxbot's own API, and follows a chat that starts over into its new session. No change to the plugin API.
 - **The line's shape** is as [The line](#the-line) now says:
   - `interrupted()` carries nothing, since `call.ts` knows what had played from `played`
   - `say` takes only text
-  - `place` takes the voicemail line, the call's length, the recognizer's hints, `quiet`, and `kept`
+  - `place` takes the voicemail line, the recognizer's hints, `quiet`, and `kept`, and no longer the call's length since the first real calls
 - **What waits while a line plays goes as the next line,** so the sentences of a reply don't each wait on a round trip to SignalWire.
 - **Five bugs the checks found:**
   - A tool call, or a message joining the turn, now ends the words before it. A subagent's report joined the running turn, and the bot's reply ran into the last unfinished words: "…with tOkay."
