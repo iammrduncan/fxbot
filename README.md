@@ -91,7 +91,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Local access](docs/phases/plugin-local-access.md) (plugin): bots reach folders the owner picks on the machine itself, off until the owner turns it on
 - [ ] [Image and video generation](docs/phases/media-generation.md) (plugin): bots create images and video
 - [ ] [Voice memos](docs/phases/voice-memos.md) (plugin): send a bot a recorded voice memo
-- [ ] [Phone call](docs/phases/phone-call.md) (plugin): press Call me and the bot rings your phone, greets you, and talks with you, hands-free, with its own model, memory, and tools
+- [ ] [Phone call](docs/phases/phone-call.md) (plugin): press Call me and the bot rings your phone, greets you, and talks with you, hands-free, with its own model, memory, and tools, on Twilio first and more phone and voice providers after
 - [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): talk with a bot by voice, in the app or over a phone line
 
 The previous design and spike are in [archive/](archive/README.md). The git host may still use the old repository name until the owner renames it.
