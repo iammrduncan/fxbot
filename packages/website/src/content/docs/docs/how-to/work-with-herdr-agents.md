@@ -40,7 +40,7 @@ So one bot can work on every machine but this one, and a bot you keep for the ma
 
 ## Work it hands on
 
-A bot names agents as herdr shows them to you, by machine, workspace, and tab, then the kind: "claude in Local · fxbot · thermite".
+A bot says where an agent is in a sentence, with herdr's names, so you can find it in herdr: "Claude in the thermite tab of fxbot on Local is idle." Local is the machine fxbot runs on.
 
 - **A prompt** goes to an agent that's ready. The bot gets an answer at once, and carries on. When the agent finishes, or stops to wait for you, its last lines reach the bot's chat as a message from **herdr**, which wakes the bot, and it tells you what happened. A card in the chat follows the prompt, from **Working on it** to **Answered**.
 - **An agent it starts** opens in a tab of its own, in a workspace named **fxbot bots** on that machine, so it stays out of your own tabs. It starts with its own settings there: one that asks before acting still asks.

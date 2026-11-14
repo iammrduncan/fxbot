@@ -213,7 +213,7 @@ A watch is one prompt, from the call to the agent's settled state:
 
   `blocked` says instead that it's waiting for an approval or an answer, which the bot can't give: "Tell the owner, who answers in herdr." Past `hours`, it says the agent is still working and the plugin stopped watching. An agent that's gone says that.
 - **Once each.** A watch's message has the `messageId` `herdr-watch-<id>`, so a restart can't tell it twice. A message that can't be sent, such as while fxbot is still starting, is tried again every 30 seconds, up to 20 times.
-- **After a load,** 10 seconds on, since fxbot takes no turns while it starts: each watch still working runs `agent get` first, and settled means tell, working means wait again, gone means say so. One that ended and wasn't told is told. Nothing is sent to an agent again.
+- **After a load,** 10 seconds on, since fxbot takes no turns while it starts: each watch from before the load still working runs `agent get` first, and settled means tell, working means wait again, gone means say so. One that ended and wasn't told is told. Nothing is sent to an agent again.
 - **At most `watches` at once,** 8 by default. A prompt past that refuses: "8 agents are working on your prompts already, the most at once. Wait for an answer first."
 
 A bot can do something with the answer: tell the owner, prompt again, or call them with [Phone call](../../phases/phone-call.md), which is how "call me when the run on lab-2 finishes" works.
@@ -254,7 +254,7 @@ create index on watches (state) where state = 'working';
 create table workspaces (machine text primary key, workspace text not null, made_at timestamptz not null default now());
 create table bots (bot text primary key, machines text[] not null);
 
--- 0002_shown.sql: how herdr shows the agent a prompt went to, such as "claude in Local · fxbot · thermite (w1:p9)".
+-- 0002_shown.sql: the agent a prompt went to, in words, such as "Claude in the thermite tab of fxbot on Local".
 alter table watches add column shown text;
 ```
 
@@ -352,7 +352,7 @@ Each was taken as recommended, at the owner's /goal to build the doc.
 - **fxbot takes no turns while it starts.** A watch is picked up 10 seconds after a load, as routines and subagents wait, and a message that fails to send tries again every 30 seconds, up to 20 times. Those are the plugin's only timers, and run only while an answer waits to be told.
 - **Full-screen agents leave runs of empty rows,** about 20 under Claude Code's answer, so a read keeps one blank line in place of a run.
 - **The machine fxbot runs on is Local,** as herdr calls it, at the owner's word: first in the tab's **Machines**, in a bot's settings, and in the agents table, and `local` to the tools, in place of the plan's `here`.
-- **Agents named as herdr shows them,** after the owner found the bot's answers named them by pane id, `w1:p9`, where herdr shows `fxbot · thermite`. `agent list` has the workspace's and tab's ids, not their names, so `herdr_agents` reads `api snapshot`, as quick, about 5 ms here and 200 on another machine, and gives each agent its place. The tool's description and the skill tell the bot to name agents that way, machine · workspace · tab, then the kind, with the pane id only to tell apart two in one tab. A prompt keeps how herdr shows its agent, in `shown` from `0002_shown.sql`, for its answer and its card: "claude in Local · fxbot · thermite (w1:p9)". The door takes `api snapshot` in place of `agent list`.
+- **Agents named as herdr shows them, in a sentence,** after the owner found the bot's answers named them by pane id, `w1:p9`, where herdr shows `fxbot · thermite`, and asked for something more natural. `agent list` has the workspace's and tab's ids, not their names, so `herdr_agents` reads `api snapshot`, as quick, about 5 ms here and 200 on another machine, and gives each agent its workspace and tab. The tool's description and the skill tell the bot to say where an agent is in a sentence, with herdr's names: "Claude in the thermite tab of fxbot on Local is idle." The plugin's own words do the same: a prompt keeps its agent in words, in `shown` from `0002_shown.sql`, for its answer and its card, with the kind capitalized, an unnamed tab as "tab 2", and the pane id only when two agents share a tab: "Claude (w1:p9) in the thermite tab of fxbot on Local". The door takes `api snapshot` in place of `agent list`.
 - **The tab asks each machine at once,** after the owner found it slow: herdr's own `machine status --json` asks them one after another, about 3.2 seconds for 9 here, so the tab asks each one `status server --json` through `--machine`, together, in about 230 ms.
 - **The summary counts machines asked,** and names those with no agents, since a machine with none adds no rows: "1 agent on 10 machines asked: 1 done. No agents on lab-1, lab-2."
 - **The door:**
@@ -362,4 +362,5 @@ Each was taken as recommended, at the owner's /goal to build the doc.
   - `fxbot herdr on` downloads `herdr-door` from the release's files when it isn't there.
   - herdr's CLI takes a prompt by its place, with no `--`, so text that starts with a dash is still text, and the door keeps every word in its place.
 - **A bug the checks found:** `fxbot herdr on` for a user that doesn't exist, or one without herdr, ended silently under `set -euo pipefail`. Each lookup now says what's wrong.
+- **A race the checks found:** in the 10 seconds after a load, the pick-up could follow a watch that a prompt had just made, which then followed it too: the pick-up's `agent get` could end it early, and both told the bot. The pick-up now takes only watches from before the load, and a message libfx refuses as already sent counts as told.
 - **The how-to** is [Work with your herdr agents](../../../packages/website/src/content/docs/docs/how-to/work-with-herdr-agents.md), since bots send work as well as look. **Add a plugin** no longer lists plugins one by one, so fxbot's list entry, with its docs link, puts herdr in the plugin directory.

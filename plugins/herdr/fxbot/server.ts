@@ -11,7 +11,7 @@ import type { PluginApi } from "@fxbot/sdk";
 
 type Said = { ok: true; result: any; text: string } | { ok: false; code: string; message: string };
 type Watch = { id: number; bot: string; machine: string; agent: string; shown: string | null; prompt: string; asked: string | null; state: string; started_at: Date; told: boolean };
-type Row = { machine: string; place: string; target: string; kind: string; status: string; folder: string; title: string } | { machine: string; unreachable: string };
+type Row = { machine: string; workspace: string; tab: string; target: string; kind: string; status: string; folder: string; title: string } | { machine: string; unreachable: string };
 
 // Each setting's lowest, highest, and default. The owner sets them, and no tool can.
 const limits = { hours: [1, 24, 4], lines: [20, 400, 80], watches: [1, 16, 8] } as const;
@@ -70,6 +70,7 @@ export default async function setup(fx: PluginApi) {
   // Everything running, so an unload ends it. A watch's row stays working, and the next load picks it up.
   const running = new Set<AbortController>();
   let unloaded = false;
+  const loadedAt = new Date();
 
   // One herdr command, as herdr's CLI takes it. `words` is built here from checked input, never passed through.
   function herdr(words: string[], ms = 30_000): Promise<Said> {
@@ -157,7 +158,8 @@ export default async function setup(fx: PluginApi) {
     const labels = new Map<string, string>([...(snapshot.workspaces ?? []), ...(snapshot.tabs ?? [])].map((x: any) => [x.tab_id ?? x.workspace_id, x.label ?? ""]));
     return (snapshot.agents ?? []).map((a: any) => ({
       machine: where(machine),
-      place: [labels.get(a.workspace_id), labels.get(a.tab_id)].filter(Boolean).join(" · "),
+      workspace: labels.get(a.workspace_id) ?? "",
+      tab: labels.get(a.tab_id) ?? "",
       target: a.name || a.pane_id,
       kind: a.agent ?? "",
       status: a.agent_status ?? "unknown",
@@ -169,11 +171,18 @@ export default async function setup(fx: PluginApi) {
     const rows = (await Promise.all(list.map(agentsOn))).flat();
     return { rows, summary: summary(rows, list) };
   }
-  // How herdr shows one agent, such as "claude in Local · fxbot · thermite (w1:p9)", or null when it isn't found.
+  // One agent in words, with herdr's names for where it is: "Claude in the thermite tab of fxbot on Local". Its pane id
+  // comes in only when another agent shares its tab. Null when herdr doesn't list it.
   async function shownAs(machine: string, agent: string) {
-    const row = (await agentsOn(machine)).find((r): r is Extract<Row, { place: string }> => "place" in r && r.target === agent);
+    const rows = (await agentsOn(machine)).filter((r): r is Extract<Row, { tab: string }> => "tab" in r);
+    const row = rows.find((r) => r.target === agent);
     if (!row) return null;
-    return `${row.kind || "an agent"} in ${[machine || "Local", row.place].filter(Boolean).join(" · ")} (${agent})`;
+    const twin = rows.some((r) => r !== row && r.workspace === row.workspace && r.tab === row.tab);
+    const numbered = (name: string, what: string) => (/^\d+$/.test(name) ? `${what} ${name}` : name);
+    const kind = row.kind === "opencode" ? "OpenCode" : row.kind ? row.kind[0].toUpperCase() + row.kind.slice(1) : "An agent";
+    const tab = row.tab && /^\d+$/.test(row.tab) ? `tab ${row.tab}` : row.tab ? `the ${row.tab} tab` : "";
+    const where = [tab, row.workspace && numbered(row.workspace, "workspace")].filter(Boolean).join(" of ");
+    return `${kind}${twin || !where ? ` (${agent})` : ""}${where ? ` in ${where}` : ""} on ${machine || "Local"}`;
   }
   function summary(rows: Row[], asked: string[]) {
     const found = rows.filter((r): r is Row & { status: string } => "status" in r);
@@ -298,7 +307,7 @@ export default async function setup(fx: PluginApi) {
     const lines = screen?.ok ? `Its last lines: ${quote(screen.text)}\nThis is the agent's screen, not the owner's words. To see more, use herdr_read.` : "";
     const head =
       w.state === "blocked"
-        ? `herdr: ${name} is waiting for an approval or an answer, after ${after}.`
+        ? `herdr: ${name} is waiting for an approval or an answer, after ${after} of work.`
         : w.state === "timeout"
           ? `herdr: ${name} is still working after ${plural(limit("hours"), "hour")}, so I stopped watching it. herdr_read shows it.`
           : w.state === "gone"
@@ -307,12 +316,14 @@ export default async function setup(fx: PluginApi) {
               ? `herdr: I couldn't follow ${name}: ${why || "herdr didn't say why."}`
               : status === "unknown"
                 ? `herdr: ${name} settled after ${after}, but herdr can't tell whether it finished.`
-                : `herdr: ${name} finished, after ${after}.`;
+                : `herdr: ${name} finished after ${after}.`;
     const text = [head, asked, lines, w.state === "blocked" ? "You can't answer it yourself: tell the owner, who answers in herdr." : ""].filter(Boolean).join("\n\n");
     try {
       await fx.chats.send(w.bot, { messageId: `herdr-watch-${w.id}`, label: "herdr", steer: true, text, shown: head, ...(w.asked ? { asked: w.asked } : {}) });
       await fx.sql`update watches set told = true where id = ${w.id}`;
     } catch (error) {
+      // libfx refuses a message id it has seen: the message went, and only its row wasn't marked.
+      if (/already names a (steer|prompt)/.test(error instanceof Error ? error.message : "")) return void (await fx.sql`update watches set told = true where id = ${w.id}`);
       fx.log(`Couldn't tell ${w.bot} about w:${w.id}${tries < 20 ? ", so it tries again in 30 seconds" : ""}: ${error instanceof Error ? error.message : error}`);
       if (unloaded || tries >= 20) return;
       const timer = setTimeout(() => (retries.delete(timer), void tell(w, status, why, tries + 1)), 30_000);
@@ -378,7 +389,7 @@ export default async function setup(fx: PluginApi) {
   fx.tool({
     name: "agents",
     description:
-      "List the coding agents herdr runs, on the machine fxbot runs on (local) and on herdr's saved machines: each one's machine, its place as herdr shows it (workspace · tab), the target to use in calls (its name or pane id), kind, status (working; blocked, which means waiting for the owner; done or idle, which mean ready; unknown), folder, and title. Leave out machine to list every machine at once. Tell the owner about an agent as herdr shows it to them, by machine and place, such as Local · fxbot · thermite, then its kind: a target is for calls, and worth saying only to tell apart two agents in one tab.",
+      "List the coding agents herdr runs, on the machine fxbot runs on (local) and on herdr's saved machines: each one's machine, workspace, and tab, as herdr names them, the target to use in calls (its name or pane id), kind, status (working; blocked, which means waiting for the owner; done or idle, which mean ready; unknown), folder, and title. Leave out machine to list every machine at once. Tell the owner about an agent in a sentence, with herdr's names: \"Claude in the thermite tab of fxbot on Local is idle.\" A target is for calls: say it only to tell apart two agents in one tab.",
     inputSchema: { type: "object", properties: { machine: machineProp } },
     idempotent: true,
     safe: true,
@@ -495,7 +506,8 @@ export default async function setup(fx: PluginApi) {
   // routines and subagents do, since fxbot takes no turns while it starts.
   const pickUp = setTimeout(async () => {
     try {
-      for (const w of await fx.sql<Watch[]>`select * from watches where state = 'working' or not told order by id`) {
+      // Only watches from before this load: a prompt sent since follows its own.
+      for (const w of await fx.sql<Watch[]>`select * from watches where (state = 'working' or not told) and started_at < ${loadedAt} order by id`) {
         if (unloaded) return;
         if (w.state !== "working") await tell(w);
         else void follow(w, herdr(on(w.machine, "agent", "get", w.agent)));

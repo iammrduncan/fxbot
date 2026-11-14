@@ -46,8 +46,8 @@ function Table({ rows }) {
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: `size-2 shrink-0 rounded-full ${dot[r.status] ?? dot.unknown}` }),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: "shrink-0 font-mono",
-						children: r.target
+						className: "shrink-0",
+						children: [r.workspace, r.tab].filter(Boolean).join(" · ") || r.target
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 						className: "shrink-0 text-muted-foreground",
@@ -127,7 +127,7 @@ function Sent({ call: tool }) {
 		look();
 		return () => (stopped = true, clearTimeout(timer));
 	}, [id]);
-	const who = `${input.agent ?? input.name ?? "An agent"}${input.machine ? ` on ${input.machine}` : ""}`;
+	const who = watch?.shown ?? `${input.agent ?? input.name ?? "An agent"}${input.machine ? ` on ${input.machine}` : ""}`;
 	const text = input.text ?? input.prompt;
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		className: "grid gap-1.5 text-sm",
