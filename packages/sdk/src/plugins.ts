@@ -130,9 +130,18 @@ export function parseManifest(text: string): Manifest {
   const { minFxbot } = own;
   if (minFxbot !== undefined && (typeof minFxbot !== "string" || !/^\d+\.\d+\.\d+$/.test(minFxbot))) fail(400, "plugin.json's minFxbot must be a version, such as 0.7.0.");
   const settings = Array.isArray(own.settings) ? own.settings : [];
-  for (const setting of settings)
+  for (const setting of settings) {
     if (typeof setting?.name !== "string" || !/^[A-Za-z][\w-]{0,63}$/.test(setting.name) || typeof (setting.description ?? "") !== "string")
       fail(400, "Each of plugin.json's settings needs a name and a description.");
+    const { options } = setting;
+    if (
+      options !== undefined &&
+      (!Array.isArray(options) ||
+        options.length > 500 ||
+        options.some((o) => typeof o?.value !== "string" || o.value.length > 200 || typeof (o.label ?? "") !== "string" || o.label?.length > 200 || typeof (o.group ?? "") !== "string" || o.group?.length > 100))
+    )
+      fail(400, "A setting's options must be a list of up to 500, each with a value, and a label and a group if it likes, up to 200 characters each.");
+  }
   const needs = own.needs ?? {};
   const isObject = (value: unknown) => typeof value === "object" && value !== null && !Array.isArray(value);
   if (!isObject(needs) || Object.entries(needs).some(([other, block]) => !pluginName.test(other) || other === name || !isObject(block)))
@@ -152,12 +161,16 @@ export function parseManifest(text: string): Manifest {
     page: part(own.page, "page"),
     css: part(own.css, "css"),
     migrations: part(own.migrations, "migrations"),
-    settings: settings.map(({ name, description = "", default: value, isRequired, isSecret }: Record<string, unknown>) => ({
+    settings: settings.map(({ name, description = "", default: value, isRequired, isSecret, options }: Record<string, unknown>) => ({
       name: name as string,
       description: description as string,
       ...(typeof value === "string" ? { default: value } : {}),
       ...(isRequired === true ? { isRequired: true } : {}),
       ...(isSecret === true ? { isSecret: true } : {}),
+      // A secret is never shown, so it offers no list.
+      ...(Array.isArray(options) && options.length && isSecret !== true
+        ? { options: (options as { value: string; label?: string; group?: string }[]).map(({ value, label, group }) => ({ value, label: label || value, ...(group ? { group } : {}) })) }
+        : {}),
     })),
     needs: needs as Manifest["needs"],
     ...(commands.length ? { commands: commands.map(({ name, description }) => ({ name, description })) } : {}),

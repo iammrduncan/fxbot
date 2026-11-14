@@ -1,8 +1,9 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ExternalLinkIcon, LoaderCircleIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from "@/components/ui/native-select";
 import type { Plugin, PackagePlugin, PackagePreview, PackageSearch } from "@fxbot/sdk/client";
 import { AddedFooter, Details, heading, hint } from "./mcp-add.tsx";
 import { PluginIcon } from "./plugin-icon.tsx";
@@ -241,6 +242,51 @@ export function PluginDialog({
 // An installed plugin, in its tab in Settings: which bots it reaches, its settings, what it added to fxbot, its MCP
 // servers, its log, and its source, with Update when its files changed there, which shows what changed and needs the
 // owner's Update before anything moves.
+const typedIn = "\u0000typed";
+
+// A setting with options: a list to pick from, showing its default until another is picked, and "Another" to type a
+// value the list doesn't have. A value saved that isn't on the list shows typed in.
+function Choice({ setting, value, onChange }: { setting: PackagePlugin["settings"][number]; value: string; onChange: (value: string) => void }) {
+  const options = setting.options ?? [];
+  const listed = options.some((o) => o.value === value);
+  const [typing, setTyping] = useState(!listed && value !== "");
+  if (typing)
+    return (
+      <span className="flex gap-2">
+        <Input autoComplete="off" value={value} placeholder={setting.default ?? ""} onChange={(e) => onChange(e.target.value)} className="min-w-0 flex-1" />
+        <Button type="button" variant="ghost" size="sm" onClick={() => setTyping(false)}>
+          From the list
+        </Button>
+      </span>
+    );
+  const items = (group: string) =>
+    options
+      .filter((o) => (o.group ?? "") === group)
+      .map((o) => (
+        <NativeSelectOption key={o.value} value={o.value}>
+          {o.label}
+        </NativeSelectOption>
+      ));
+  // A closed list shows only the label, so the heading it's under goes beneath it.
+  const under = options.find((o) => o.value === value)?.group;
+  return (
+    <>
+      <NativeSelect className="w-full font-normal" value={listed ? value : ""} onChange={(e) => (e.target.value === typedIn ? setTyping(true) : onChange(e.target.value))}>
+        {!listed && (
+          <NativeSelectOption value="" disabled>
+            Pick one
+          </NativeSelectOption>
+        )}
+        {[...new Set(options.map((o) => o.group ?? ""))].map((group) => (
+          <Fragment key={group}>{group ? <NativeSelectOptGroup label={group}>{items(group)}</NativeSelectOptGroup> : items(group)}</Fragment>
+        ))}
+        <NativeSelectOption value={typedIn}>Another, typed in…</NativeSelectOption>
+      </NativeSelect>
+      {under && <span className="text-xs font-normal text-muted-foreground">{under}</span>}
+    </>
+  );
+}
+
 export function PluginSettings({ addon, bots, servers, onChange, onRemoved }: { addon: PackagePlugin; bots: ReactNode; servers: ReactNode; onChange: (addon: Plugin) => void; onRemoved: () => void }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [log, setLog] = useState<string[] | null>(null);
@@ -290,13 +336,17 @@ export function PluginSettings({ addon, bots, servers, onChange, onRemoved }: { 
                 {s.name}
                 {s.description && <span className="font-normal text-muted-foreground">: {s.description}</span>}
               </span>
-              <Input
-                type={s.isSecret ? "password" : "text"}
-                autoComplete="off"
-                value={values[s.name] ?? (s.isSecret ? "" : (s.value ?? ""))}
-                placeholder={s.isSecret ? (s.set ? "Set. Type to replace it." : "Not set") : (s.default ?? "")}
-                onChange={(e) => setValues({ ...values, [s.name]: e.target.value })}
-              />
+              {s.options?.length ? (
+                <Choice setting={s} value={values[s.name] ?? s.value ?? s.default ?? ""} onChange={(value) => setValues({ ...values, [s.name]: value })} />
+              ) : (
+                <Input
+                  type={s.isSecret ? "password" : "text"}
+                  autoComplete="off"
+                  value={values[s.name] ?? (s.isSecret ? "" : (s.value ?? ""))}
+                  placeholder={s.isSecret ? (s.set ? "Set. Type to replace it." : "Not set") : (s.default ?? "")}
+                  onChange={(e) => setValues({ ...values, [s.name]: e.target.value })}
+                />
+              )}
             </label>
           ))}
           <Button type="submit" size="sm" className="justify-self-start" disabled={!Object.keys(values).length}>

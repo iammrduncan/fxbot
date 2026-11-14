@@ -277,7 +277,10 @@ export type SkillPlugin = PluginCommon & { kind: "skill"; source: SkillSource; d
 // A plugin: code that changes fxbot itself, from a GitHub repository's folder at a pinned commit, or in a checkout from
 // a folder of FXBOT_PLUGIN_DIRS. `parts` is what it registered when it loaded; `error` is why it is off.
 export type PackageSource = { local: string } | { repo: string; path: string; commit: string; from: "fxbot" | "github" };
-export type PluginSetting = { name: string; description: string; default?: string; isRequired?: boolean; isSecret?: boolean };
+/** A choice a setting offers: its value, the words the page shows for it, and the heading it's listed under. */
+export type PluginSettingOption = { value: string; label: string; group?: string };
+/** With `options`, the page shows a list to pick from, and still takes another value typed in. */
+export type PluginSetting = { name: string; description: string; default?: string; isRequired?: boolean; isSecret?: boolean; options?: PluginSettingOption[] };
 export type PackageParts = { tools: string[]; hooks: string[]; routes: string[]; sockets: string[]; page: boolean };
 export type PackagePlugin = PluginCommon & {
   kind: "package";

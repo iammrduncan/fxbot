@@ -33,7 +33,7 @@ Only `plugin.json` is required, and only the paths it names count.
 | `extensions["sh.fxbot"].page` | Its page code |
 | `extensions["sh.fxbot"].css` | Its CSS |
 | `extensions["sh.fxbot"].migrations` | A folder of `.sql` files |
-| `extensions["sh.fxbot"].settings` | A list of settings, each with `name`, `description`, and optionally `default`, `isRequired`, and `isSecret` |
+| `extensions["sh.fxbot"].settings` | A list of settings, each with `name`, `description`, and optionally `default`, `isRequired`, `isSecret`, and `options`. `options` is a list for the owner to pick from, up to 500, each with `value`, and optionally `label`, the words shown, and `group`, a heading to list it under. The owner can still type a value that isn't listed. A secret offers no list. Since 0.11.0: an older fxbot shows a text box. |
 | `extensions["sh.fxbot"].commands` | Commands for the `/` list in a bot's message box, each with `name` (up to 40 lowercase letters, digits, and dashes) and `description` (up to 200 characters). Listing one runs nothing: the plugin's `message` hook sees `/name` as text. Since 0.5.0. |
 | `extensions["sh.fxbot"].needs` | The plugins it needs, each name mapped to an object for that plugin, up to 16 KiB in all. See [Plugins that need others](#plugins-that-need-others). |
 
