@@ -24,7 +24,7 @@ With notes from the agent that runs the owner's lab:
 
 **The door is the install's, like the computer's engine.** A plugin can't reach the machine from the container, and it shouldn't be able to make its own way out. The machine's `fxbot` command already sets up one plugin's part on the machine, `fxbot computer on|off`, from the release's own files. herdr gets the same: `fxbot herdr on|off`, and a small script, `deploy/herdr-door`, that `fxbot update` keeps in step with each release. That names herdr in `deploy/`, as `computer` is named there. Unlike the computer, the app can't ask for it: only root opens it, with `sudo`.
 
-**Why not give the container herdr's socket,** as the first plugin's README did with a `socat` relay run as root. herdr's socket takes every one of its 102 methods, among them `pane.send_text`, `pane.send_keys`, and `pane.send_input`, which type into any pane, a root shell's included. Whatever holds that socket can run any command as herdr's user, and herdr runs as root on the owner's lab machine. The relay gave that to every plugin in the container.
+**Why not give the container herdr's socket,** as the first plugin's README did with a `socat` relay run as root. herdr's socket takes every one of its 102 methods, among them `pane.send_text`, `pane.send_keys`, and `pane.send_input`, which type into any pane, a root shell's included. Whatever holds that socket can run any command as herdr's user, and herdr runs as root on the owner's machine. The relay gave that to every plugin in the container.
 
 **Why not the request files `fxbot apply` reads.** They're the one way the app reaches the machine today, and a herdr request would fit there. But `fxbot apply` runs one request at a time, as a systemd service that starts for each, so an agent's wait of minutes would hold up an update, and waiting would have to be polling: a service start, and lines in the journal, every few seconds for as long as an agent works. A socket answers on the same connection, runs calls at once, and lets a wait block.
 
@@ -35,14 +35,14 @@ With notes from the agent that runs the owner's lab:
 ### herdr, on this machine
 
 From herdr 0.9.3's CLI, `herdr --skill`, and its socket API's schema (`herdr api schema --json`, 102 request methods), read on 2026-11-14:
-- **Agents** are recognized coding agents in panes. `agent list` gives each one's pane id, kind (`claude`, `codex`, and 22 more), status, folder, terminal title, workspace, and tab. `agent get`, `read`, `prompt`, `wait`, `send-keys`, `start`, `rename`, and `focus` take a live agent's name or its pane id.
+- **Agents** are recognized coding agents in panes. `agent list` gives each one's pane id, kind (`claude`, `codex`, and 22 more), status, folder, terminal title, workspace, and tab. `agent get`, `read`, `prompt`, `wait`, `send-keys`, `rename`, and `focus` take a live agent's name or its pane id.
 - **Status:** `idle` and `done` mean ready for input, `working` busy, `blocked` at an approval or a question herdr recognized, and `unknown` present but unclassified, which "does not prove completion."
 - **A prompt** (`agent prompt <target> <text>`) pastes the text and presses Enter. It refuses an agent that's `blocked` before sending anything. With `--wait`, it needs to see the agent working within 5 seconds, or answers `agent_prompt_stalled`, and then waits for the first settled state. "A timeout or stalled response does not prove the prompt was never delivered; do not blindly submit it again."
 - **A read** (`agent read --source recent-unwrapped --lines N`) is the screen's recent lines. Alternate-screen rows don't enter scrollback, so a full-screen agent's whole answer may not be there. herdr's fallback is to ask the agent to write its answer to a file.
 - **Starting** (`agent start <name> --kind <kind> --pane <id>`) needs an existing pane at a shell prompt, and takes the agent's own arguments only after `--`. `workspace create` and `tab create` take `--label`, `--cwd`, `--no-focus`, and `--env`.
 - **Other machines** are saved SSH profiles (`herdr machine list --json`: id, label, target, session, enabled). Every API command takes `--machine <label-or-id>`, run on that machine's herdr. The socket schema has no machine field: forwarding is the CLI's, so reaching the lab means running the CLI. "A connection failure does not prove a mutation was not applied: inspect remote state before retrying."
 - **herdr's rules for agents** that use it: don't close what you didn't create, don't answer an agent's approval without the user, don't stop the server, and use a named session for experiments.
-- **Measured here:** a local `agent list` takes 2 ms. On a lab machine it takes 200 to 360 ms. The same forwarded call, run with an empty environment, no terminal, and no SSH agent, as a systemd service would run it, took 305 ms and answered. The machine has 10 saved profiles, all enabled and reachable.
+- **Measured here:** a local `agent list` takes 2 ms. On a lab machine it takes 200 to 360 ms. The same forwarded call, run with an empty environment, no terminal, and no SSH agent, as a systemd service would run it, took 305 ms and answered. The machine had 10 saved profiles when measured, all enabled and reachable.
 
 ### fxbot's first herdr plugin, and drovr
 
@@ -100,7 +100,7 @@ From each repository at its 2026-11-13 commit, or its docs where it has no publi
 
 `plugins/herdr/`, version 0.2.0, so an install that kept 0.1.0 sees an update. In fxbot's list, not in **Essentials**.
 - `plugin.json`: settings, and `minFxbot` `0.9.0`
-- `fxbot/server.ts`: the tools, the door and the CLI, the watches, and a route for the page
+- `fxbot/server.ts`: the tools, the door and the CLI, the watches, and two routes for the page, `/watches/:id` and `/status`
 - `fxbot/page.jsx`, built to `page.js` with the rolldown command in its README: the cards and the settings tab
 - `fxbot/migrations/0001_herdr.sql`
 - `skills/herdr/SKILL.md`, `README.md`
@@ -115,7 +115,7 @@ One function, `herdr(words, signal)`, runs one herdr command and answers its JSO
 ### The door
 
 **`sudo fxbot herdr on [--user <login>] [--read-only]`**, in `deploy/fxbot`:
-1. Finds herdr's user, `--user` or root, and checks that `herdr status` answers as that user with a running server. Otherwise it stops and says why, changing nothing.
+1. Finds herdr's user, `--user` or root, and checks that `herdr status server --json` answers as that user with a running server. Otherwise it stops and says why, changing nothing.
 2. Asks each saved machine, `machine status --json`, the way the door will: as that user, with an empty environment and no SSH agent. It names any that don't answer, such as one whose key has a passphrase, which the door can't reach until the key is loaded where the door sees it, and goes on.
 3. Writes two units and starts the socket:
 
@@ -126,7 +126,7 @@ One function, `herdr(words, signal)`, runs one herdr command and answers its JSO
    Accept=yes
    SocketGroup=<FXBOT_GID>
    SocketMode=0660
-   MaxConnections=32
+   MaxConnections=64
 
    # /etc/systemd/system/fxbot-herdr@.service
    [Service]
@@ -145,15 +145,17 @@ The socket is in the control folder, which the container already mounts, so the 
 
 | Command | Its other words | `--read-only` |
 | --- | --- | --- |
-| `status`, `machine list --json`, `machine status --json` | none | yes |
-| `agent list`, `workspace list` | none | yes |
+| `status server --json` | none | yes |
+| `machine list --json`, `machine status --json`, only without `--machine`, since herdr doesn't forward them | none | yes |
+| `agent list` | none | yes |
+| `workspace get <w<n>>` | none | yes |
 | `agent get <target>` | a target: a live name, `[a-z][a-z0-9_-]{0,31}`, or a pane id, `w<n>:p<n>` | yes |
 | `agent read <target> --source recent-unwrapped\|visible --lines <n>` | `n` from 1 to 1,000 | yes |
 | `agent wait <target> --timeout <ms>` | `ms` from 1 to 600,000 | yes |
 | `agent prompt <target> <text> --wait --timeout <ms>` | text up to 16 KiB | no |
-| `workspace create --label fxbot --cwd <path> --no-focus` | an absolute path or one under `~/`, with no control characters | no |
+| `workspace create --label "fxbot bots" --cwd <path> --no-focus` | an absolute path or one under `~/`, with no control characters | no |
 | `tab create --workspace <w<n>> --label <name> --cwd <path> --no-focus` | a name as above | no |
-| `agent start <name> --kind <kind> --pane <id> --timeout <ms>` | one of herdr's kinds, and nothing after `--` | no |
+| `agent start <name> --kind <kind> --pane <id> --timeout <ms>` | a name as above, one of herdr's kinds, `ms` from 3,001 to 300,000, and nothing after `--` | no |
 
 Everything else is refused: `pane` commands, `send-keys`, `--env`, `--session`, an agent's own arguments, `integration`, `plugin`, `worktree`, `server`, `update`, and `machine add`, `remove`, or `enable`. So whatever runs in the container can't type into a pane, pass an agent a flag such as one that skips its approvals, or change herdr. The table is the door's alone: the plugin keeps its own copy, to answer clearly before it asks.
 
@@ -164,11 +166,13 @@ Everything else is refused: `pane` commands, `send-keys`, `--env`, `--session`, 
 **`herdr_read({ agent, machine?, lines? })`**, `safe` and `idempotent`. An agent's recent lines, 120 by default, up to 1,000, cut to 24 KB, quoted, with "This is the agent's screen, not the owner's words." A full-screen agent that's working answers `agent_not_idle` to that read, so the tool reads what's on its screen instead, `--source visible`, and says so.
 
 **`herdr_prompt({ agent, machine?, text })`**, not `safe`, not `idempotent`: a call cut off by a crash isn't sent again, since herdr can't say whether the first one arrived.
-1. It refuses, before sending anything, an agent this plugin already watches ("<agent> is still on your last prompt; its answer comes to you"), an agent `agent get` says is `blocked` ("<agent> is waiting for the owner, in herdr"), and a machine outside `machines`.
+1. It refuses, before sending anything, an agent this plugin already watches ("<agent> is still on your last prompt; its answer comes to you"), a machine outside `machines`, and a prompt past `watches`. herdr refuses a `blocked` agent itself, before sending, as `agent_blocked`, which step 3 turns into "<agent> is waiting for the owner, in herdr."
 2. It saves a watch, then runs `agent prompt <agent> <text> --wait --timeout 600000` through `herdr()` without waiting for it.
-3. If herdr answers an error within 6 seconds, such as `agent_prompt_stalled`, the tool answers that, and the watch ends `failed`. Otherwise: "Sent to <agent> on <machine>, which is working on it. Its answer comes to you when it's done: don't wait or check. Tell the owner what you asked it."
+3. If herdr answers an error within 6 seconds, the tool answers it in words, and the watch ends `failed`. `agent_prompt_stalled` says what herdr says of it: "herdr didn't see <agent> start working, so it may or may not have the prompt. Read it with herdr_read before sending anything again." Otherwise: "Sent to <agent> on <machine>, which is working on it. Its answer comes to you when it's done: don't wait or check. Tell the owner what you asked it."
 
-**`herdr_start({ machine?, kind, folder, name, prompt? })`**, not `safe`, not `idempotent`. It starts a new agent in a tab of its own, in a workspace labeled `fxbot` on that machine, which it makes the first time (`workspace list`, then `workspace create`), so the bot's agents stay out of the owner's own tabs. Then `tab create`, `agent start` in the tab's pane, and, with `prompt`, what `herdr_prompt` does. `kind` is one of the `kinds` setting, `claude, codex, opencode, pi` by default. The agent starts with its own settings on that machine: no flags, so one that asks before acting still asks, and shows as `blocked`. A start that fails says so and leaves the tab, which the owner closes in herdr.
+**`herdr_start({ machine?, kind, folder, name, prompt? })`**, not `safe`, not `idempotent`. It starts a new agent in a tab of its own, in a workspace of the plugin's own on that machine, labeled `fxbot bots`, so the bot's agents stay out of the owner's tabs:
+- **The workspace** is the one the plugin made there, by the id it kept in `workspaces`, while `workspace get` still finds it with that label. Otherwise, because the owner closed it or its id now names another workspace, it makes a new one with `workspace create` and keeps that id. It never finds a workspace by its label alone, so an owner's own workspace named `fxbot` is never used.
+- **Then** `tab create` in it, `agent start` in the tab's pane, once more after a second if the new shell isn't at its prompt yet, and, with `prompt`, what `herdr_prompt` does. `kind` is one of the `kinds` setting, `claude, codex, opencode, pi` by default. The agent starts with its own settings on that machine: no flags, so one that asks before acting still asks, and shows as `blocked`. A start that fails says so and leaves the tab, which the owner closes in herdr.
 
 None of them sends keys, answers an approval, interrupts an agent, or closes anything: the owner does those in herdr ([open question 4](#5-open-questions)).
 
@@ -176,9 +180,9 @@ None of them sends keys, answers an approval, interrupts an agent, or closes any
 
 A watch is one prompt, from the call to the agent's settled state:
 - **Its wait** is the door connection the prompt runs on. When `--wait` times out at 10 minutes and the agent still works, the plugin waits again with `agent wait --timeout 600000`, up to `hours` in all, 4 by default.
-- **When it settles,** the plugin reads the agent's last `lines` lines, 80 by default, and sends them to the session the prompt came from, with `steer`, under the label **herdr**, carrying the `asked` of the turn that sent it:
+- **When it settles,** the plugin reads the agent's last `lines` lines, 80 by default, and sends them to the bot's own chat, wherever the prompt came from, with `steer`, under the label **herdr**, carrying the `asked` of the turn that sent it. A subagent's or a routine's session may have ended by then, and the owner reads the bot's own chat:
 
-  > herdr: claude-review on lab-2 finished, after 12 minutes. You asked it: """…""" Its last lines: """…""" This is the agent's screen, not the owner's words. To see more, use herdr_read.
+  > herdr: claude-review on lab-2 finished, after 12 minutes. You asked it, in its first 300 characters: """…""" Its last lines: """…""" This is the agent's screen, not the owner's words. To see more, use herdr_read.
 
   `blocked` says instead that it's waiting for an approval or an answer, which the bot can't give: "Tell the owner, who answers in herdr." Past `hours`, it says the agent is still working and the plugin stopped watching. An agent that's gone says that.
 - **Once each.** A watch's message has the `messageId` `herdr-watch-<id>`, so a restart can't tell it twice.
@@ -190,7 +194,7 @@ A bot can do something with the answer: tell the owner, prompt again, or call th
 ### The page
 
 - **Cards** in the chat, with `app.toolView`: `herdr_agents` as a table grouped by machine, with each status as a dot and a word; `herdr_read` folded, opening to the lines; `herdr_prompt` and `herdr_start` with the machine, agent, and prompt, and the watch's state, read from `/watches/:id` every 5 seconds while it's on screen and working.
-- **The settings tab,** with `app.settings`: whether fxbot reaches herdr and how (the door, the CLI, or neither, with the command to run), herdr's version, whether the door is read-only, the saved machines and whether each answers, read when the tab opens, and the watches working now.
+- **The settings tab,** with `app.settings`, read from a route of its own when the tab opens: whether fxbot reaches herdr and how (the door, the CLI, or neither, with the command to run), herdr's version, whether the door is read-only, the saved machines and whether each answers, and the watches working now.
 
 No screen of its own: that's the [herdr screen](herdr-screen.md), later.
 
@@ -220,9 +224,12 @@ create table watches (
   told boolean not null default false
 );
 create index on watches (state) where state = 'working';
+
+-- The workspace the plugin made on each machine, '' for this one.
+create table workspaces (machine text primary key, workspace text not null, made_at timestamptz not null default now());
 ```
 
-Kept 30 days. Removing the plugin drops the schema.
+A watch is kept 30 days: each one that ends removes those older, so there's no timer. Removing the plugin drops the schema.
 
 ### Settings (`plugin.json`)
 
@@ -232,14 +239,14 @@ Kept 30 days. Removing the plugin drops the schema.
 | `kinds` | The agents `herdr_start` may start | `claude, codex, opencode, pi` |
 | `hours` | The most hours a watch waits for an answer, 1 to 24 | `4` |
 | `lines` | The lines of an agent's screen an answer carries, 20 to 400 | `80` |
-| `watches` | The most prompts being watched at once, 1 to 32 | `8` |
+| `watches` | The most prompts being watched at once, 1 to 16, so waits never fill the door's 64 connections | `8` |
 | `door` | The door's socket, as fxbot sees it | `/var/lib/fxbot/control/herdr.sock` |
 | `herdr` | herdr's command, in a checkout | `herdr` |
 
 ### Cost
 
 - **Each request of each bot it's on for:** four tool definitions, about 450 tokens, cached with the rest, and the skill's line.
-- **A call:** through the door, a systemd service start and one Bash for each connection, plus herdr's own 2 ms here or 200 to 360 ms on another machine. `herdr_agents` across 10 machines asks them at once, so about as long as the slowest.
+- **A call:** through the door, a systemd service start and one Bash for each connection, plus herdr's own 2 ms here or 200 to 360 ms on another machine. `herdr_agents` asks every saved machine at once, so it takes about as long as the slowest.
 - **A watch:** one waiting connection, a sleeping Bash and herdr's CLI, for as long as the agent works, and one read at the end.
 - **Idle, and with no watches:** nothing: no timer, no poll, no process. With the plugin off, nothing at all, and the door, if open, is a socket no one connects to.
 - **The journal:** systemd writes a line or two for each connection.
@@ -267,9 +274,9 @@ Checks use a herdr session of their own, never the owner's live one, except wher
 - [ ] `herdr()` through the CLI: in a checkout run as herdr's user, `herdr_agents` lists the test session's agents, with a pane id or name, kind, status, folder, and title.
 - [ ] Without `machine`, it lists this machine's and each saved machine's at once, and a machine that doesn't answer is a row that says so. Against the owner's lab, read-only: every machine answers, and the whole list takes under a second.
 - [ ] `herdr_read` gives the recent lines, quoted, cut at 24 KB.
-- [ ] `herdr_prompt` to a ready agent in the test session answers "Sent" within 6 seconds, the agent works, and when it's done, its last lines reach the bot's chat once, under **herdr**, and wake it. A prompt to an agent that's `blocked` is refused before anything is sent, and one to an agent already watched is refused.
+- [ ] `herdr_prompt` to a ready agent in the test session answers "Sent" within 6 seconds, the agent works, and when it's done, its last lines reach the bot's own chat once, under **herdr**, and wake it, from a routine's run too. A prompt to an agent that's `blocked` is refused before anything is sent, and one to an agent already watched is refused.
 - [ ] A watch past 10 minutes waits again, and one past `hours` says so and stops. A restart mid-watch: the answer still comes, once, and nothing is sent to the agent again.
-- [ ] `herdr_start` makes the `fxbot` workspace once, a tab for each agent, starts the agent, and with `prompt` watches it. A `kind` outside `kinds` is refused.
+- [ ] `herdr_start` makes the `fxbot bots` workspace once on a machine, a tab in it for each agent, starts the agent, and with `prompt` watches it. With a workspace of the test session's own labeled `fxbot` already there, it's left alone. Closing the plugin's workspace makes the next start make a new one. A `kind` outside `kinds` is refused.
 - [ ] Permissions on `ask`: `herdr_agents` and `herdr_read` run without a card, and `herdr_prompt` and `herdr_start` show one.
 - [ ] The cards: the agents table, the folded read, and a prompt's card that goes from working to done. The settings tab says how fxbot reaches herdr, or the command to run.
 
@@ -279,7 +286,7 @@ Checks use a herdr session of their own, never the owner's live one, except wher
 - [ ] Each allowed command answers through the door as herdr's user, `--machine` included.
 - [ ] Each refused one answers `refused` without running herdr: a `pane` command, `send-keys`, `--env`, words after `--`, `--session`, a target with a space or a newline, a text over 16 KiB, a path with a control character, and a request over 64 KiB.
 - [ ] `--read-only` refuses prompts, workspaces, tabs, and starts.
-- [ ] Ten connections at once all answer. A wait of 10 minutes holds while other calls answer.
+- [ ] Twenty connections at once all answer. A wait of 10 minutes holds while other calls answer.
 - [ ] `fxbot update` brings the new release's `herdr-door`.
 - [ ] Not run where this machine can't: SELinux (whether a confined container reaches a socket systemd made in a `:z` folder), and herdr as a user whose SSH key needs an agent.
 
@@ -294,7 +301,7 @@ Checks use a herdr session of their own, never the owner's live one, except wher
 
 1. **The conventions.** Add herdr to [Bots and the owner's machine](../../CONVENTIONS.md#bots-and-the-owners-machine), beside local access, as the second way a bot's work reaches the owner's machines: through the owner's own agents, never a shell, opened only by the owner on the machine? Recommended: yes, in those words.
 2. **Prompts and starts through Permissions,** like every other call that reaches outside, or a card of the plugin's own every time, whatever the bot's mode? Recommended: Permissions. An owner on `yolo` chose that.
-3. **Starting agents in this phase,** or only prompting the ones the owner started? Recommended: in this phase, in the `fxbot` workspace, with no flags.
+3. **Starting agents in this phase,** or only prompting the ones the owner started? Recommended: in this phase, in the `fxbot bots` workspace, with no flags.
 4. **Keys:** should a bot ever press keys in another agent, such as Escape to interrupt it or `y` to approve? Recommended: not in this phase. herdr's own guide tells agents to ask the user before answering one, and Permissions can't judge a keystroke well.
 5. **Narrowing machines on the machine,** such as `fxbot herdr on --machines a,b`, so even a changed plugin can't reach the rest? Recommended: later, if the owner wants it. Today the `machines` setting narrows them for bots, and herdr's own profiles are the list.
 6. **A read-only door by default,** with prompts and starts only after `--prompts`? Recommended: no. Prompting is what the owner asked for, and `--read-only` is there for an owner who wants only to look.
