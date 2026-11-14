@@ -7,13 +7,13 @@
 - **Only your phone.** You set your number once and confirm it, and no tool takes a number.
 - **Nothing reaches fxbot.** fxbot opens one connection to SignalWire for each call. SignalWire places the call, hears the owner, and speaks the bot's words, and never connects to fxbot.
 
-It's the first of two phone plugins. [Phone: Telnyx](phone-telnyx.md), later, is a softphone with speech providers of the owner's own: more code, a third of the price, and better speech.
+It's the first of two phone plugins. [Phone: Telnyx](../../phases/phone-telnyx.md), later, is a softphone with speech providers of the owner's own: more code, a third of the price, and better speech.
 
-Status: planned on 2026-11-14 at the owner's word, not built. It replaces the same day's plans for a call that only read a message out, and then for Twilio's ConversationRelay through a public path, which the owner ruled out: fxbot has no public endpoint. Researched against the research directive's references, OpenClaw, Hermes Agent and its phone plugins, Twring, the coding-agent phone projects, ChatGPT, Home Assistant, the phone services, ElevenLabs, xAI, Cartesia, the other speech providers, and the realtime voice models, read on 2026-11-14. It needs no change to the plugin API.
+Status: built on 2026-11-14 on `release/0.11.0`, at the owner's /goal, and checked against a fake RELAY, a mock model, and Chromium, not yet on a real SignalWire call ([What the build changed](#what-the-build-changed)). Planned the same day at the owner's word, it replaces the same day's plans for a call that only read a message out, and then for Twilio's ConversationRelay through a public path, which the owner ruled out: fxbot has no public endpoint. Researched against the research directive's references, OpenClaw, Hermes Agent and its phone plugins, Twring, the coding-agent phone projects, ChatGPT, Home Assistant, the phone services, ElevenLabs, xAI, Cartesia, the other speech providers, and the realtime voice models, read on 2026-11-14. It needs no change to the plugin API.
 
 ## What the owner asked
 
-- "I want to get these two things launched on fxbot such that the bot is able to make outgoing phone calls when asked and approved (to my phone) and the agent is able to use herdr to see agent activity and access the rest of my ai lab." (2026-11-14; the herdr half is [herdr](../_completed/phases/herdr.md).)
+- "I want to get these two things launched on fxbot such that the bot is able to make outgoing phone calls when asked and approved (to my phone) and the agent is able to use herdr to see agent activity and access the rest of my ai lab." (2026-11-14; the herdr half is [herdr](herdr.md).)
 - Of the first plan: "I want the bot to call me and we have a live conversation. So I click a button and it calls me and says "Hey this is your fxbot <name>, how can I help today?" and then I can start talking to it back and forth via voice instead of text chat. So that I can control it while driving hands free etc... gpt-live is one option, there are many out there."
 - "what about elevenlabs? I would support multiple providers... Some providers offer phone and voice model support, some are just voice models, some are jsut phone... But we should find the simplest, highest quality, and cost effective as first target." With "also https://x.ai/voice" and "also https://www.cartesia.ai/".
 - "I want no public endpoint of fxbot, so anything that requires that is out."
@@ -21,7 +21,7 @@ Status: planned on 2026-11-14 at the owner's word, not built. It replaces the sa
 
 ## 0. Core or plugin
 
-**A plugin**, `phone-signalwire` ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). A phone service isn't what every bot needs, what plugins plug into, or what fxbot needs to run. It costs money, needs an account, and not every owner wants it. It's in fxbot's list, off until added, and not in **Essentials**.
+**A plugin**, `phone-signalwire` ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). A phone service isn't what every bot needs, what plugins plug into, or what fxbot needs to run. It costs money, needs an account, and not every owner wants it. It's in fxbot's list, off until added, and not in **Essentials**.
 
 **One plugin for each phone service,** as the owner put it: `phone-signalwire` now, and `phone-telnyx` later. The conversation inside is kept apart from SignalWire in a file of its own ([The line](#the-line)). When the second plugin is built, that file is the part they share, through one of:
 - a `phone` plugin both need, with `fx.provide`
@@ -33,7 +33,7 @@ That's decided then, with a second real use ([open question 2](#5-open-questions
 - the bot's own chat:
   - `fx.chats.send`, with `steer`, so what the owner says joins a turn that's running
   - `asked`, so Permissions' reviewer sees the owner's words
-  - `fx.chats.stream` for the reply as it's written
+  - fxbot's own API, at `fx.localUrl`, for the bot's chat as the reply is written, since `fx.chats.stream` reads only a plugin's own sessions
   - `fx.chats.cancel` for "stop"
 - a button in the message box (`app.composer`), a bar above it (`app.chat`), a card in the chat (`app.toolView`), and settings with secrets
 
@@ -80,14 +80,14 @@ Each row is a whole call. The prices leave out the bot's own model and the numbe
 Sources:
 - SignalWire: [RELAY](https://signalwire.com/docs/platform/voice/make-and-receive-calls#make-and-receive-calls-via-websocket-relay), [prices](https://signalwire.com/pricing/voice)
 - Voximplant: its [WebSockets doc](https://github.com/voximplant/vox-docs-en/blob/main/fern/pages/help/websockets.md), [prices](https://voximplant.com/pricing)
-- Telnyx: [Phone: Telnyx](phone-telnyx.md)
+- Telnyx: [Phone: Telnyx](../../phases/phone-telnyx.md)
 - GPT-Live: [SIP](https://developers.openai.com/api/docs/guides/voice-sip.md), [delegation](https://developers.openai.com/api/docs/guides/live-delegation.md)
 - Vapi: [listen](https://docs.vapi.ai/calls/call-listen), [control](https://docs.vapi.ai/calls/call-features)
 
 What rules out the rest:
 - **Retell and Telnyx's AI Assistant** reword the bot's answers.
 - **Twilio with its Conversation Orchestrator** takes about 4 to 10 seconds to a first word, and can't be cut off.
-- **LiveKit Cloud and Amazon Chime** need cloud code the owner runs. LiveKit's Node agent also needs a native binding a plugin can't carry (web pairing's [WebRTC in Node](../_completed/phases/web-pairing.md#webrtc-in-node)).
+- **LiveKit Cloud and Amazon Chime** need cloud code the owner runs. LiveKit's Node agent also needs a native binding a plugin can't carry (web pairing's [WebRTC in Node](web-pairing.md#webrtc-in-node)).
 
 **Why SignalWire first.** It's the simplest, in the owner's words "signalwire relay first, later we add telnyx as a more complex but cheaper alternative":
 - one account, one connection out, no audio in fxbot, no trunk, and no code that runs anywhere else
@@ -197,13 +197,13 @@ The directive's references:
 - CarPlay's assistant category, new in iOS 26.4, needs a native app with Apple's entitlement, and Android Auto has no category for others' assistants. A web app can be neither.
 - An installed iPhone web app loses the microphone when the screen locks or it goes to the background ([WebKit 239602](https://bugs.webkit.org/show_bug.cgi?id=239602), open).
 - A phone call works in any car. It rings through Driving Focus when the phone is connected to the car, answers from the steering wheel, and the car cancels the echo.
-- So the call is the way to talk while driving. Voice in the app, over web pairing, is free and private for the desk, and stays in the [Phone calls](phone-calls.md) stub.
+- So the call is the way to talk while driving. Voice in the app, over web pairing, is free and private for the desk, and stays in the [Phone calls](../../phases/phone-calls.md) stub.
 
 ### fxbot today
 
 - **A turn's owner:** a turn with no `from` on `turn.start` is the owner's own, typed in the bot's own chat. Any other is background, and a message a plugin sends has its `from` (`plugins/permissions/README.md`, Who's there).
 - **Steer:** `fx.chats.send` with `steer` joins a turn that's running in the bot's own chat, and answers that turn's id as `joined`. The turn takes it at its next step, so the work isn't lost and the owner isn't queued.
-- **The reply as it's written:** `fx.chats.stream` gives a session's lines, with `text_delta` and `turn_end`, as chat rooms reads them (`plugins/chat-rooms/fxbot/server.ts:345`).
+- **The reply as it's written:** a chat's stream gives its lines, with `turn_start`, `text_delta`, `tool_start`, `user_message` for a message that joined a turn, and `turn_end`. `fx.chats.stream` gives them only for a plugin's own sessions. The bot's own chat comes from fxbot's own API, `/api/profiles/<bot>/stream`, at `fx.localUrl`, which the plugin API offers "for requests to fxbot's own API." A long chat, about 2,400 lines, replays in about 260 KB.
 - **Stop:** `fx.chats.cancel(bot)` stops the turn running in the bot's own chat if this plugin started it.
 - **Permissions:**
   - A card in a background turn expires after `expires` minutes, 30 by default.
@@ -216,7 +216,7 @@ The directive's references:
 
 1. **The bot's own turn runs the call.** What the owner says is a message in the bot's own chat, and the bot's reply is what they hear, word for word. No second model talks for it, so a bot on any model, hosted or local, works, and it's the bot the owner controls.
 2. **Nothing reaches fxbot.** Every phone service that streams a call, and every hosted agent that lets your model think, connects in. So the call is placed and steered over a connection fxbot opens.
-3. **SignalWire's RELAY first, as the simplest:** one account, one connection, no audio in fxbot, every word the bot's, and an exact greeting, for $0.79 to $1.01 for 10 minutes. The cheaper way, a softphone on Telnyx at about $0.26, is a plugin of its own later ([Phone: Telnyx](phone-telnyx.md)).
+3. **SignalWire's RELAY first, as the simplest:** one account, one connection, no audio in fxbot, every word the bot's, and an exact greeting, for $0.79 to $1.01 for 10 minutes. The cheaper way, a softphone on Telnyx at about $0.26, is a plugin of its own later ([Phone: Telnyx](../../phases/phone-telnyx.md)).
 4. **Cutting in is the open part.** A collect that keeps listening while the bot speaks, and stopping the speech when the owner starts, are each documented, but not together. The first real call tries it. Without it, the call takes turns, and "stop" waits for the end of a reply.
 5. **The greeting is the owner's words, played the moment the call is answered.** A call the bot makes opens with why it called, and the bot hears what was said.
 6. **Fill the wait with true things:** "One moment." once, then "Still working on it." while a turn runs. Hand long work to a subagent, and the result is read out if the call's still on.
@@ -242,23 +242,26 @@ The directive's references:
 ### The line
 
 A **line** is what `call.ts` holds a call through, in text:
-- **`place({ to, greeting })`** rings the owner, and answers the service's id for the call.
+- **`place({ to, greeting, voicemail?, seconds, hints?, quiet?, kept? })`** rings the owner, and answers once they answer, or don't, with how it went: `answered`, `voicemail`, `missed`, `busy`, `declined`, or `failed`.
+  - `voicemail` is for a call the bot makes: a machine gets that line instead.
+  - `quiet` speaks and doesn't listen, for the call that confirms a number.
+  - `kept` is given what a restart needs to end the call, once the service names it.
 - **It tells the call:**
   - `heard(text)`: the owner finished a turn
-  - `interrupted(heard)`: they cut in, after hearing that much
+  - `interrupted()`: they cut in, so what was playing stopped and what waited was dropped. `call.ts` knows what had played, from `played`.
   - `played(text)`: those words are out
   - `ended(how)`
 - **It does:**
-  - `say(text, { last })`
+  - `say(text)`
   - `stop()`
-  - `hangUp()`
+  - `hangUp(now?)`: once what waits has played, or at once
 
 `relay.ts` is that over RELAY. Telnyx's softphone would be the same shape over audio and speech providers, which is what makes `call.ts` the part two plugins could share.
 
 ### A call
 
 1. **Connecting.** When a call is placed, `relay.ts` opens `wss://<space>`, the owner's SignalWire space, and signs in with the project and its token. It closes the connection when the call ends, so nothing is open between calls. A connection that drops mid-call connects again with its `protocol`, up to 3 times in 10 seconds, since SignalWire keeps the call. After that, the call is over.
-2. **Dialing:** `calling.dial` to the owner's number from the account's number, ringing 30 seconds, with `max_duration` set from `minutes`. Whether that's in minutes or seconds is unclear: the SDK and SignalWire's reference disagree (signalwire-typescript #183). So the plugin also ends the call itself at `minutes`.
+2. **Dialing:** `calling.dial` to the owner's number from the account's number, ringing 30 seconds, with `max_duration` set from `minutes`, in seconds. Whether SignalWire reads it in minutes or seconds is unclear: the SDK and SignalWire's reference disagree (signalwire-typescript #183). Read as minutes, it's only longer, and the plugin ends the call itself at `minutes` either way.
 3. **Answered:** the greeting plays at once, with the voice setting, as one `calling.play`:
    - "Hey, this is your fxbot Bob. How can I help today?"
    - or, for a call the bot makes, "Hey, this is your fxbot Bob." and the reason
@@ -267,10 +270,13 @@ A **line** is what `call.ts` holds a call through, in text:
 4. **Listening:** one `calling.collect` that keeps listening for the whole call, started with the greeting. It has:
    - `speech: { end_silence_timeout: 0.8, language: "Deepgram:<language>", hints: [the bot's name] }`
    - `continuous`, `partial_results`, and `send_start_of_input`
+
+   If SignalWire refuses Deepgram by name, the collect starts again with the plain language, SignalWire's own pick, said in the plugin's log. A collect that ends starts again, at most 5 times a minute.
 5. **Ended** by a hang-up, the bot, **End call**, the idle or length limit, or SignalWire. `calling.call.state` says `ended` and why: `hangup`, `noAnswer`, `busy`, `decline`, or `error`.
 
 **A call the bot makes** runs `calling.detect` for a machine while the greeting plays:
 - **On `MACHINE`:** the plugin stops the greeting and waits for `READY`, the beep. Then it plays "Hi, it's Bob from fxbot. <reason>. Talk to me in the app anytime." and hangs up, and the tool says voicemail.
+- **On `HUMAN` or `UNKNOWN`,** or nothing in 30 seconds, it's the owner.
 
 **One call at a time,** for every bot: a second one refuses while one is ringing or on.
 
@@ -281,7 +287,7 @@ A **line** is what `call.ts` holds a call through, in text:
 **What the owner says** comes from the line as `heard`, a collect's final result. Each goes to the bot's own chat:
 
 ```ts
-fx.chats.send(bot, { text, shown: words, label: "On the phone", steer: true, asked: words })
+fx.chats.send(bot, { text, shown: words, label: "your call", steer: true, asked: words, messageId: `phone-<call>-<n>` })
 ```
 
 - **`text`** starts with a note. The first message of a call has the whole note:
@@ -289,46 +295,48 @@ fx.chats.send(bot, { text, shown: words, label: "On the phone", steer: true, ask
   > You're on a live phone call with the owner, who may be driving. You called them and said: "Hey, this is your fxbot Bob. How can I help today?" What they say comes to you as text, and what you write is read out to them. Answer in one to three short spoken sentences, with no lists, tables, links, code, or markdown. Before work that takes more than a few seconds, say in a few words what you'll do, and hand long work to a subagent if you have one. Anything that needs their OK shows on their screen, which they can't look at while driving. When they're done, say goodbye and use phone-signalwire_hang_up.
 
   Later ones start with "[On the phone]". The note is in the message, not the instructions, so the chat's cache holds.
-- **`shown`** is what the owner said, and the chat shows it, so the whole call is there afterward.
+- **`shown`** is what the owner said, and the chat shows it on the owner's side, marked **From your call**, so the whole call is there afterward.
 - **`steer`** joins a turn that's running. The turn's id comes back as `joined`, and the call speaks that turn from there.
 - **`asked`** gives Permissions' reviewer the owner's words.
 
 **What the owner hears:**
-- The plugin follows the bot's own chat with `fx.chats.stream`, from the first message of the call.
-- It speaks every reply in that chat while the call is on, including a subagent's report, since the owner is on the line.
-- It gathers `text_delta`s into sentences and plays them in order, each after the last one's `finished`.
+- The plugin follows the bot's own chat through fxbot's own API, from the first message of the call, which its id finds. A chat that starts over, as idle compaction does, is followed into its new session.
+- It speaks every reply in that chat while the call is on, including the bot's reply to a subagent's report, since the owner is on the line.
+- It gathers `text_delta`s into sentences. What waits while a line plays goes as the next line, so sentences don't each wait on a round trip. A tool call, or a message joining the turn, ends what came before it, so two steps' words don't run together.
 - Before a sentence goes, it's made speakable:
   - markdown marks go
   - a link is said as "a link in the chat"
   - a code block or table is said once as "There's more in the chat"
 
 **Fillers,** only from what's true:
-- "One moment." once a turn, when 1.5 seconds pass after the owner's words with nothing to say.
+- "One moment." once for each thing the owner says, when 1.5 seconds pass after it with nothing to say.
 - "Still working on it." every 20 seconds while a tool runs and nothing else is said.
 
 **Interruptions:**
 - **What counts:** while a sentence plays, a partial result of two or more words cuts in, unless its words are mostly the sentence playing, which is the bot's own voice coming back. `start_of_input` alone doesn't, since road noise may set it off, until a real call shows it's clean.
-- **What happens:** the line stops the play and drops the sentences after it, and says `interrupted` with the sentences that finished.
+- **What happens:** the line stops the play and drops the sentences after it, and says `interrupted`. A final result of two or more words during a play cuts in the same way.
 - **What the bot learns:** the owner's next words go to the bot with "(They cut you off after: "…")", so it knows where they stopped listening. The turn itself keeps running.
 
-If a real call shows that SignalWire won't listen during a play, the call takes turns instead: the collect runs only between the bot's replies, the owner can't cut in, and the how-to says so ([open question 3](#5-open-questions)).
+If a real call shows that SignalWire won't listen during a play, the plan is for the call to take turns instead: the collect runs only between the bot's replies, the owner can't cut in, and the how-to says so. That isn't built: it waits on the first real call ([open question 3](#5-open-questions)).
 
 **Words the bot never gets:**
-- **Stop words:** an utterance that's only "stop", "cancel", or "never mind", with at most the bot's name or "okay", cancels the call's running turn with `fx.chats.cancel(bot)`. The plugin says "Okay, stopped." itself. A turn the call didn't start, such as the owner's typed one, isn't the plugin's to stop, so it says "That one isn't mine to stop from here."
+- **Stop words:** an utterance that's only "stop", "cancel", or "never mind", with at most the bot's name, "okay", "hey", or "no" before it, or "please" or "now" after it, cancels the call's running turn with `fx.chats.cancel(bot)`. The plugin says "Okay, stopped." itself. A turn the call didn't start, such as the owner's typed one, isn't the plugin's to stop, so it says "That one isn't mine to stop from here."
 - **Floor words:** an utterance that's only "wait", "hold on", "one second", or "sorry" isn't sent, and stops the sentence playing.
 
 **Ending:**
 - **The owner hangs up:** `calling.call.state` says `ended`.
-- **The bot:** `phone-signalwire_hang_up` ends the call once its turn ends and its last play is `finished`, with `calling.end`.
+- **The bot:** `phone-signalwire_hang_up` ends the call once its turn ends, which the chat says, and its last line is `finished`, with `calling.end`. It's marked `safe`: it can only end the owner's own call, so Permissions doesn't hold it. If the chat never says the turn ended, the call ends in a minute.
 - **Idle:** with nothing from the owner and no turn running for 60 seconds, the plugin says "I'll let you go. Bye for now." and ends the call.
 - **Length:** at one minute left of `minutes`, "We have about a minute left on this call," and at `minutes` the plugin ends it.
 - **The page's End call:** ends it at once.
+
+A hang-up waits for SignalWire's own `ended`, up to 5 seconds, before it closes the connection, so the call's last events are acknowledged.
 
 When a call ends, a turn still running keeps going. Its reply lands in the chat, and if the owner asked for a call-back, the bot can call ([below](#who-can-start-a-call)).
 
 **After a restart,** SignalWire may keep the call up with no one steering it, since "call objects survive reconnect." So the plugin takes back each call still `ringing` or `on`:
 - it connects again with the `protocol` it kept with the call, as a dropped connection would
-- it ends the call with `calling.end`, and marks it ended with "fxbot restarted."
+- it ends the call with `calling.end`, and marks it ended, or failed if it was still ringing, with "fxbot restarted." and its length
 
 If SignalWire won't take the old `protocol`, `max_duration` still ends the call. Nothing is placed again.
 
@@ -347,7 +355,7 @@ If SignalWire won't take the old `protocol`, `max_duration` still ends the call.
   Otherwise: "The owner didn't ask for a call. Tell them in the chat, and they can ask you to call."
 - **On a call already,** a call now refuses: "You're on a call with the owner now: just tell them." A call-back can still be kept.
 
-The plugin tells the turns apart with `turn.start`: no `from` is the owner's typed turn, and a turn the call's words started or joined (`joined`) is the owner's spoken one. `reason` is up to 300 characters. The tool waits until the call is answered or isn't, and answers in words: "Answered." "Not answered after 30 seconds of ringing." "It went to voicemail, and I left the reason." "Busy." "The call failed: <SignalWire's words>."
+The plugin tells the turns apart with `turn.start`: no `from` is the owner's typed turn, and a turn the call's words started or joined (`joined`) is the owner's spoken one. `reason` is up to 300 characters. The tool waits until the call is answered or isn't, and answers in words: "Answered." "Not answered after 30 seconds of ringing." "It went to voicemail, and I left the reason." "Busy." "They declined it." "The call failed: <SignalWire's words>."
 
 **`phone-signalwire_hang_up()`**, on a call only: "Hanging up after this reply."
 
@@ -365,14 +373,12 @@ So a typo can't ring a stranger. The how-to has the owner:
 ### The page
 
 - **Call me,** with `app.composer`: a phone button in the message box. When the plugin isn't set up, it opens the settings tab instead.
-- **The call bar,** with `app.chat`, above the message box: "Ringing…", then "On the phone · 3:12" with **End call**. It reads `/calls/live` every 2 seconds while a call is ringing or on, and every 15 while the chat is open and none is.
+- **The call bar,** with `app.chat`, above the message box: "Ringing your phone…", then "On the phone with Bob · 3:12" with **End call**. It reads `/calls/live` every 2 seconds while a call is ringing or on, and every 15 while the chat is open and none is. **Call me** waits while a call is on.
 - **A call's card,** `app.toolView("call")`: the reason, ringing, on the call, then how it ended and how long it lasted.
-- **The settings tab,** with `app.settings`:
-  - SignalWire's space, project, token, and number
-  - the owner's number, with **Call me to confirm** and the code's box
-  - the voice and language, and the limits
-  - the last 20 calls, each with its bot, time, how it ended, and length
-- **A bot's section,** with `app.botSettings`: **May call me on its own**, and the bot's open call-back, with **Remove**.
+- **The settings tab:** fxbot's own settings form for the space, project, token, numbers, voice, language, and limits, and with `app.settings`, **Your phone**:
+  - the owner's number, with **Call me to confirm** and the code's box, or that it's confirmed
+  - the last 20 calls, each with its bot, time, how it ended, length, and any error
+- **A bot's section,** **Phone**, with `app.botSettings`: **May call me on its own**, with the day's limit and the quiet hours in words, and the bot's open call-back, with **Remove**.
 
 ### The skill
 
@@ -442,23 +448,23 @@ The confirmed number, and a code waiting to be typed, for 10 minutes, are kept w
 
 ### Size
 
-About 1,200 lines of code:
-- `relay.ts`: about 400, the JSON-RPC client and the line
-- `server.ts`: about 350
-- `call.ts`: about 250
-- `page.jsx`: about 200
-- the SQL: about 20
+Planned at about 1,200 lines of code. Built, 1,308:
+- `relay.ts`: 419, the JSON-RPC client and the line
+- `server.ts`: 318
+- `call.ts`: 293
+- `page.jsx`: 257
+- the SQL: 21
 
 Plus the skill, the README, and a how-to. OpenClaw's voice-call plugin is about 18,000 lines, for three phone services and several ways to hold a conversation. This has one of each.
 
 ### Not in this phase
 
-- **Phone: Telnyx,** the cheaper softphone: a plugin of its own ([stub](phone-telnyx.md)).
+- **Phone: Telnyx,** the cheaper softphone: a plugin of its own ([stub](../../phases/phone-telnyx.md)).
 - **Calling the bot,** such as "Hey Siri, call Bob" from the car. RELAY can take calls in on a connection fxbot holds open, with nothing public, through a RELAY application on the number. That's a connection kept open all day, and a keypad PIN on top of caller ID, since "Caller ID is not proof" (hermes-line). It's next, if the owner wants it ([open question 6](#5-open-questions)).
 - **A voice model in front,** GPT-Live or Grok Voice, for owners who want its speed and accept its words.
 - **Approvals by voice.** They stay on the screen.
-- **Voice in the app,** over web pairing, for the desk: the [Phone calls](phone-calls.md) stub.
-- **Calling anyone else,** and texts: [Gateways](gateways.md).
+- **Voice in the app,** over web pairing, for the desk: the [Phone calls](../../phases/phone-calls.md) stub.
+- **Calling anyone else,** and texts: [Gateways](../../phases/gateways.md).
 - **Recording.** What was said is in the chat.
 
 ### What changes
@@ -475,7 +481,9 @@ Plus the skill, the README, and a how-to. OpenClaw's voice-call plugin is about 
 
 ## 4. Checklist
 
-**First, with the owner's go-ahead,** since it uses their SignalWire account, rings their phone, and spends trial credit: a short script on this machine, through RELAY, before the plugin. Each answer goes into this doc, and a "no" changes the plan before more is built:
+**First, with the owner's go-ahead,** since it uses their SignalWire account, rings their phone, and spends trial credit: a short script on this machine, through RELAY, before the plugin. Each answer goes into this doc, and a "no" changes the plan before more is built.
+
+Not run: there's no SignalWire account here, and the owner set the /goal to build. The plugin was built against the fake below, and its log says what the first real calls need to show: when the owner began to speak during a line, and how long a line took to stop.
 - [ ] It signs in to the space with the project and token, and dials the owner's verified number from the account's number. The caller ID shows as that number.
 - [ ] A greeting plays on `answered`, and the time from answer to sound is noted.
 - [ ] A continuous `calling.collect` runs while a `calling.play` runs, and `start_of_input` and partials arrive during the play. `calling.play.stop` cuts the sound, in how many milliseconds.
@@ -488,49 +496,50 @@ Plus the skill, the README, and a how-to. OpenClaw's voice-call plugin is about 
 - [ ] The invoice: how the listening charge is rounded, and the characters spoken.
 
 **The plugin.** Its checks run against a fake RELAY, a small local WebSocket server, through `FXBOT_PHONE_RELAY`. It answers `signalwire.connect` and `calling.dial` with state events, plays with `playing` and `finished`, and the collect with `start_of_input`, partials, and finals on cue. It keeps every frame. The checks run with a mock model and a disposable fxbot, and no check rings a real phone.
-- [ ] `plugins/phone-signalwire/` 0.1.0, with its migration, settings, skill, and README. `page.js` is built from `page.jsx` and committed. `npm run typecheck` passes, with its `minFxbot`.
-- [ ] `call.ts` names no phone service: it holds a call only through the line's `place`, `heard`, `interrupted`, `played`, `ended`, `say`, `stop`, and `hangUp`.
-- [ ] **The client:**
+- [x] `plugins/phone-signalwire/` 0.1.0, with its migration, settings, skill, and README. `page.js` is built from `page.jsx` and committed. `npm run typecheck` passes, with its `minFxbot`.
+- [x] `call.ts` names no phone service: it holds a call only through the line's `place`, `heard`, `interrupted`, `played`, `ended`, `say`, `stop`, and `hangUp`.
+- [x] **The client:**
   - It signs in with the project and token.
-  - It acknowledges every event and answers pings.
-  - It connects again on `signalwire.disconnect` and on a dropped connection, with its `protocol`, up to 3 times.
+  - It acknowledges every event, the last ones of a call included, and answers pings.
+  - It connects again on a dropped connection, with its `protocol`, and the call goes on. `signalwire.disconnect` takes the same path, and the fake didn't send one.
   - It closes when the call ends, and nothing is open between calls.
-- [ ] **Confirming:** **Call me to confirm** dials and plays a 4-digit code twice. The right code confirms, a wrong one doesn't, and changing `to` unconfirms. Before it's confirmed, every call refuses.
-- [ ] **Call me:**
+- [x] **Confirming:** **Call me to confirm** dials and plays a 4-digit code twice. The right code confirms, a wrong one doesn't, and changing `to` unconfirms. Before it's confirmed, every call refuses.
+- [x] **Call me:**
   - The fake gets `calling.dial` with the owner's number, the account's, and 30 seconds.
   - The greeting plays on `answered`, in exact words, with the voice setting.
   - The collect starts with it.
   - A second **Call me** while one rings refuses.
-- [ ] **A conversation:**
-  - A final result becomes a message in the bot's own chat, showing the owner's words with the label and carrying the note and `asked`.
-  - The mock reply plays sentence by sentence, each after the last `finished`.
+- [x] **A conversation:**
+  - A final result becomes a message in the bot's own chat, showing the owner's words with the label and carrying the note. `turn.start` gets the words as `asked`.
+  - The mock reply plays as it arrives, a line at a time, what waited going as the next line.
   - Markdown, a link, and a code block come out speakable.
-- [ ] **Fillers:** a slow mock turn gets "One moment." once at 1.5 s. A tool that runs 45 s gets "Still working on it." twice.
-- [ ] **Steer:** a final result while a turn runs joins it (`joined`), and the reply that follows is spoken.
-- [ ] **Interrupting:**
+- [x] **Fillers:** a slow mock turn gets "One moment." once at 1.5 s. A tool that runs 45 s gets "Still working on it." twice.
+- [x] **Steer:** a final result while a turn runs joins it (`joined`), and the reply that follows is spoken.
+- [x] **Interrupting:**
   - A two-word partial during a play stops it and drops the sentences after it, and the next message carries what was heard.
   - A partial that's mostly the sentence playing doesn't stop it.
   - `start_of_input` alone doesn't stop it.
-- [ ] **Stop words:** "stop" cancels the call's turn, says "Okay, stopped.", and reaches no message. "Hold on" alone reaches none, and stops the sentence playing. "Stop the build when it's red" goes to the bot.
-- [ ] **A subagent's report** during a call is spoken.
-- [ ] **Ending:**
+- [x] **Stop words:** "stop" cancels the call's turn, says "Okay, stopped.", and reaches no message. "Hold on" alone reaches none, and stops the sentence playing. "Stop the build when it's red" goes to the bot.
+- [x] **The bot's reply to a subagent's report** during a call is spoken, apart from the words before it.
+- [x] **Ending:**
   - `phone-signalwire_hang_up` sends `calling.end` after the last play's `finished`.
   - 60 s idle ends the call, after its words.
   - The minute's warning comes before `minutes`, and the plugin ends the call at `minutes`.
   - **End call** ends it.
   - `ended` from the fake marks the call ended, with its reason.
-- [ ] **`phone-signalwire_call`:**
+  - A reload of the plugin mid-call ends it, and its row says "fxbot reloaded the plugin."
+- [x] **`phone-signalwire_call`:**
   - In the owner's typed turn, and in a call's turn, it calls.
   - `later: true` keeps a call-back and calls no one.
-  - A subagent's report then calls on it, and uses it up.
+  - A background turn, from a plugin's message, then calls on it, and uses it up.
   - With no call-back, a background turn refuses. With **May call me on its own**, it calls outside `quiet`, refuses inside it, and stops at `perDay`.
   - On a call, a call now refuses, and `later: true` still keeps a call-back.
-- [ ] **A bot's call:** `calling.detect` runs. On `HUMAN` the greeting and the reason play. On `MACHINE`, the greeting stops, and at `READY` the one line plays, the call ends, and the tool says voicemail.
-- [ ] **A restart** while the fake rings, and while it's on: the plugin connects again with the kept `protocol` and sends `calling.end`, nothing is placed again, and the row says it ended.
-- [ ] **The page:** **Call me**, the bar's ringing, its time, and **End call**, the call's card, the settings tab with the code and the last calls, and a bot's section with **May call me on its own** and **Remove**.
+- [x] **A bot's call:** `calling.detect` runs. On `HUMAN` the greeting and the reason play. On `MACHINE`, the greeting stops, and at `READY` the one line plays, the call ends, and the tool says voicemail.
+- [x] **A restart,** a crash, while the fake rings, and while it's on: the plugin connects again with the kept `protocol` and sends `calling.end`, nothing is placed again, and the row says it ended.
+- [x] **The page,** on a desktop in light and a phone in dark, with no page errors: **Call me**, the bar's ringing, its time, and **End call**, the call's card, the settings tab with the number confirmed and the last calls, and a bot's section with **May call me on its own**. **Remove** was checked through its route, and the code's box through the confirming checks.
 
 **The docs**
-- [ ] The how-to, the plugin's README, `CHANGELOG.md`, and the README's Phases line. `npm run build-site` passes.
+- [x] The how-to, the plugin's README, `CHANGELOG.md`, and the README's Phases line. `npm run build-site` passes.
 
 **Only a person can check**
 - [ ] **Call me** rings the owner's phone from the saved contact, greets in exact words as they answer, and a question gets the bot's answer. The time to its first word is noted.
@@ -550,3 +559,27 @@ Plus the skill, the README, and a how-to. OpenClaw's voice-call plugin is about 
 6. **Calling the bot** from the car, through a RELAY connection kept open, with a keypad PIN, next? Recommended: as its own phase, once calling out is in use.
 7. **A voice for each bot,** in a bot's section? Recommended: later. One voice for the plugin first.
 8. **Approvals while driving.** A card the bot needs waits on the screen, and in a call's turn it expires after Permissions' `expires`, 30 minutes, as any background card does. Recommended: as is, with the note telling the bot to say so. Permissions could later keep a call's card open until the call ends.
+
+## What the build changed
+
+Built on 2026-11-14, on `release/0.11.0`, at the owner's /goal. The checks ran against a fake RELAY, a mock model, and Chromium, on a disposable fxbot with this branch's subagents plugin and a check-only plugin with a slow tool and a message route. No real SignalWire call was placed: there's no account here.
+
+- **The bot's own chat comes through fxbot's own API.** The plan named `fx.chats.stream`, which reads only a plugin's own sessions and answered "session not found" for the bot's chat. The call follows `/api/profiles/<bot>/stream` at `fx.localUrl`, which the plugin API offers for requests to fxbot's own API, and follows a chat that starts over into its new session. No change to the plugin API.
+- **The line's shape** is as [The line](#the-line) now says:
+  - `interrupted()` carries nothing, since `call.ts` knows what had played from `played`
+  - `say` takes only text
+  - `place` takes the voicemail line, the call's length, the recognizer's hints, `quiet`, and `kept`
+- **What waits while a line plays goes as the next line,** so the sentences of a reply don't each wait on a round trip to SignalWire.
+- **Five bugs the checks found:**
+  - A tool call, or a message joining the turn, now ends the words before it. A subagent's report joined the running turn, and the bot's reply ran into the last unfinished words: "…with tOkay."
+  - `phone-signalwire_hang_up` could run before the chat had shown its turn start, so the call ended before the goodbye. It now waits for that turn's end, or a minute.
+  - Postgres gives a `bigserial` as a string, so **End call** never matched the call on. Ids are cast at insert.
+  - A hang-up closed the connection when SignalWire took `calling.end`, so the call's last two events went unacknowledged. It waits for SignalWire's own `ended` now, up to 5 seconds.
+  - A call that wasn't answered closed on `ended`, before SignalWire's `calling.call.dial` result, which the guide says comes after it. It waits for that too, up to 2 seconds.
+- **What ends a call after a restart is saved as soon as SignalWire names it,** not when it's answered. A crash while the phone rang left the call ringing at SignalWire otherwise.
+- **Unloading the plugin ends a call that's on, and saves how it ended:** "fxbot reloaded the plugin." fxbot waits 5 seconds for a plugin's cleanup, and the database closes after it, so the hang-up gets 3. A checkout reloads a plugin when its files change, which is how a check found it.
+- **The confirming call doesn't listen,** so it isn't billed for listening, and a call's `collect` starts again at most 5 times a minute, so a collect that keeps failing can't loop.
+- **The start's sweep computes a call's length,** and a call it ended says "fxbot restarted."
+- **The owner's spoken words show on their side of the chat,** marked **From your call**, the label the plan called "On the phone".
+- **For the owner's first real calls,** the plugin's log says when the owner began to speak during a line, and how long a line took to stop. That's what the first group of the checklist asks.
+- **Size:** 1,308 lines of code, against about 1,200 planned.

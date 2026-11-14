@@ -1,0 +1,26 @@
+{
+  "name": "phone-signalwire",
+  "version": "0.1.0",
+  "description": "Press Call me and a bot rings your phone through SignalWire, and you talk with it, hands-free. Its own model, memory, and tools answer, and nothing reaches fxbot.",
+  "license": "Apache-2.0",
+  "extensions": {
+    "sh.fxbot": {
+      "minFxbot": "0.9.0",
+      "server": "./fxbot/server.ts",
+      "page": "./fxbot/page.js",
+      "migrations": "./fxbot/migrations",
+      "settings": [
+        { "name": "space", "description": "Your SignalWire space, such as example.signalwire.com" },
+        { "name": "project", "description": "The space's project id" },
+        { "name": "token", "description": "An API token of the space with the Voice scope", "isSecret": true },
+        { "name": "from", "description": "Your SignalWire number calls come from, such as +15551234567" },
+        { "name": "to", "description": "Your phone, the only number bots call, such as +15557654321" },
+        { "name": "voice", "description": "A SignalWire voice, as engine.voice:model: Polly Neural is the cheapest, ElevenLabs and Cartesia cost about three times as much", "default": "amazon.Joanna:neural:en-US" },
+        { "name": "language", "description": "What you speak on calls", "default": "en-US" },
+        { "name": "minutes", "description": "The longest call, 5 to 120 minutes", "default": "30" },
+        { "name": "quiet", "description": "Hours a bot doesn't call on its own, in your time zone", "default": "22:00-07:00" },
+        { "name": "perDay", "description": "The most calls one bot makes on its own in a day, 1 to 20", "default": "3" }
+      ]
+    }
+  }
+}

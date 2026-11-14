@@ -53,6 +53,14 @@
       "docs": "/docs/how-to/work-with-herdr-agents/"
     },
     {
+      "name": "phone-signalwire",
+      "description": "Press Call me and a bot rings your phone through SignalWire, and you talk with it, hands-free. Its own model, memory, and tools answer, and nothing reaches fxbot.",
+      "note": "It needs a SignalWire space, a number, and your own number confirmed, in the plugin's tab.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/phone-signalwire",
+      "docs": "/docs/how-to/talk-with-a-bot-on-the-phone/"
+    },
+    {
       "name": "soul",
       "description": "Each bot writes a short soul, who it is and how it helps you, in a first meeting with you, and keeps it up when you ask. Brings one in from Hermes Agent or OpenClaw.",
       "repo": "iammrduncan/fxbot",

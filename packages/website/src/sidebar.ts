@@ -40,6 +40,7 @@ export const topics: Topic[] = [
           { slug: "how-to/let-bots-work-together", label: "Let bots work together" },
           { slug: "how-to/hand-work-to-subagents", label: "Hand work to subagents" },
           { slug: "how-to/work-with-herdr-agents", label: "Work with your herdr agents" },
+          { slug: "how-to/talk-with-a-bot-on-the-phone", label: "Talk with a bot on the phone" },
           { slug: "how-to/give-a-bot-a-soul", label: "Give a bot a soul" },
           { slug: "how-to/choose-how-hard-a-bot-thinks", label: "Choose how hard a bot thinks" },
           { slug: "how-to/choose-what-a-bot-can-do-alone", label: "Choose what a bot can do alone" },
