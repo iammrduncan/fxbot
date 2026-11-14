@@ -30,11 +30,11 @@ The door is a socket in fxbot's control folder that takes a short list of herdr'
 
 **A checkout** run by herdr's own user reaches herdr directly, with nothing to open. One run by another user can't.
 
-The plugin's tab in **Settings** says how fxbot reaches herdr, herdr's version, and whether each machine answers, this one first.
+The plugin's tab in **Settings** says how fxbot reaches herdr, herdr's version, and whether each machine answers, Local first.
 
 ## Choose each bot's machines
 
-Each bot reaches every machine, with any herdr adds later, until you choose. In a bot's settings, under **herdr**, turn off **Every machine** and pick its machines, this machine among them, by its name. Bots can call it by its name too, or "here". On the others, the bot doesn't see agents, can't send them work, and can't start them.
+Each bot reaches every machine, with any herdr adds later, until you choose. In a bot's settings, under **herdr**, turn off **Every machine** and pick its machines, **Local**, the machine fxbot runs on, among them. On the others, the bot doesn't see agents, can't send them work, and can't start them.
 
 So one bot can work on every machine but this one, and a bot you keep for the machines' own upkeep can reach this one too. How careful each one is is up to its instructions and its [Permissions](/docs/how-to/choose-what-a-bot-can-do-alone/) mode: a bot on **Ask** asks you before every prompt and every start.
 

@@ -29,7 +29,7 @@ const dot = {
 	unknown: "bg-border"
 };
 const firstLine = (text) => (text ?? "").split("\n")[0];
-function Table({ rows, here }) {
+function Table({ rows }) {
 	const machines = [...new Set(rows.map((r) => r.machine))];
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 		className: "grid gap-3",
@@ -37,7 +37,7 @@ function Table({ rows, here }) {
 			className: "grid gap-1",
 			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "text-xs font-medium text-muted-foreground",
-				children: machine === "here" && here ? `${here} (this machine)` : machine
+				children: machine === "local" ? "Local" : machine
 			}), rows.filter((r) => r.machine === machine).map((r, i) => r.unreachable ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 				className: "text-xs text-destructive",
 				children: ["Didn't answer: ", r.unreachable]
@@ -87,10 +87,7 @@ function Agents({ call: tool }) {
 			now ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 				className: "text-xs text-muted-foreground",
 				children: ["Now: ", now.summary]
-			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Table, {
-				rows: now.rows,
-				here: now.here
-			})] }) : !tool.error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Table, { rows: now.rows })] }) : !tool.error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
 				type: "button",
 				size: "xs",
 				variant: "outline",
@@ -190,23 +187,19 @@ function Tab() {
 					]
 				})]
 			}),
-			(state.here || state.machines.length > 0) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			(how || state.machines.length > 0) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: "grid gap-1",
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 						className: "font-medium",
 						children: "Machines"
 					}),
-					state.here && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+					how && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 						className: "text-muted-foreground",
-						children: [
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-								className: "text-foreground",
-								children: state.here
-							}),
-							" (this machine, where fxbot runs): ",
-							how ? "answers" : "doesn't answer"
-						]
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "text-foreground",
+							children: "Local"
+						}), ": answers"]
 					}),
 					state.machines.map((m) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 						className: "text-muted-foreground",
@@ -296,8 +289,8 @@ function BotMachines({ bot }) {
 					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Checkbox, {
 						checked: data.machines.includes(machine),
 						onCheckedChange: (on) => toggle(machine, on === true)
-					}), machine || `This machine${data.here ? `, ${data.here}` : ""}, where fxbot runs`]
-				}, machine || "here"))
+					}), machine || "Local"]
+				}, machine || "local"))
 			}),
 			error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "text-destructive",

@@ -1,10 +1,9 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { connect } from "node:net";
-import { hostname } from "node:os";
 import type { PluginApi } from "@fxbot/sdk";
 
-// herdr: bots list, read, prompt, and start the coding agents herdr runs, here and on its saved machines, and hear back
+// herdr: bots list, read, prompt, and start the coding agents herdr runs, locally and on its saved machines, and hear back
 // when one they prompted settles (docs/phases/herdr.md). It runs only herdr's CLI: through the door that
 // `sudo fxbot herdr on` opens in a release, or directly in a checkout run by herdr's own user. It builds each command
 // from checked input, and the door checks every word again on the machine. It never sends keys, answers an agent's
@@ -31,7 +30,8 @@ const statusWords: Record<string, string> = { working: "working", blocked: "wait
 // Any run of three quotes or more becomes one, so an agent's words can't close the quote and write a frame of their own.
 const quote = (words: string) => `"""\n${words.replace(/"{3,}/g, '"')}\n"""`;
 const json = (body: unknown, status = 200) => Response.json(body, { status });
-const where = (machine: string) => machine || "here";
+// The machine fxbot runs on is Local, as herdr calls it.
+const where = (machine: string) => machine || "local";
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -108,17 +108,6 @@ export default async function setup(fx: PluginApi) {
   }
   const on = (machine: string, ...words: string[]) => (machine ? ["--machine", machine, ...words] : words);
 
-  // The name of the machine fxbot runs on, for the owner and for bots, who may call it by name. herdr has none for it:
-  // through the door, the door says, since it runs on that machine, while fxbot's container has a name of its own;
-  // directly, it's this process's. Kept once it's known.
-  let hostName = "";
-  async function here() {
-    if (hostName) return hostName;
-    if (!existsSync(door())) return (hostName = hostname());
-    const said = await herdr(["door"]);
-    return (hostName = said.ok && typeof said.result?.door?.host === "string" ? said.result.door.host : "");
-  }
-
   // herdr's saved machines that are on, kept 30 seconds.
   let saved: { at: number; labels: string[] } = { at: 0, labels: [] };
   async function machines() {
@@ -135,11 +124,11 @@ export default async function setup(fx: PluginApi) {
     const [row] = await fx.sql<{ machines: string[] }[]>`select machines from bots where bot = ${bot}`;
     return row ? all.filter((m) => row.machines.includes(m)) : all;
   }
-  const named = (machines: string[]) => machines.map((m) => (m ? m : "here (the machine fxbot runs on)")).join(", ");
+  const named = (machines: string[]) => machines.map((m) => (m ? m : "local (the machine fxbot runs on)")).join(", ");
   // The machine a tool named, checked against what this bot may reach: "" for the one fxbot runs on.
   async function machineOf(input: unknown, bot: string) {
     const asked = typeof input === "string" ? input.trim() : "";
-    const machine = asked === "here" || (asked && asked === (await here()) && !(await machines()).includes(asked)) ? "" : asked;
+    const machine = asked.toLowerCase() === "local" ? "" : asked;
     if (machine.length > 64 || control.test(machine)) throw new Error("That isn't one of herdr's machines.");
     const allowed = await allowedFor(bot);
     if (!allowed.includes(machine))
@@ -372,7 +361,7 @@ export default async function setup(fx: PluginApi) {
       return error instanceof Error ? error.message : String(error);
     }
   };
-  const machineProp = { type: "string", description: "One of herdr's saved machines, by label, or here, or its name, for the machine fxbot runs on, which herdr_agents names. Leave it out for that one." };
+  const machineProp = { type: "string", description: "One of herdr's saved machines, by label, or local for the machine fxbot runs on." };
   const agentProp = { type: "string", description: "The agent's name or pane id, as herdr_agents lists it" };
 
   fx.tool({
@@ -386,8 +375,7 @@ export default async function setup(fx: PluginApi) {
       answer(async () => {
         const list = input.machine === undefined ? await allowedFor(call.bot) : [await machineOf(input.machine, call.bot)];
         const { rows, summary: said } = await agents(list);
-        const name = list.includes("") ? await here() : "";
-        return `${said}${name ? ` "here" is ${name}, the machine fxbot runs on.` : ""}\n${JSON.stringify(rows)}`;
+        return `${said}\n${JSON.stringify(rows)}`;
       }),
   });
 
@@ -454,11 +442,11 @@ export default async function setup(fx: PluginApi) {
     return w ? json({ ...w, machine: where(w.machine) }) : json({ error: "No such watch." }, 404);
   });
   // The owner's view, for the agents card: every machine, whatever a bot may reach.
-  fx.route("GET", "/agents", async () => json({ ...(await agents(["", ...(await machines())])), here: await here() }));
+  fx.route("GET", "/agents", async () => json(await agents(["", ...(await machines())])));
   // A bot's machines, for its settings: all of them, or the ones the owner picked.
   fx.route("GET", "/bots/:bot", async (_request, { bot }) => {
     const [row] = await fx.sql<{ machines: string[] }[]>`select machines from bots where bot = ${bot}`;
-    return json({ all: !row, machines: row ? row.machines : [], available: ["", ...(await machines())], here: await here() });
+    return json({ all: !row, machines: row ? row.machines : [], available: ["", ...(await machines())] });
   });
   fx.route("PUT", "/bots/:bot", async (request, { bot }) => {
     const body = (await request.json().catch(() => ({}))) as { all?: unknown; machines?: unknown };
@@ -480,7 +468,6 @@ export default async function setup(fx: PluginApi) {
     const watching = await fx.sql`select id, bot, machine, agent, started_at from watches where state = 'working' order by id`;
     return json({
       how: server.ok ? how : "none",
-      here: await here(),
       door: path,
       error: server.ok ? null : server.message,
       version: server.ok ? (server.result?.version ?? null) : null,

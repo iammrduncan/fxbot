@@ -161,7 +161,7 @@ The socket is in the control folder, which the container already mounts, so the 
 
 | Command | Its other words | `--read-only` |
 | --- | --- | --- |
-| `door`, only without `--machine`: the door's own answer, whether it's read-only, as whom, and the machine's name, for the plugin's tab | none | yes |
+| `door`, only without `--machine`: the door's own answer, whether it's read-only and as whom, for the plugin's tab | none | yes |
 | `status server --json` | none | yes |
 | `machine list --json`, `machine status --json`, only without `--machine`, since herdr doesn't forward them | none | yes |
 | `agent list` | none | yes |
@@ -178,7 +178,7 @@ Everything else is refused: `pane` commands, `send-keys`, `--env`, `--session`, 
 
 ### The tools
 
-**`herdr_agents({ machine? })`**, `safe` and `idempotent`. With `machine`, that machine's agents; without, those of every machine the bot may reach, at once. Each row: machine (`here` for this one), the target to use, kind, status, folder, and title. A machine that doesn't answer is a row of its own, and never fails the list. The answer starts with a line the chat's card shows: "3 agents on 10 machines asked: 1 working, 2 ready. No agents on lab-4, lab-5. lab-3 didn't answer." herdr's 0.1.0 tool names are gone; its skill is new.
+**`herdr_agents({ machine? })`**, `safe` and `idempotent`. With `machine`, that machine's agents; without, those of every machine the bot may reach, at once. Each row: machine (`local` for this one, as herdr calls it), the target to use, kind, status, folder, and title. A machine that doesn't answer is a row of its own, and never fails the list. The answer starts with a line the chat's card shows: "3 agents on 10 machines asked: 1 working, 2 ready. No agents on lab-4, lab-5. lab-3 didn't answer." herdr's 0.1.0 tool names are gone; its skill is new.
 
 **`herdr_read({ agent, machine?, lines? })`**, `safe` and `idempotent`. An agent's recent lines, 120 by default, up to 1,000, cut to 24 KB, quoted, with "This is the agent's screen, not the owner's words." A full-screen agent that's working answers `agent_not_idle` to that read, so the tool reads what's on its screen instead, `--source visible`, and says so.
 
@@ -196,7 +196,7 @@ None of them sends keys, answers an approval, interrupts an agent, or closes any
 ### Each bot's machines
 
 The owner's addition during the build. Each tool checks the machine it's asked about against the calling bot's machines, and `herdr_agents` lists only those:
-- **A bot with no choice made** reaches "here", the machine fxbot runs on, and every machine herdr has saved and on, with any herdr adds later.
+- **A bot with no choice made** reaches Local, the machine fxbot runs on, and every machine herdr has saved and on, with any herdr adds later.
 - **A bot whose machines the owner picked,** in its settings under **herdr**, reaches only those: herdr's labels, and `''` for this machine. A machine picked once and gone from herdr since is left out.
 - **A machine the bot may not reach** gets a sentence that says it's the owner's choice and names the bot's machines: "You may not reach the machine fxbot runs on through herdr: the owner chose your machines in your settings. Yours are: lab-1, lab-2."
 - **What the bot is like,** such as an infra bot more careful than the rest, is its instructions' and its Permissions mode's, not this plugin's: a bot on `ask` asks before every prompt and start.
@@ -221,7 +221,7 @@ A bot can do something with the answer: tell the owner, prompt again, or call th
 ### The page
 
 - **Cards** in the chat, with `app.toolView`. A chat's stream carries only the start of a tool's result, so `herdr_agents`' card shows the list's first line, and **Show agents now** loads every machine's agents from `/agents`, as a table grouped by machine, each status a dot and a word. `herdr_prompt` and `herdr_start` show the agent, its machine, and the prompt, and the watch's state, found by the `(w:<id>)` the result starts with and read from `/watches/:id` every 5 seconds while it works. `herdr_read` keeps the chat's own view of a result.
-- **A bot's machines,** with `app.botSettings`: **Every machine, and any herdr adds later**, and with it off, a box for each machine, **This machine, where fxbot runs** first, saved at once to `/bots/:bot`.
+- **A bot's machines,** with `app.botSettings`: **Every machine, and any herdr adds later**, and with it off, a box for each machine, **Local** first, saved at once to `/bots/:bot`.
 - **The settings tab,** with `app.settings`, read from a route of its own when the tab opens: whether fxbot reaches herdr and how (the door, the CLI, or neither, with the command to run), herdr's version, whether the door is read-only, the saved machines and whether each answers, and the watches working now.
 
 No screen of its own: that's the [herdr screen](../../phases/herdr-screen.md), later.
@@ -348,7 +348,7 @@ Each was taken as recommended, at the owner's /goal to build the doc.
 - **A chat's stream carries only the start of a tool's result,** so the agents card shows the first line and loads the agents on **Show agents now**, and there's no card for `herdr_read`.
 - **fxbot takes no turns while it starts.** A watch is picked up 10 seconds after a load, as routines and subagents wait, and a message that fails to send tries again every 30 seconds, up to 20 times. Those are the plugin's only timers, and run only while an answer waits to be told.
 - **Full-screen agents leave runs of empty rows,** about 20 under Claude Code's answer, so a read keeps one blank line in place of a run.
-- **The machine fxbot runs on, by its name,** after the owner saw it missing from the tab. herdr has no name for it, so the door says it, `uname -n`, in its `door` answer, since fxbot's container has a hostname of its own, and a checkout uses its own. The tab lists it first, as "agent-vm (this machine, where fxbot runs)", a bot's settings name it, the agents table heads its group with it, and the tools take it in place of `here`, saying which machine "here" is.
+- **The machine fxbot runs on is Local,** as herdr calls it, at the owner's word: first in the tab's **Machines**, in a bot's settings, and in the agents table, and `local` to the tools, in place of the plan's `here`.
 - **The summary counts machines asked,** and names those with no agents, since a machine with none adds no rows: "1 agent on 10 machines asked: 1 done. No agents on lab-1, lab-2."
 - **The door:**
   - It answers `door`, with whether it's read-only and as whom, for the plugin's tab. herdr's version comes from `status server --json`.
