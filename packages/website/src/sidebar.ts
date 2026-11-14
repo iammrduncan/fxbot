@@ -85,6 +85,7 @@ export const topics: Topic[] = [
           { slug: "providers/together", label: "Together AI" },
           { slug: "providers/fireworks", label: "Fireworks AI" },
           { slug: "providers/deepinfra", label: "DeepInfra" },
+          { slug: "providers/baseten", label: "Baseten" },
           { slug: "providers/cerebras", label: "Cerebras" },
           { slug: "providers/nvidia", label: "NVIDIA" },
           { slug: "providers/opencode", label: "OpenCode Zen and Go" },

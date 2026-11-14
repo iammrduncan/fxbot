@@ -281,6 +281,22 @@
       "docs": "/docs/providers/deepinfra/"
     },
     {
+      "id": "baseten",
+      "name": "Baseten",
+      "about": "Open models such as GLM, Kimi, and DeepSeek, from Baseten's Model APIs",
+      "group": "key",
+      "order": 165,
+      "connect": "key",
+      "baseUrl": "https://inference.baseten.co/v1",
+      "keyPage": "https://app.baseten.co/settings/api_keys",
+      "steps": ["Choose Create API key, then Team. Set Expiration to Never, where you can, and choose Next.", "Pick the team, choose Call Model APIs under Permissions, and create the key. Baseten shows it only once."],
+      "note": "A personal key works too, but it ends within 90 days, and Baseten revokes one that goes 30 days unused.",
+      "start": "Credits to start",
+      "modelsDev": "baseten",
+      "recommended": "zai-org/GLM-5.3",
+      "docs": "/docs/providers/baseten/"
+    },
+    {
       "id": "cerebras",
       "name": "Cerebras",
       "about": "Open models on Cerebras's own chips, served very fast",
