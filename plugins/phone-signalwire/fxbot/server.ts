@@ -50,14 +50,11 @@ export default async function setup(fx: PluginApi) {
     return fallback;
   }
   const setting = (name: string) => (fx.settings[name] ?? "").trim();
-  // A checkout's checks point the plugin at a fake RELAY, read once at start.
+  // RELAY has one address for every space: the project says whose. A checkout's checks point the plugin at a fake
+  // one, read once at start.
   const fake = process.env.FXBOT_PHONE_RELAY ?? "";
   const relay = (): Relay => ({
-    url:
-      fake ||
-      `wss://${setting("space")
-        .replace(/^(?:https?|wss?):\/\//, "")
-        .replace(/\/.*$/, "")}`,
+    url: fake || "wss://relay.signalwire.com",
     project: setting("project"),
     token: setting("token"),
     from: setting("from"),
@@ -68,7 +65,6 @@ export default async function setup(fx: PluginApi) {
   // What's missing before any call: the account, the numbers, and the owner's number confirmed.
   function missing() {
     const out: string[] = [];
-    if (!setting("space") && !fake) out.push("space");
     for (const name of ["project", "token"]) if (!setting(name)) out.push(name);
     for (const name of ["from", "to"]) if (!phone.test(setting(name))) out.push(name);
     return out;
@@ -121,7 +117,7 @@ export default async function setup(fx: PluginApi) {
       onEnd: (how) => void finish(id, how).catch((error) => fx.log(`Call ${id} didn't save its end: ${error.message}`)),
     });
     live = { id, bot, conversation: call };
-    const result = await call.place({ to: setting("to"), greeting, voicemail, seconds: limit("minutes") * 60, hints: [name], kept: keep(id) });
+    const result = await call.place({ to: setting("to"), greeting, voicemail, hints: [name], kept: keep(id) });
     await fx.sql`update calls set status = ${statusOf[result.outcome]}, error = ${result.error ?? null},
       answered_at = ${result.outcome === "answered" || result.outcome === "voicemail" ? fx.sql`now()` : null},
       ended_at = ${result.outcome === "answered" ? null : fx.sql`now()`} where id = ${id} and ended_at is null`;
@@ -267,13 +263,13 @@ export default async function setup(fx: PluginApi) {
       const result = await confirm.place({
         to: setting("to"),
         greeting: `Your fxbot code is ${spaced}. Again: ${spaced}. Goodbye.`,
-        seconds: 120,
         quiet: true,
         kept: keep(id),
       });
-      if (result.outcome === "answered") await confirm.hangUp();
+      // Answered when it's answered, so the call's length is how long the code took to read.
+      if (result.outcome === "answered") await fx.sql`update calls set status = 'on', answered_at = now() where id = ${id}`, await confirm.hangUp();
       await fx.sql`update calls set status = ${result.outcome === "answered" ? "ended" : statusOf[result.outcome]}, error = ${result.error ?? null},
-        answered_at = ${result.outcome === "answered" ? fx.sql`now()` : null}, ended_at = now() where id = ${id}`;
+        ended_at = now(), seconds = extract(epoch from now() - answered_at)::int where id = ${id}`;
     })()
       .catch((error) => fx.log(`The confirming call failed: ${error.message}`))
       .finally(() => (confirming = false));

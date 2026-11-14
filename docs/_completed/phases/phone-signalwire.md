@@ -260,8 +260,8 @@ A **line** is what `call.ts` holds a call through, in text:
 
 ### A call
 
-1. **Connecting.** When a call is placed, `relay.ts` opens `wss://<space>`, the owner's SignalWire space, and signs in with the project and its token. It closes the connection when the call ends, so nothing is open between calls. A connection that drops mid-call connects again with its `protocol`, up to 3 times in 10 seconds, since SignalWire keeps the call. After that, the call is over.
-2. **Dialing:** `calling.dial` to the owner's number from the account's number, ringing 30 seconds, with `max_duration` set from `minutes`, in seconds. Whether SignalWire reads it in minutes or seconds is unclear: the SDK and SignalWire's reference disagree (signalwire-typescript #183). Read as minutes, it's only longer, and the plugin ends the call itself at `minutes` either way.
+1. **Connecting.** When a call is placed, `relay.ts` opens `wss://relay.signalwire.com`, RELAY's one address for every space, and signs in with the project and its token, which say whose space it is. It closes the connection when the call ends, so nothing is open between calls. A connection that drops mid-call connects again with its `protocol`, up to 3 times in 10 seconds, since SignalWire keeps the call. After that, the call is over.
+2. **Dialing:** `calling.dial` to the owner's number from the account's number, ringing 30 seconds. The phone device takes only `from_number`, `to_number`, and `timeout`, and SignalWire refuses anything else there with "call_device_phone error". There's no `max_duration`: whether SignalWire reads it in minutes or seconds is unclear, since the SDK and SignalWire's reference disagree (signalwire-typescript #183). The plugin ends the call itself at `minutes`, and a restart ends one left on.
 3. **Answered:** the greeting plays at once, with the voice setting, as one `calling.play`:
    - "Hey, this is your fxbot Bob. How can I help today?"
    - or, for a call the bot makes, "Hey, this is your fxbot Bob." and the reason
@@ -375,7 +375,7 @@ So a typo can't ring a stranger. The how-to has the owner:
 - **Call me,** with `app.composer`: a phone button in the message box. When the plugin isn't set up, it opens the settings tab instead.
 - **The call bar,** with `app.chat`, above the message box: "Ringing your phone…", then "On the phone with Bob · 3:12" with **End call**. It reads `/calls/live` every 2 seconds while a call is ringing or on, and every 15 while the chat is open and none is. **Call me** waits while a call is on.
 - **A call's card,** `app.toolView("call")`: the reason, ringing, on the call, then how it ended and how long it lasted.
-- **The settings tab:** fxbot's own settings form for the space, project, token, numbers, voice, language, and limits, and with `app.settings`, **Your phone**:
+- **The settings tab:** fxbot's own settings form for the project, token, numbers, voice and language, each picked from a list, and limits, and with `app.settings`, **Your phone**:
   - the owner's number, with **Call me to confirm** and the code's box, or that it's confirmed
   - the last 20 calls, each with its bot, time, how it ended, length, and any error
 - **A bot's section,** **Phone**, with `app.botSettings`: **May call me on its own**, with the day's limit and the quiet hours in words, and the bot's open call-back, with **Remove**.
@@ -416,7 +416,6 @@ The confirmed number, and a code waiting to be typed, for 10 minutes, are kept w
 
 | Setting | What it is | Default |
 | --- | --- | --- |
-| `space` | The SignalWire space, such as `example.signalwire.com` | |
 | `project` | Its project id | |
 | `token` | An API token with the Voice scope, sealed (`isSecret`) | |
 | `from` | The account's number calls come from, such as +15551234567 | |
@@ -427,7 +426,7 @@ The confirmed number, and a code waiting to be typed, for 10 minutes, are kept w
 | `quiet` | Hours a bot doesn't call on its own, in the owner's time zone | `22:00-07:00` |
 | `perDay` | The most calls one bot makes on its own in a day, 1 to 20 | `3` |
 
-`FXBOT_PHONE_RELAY`, read once at start, points the plugin at another RELAY address than the space's, for checks only, as the computer reads `FXBOT_COMPUTER_NAME`.
+`FXBOT_PHONE_RELAY`, read once at start, points the plugin at another RELAY address than SignalWire's, for checks only, as the computer reads `FXBOT_COMPUTER_NAME`.
 
 ### Cost
 
@@ -473,7 +472,7 @@ Plus the skill, the README, and a how-to. OpenClaw's voice-call plugin is about 
 - No change to the core or the plugin API, so no line in `plugin-breaks.json`.
 - The docs:
   - a how-to, **Talk with a bot on the phone**, covering:
-    - SignalWire's space, the project and a Voice token, and a number
+    - SignalWire's project and a Voice token, and a number
     - the owner's number verified for a trial, confirmed in fxbot, and the account's number saved as a contact
     - picking a voice, with what each tier costs
   - the README's Phases line
@@ -484,7 +483,7 @@ Plus the skill, the README, and a how-to. OpenClaw's voice-call plugin is about 
 **First, with the owner's go-ahead,** since it uses their SignalWire account, rings their phone, and spends trial credit: a short script on this machine, through RELAY, before the plugin. Each answer goes into this doc, and a "no" changes the plan before more is built.
 
 Not run: there's no SignalWire account here, and the owner set the /goal to build. The plugin was built against the fake below, and its log says what the first real calls need to show: when the owner began to speak during a line, and how long a line took to stop.
-- [ ] It signs in to the space with the project and token, and dials the owner's verified number from the account's number. The caller ID shows as that number.
+- [x] It signs in with the project and token, and dials the owner's number from the account's number: the confirm call, 2026-11-14, after the fixes in [First real calls](#first-real-calls). Whether the caller ID showed as that number wasn't noted.
 - [ ] A greeting plays on `answered`, and the time from answer to sound is noted.
 - [ ] A continuous `calling.collect` runs while a `calling.play` runs, and `start_of_input` and partials arrive during the play. `calling.play.stop` cuts the sound, in how many milliseconds.
 - [ ] A second `calling.play` sent during one: whether it queues, mixes, or replaces. The gap between back-to-back sentences.
@@ -583,3 +582,15 @@ Built on 2026-11-14, on `release/0.11.0`, at the owner's /goal. The checks ran a
 - **The owner's spoken words show on their side of the chat,** marked **From your call**, the label the plan called "On the phone".
 - **For the owner's first real calls,** the plugin's log says when the owner began to speak during a line, and how long a line took to stop. That's what the first group of the checklist asks.
 - **Size:** 1,308 lines of code, against about 1,200 planned.
+
+### First real calls
+
+On 2026-11-14 the owner added the plugin to their own fxbot and confirmed their number, on a paid SignalWire account. The first tries found what the fake couldn't:
+
+- **RELAY has one address,** `wss://relay.signalwire.com`, for every space. The plugin opened the owner's space, `<name>.signalwire.com`, which refuses a WebSocket, so the `space` setting is gone: the project says whose space it is. SignalWire's SDKs name the same host.
+- **A phone device takes only `from_number`, `to_number`, and `timeout`.** The plugin sent `max_duration` there too, and SignalWire refused the dial with a bare "call_device_phone error", code 400. SignalWire's newest SDK, `@signalwire/sdk` 3.9.0, puts `max_duration` on the dial itself, in minutes by its code and in seconds by its docs, so the plugin sends none: it ends a call at `minutes` itself, and a restart ends one left on. Connect stays at version 2.0.0, as that SDK sends, and its generated schema has every collect option the plugin uses.
+- **What SignalWire refuses goes into the plugin's log in full,** without the request it echoes back, which holds the token. Before, only the message reached the call's row.
+- **A project id with its first character lost** gave "Authentication service failed with status 401". The id is a UUID, 8-4-4-4-12.
+- **The confirming call saves when it was answered and how long it took.** It saved its answer as its end, with no length.
+- **`voice` and `language` are picked from lists.** The owner asked: "how am I supposed to just guess the voices available etc??? settings should show drop down on which model to use for the voice from a list of available on signalwire." SignalWire has no API that lists its voices, so the plugin carries 131 English voices from SignalWire's pages, on 14 engines, grouped by engine with what a 10-minute call costs in all, and the five English variants Deepgram hears. Smallest.ai and Fish Audio are left out, since SignalWire names one voice for each and no price. `amazon.Joanna:neural:en-US`, the default, is the form SignalWire's Polly page gives. The lists needed a small change to the core: a plugin's setting can offer `options`, each with a value, a label, and a group, shown as a drop-down with **Another, typed in…**, and the chosen option's group under it. A plugin on an older fxbot shows a text box, so `minFxbot` stays 0.9.0.
+- **A plugin's reload in a checkout re-imports only its `server.ts`.** Node keeps the files it imports, such as `relay.ts`, as they were, so a change to them runs only after the API restarts. That's fxbot's, not this plugin's, and it isn't fixed here.

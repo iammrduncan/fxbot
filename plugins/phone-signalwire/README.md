@@ -26,13 +26,12 @@ Add it from **Plugins**. It needs fxbot 0.9.0 or newer. It runs inside fxbot: re
 
 | Setting | What it is | Default |
 | --- | --- | --- |
-| `space` | Your SignalWire space, such as `example.signalwire.com` | |
-| `project` | The space's project id | |
-| `token` | An API token of the space with the Voice scope, sealed | |
+| `project` | Your SignalWire project id, from API Credentials | |
+| `token` | An API token of the project with the Voice scope, sealed | |
 | `from` | Your SignalWire number calls come from | |
 | `to` | Your phone, the only number bots call | |
-| `voice` | A SignalWire voice, as `engine.voice:model` | `amazon.Joanna:neural:en-US` |
-| `language` | What you speak on calls | `en-US` |
+| `voice` | A SignalWire voice, picked from a list by engine with what 10 minutes cost, or typed as `engine.voice:model` | `amazon.Joanna:neural:en-US` |
+| `language` | Which English you speak on calls, picked from a list | `en-US` |
 | `minutes` | The longest call, 5 to 120 | `30` |
 | `quiet` | Hours a bot doesn't call on its own, in your time zone | `22:00-07:00` |
 | `perDay` | The most calls one bot makes on its own in a day, 1 to 20 | `3` |
@@ -41,7 +40,7 @@ A value outside its range means its default, with a line in the plugin's log. Th
 
 ## Cost
 
-SignalWire bills a call, listening throughout so you can cut in, at about $0.08 a minute with the default voice, or $0.10 with ElevenLabs or Cartesia: $0.008 a minute to call out, $0.06 a minute to listen, and the voice by the character. A bot's call adds $0.006 to listen for voicemail. A number is $0.50 a month. Each thing you say is also a turn on the bot's own model.
+SignalWire bills a call, listening throughout so you can cut in, at about $0.08 a minute with the default voice, and up to $0.14 with the dearest: $0.008 a minute to call out, $0.06 a minute to listen, and the voice by the character. A bot's call adds $0.006 to listen for voicemail. A number is $0.50 a month. Each thing you say is also a turn on the bot's own model.
 
 ## Tables
 
@@ -73,4 +72,4 @@ The confirmed number and a code waiting to be typed are kept sealed. What was sa
 npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app --file fxbot/page.js
 ```
 
-`FXBOT_PHONE_RELAY`, read once at start, points the plugin at another RELAY address than your space's, such as a fake one for checks.
+`FXBOT_PHONE_RELAY`, read once at start, points the plugin at another RELAY address than SignalWire's, `wss://relay.signalwire.com`, such as a fake one for checks.

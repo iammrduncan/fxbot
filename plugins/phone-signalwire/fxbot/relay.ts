@@ -26,8 +26,6 @@ export type Place = {
   greeting: string;
   /** For a call the bot makes: a machine gets this line at the beep instead, and the call ends. */
   voicemail?: string;
-  /** The longest the call may last. */
-  seconds: number;
   /** Words the recognizer should expect, such as the bot's name. */
   hints?: string[];
   /** A call that only speaks, such as the code that confirms a number: nothing listens, so nothing is billed for it. */
@@ -48,7 +46,7 @@ export type Line = {
   readonly speaking: boolean;
 };
 
-type Pending = { resolve: (result: any) => void; reject: (error: Error) => void; timer: NodeJS.Timeout };
+type Pending = { method: string; resolve: (result: any) => void; reject: (error: Error) => void; timer: NodeJS.Timeout };
 
 // One RELAY connection. `onEvent` gets each event's type and params; `onLost` runs when it's gone for good.
 function connection(relay: Relay, onEvent: (type: string, params: any) => void, onLost: () => void, protocol = "") {
@@ -73,9 +71,13 @@ function connection(relay: Relay, onEvent: (type: string, params: any) => void, 
     if (!waiting) return;
     pending.delete(frame.id);
     clearTimeout(waiting.timer);
-    if (frame.error) return waiting.reject(new Error(String(frame.error.message ?? "SignalWire refused it.")));
     const code = frame.result?.code;
-    if (code !== undefined && !/^2/.test(String(code))) return waiting.reject(new Error(String(frame.result.message ?? `SignalWire answered ${code}.`)));
+    if (frame.error || (code !== undefined && !/^2/.test(String(code)))) {
+      // The log keeps all SignalWire said, but not the request it echoes, which can hold the token.
+      const { original_request: _, ...said } = frame.error ?? frame.result;
+      relay.log(`SignalWire refused ${waiting.method}: ${JSON.stringify(said)}`);
+      return waiting.reject(new Error(String(said.message ?? (code === undefined ? "SignalWire refused it." : `SignalWire answered ${code}.`))));
+    }
     waiting.resolve(frame.result ?? {});
   }
 
@@ -83,7 +85,7 @@ function connection(relay: Relay, onEvent: (type: string, params: any) => void, 
     const id = randomUUID();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => (pending.delete(id), reject(new Error(`SignalWire didn't answer ${method}.`))), ms);
-      pending.set(id, { resolve, reject, timer });
+      pending.set(id, { method, resolve, reject, timer });
       if (!send({ jsonrpc: "2.0", id, method, params }))
         (pending.delete(id), clearTimeout(timer), reject(new Error("The connection to SignalWire is closed.")));
     });
@@ -364,12 +366,13 @@ export function line(relay: Relay, on: LineEvents): Line {
       const outcome = new Promise<{ outcome: Outcome; error?: string }>((resolve) => (settle = (result) => ((settle = null), resolve(result))));
       try {
         await conn.open();
-        // The greeting waits for the answer. max_duration is sent in seconds: SignalWire's own pages disagree on the
-        // unit, and minutes would only make it longer, while the call ends itself at its length anyway.
+        // The greeting waits for the answer. A phone device takes only its numbers and how long it rings: SignalWire
+        // refuses anything else with "call_device_phone error". No max_duration either, since its own SDK says minutes
+        // and its pages seconds: the call ends itself at its length, and a restart ends one left on.
         queue.push(call.greeting);
         await conn.request("calling.dial", {
           tag,
-          devices: [[{ type: "phone", params: { from_number: relay.from, to_number: call.to, timeout: 30, max_duration: call.seconds } }]],
+          devices: [[{ type: "phone", params: { from_number: relay.from, to_number: call.to, timeout: 30 } }]],
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

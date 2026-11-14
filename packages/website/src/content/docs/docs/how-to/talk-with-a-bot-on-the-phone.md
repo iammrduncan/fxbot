@@ -14,8 +14,8 @@ fxbot opens a connection to SignalWire for each call, and SignalWire places the 
 
 ## Set up SignalWire
 
-1. Sign up at [signalwire.com](https://signalwire.com), and pick your space's name: your space is `<name>.signalwire.com`.
-2. In the space's **API Credentials**, copy the **Project ID**, and make an **API token** with the **Voice** scope.
+1. Sign up at [signalwire.com](https://signalwire.com).
+2. In your space's **API Credentials**, copy the **Project ID**, all 36 characters, and make an **API token** with the **Voice** scope.
 3. Buy a phone number, $0.50 a month in the US. Calls come from it.
 4. A trial account calls only numbers you've verified. Verify your own phone there, and you can try it before paying. Adding $5 ends the trial.
 
@@ -23,7 +23,6 @@ fxbot opens a connection to SignalWire for each call, and SignalWire places the 
 
 | Setting | What to put |
 | --- | --- |
-| `space` | Your space, such as `example.signalwire.com` |
 | `project` | The Project ID |
 | `token` | The API token, which fxbot keeps sealed |
 | `from` | The number you bought, such as `+15551234567` |
@@ -50,15 +49,19 @@ Ask it: "Call me." Or "Call me when the build is done": the bot keeps one call-b
 
 To let a bot call when it decides to, turn on **May call me on its own** in its settings, under **Phone**. It calls at most `perDay` times a day, 3 by default, and never in your quiet hours, 22:00 to 07:00 by default. A call it makes listens for voicemail first, and leaves a short message there.
 
-## Voices and what a call costs
+## Pick a voice
 
-`voice` is a SignalWire voice, as `engine.voice:model`. SignalWire bills a call, listening throughout so you can cut in:
+**voice**, in the plugin's settings, lists SignalWire's English voices by engine, and under each engine what a 10-minute call costs. Joanna, on Amazon Polly Neural, is the default. **language** says which English you speak, for SignalWire to hear. To use a voice the list doesn't have, pick **Another, typed in…** and type its ID from SignalWire's [voices](https://signalwire.com/docs/platform/voice/tts) page, as `engine.voice:model`. SignalWire plays its own default voice for an ID it doesn't know.
 
-| Voice | Example | 10 minutes |
-| --- | --- | --- |
-| Amazon Polly Neural, the default | `amazon.Joanna:neural:en-US` | about $0.79 |
-| ElevenLabs Flash, or Cartesia Sonic | `elevenlabs.Rachel:eleven_flash_v2_5` | about $1.01 |
+SignalWire bills a call, listening throughout so you can cut in:
 
-That's $0.008 a minute to call out, $0.06 a minute to listen, and the voice by the character. SignalWire's [voices](https://signalwire.com/docs/platform/voice/tts) page lists them all. Each thing you say is also a turn on the bot's own model.
+| Voices | 10 minutes |
+| --- | --- |
+| Amazon Polly Neural and Generative, and Google Neural2 | about $0.79 |
+| ElevenLabs Flash, Cartesia Sonic 3, OpenAI, Deepgram Aura-1, Azure, Grok, Groq, and Inworld | about $1.02 |
+| Deepgram Aura-2 and Google Chirp 3 HD | about $1.19 |
+| Rime Coda | about $1.36 |
+
+That's $0.008 a minute to call out, $0.06 a minute to listen, and the voice by the character, for about 3,400 characters in 10 minutes. Each thing you say is also a turn on the bot's own model.
 
 SignalWire hears the call, as any phone service does. fxbot records nothing: what was said is in the bot's chat.
