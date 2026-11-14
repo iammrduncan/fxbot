@@ -349,6 +349,7 @@ Each was taken as recommended, at the owner's /goal to build the doc.
 - **fxbot takes no turns while it starts.** A watch is picked up 10 seconds after a load, as routines and subagents wait, and a message that fails to send tries again every 30 seconds, up to 20 times. Those are the plugin's only timers, and run only while an answer waits to be told.
 - **Full-screen agents leave runs of empty rows,** about 20 under Claude Code's answer, so a read keeps one blank line in place of a run.
 - **The machine fxbot runs on is Local,** as herdr calls it, at the owner's word: first in the tab's **Machines**, in a bot's settings, and in the agents table, and `local` to the tools, in place of the plan's `here`.
+- **The tab asks each machine at once,** after the owner found it slow: herdr's own `machine status --json` asks them one after another, about 3.2 seconds for 9 here, so the tab asks each one `status server --json` through `--machine`, together, in about 230 ms.
 - **The summary counts machines asked,** and names those with no agents, since a machine with none adds no rows: "1 agent on 10 machines asked: 1 done. No agents on lab-1, lab-2."
 - **The door:**
   - It answers `door`, with whether it's read-only and as whom, for the plugin's tab. herdr's version comes from `status server --json`.

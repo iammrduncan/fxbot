@@ -460,11 +460,13 @@ export default async function setup(fx: PluginApi) {
   fx.route("GET", "/status", async () => {
     const path = door();
     const how = existsSync(path) ? "door" : "cli";
-    const asked = await herdr(["status", "server", "--json"]);
-    // It answers when the server is down too, with running false.
-    const server: Said = asked.ok && asked.result?.running === false ? { ok: false, code: "unreachable", message: "herdr's server isn't running." } : asked;
-    const opened = how === "door" ? await herdr(["door"]) : null;
-    const listed = await herdr(["machine", "status", "--json"]);
+    // Each machine asked at once: herdr's own `machine status` asks them one after another, about 3 seconds for 9.
+    const up = (said: Said): Said => (said.ok && said.result?.running === false ? { ok: false, code: "unreachable", message: "herdr's server isn't running." } : said);
+    const [server, opened, labels] = await Promise.all([herdr(["status", "server", "--json"]).then(up), how === "door" ? herdr(["door"]) : null, machines()]);
+    const saved = await Promise.all(labels.map(async (label) => {
+      const said = up(await herdr(on(label, "status", "server", "--json")));
+      return { label, status: said.ok ? "reachable" : "unreachable", error: said.ok ? null : said.message };
+    }));
     const watching = await fx.sql`select id, bot, machine, agent, started_at from watches where state = 'working' order by id`;
     return json({
       how: server.ok ? how : "none",
@@ -473,7 +475,7 @@ export default async function setup(fx: PluginApi) {
       version: server.ok ? (server.result?.version ?? null) : null,
       readOnly: opened?.ok ? Boolean(opened.result?.door?.readOnly) : null,
       user: opened?.ok ? (opened.result?.door?.user ?? null) : null,
-      machines: listed.ok && Array.isArray(listed.result) ? listed.result.map((m: any) => ({ label: m.label, status: m.status, error: m.error ?? null })) : [],
+      machines: saved,
       watches: watching.map((w: any) => ({ ...w, machine: where(w.machine) })),
     });
   });
