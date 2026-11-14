@@ -16,6 +16,10 @@ Our reference implementations we glean inspiration from are the following:
 - https://github.com/vercel-labs/fx0
 - https://github.com/vercel-labs/durable-harness
 - https://github.com/vercel-labs/agent-browser
+- https://herdr.dev/ (the Herdr desktop app: https://github.com/herdrdev/herdr-app)
+- https://herdr.dev/core/ (herdr-core, the `hc` runtime both Herdr apps are built on: https://github.com/herdrdev/herdr-core)
+- https://herdr.dev/mobile/ (Herdr for iPhone, iPad, and Android, on herdr-core)
+- https://github.com/herdrdev/herdr (the Herdr TUI, which fxbot's herdr plugin drives today)
 
 Keep in mind our conventions @../CONVENTIONS.md
 
