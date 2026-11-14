@@ -32,7 +32,7 @@ Records live in Postgres, and so do libfx's sessions, each chat's. No Next.js, a
 
 ## Phases
 
-In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Distribution, Mac support, Phone call, and hc are.
+In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Distribution, Mac support, Phone call, hc, and Embedded links are.
 
 - [x] [v1](docs/_completed/v1-plan.md) (core): bot profiles and a streaming chat
 - [x] [Provider logins](docs/_completed/phases/provider-logins.md) (core): ChatGPT, Grok, and Vercel accounts, API keys, and local model servers
@@ -85,6 +85,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [herdr screen](docs/phases/herdr-screen.md) (plugin): the [herdr](https://herdr.dev) interface in the app, from a herdr plugin
 - [ ] [Web search](docs/phases/web-search.md) (plugin): bots search and read the web, and cite it
 - [ ] [X feed](docs/phases/plugin-x-feed.md) (plugins): bots read X (Twitter) for free with tools of their own, posts, search, mentions, followers, and lists, from X's public pages, its embeds, and FxTwitter, or through a signed-in tab on the bot's computer, and watches start a turn when someone posts or the owner is mentioned
+- [ ] [Embedded links](docs/phases/embedded-links.md) (plugin, with a small core hook): a link on its own line, pasted or in a bot's reply, shows as a preview card, an X post as the post, and a YouTube video as its player, and stays a link to right-click and copy
 - [ ] [Vault](docs/phases/vault.md) (plugin): saved secrets and details bots use when allowed
 - [ ] [1Password](docs/phases/1password.md) (plugin): bots use stored logins and items from 1Password
 - [ ] [Local access](docs/phases/plugin-local-access.md) (plugin): bots reach folders the owner picks on the machine itself, off until the owner turns it on
