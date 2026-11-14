@@ -1,0 +1,22 @@
+{
+  "name": "herdr",
+  "version": "0.2.0",
+  "description": "Bots see the coding agents herdr runs, here and on its saved machines, send them work, start new ones, and hear back when one is done.",
+  "license": "Apache-2.0",
+  "extensions": {
+    "sh.fxbot": {
+      "minFxbot": "0.9.0",
+      "server": "./fxbot/server.ts",
+      "page": "./fxbot/page.js",
+      "migrations": "./fxbot/migrations",
+      "settings": [
+        { "name": "kinds", "description": "The agents bots may start, comma-separated", "default": "claude, codex, opencode, pi" },
+        { "name": "hours", "description": "The most hours fxbot waits for an agent's answer, 1 to 24", "default": "4" },
+        { "name": "lines", "description": "How many of an agent's last lines its answer carries, 20 to 400", "default": "80" },
+        { "name": "watches", "description": "The most prompts waiting for an answer at once, 1 to 16", "default": "8" },
+        { "name": "door", "description": "The door's socket, as fxbot sees it: sudo fxbot herdr on opens it", "default": "/var/lib/fxbot/control/herdr.sock" },
+        { "name": "herdr", "description": "herdr's command, for a checkout run by herdr's own user", "default": "herdr" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# fxbot's door to herdr. systemd runs it once for each connection to the socket in fxbot's control folder, as herdr's
+# user, with the connection as stdin and stdout: `fxbot herdr on` writes those units, and only root runs that. It reads
+# one herdr command, its words separated by NUL bytes, checks every word against the commands below, and runs herdr's
+# CLI with them, or answers `refused` in herdr's own shape. No word is ever read by a shell. It sources nothing, so it
+# never sees fxbot's .env. With --read-only it takes only the commands that look (docs/phases/herdr.md).
+set -uo pipefail
+export LC_ALL=C
+read_only=0
+[ "${1:-}" = --read-only ] && read_only=1
+herdr=${HERDR_BIN:-herdr}
+
+refuse() {
+  printf '{"error":{"code":"refused","message":"%s"}}\n' "fxbot's door to herdr refuses that: $1"
+  exit 0
+}
+writes() { [ "$read_only" = 0 ] || refuse "it's read-only, so it takes no prompts, workspaces, tabs, or starts"; }
+
+# One command of at most 64 KiB.
+mapfile -d '' -t words < <(head -c 65537)
+size=${#words[@]}
+for word in "${words[@]}"; do size=$((size + ${#word})); done
+[ "$size" -le 65536 ] || refuse "a command is at most 64 KiB"
+[ "${#words[@]}" -gt 0 ] || refuse "no command"
+
+# Each kind of word.
+target='^([a-z][a-z0-9_-]{0,31}|w[0-9]{1,9}:p[0-9]{1,9})$'
+name='^[a-z][a-z0-9_-]{0,31}$'
+workspace='^w[0-9]{1,9}$'
+pane='^w[0-9]{1,9}:p[0-9]{1,9}$'
+number='^[1-9][0-9]{0,8}$'
+kinds=' pi claude codex gemini cursor devin agy cline omp mastracode opencode copilot kimi kiro droid amp grok hermes kilo qodercli qwen letta maki muse '
+plain() { [[ -n $1 && ${#1} -le $2 && $1 != -* && ! $1 =~ [[:cntrl:]] ]]; }
+path() { [[ ${#1} -le 1024 && ! $1 =~ [[:cntrl:]] && ( $1 == /* || $1 == "~" || $1 == "~/"* ) ]]; }
+within() { [[ $1 =~ $number ]] && [ "$1" -ge "$2" ] && [ "$1" -le "$3" ]; }
+
+machine=()
+if [ "${words[0]}" = --machine ]; then
+  plain "${words[1]:-}" 64 || refuse "a machine's label is up to 64 characters"
+  machine=(--machine "${words[1]}")
+  words=("${words[@]:2}")
+fi
+w=("${words[@]}" "" "" "" "" "" "" "" "")
+n=${#words[@]}
+
+case "${w[0]} ${w[1]}" in
+  "door ")
+    [ "$n" = 1 ] && [ ${#machine[@]} = 0 ] || refuse "door takes nothing more"
+    printf '{"door":{"readOnly":%s,"user":"%s"}}\n' "$([ "$read_only" = 1 ] && echo true || echo false)" "$(id -un)"
+    exit 0
+    ;;
+  "status server") [ "$n" = 3 ] && [ "${w[2]}" = --json ] || refuse "status server --json only" ;;
+  "machine list" | "machine status")
+    [ "$n" = 3 ] && [ "${w[2]}" = --json ] && [ ${#machine[@]} = 0 ] || refuse "machine list or status --json, on this machine only"
+    ;;
+  "agent list") [ "$n" = 2 ] || refuse "agent list takes nothing more" ;;
+  "workspace get") [ "$n" = 3 ] && [[ ${w[2]} =~ $workspace ]] || refuse "workspace get takes a workspace id" ;;
+  "agent get") [ "$n" = 3 ] && [[ ${w[2]} =~ $target ]] || refuse "agent get takes an agent's name or pane id" ;;
+  "agent read")
+    [ "$n" = 7 ] && [[ ${w[2]} =~ $target ]] && [ "${w[3]}" = --source ] && [[ ${w[4]} == recent-unwrapped || ${w[4]} == visible ]] &&
+      [ "${w[5]}" = --lines ] && within "${w[6]}" 1 1000 || refuse "agent read <agent> --source recent-unwrapped|visible --lines 1-1000"
+    ;;
+  "agent wait")
+    [ "$n" = 5 ] && [[ ${w[2]} =~ $target ]] && [ "${w[3]}" = --timeout ] && within "${w[4]}" 1 600000 || refuse "agent wait <agent> --timeout 1-600000"
+    ;;
+  "agent prompt")
+    writes
+    [ "$n" = 7 ] && [[ ${w[2]} =~ $target ]] && [ -n "${w[3]}" ] && [ ${#w[3]} -le 16384 ] && [ "${w[4]}" = --wait ] &&
+      [ "${w[5]}" = --timeout ] && within "${w[6]}" 1 600000 || refuse "agent prompt <agent> <text up to 16 KiB> --wait --timeout 1-600000"
+    ;;
+  "workspace create")
+    writes
+    [ "$n" = 7 ] && [ "${w[2]}" = --label ] && [ "${w[3]}" = "fxbot bots" ] && [ "${w[4]}" = --cwd ] && path "${w[5]}" && [ "${w[6]}" = --no-focus ] ||
+      refuse "workspace create --label \\\"fxbot bots\\\" --cwd <path> --no-focus"
+    ;;
+  "tab create")
+    writes
+    [ "$n" = 9 ] && [ "${w[2]}" = --workspace ] && [[ ${w[3]} =~ $workspace ]] && [ "${w[4]}" = --label ] && [[ ${w[5]} =~ $name ]] &&
+      [ "${w[6]}" = --cwd ] && path "${w[7]}" && [ "${w[8]}" = --no-focus ] || refuse "tab create --workspace <id> --label <name> --cwd <path> --no-focus"
+    ;;
+  "agent start")
+    writes
+    [ "$n" = 9 ] && [[ ${w[2]} =~ $name ]] && [ "${w[3]}" = --kind ] && [[ $kinds == *" ${w[4]} "* ]] && [ "${w[5]}" = --pane ] &&
+      [[ ${w[6]} =~ $pane ]] && [ "${w[7]}" = --timeout ] && within "${w[8]}" 3001 300000 ||
+      refuse "agent start <name> --kind <kind> --pane <pane> --timeout 3001-300000, and nothing after it"
+    ;;
+  *) refuse "it isn't one of the commands fxbot's bots may use" ;;
+esac
+
+exec timeout -k 5 630 "$herdr" "${machine[@]}" "${words[@]}" 2>&1

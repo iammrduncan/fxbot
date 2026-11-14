@@ -12,6 +12,7 @@
 #   fxbot rotate-key           every stored secret sealed again under a new key
 #   fxbot embedder cpu|gpu|off  the local embedder for memory search, on the CPU, on a GPU, or not at all
 #   fxbot computer on|off      the computer plugin's engine: a user of its own, rootless, with a firewall
+#   fxbot herdr on [--user <login>] [--read-only] | off  the herdr plugin's door to herdr's agents
 #   fxbot uninstall [--purge] [--yes]  fxbot off this machine, keeping a backup and the key unless --purge
 set -euo pipefail
 
@@ -225,6 +226,10 @@ update() {
   if [ "${FXBOT_ENGINE:-podman}" = docker ]; then
     curl -fsSL "$files/v$to/deploy/compose.docker.yaml" -o compose.docker.yaml || fail "Couldn't download $to's files from $files."
   fi
+  # herdr's door, when it's here, comes with each release.
+  if [ -f herdr-door ]; then
+    curl -fsSL "$files/v$to/deploy/herdr-door" -o "$next/herdr-door" || fail "Couldn't download $to's files from $files."
+  fi
   # A release's tags never change, so an image that is here already is the right one.
   FXBOT_VERSION=$to compose -f "$next/compose.yaml" pull --policy missing -q >/dev/null 2>&1 || fail "Couldn't download $to's images."
 
@@ -232,15 +237,17 @@ update() {
   local old
   old=$(compose config --images 2>/dev/null | sort -u)
   cp -p .env .env.back && cp -p compose.yaml compose.yaml.back && cp -p fxbot fxbot.back
+  [ ! -f herdr-door ] || cp -p herdr-door herdr-door.back
   cp -p "compose.gpu.${FXBOT_ENGINE:-podman}.yaml" compose.gpu.back 2>/dev/null || true
   sed -i "s/^FXBOT_VERSION=.*/FXBOT_VERSION=$to/" .env
   chmod 755 "$next/fxbot"
   # Renamed into place: this run keeps reading its own copy of the script.
+  [ ! -f "$next/herdr-door" ] || { chmod 755 "$next/herdr-door" && mv "$next/herdr-door" herdr-door; }
   mv "$next/compose.yaml" compose.yaml && mv "$next/compose.gpu.yaml" "compose.gpu.${FXBOT_ENGINE:-podman}.yaml" && mv "$next/fxbot" fxbot && rm -rf "$next"
   touch .update-started
   step "Starting $to"
   if FXBOT_VERSION=$to start >/dev/null 2>&1; then
-    rm -f .env.back compose.yaml.back fxbot.back compose.gpu.back
+    rm -f .env.back compose.yaml.back fxbot.back compose.gpu.back herdr-door.back
     # The old release's images, by name, now that nothing goes back to them.
     comm -23 <(printf '%s\n' "$old") <(FXBOT_VERSION=$to compose config --images 2>/dev/null | sort -u) |
       while read -r image; do [ -z "$image" ] || "${FXBOT_ENGINE:-podman}" rmi "$image" >/dev/null 2>&1 || true; done
@@ -259,6 +266,7 @@ update() {
   fi
   mv .env.back .env && mv compose.yaml.back compose.yaml && mv fxbot.back fxbot
   [ ! -f compose.gpu.back ] || mv compose.gpu.back "compose.gpu.${FXBOT_ENGINE:-podman}.yaml"
+  [ ! -f herdr-door.back ] || mv herdr-door.back herdr-door
   FXBOT_VERSION=$from start >/dev/null 2>&1 ||
     fail "$to didn't start, and neither did $from after going back. See: fxbot logs"
   status back "$to didn't start, so fxbot went back to $from.${why:+$'\n\n'$why}"
@@ -370,6 +378,64 @@ computer() {
 # fxbot off the machine. Unless --purge, a backup, the key, and the fxbot user stay, for an install and a restore later;
 # the packages setup.sh installed are named, not removed. Each step that fails says so and the rest go on, so a second
 # run finishes what a first one left; only a failed backup stops it, before anything is removed.
+# herdr's door for the herdr plugin: a socket in the control folder, which the app's container already sees, that runs a
+# short list of herdr's commands as herdr's user, from this release's herdr-door (docs/phases/herdr.md). Only root opens
+# it: the app can't ask for it, since it lets bots send work to the agents herdr runs here and on its saved machines.
+herdr_door() {
+  local to=${1:-} user=root read_only="" home bin group label unit=/etc/systemd/system/fxbot-herdr
+  shift || true
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --user) [ -n "${2:-}" ] || die "--user takes herdr's login"; user=$2; shift 2 ;;
+      --read-only) read_only=" --read-only"; shift ;;
+      *) die "herdr on takes --user <login> and --read-only, not $1" ;;
+    esac
+  done
+  case $to in
+    off)
+      systemctl disable --now fxbot-herdr.socket >/dev/null 2>&1 || true
+      systemctl stop 'fxbot-herdr@*.service' >/dev/null 2>&1 || true
+      rm -f "$unit.socket" "$unit@.service" "$control/herdr.sock"
+      systemctl daemon-reload
+      echo "herdr's door is closed."
+      return
+      ;;
+    on) ;;
+    *) die "name on or off: sudo fxbot herdr on [--user <login>] [--read-only], or sudo fxbot herdr off" ;;
+  esac
+  home=$(getent passwd "$user" | cut -d: -f6 || true)
+  [ -n "$home" ] || die "there's no user $user. Name herdr's user: sudo fxbot herdr on --user <login>"
+  bin=$(runuser -u "$user" -- bash -lc 'command -v herdr' 2>/dev/null | tail -n 1 || true)
+  [ -n "$bin" ] || [ ! -x "$home/.local/bin/herdr" ] || bin=$home/.local/bin/herdr
+  [ -n "$bin" ] || die "herdr isn't installed for $user. Install it from https://herdr.dev, or name its user with --user"
+  # As the door runs it: herdr's user, its home, and nothing else from this shell.
+  as_door() { runuser -u "$user" -- env -i HOME="$home" USER="$user" LOGNAME="$user" PATH=/usr/local/bin:/usr/bin:/bin "$bin" "$@"; }
+  as_door status server --json 2>/dev/null | grep -q '"running": *true' || die "herdr's server isn't running for $user. Start herdr, then run this again"
+  # Each saved machine, as the door reaches it: with no SSH agent. One whose key needs an agent can't be reached.
+  while IFS= read -r label; do
+    [ -z "$label" ] || echo "herdr can't reach $label with no SSH agent, so the door can't either, until its key is loaded where the door sees it."
+  done < <(as_door machine status --json 2>/dev/null | tr -d '\n' | sed 's/": *"/":"/g; s/", *"/","/g' |
+    grep -o '"label":"[^"]*","status":"[^"]*"' | grep -v '"status":"reachable"' | sed 's/^"label":"\([^"]*\)".*/\1/')
+  if [ ! -f herdr-door ]; then
+    curl -fsSL "$files/v$FXBOT_VERSION/deploy/herdr-door" -o herdr-door.next || { rm -f herdr-door.next; die "couldn't download herdr-door for $FXBOT_VERSION from $files"; }
+    chmod 755 herdr-door.next && mv herdr-door.next herdr-door
+  fi
+  group=$(getent group "${FXBOT_GID:?}" | cut -d: -f1 || true)
+  printf '%s\n' "[Unit]" "Description=fxbot's door to herdr" "" "[Socket]" "ListenStream=$control/herdr.sock" "Accept=yes" \
+    "SocketUser=root" "SocketGroup=${group:-$FXBOT_GID}" "SocketMode=0660" "MaxConnections=64" "" "[Install]" "WantedBy=sockets.target" >"$unit.socket"
+  printf '%s\n' "[Unit]" "Description=fxbot's door to herdr" "" "[Service]" "User=$user" "Environment=HERDR_BIN=$bin" \
+    "ExecStart=$here/herdr-door$read_only" "StandardInput=socket" "StandardOutput=socket" "StandardError=journal" "RuntimeMaxSec=15min" >"$unit@.service"
+  systemctl daemon-reload
+  systemctl enable fxbot-herdr.socket >/dev/null 2>&1
+  systemctl restart fxbot-herdr.socket || die "the door's socket didn't start. See: journalctl -u fxbot-herdr.socket"
+  if [ -n "$read_only" ]; then
+    echo "fxbot's app can now list and read herdr's agents, as $user, here and on herdr's saved machines. It can't send them work or start them."
+  else
+    echo "fxbot's app can now list and read herdr's agents, send them work, and start new ones, as $user, here and on herdr's saved machines."
+  fi
+  echo "Close it with: sudo fxbot herdr off"
+}
+
 uninstall() {
   local purge="" yes="" arg folder="" name=${FXBOT_COMPUTER_NAME:-fxbot-computer} engine=${FXBOT_ENGINE:-podman}
   local port=${FXBOT_PORT:-8787} etc=${FXBOT_ROOT:-}/etc/fxbot moved="" images
@@ -379,7 +445,7 @@ uninstall() {
   echo "fxbot uninstall removes fxbot from this machine:"
   echo "  its containers, its database and model volumes, and its images"
   echo "  the computer: the user $name, its computers and their homes, and its firewall"
-  echo "  fxbot.service and fxbot-control, the fxbot command, and $here"
+  echo "  fxbot.service and fxbot-control, herdr's door if it's open, the fxbot command, and $here"
   if [ -z "$purge" ]; then
     echo "It keeps, so you can install again and restore:"
     echo "  a backup of the database and plugins' files, in $var/backups"
@@ -421,6 +487,7 @@ uninstall() {
       echo "The computer's setup script isn't here, and couldn't be downloaded, so its user $name stays."
     fi
   fi
+  [ ! -f /etc/systemd/system/fxbot-herdr.socket ] || herdr_door off >/dev/null
   systemctl disable --now fxbot >/dev/null 2>&1 || true
   images=$(compose config --images 2>/dev/null || true)
   compose down --volumes --rmi all --remove-orphans >/dev/null 2>&1 || echo "Compose couldn't take everything down: see fxbot compose ps -a"
@@ -484,6 +551,10 @@ case ${1:-} in
       echo "fxbot doesn't answer. See: sudo fxbot logs fxbot"
     fi
     compose ps
+    if [ -f /etc/systemd/system/fxbot-herdr.socket ]; then
+      echo
+      echo "herdr's door is open, as $(sed -n 's/^User=//p' /etc/systemd/system/fxbot-herdr@.service)$(grep -q -- '--read-only' /etc/systemd/system/fxbot-herdr@.service && echo ", read-only"). Close it with: sudo fxbot herdr off"
+    fi
     if [ -L "$here/current" ]; then
       echo
       echo "The 0.2 install that moved into containers is still here. Once you're sure, remove it:"
@@ -503,9 +574,10 @@ case ${1:-} in
   rotate-key) rotate_key ;;
   embedder) embedder "${2:-}" ;;
   computer) computer "${2:-}" ;;
+  herdr) herdr_door "${@:2}" ;;
   uninstall) uninstall "${@:2}" ;;
   *)
-    sed -n '6,15p' "$0" | sed 's/^# //'
+    sed -n '6,16p' "$0" | sed 's/^# //'
     exit 1
     ;;
 esac
