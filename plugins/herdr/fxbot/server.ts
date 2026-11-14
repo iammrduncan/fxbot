@@ -178,11 +178,14 @@ export default async function setup(fx: PluginApi) {
     const row = rows.find((r) => r.target === agent);
     if (!row) return null;
     const twin = rows.some((r) => r !== row && r.workspace === row.workspace && r.tab === row.tab);
-    const numbered = (name: string, what: string) => (/^\d+$/.test(name) ? `${what} ${name}` : name);
-    const kind = row.kind === "opencode" ? "OpenCode" : row.kind ? row.kind[0].toUpperCase() + row.kind.slice(1) : "An agent";
-    const tab = row.tab && /^\d+$/.test(row.tab) ? `tab ${row.tab}` : row.tab ? `the ${row.tab} tab` : "";
-    const where = [tab, row.workspace && numbered(row.workspace, "workspace")].filter(Boolean).join(" of ");
-    return `${kind}${twin || !where ? ` (${agent})` : ""}${where ? ` in ${where}` : ""} on ${machine || "Local"}`;
+    return inWords(row.kind, machine, row.workspace, row.tab, twin || !(row.tab || row.workspace) ? agent : "");
+  }
+  // "Claude in the thermite tab of fxbot on Local", with the pane id after the kind when it's given.
+  function inWords(kind: string, machine: string, workspace: string, tab: string, id = "") {
+    const named = kind === "opencode" ? "OpenCode" : kind ? kind[0].toUpperCase() + kind.slice(1) : "An agent";
+    const tabWords = /^\d+$/.test(tab) ? `tab ${tab}` : tab ? `the ${tab} tab` : "";
+    const where = [tabWords, /^\d+$/.test(workspace) ? `workspace ${workspace}` : workspace].filter(Boolean).join(" of ");
+    return `${named}${id ? ` (${id})` : ""}${where ? ` in ${where}` : ""} on ${machine || "Local"}`;
   }
   function summary(rows: Row[], asked: string[]) {
     const found = rows.filter((r): r is Row & { status: string } => "status" in r);
@@ -226,7 +229,7 @@ export default async function setup(fx: PluginApi) {
 
   // --- Watches: one prompt each, from the call to the agent's settled state.
   const following = new Set<number>();
-  async function prompt(bot: string, machine: string, agent: string, text: string, messageId: string) {
+  async function prompt(bot: string, machine: string, agent: string, text: string, messageId: string, started = false) {
     const [{ count }] = await fx.sql<{ count: number }[]>`select count(*)::int from watches where state = 'working'`;
     if (count >= limit("watches")) return `${plural(count, "agent is", "agents are")} working on your prompts already, the most at once. Wait for an answer first.`;
     const [busy] = await fx.sql<Watch[]>`select * from watches where state = 'working' and machine = ${machine} and agent = ${agent}`;
@@ -244,6 +247,7 @@ export default async function setup(fx: PluginApi) {
       return `The prompt wasn't sent: ${failed(early)}`;
     }
     void follow(w, first);
+    if (started) return `It has the prompt (w:${w.id}) and is working on it. Its answer comes to you when it's done: don't wait or check. Tell the owner what you asked it.`;
     return `Sent to ${shown ?? `${agent} on ${where(machine)}`} (w:${w.id}), which is working on it. Its answer comes to you when it's done: don't wait or check. Tell the owner what you asked it.`;
   }
 
@@ -356,6 +360,9 @@ export default async function setup(fx: PluginApi) {
       if (!made.ok) return `No workspace for it: ${failed(made)}`;
       const workspace = made.result?.workspace?.workspace_id;
       pane = made.result?.root_pane?.pane_id ?? "";
+      // herdr names the tab it makes with a workspace by its number: this one is the agent's.
+      const first = made.result?.tab?.tab_id;
+      if (typeof first === "string") await herdr(on(machine, "tab", "rename", first, name));
       if (workspace) await fx.sql`insert into workspaces (machine, workspace) values (${machine}, ${workspace}) on conflict (machine) do update set workspace = excluded.workspace, made_at = now()`;
     }
     if (!target.test(pane)) return "herdr gave no pane for it.";
@@ -367,12 +374,12 @@ export default async function setup(fx: PluginApi) {
       await sleep(1000);
       started = await herdr(words, 90_000);
     }
-    const there = `${name} (${kind}) on ${where(machine)}, in ${folder}, in the ${workspaceLabel} workspace`;
+    const there = `${inWords(kind, machine, workspaceLabel, name)}, in ${folder}`;
     if (!started.ok && started.code === "agent_not_ready")
       return `Started ${there}, but it stopped at startup waiting for the owner, such as a question about trusting the folder. The owner answers it in herdr.${text ? " Its prompt wasn't sent: send it with herdr_prompt once it's ready." : ""}`;
-    if (!started.ok) return `${name} didn't start: ${failed(started)} Its tab stays, for the owner to close in herdr.`;
-    if (!text) return `Started ${there}. It's ready for a prompt.`;
-    return `Started ${there}. ${await prompt(bot, machine, name, text, messageId)}`;
+    if (!started.ok) return `${inWords(kind, machine, workspaceLabel, name)} didn't start: ${failed(started)} Its tab stays, for the owner to close in herdr.`;
+    if (!text) return `Started ${there}. It's ready for a prompt, as ${name}.`;
+    return `Started ${there}. ${await prompt(bot, machine, name, text, messageId, true)}`;
   }
 
   // --- The tools.

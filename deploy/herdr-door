@@ -28,6 +28,7 @@ target='^([a-z][a-z0-9_-]{0,31}|w[0-9]{1,9}:p[0-9]{1,9})$'
 name='^[a-z][a-z0-9_-]{0,31}$'
 workspace='^w[0-9]{1,9}$'
 pane='^w[0-9]{1,9}:p[0-9]{1,9}$'
+tab='^w[0-9]{1,9}:t[0-9]{1,9}$'
 number='^[1-9][0-9]{0,8}$'
 kinds=' pi claude codex gemini cursor devin agy cline omp mastracode opencode copilot kimi kiro droid amp grok hermes kilo qodercli qwen letta maki muse '
 plain() { [[ -n $1 && ${#1} -le $2 && $1 != -* && ! $1 =~ [[:cntrl:]] ]]; }
@@ -77,6 +78,10 @@ case "${w[0]} ${w[1]}" in
     writes
     [ "$n" = 9 ] && [ "${w[2]}" = --workspace ] && [[ ${w[3]} =~ $workspace ]] && [ "${w[4]}" = --label ] && [[ ${w[5]} =~ $name ]] &&
       [ "${w[6]}" = --cwd ] && path "${w[7]}" && [ "${w[8]}" = --no-focus ] || refuse "tab create --workspace <id> --label <name> --cwd <path> --no-focus"
+    ;;
+  "tab rename")
+    writes
+    [ "$n" = 4 ] && [[ ${w[2]} =~ $tab ]] && [[ ${w[3]} =~ $name ]] || refuse "tab rename <tab id> <name>"
     ;;
   "agent start")
     writes
