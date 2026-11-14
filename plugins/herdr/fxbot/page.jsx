@@ -32,7 +32,7 @@ function Table({ rows }) {
               ) : (
                 <div key={r.target} className="flex min-w-0 items-center gap-2 text-xs">
                   <span className={`size-2 shrink-0 rounded-full ${dot[r.status] ?? dot.unknown}`} />
-                  <span className="shrink-0 font-mono">{r.target}</span>
+                  <span className="shrink-0">{r.place || r.target}</span>
                   <span className="shrink-0 text-muted-foreground">{r.kind}</span>
                   <span className={`shrink-0 ${r.status === "blocked" ? "font-medium text-destructive" : ""}`}>{statusText[r.status] ?? r.status}</span>
                   <span className="min-w-0 truncate text-muted-foreground" title={r.folder}>
@@ -104,7 +104,7 @@ function Sent({ call: tool }) {
     look();
     return () => ((stopped = true), clearTimeout(timer));
   }, [id]);
-  const who = `${input.agent ?? input.name ?? "An agent"}${input.machine ? ` on ${input.machine}` : ""}`;
+  const who = watch?.shown ?? `${input.agent ?? input.name ?? "An agent"}${input.machine ? ` on ${input.machine}` : ""}`;
   const text = input.text ?? input.prompt;
   return (
     <div className="grid gap-1.5 text-sm">

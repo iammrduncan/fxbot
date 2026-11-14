@@ -53,7 +53,7 @@ case "${w[0]} ${w[1]}" in
   "machine list" | "machine status")
     [ "$n" = 3 ] && [ "${w[2]}" = --json ] && [ ${#machine[@]} = 0 ] || refuse "machine list or status --json, on this machine only"
     ;;
-  "agent list") [ "$n" = 2 ] || refuse "agent list takes nothing more" ;;
+  "api snapshot") [ "$n" = 2 ] || refuse "api snapshot takes nothing more" ;;
   "workspace get") [ "$n" = 3 ] && [[ ${w[2]} =~ $workspace ]] || refuse "workspace get takes a workspace id" ;;
   "agent get") [ "$n" = 3 ] && [[ ${w[2]} =~ $target ]] || refuse "agent get takes an agent's name or pane id" ;;
   "agent read")

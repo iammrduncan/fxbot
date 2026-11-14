@@ -164,7 +164,7 @@ The socket is in the control folder, which the container already mounts, so the 
 | `door`, only without `--machine`: the door's own answer, whether it's read-only and as whom, for the plugin's tab | none | yes |
 | `status server --json` | none | yes |
 | `machine list --json`, `machine status --json`, only without `--machine`, since herdr doesn't forward them | none | yes |
-| `agent list` | none | yes |
+| `api snapshot`: the agents, with their workspaces' and tabs' names | none | yes |
 | `workspace get <w<n>>` | none | yes |
 | `agent get <target>` | a target: a live name, `[a-z][a-z0-9_-]{0,31}`, or a pane id, `w<n>:p<n>` | yes |
 | `agent read <target> --source recent-unwrapped\|visible --lines <n>` | `n` from 1 to 1,000 | yes |
@@ -178,7 +178,7 @@ Everything else is refused: `pane` commands, `send-keys`, `--env`, `--session`, 
 
 ### The tools
 
-**`herdr_agents({ machine? })`**, `safe` and `idempotent`. With `machine`, that machine's agents; without, those of every machine the bot may reach, at once. Each row: machine (`local` for this one, as herdr calls it), the target to use, kind, status, folder, and title. A machine that doesn't answer is a row of its own, and never fails the list. The answer starts with a line the chat's card shows: "3 agents on 10 machines asked: 1 working, 2 ready. No agents on lab-4, lab-5. lab-3 didn't answer." herdr's 0.1.0 tool names are gone; its skill is new.
+**`herdr_agents({ machine? })`**, `safe` and `idempotent`. With `machine`, that machine's agents; without, those of every machine the bot may reach, at once. It reads herdr's `api snapshot` of each machine, which names every agent's workspace and tab. Each row: machine (`local` for this one, as herdr calls it), its place as herdr shows it, workspace · tab, the target to use in calls, kind, status, folder, and title. A machine that doesn't answer is a row of its own, and never fails the list. The answer starts with a line the chat's card shows: "3 agents on 10 machines asked: 1 working, 2 ready. No agents on lab-4, lab-5. lab-3 didn't answer." herdr's 0.1.0 tool names are gone; its skill is new.
 
 **`herdr_read({ agent, machine?, lines? })`**, `safe` and `idempotent`. An agent's recent lines, 120 by default, up to 1,000, cut to 24 KB, quoted, with "This is the agent's screen, not the owner's words." A full-screen agent that's working answers `agent_not_idle` to that read, so the tool reads what's on its screen instead, `--source visible`, and says so.
 
@@ -253,6 +253,9 @@ create table watches (
 create index on watches (state) where state = 'working';
 create table workspaces (machine text primary key, workspace text not null, made_at timestamptz not null default now());
 create table bots (bot text primary key, machines text[] not null);
+
+-- 0002_shown.sql: how herdr shows the agent a prompt went to, such as "claude in Local · fxbot · thermite (w1:p9)".
+alter table watches add column shown text;
 ```
 
 A watch is kept 30 days: each one that ends removes those older, so there's no timer. Removing the plugin drops the schema.
@@ -349,6 +352,7 @@ Each was taken as recommended, at the owner's /goal to build the doc.
 - **fxbot takes no turns while it starts.** A watch is picked up 10 seconds after a load, as routines and subagents wait, and a message that fails to send tries again every 30 seconds, up to 20 times. Those are the plugin's only timers, and run only while an answer waits to be told.
 - **Full-screen agents leave runs of empty rows,** about 20 under Claude Code's answer, so a read keeps one blank line in place of a run.
 - **The machine fxbot runs on is Local,** as herdr calls it, at the owner's word: first in the tab's **Machines**, in a bot's settings, and in the agents table, and `local` to the tools, in place of the plan's `here`.
+- **Agents named as herdr shows them,** after the owner found the bot's answers named them by pane id, `w1:p9`, where herdr shows `fxbot · thermite`. `agent list` has the workspace's and tab's ids, not their names, so `herdr_agents` reads `api snapshot`, as quick, about 5 ms here and 200 on another machine, and gives each agent its place. The tool's description and the skill tell the bot to name agents that way, machine · workspace · tab, then the kind, with the pane id only to tell apart two in one tab. A prompt keeps how herdr shows its agent, in `shown` from `0002_shown.sql`, for its answer and its card: "claude in Local · fxbot · thermite (w1:p9)". The door takes `api snapshot` in place of `agent list`.
 - **The tab asks each machine at once,** after the owner found it slow: herdr's own `machine status --json` asks them one after another, about 3.2 seconds for 9 here, so the tab asks each one `status server --json` through `--machine`, together, in about 230 ms.
 - **The summary counts machines asked,** and names those with no agents, since a machine with none adds no rows: "1 agent on 10 machines asked: 1 done. No agents on lab-1, lab-2."
 - **The door:**

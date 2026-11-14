@@ -10,8 +10,8 @@ import type { PluginApi } from "@fxbot/sdk";
 // approval, or closes anything.
 
 type Said = { ok: true; result: any; text: string } | { ok: false; code: string; message: string };
-type Watch = { id: number; bot: string; machine: string; agent: string; prompt: string; asked: string | null; state: string; started_at: Date; told: boolean };
-type Row = { machine: string; target: string; kind: string; status: string; folder: string; title: string } | { machine: string; unreachable: string };
+type Watch = { id: number; bot: string; machine: string; agent: string; shown: string | null; prompt: string; asked: string | null; state: string; started_at: Date; told: boolean };
+type Row = { machine: string; place: string; target: string; kind: string; status: string; folder: string; title: string } | { machine: string; unreachable: string };
 
 // Each setting's lowest, highest, and default. The owner sets them, and no tool can.
 const limits = { hours: [1, 24, 4], lines: [20, 400, 80], watches: [1, 16, 8] } as const;
@@ -149,11 +149,15 @@ export default async function setup(fx: PluginApi) {
   const failed = (said: Said & { ok: false }) => (["door", "refused", "unreachable", "no_answer"].includes(said.code) ? said.message : `herdr says: ${said.message}`);
 
   // --- Agents, on one machine or all.
+  // Agents from herdr's snapshot of a machine, which names each one's workspace and tab, as herdr shows them.
   async function agentsOn(machine: string): Promise<Row[]> {
-    const said = await herdr(on(machine, "agent", "list"));
+    const said = await herdr(on(machine, "api", "snapshot"));
     if (!said.ok) return [{ machine: where(machine), unreachable: said.message }];
-    return (said.result?.agents ?? []).map((a: any) => ({
+    const snapshot = said.result?.snapshot ?? {};
+    const labels = new Map<string, string>([...(snapshot.workspaces ?? []), ...(snapshot.tabs ?? [])].map((x: any) => [x.tab_id ?? x.workspace_id, x.label ?? ""]));
+    return (snapshot.agents ?? []).map((a: any) => ({
       machine: where(machine),
+      place: [labels.get(a.workspace_id), labels.get(a.tab_id)].filter(Boolean).join(" · "),
       target: a.name || a.pane_id,
       kind: a.agent ?? "",
       status: a.agent_status ?? "unknown",
@@ -164,6 +168,12 @@ export default async function setup(fx: PluginApi) {
   async function agents(list: string[]) {
     const rows = (await Promise.all(list.map(agentsOn))).flat();
     return { rows, summary: summary(rows, list) };
+  }
+  // How herdr shows one agent, such as "claude in Local · fxbot · thermite (w1:p9)", or null when it isn't found.
+  async function shownAs(machine: string, agent: string) {
+    const row = (await agentsOn(machine)).find((r): r is Extract<Row, { place: string }> => "place" in r && r.target === agent);
+    if (!row) return null;
+    return `${row.kind || "an agent"} in ${[machine || "Local", row.place].filter(Boolean).join(" · ")} (${agent})`;
   }
   function summary(rows: Row[], asked: string[]) {
     const found = rows.filter((r): r is Row & { status: string } => "status" in r);
@@ -213,7 +223,8 @@ export default async function setup(fx: PluginApi) {
     const [busy] = await fx.sql<Watch[]>`select * from watches where state = 'working' and machine = ${machine} and agent = ${agent}`;
     if (busy) return `${agent} on ${where(machine)} is still on your last prompt. Its answer comes to you by itself.`;
     const asked = asks.get(messageId) ?? null;
-    const [w] = await fx.sql<Watch[]>`insert into watches (bot, machine, agent, prompt, asked) values (${bot}, ${machine}, ${agent}, ${text}, ${asked}) returning *`;
+    const shown = await shownAs(machine, agent);
+    const [w] = await fx.sql<Watch[]>`insert into watches (bot, machine, agent, shown, prompt, asked) values (${bot}, ${machine}, ${agent}, ${shown}, ${text}, ${asked}) returning *`;
     const first = herdr(on(machine, "agent", "prompt", agent, text, "--wait", "--timeout", String(waitMs)), waitMs + 30_000);
     const early = await Promise.race([first, sleep(6000).then(() => null)]);
     if (early && !early.ok) {
@@ -224,7 +235,7 @@ export default async function setup(fx: PluginApi) {
       return `The prompt wasn't sent: ${failed(early)}`;
     }
     void follow(w, first);
-    return `Sent to ${agent} on ${where(machine)} (w:${w.id}), which is working on it. Its answer comes to you when it's done: don't wait or check. Tell the owner what you asked it.`;
+    return `Sent to ${shown ?? `${agent} on ${where(machine)}`} (w:${w.id}), which is working on it. Its answer comes to you when it's done: don't wait or check. Tell the owner what you asked it.`;
   }
 
   async function follow(w: Watch, current: Promise<Said>) {
@@ -279,7 +290,7 @@ export default async function setup(fx: PluginApi) {
   // the plugin's only timers, and only while an answer waits to be told.
   const retries = new Set<NodeJS.Timeout>();
   async function tell(w: Watch, status = w.state, why = "", tries = 0) {
-    const name = `${w.agent} on ${where(w.machine)}`;
+    const name = w.shown ?? `${w.agent} on ${where(w.machine)}`;
     const minutes = Math.max(1, Math.round((Date.now() - new Date(w.started_at).getTime()) / minute));
     const after = plural(minutes, "minute");
     const asked = `You asked it${w.prompt.length > most.asked ? ", in its first 300 characters" : ""}: ${quote(w.prompt.slice(0, most.asked))}`;
@@ -367,7 +378,7 @@ export default async function setup(fx: PluginApi) {
   fx.tool({
     name: "agents",
     description:
-      "List the coding agents herdr runs, on the machine fxbot runs on and on herdr's saved machines: each one's machine, the target to use (its name or pane id), kind, status (working; blocked, which means waiting for the owner; done or idle, which mean ready; unknown), folder, and title. Leave out machine to list every machine at once.",
+      "List the coding agents herdr runs, on the machine fxbot runs on (local) and on herdr's saved machines: each one's machine, its place as herdr shows it (workspace · tab), the target to use in calls (its name or pane id), kind, status (working; blocked, which means waiting for the owner; done or idle, which mean ready; unknown), folder, and title. Leave out machine to list every machine at once. Tell the owner about an agent as herdr shows it to them, by machine and place, such as Local · fxbot · thermite, then its kind: a target is for calls, and worth saying only to tell apart two agents in one tab.",
     inputSchema: { type: "object", properties: { machine: machineProp } },
     idempotent: true,
     safe: true,
@@ -438,7 +449,7 @@ export default async function setup(fx: PluginApi) {
 
   // --- Routes for the page.
   fx.route("GET", "/watches/:id", async (_request, { id }) => {
-    const [w] = await fx.sql<Watch[]>`select id, machine, agent, state, started_at, ended_at from watches where id = ${Number(id) || 0}`;
+    const [w] = await fx.sql<Watch[]>`select id, machine, agent, shown, state, started_at, ended_at from watches where id = ${Number(id) || 0}`;
     return w ? json({ ...w, machine: where(w.machine) }) : json({ error: "No such watch." }, 404);
   });
   // The owner's view, for the agents card: every machine, whatever a bot may reach.

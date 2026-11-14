@@ -7,7 +7,8 @@ description: Work with the coding agents herdr runs, on this machine and the own
 
 herdr runs coding agents, such as Claude Code and Codex, in terminal panes, on this machine and on the owner's saved machines. Four tools work with them.
 
-1. **`herdr_agents` first.** Each agent has a machine, a target (its name or pane id), a kind, a status, a folder, and a title. A target means something only with its machine.
+1. **`herdr_agents` first.** Each agent has a machine, a place (its workspace and tab), a target (its name or pane id), a kind, a status, a folder, and a title. A target means something only with its machine.
+   - Name agents to the owner as herdr shows them: machine · workspace · tab, then the kind, such as "claude in Local · fxbot · thermite". Local is the machine fxbot runs on. Use targets in calls, and say one only to tell apart two agents in one tab.
    - `blocked`: it waits for the owner, often for an approval. Say so first.
    - `working`: it's busy.
    - `done` or `idle`: it's ready for work.

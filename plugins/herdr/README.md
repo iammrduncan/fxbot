@@ -2,7 +2,7 @@
 
 A plugin for [fxbot](https://fxbot.sh): bots see the coding agents [herdr](https://herdr.dev) runs, on fxbot's machine and on herdr's saved machines, send them work, start new ones, and hear back when one is done.
 
-- `herdr_agents` lists the agents on a bot's machines: each one's machine, name or pane id, kind, status, folder, and title. The chat shows how many, and **Show agents now** lists them.
+- `herdr_agents` lists the agents on a bot's machines as herdr shows them: each one's machine, workspace, and tab, such as Local · fxbot · thermite, its name or pane id for calls, kind, status, folder, and title. The chat shows how many, and **Show agents now** lists them.
 - `herdr_read` reads an agent's recent lines.
 - `herdr_prompt` sends a ready agent work and answers at once. When the agent finishes or stops to wait for you, its last lines reach the bot's own chat, from **herdr**, which wakes it.
 - `herdr_start` starts an agent in a folder, in a tab of its own in herdr's **fxbot bots** workspace on that machine, and with a prompt, sends it work.
@@ -37,8 +37,8 @@ A value outside its range means its default, with a line in the plugin's log.
 
 ## Tables
 
-In the plugin's own schema, `plugin_herdr`, from `fxbot/migrations/0001_herdr.sql`:
-- `watches`: each prompt, from the call to the agent's settled state, and whether the bot was told. Ended ones are kept 30 days.
+In the plugin's own schema, `plugin_herdr`, from `fxbot/migrations/`:
+- `watches`: each prompt, from the call to the agent's settled state, how herdr shows its agent, and whether the bot was told. Ended ones are kept 30 days.
 - `workspaces`: the **fxbot bots** workspace on each machine, by its id there.
 - `bots`: the machines a bot reaches, when you picked them.
 
@@ -52,7 +52,7 @@ Removing the plugin drops the schema.
 | `fxbot/server.ts` | The tools, herdr's CLI through the door or directly, the watches, and the routes |
 | `fxbot/page.jsx` | The cards, a bot's machines, and the plugin's tab |
 | `fxbot/page.js` | `page.jsx`, built |
-| `fxbot/migrations/0001_herdr.sql` | Its three tables |
+| `fxbot/migrations/` | Its three tables, and how a prompt's agent is shown |
 | `skills/herdr/SKILL.md` | How bots use the tools |
 
 ## Building it
