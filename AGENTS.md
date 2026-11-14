@@ -20,7 +20,7 @@ The code:
 - **`packages/ui`:** the app, a PWA.
 - **`packages/website`:** fxbot.sh and its docs, static pages that import none of the other three.
 - **`packages/web-app`:** outside the workspaces, what fxbot.sh hosts for web pairing: the app at web.fxbot.sh, a frame for each fxbot's own page, and a Cloudflare Worker that passes the sealed handshake and stores nothing.
-- **`plugins/`:** fxbot's own plugins, outside the workspaces, added from GitHub like anyone's: the computer, with a room's computer when chat rooms is added, chat rooms, dreams, routines, messages, subagents, permissions, pages, mermaid, soul, and web pairing.
+- **`plugins/`:** fxbot's own plugins, outside the workspaces, added from GitHub like anyone's: the computer, with a room's computer when chat rooms is added, chat rooms, dreams, routines, messages, subagents, permissions, pages, mermaid, soul, web pairing, and herdr.
 - **`setup.sh` and `deploy/`:** a release install, as containers under podman or docker (fxbot, pgvector's Postgres, and a local embedder), with a host `fxbot` command for updates, backups, and uninstall.
 - **`scripts/`:** what writes generated files (provider logos, blob data, screenshots, the link card), and the plugins' `minFxbot` check.
 

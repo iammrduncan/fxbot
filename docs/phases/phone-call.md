@@ -12,7 +12,7 @@ Status: planned on 2026-11-14 at the owner's word, not built. It plans the part 
 
 ## What the owner asked
 
-"I want to get these two things launched on fxbot such that the bot is able to make outgoing phone calls when asked and approved (to my phone) and the agent is able to use herdr to see agent activity and access the rest of my ai lab." (2026-11-14; the herdr half is [herdr](herdr.md).)
+"I want to get these two things launched on fxbot such that the bot is able to make outgoing phone calls when asked and approved (to my phone) and the agent is able to use herdr to see agent activity and access the rest of my ai lab." (2026-11-14; the herdr half is [herdr](../_completed/phases/herdr.md).)
 
 ## 0. Core or plugin
 

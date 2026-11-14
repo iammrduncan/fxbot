@@ -33,6 +33,7 @@ The rules:
 
 A bot never acts on the owner's machine directly: it reads, writes, and removes no file outside fxbot's own data, and runs no command there. Its tools work on fxbot's own data, the library, memories, and skills, and on services it reaches over the network. Work that needs files or commands happens on the [computer](docs/_completed/phases/computer.md), a machine of each bot's own, apart from the owner's. This is what lets fxbot run as an app on the owner's own computer, outside a VM.
 - A plugin's tools follow the same rule. A tool that reaches the machine, a folder or a command on it, belongs only in the [local access](docs/phases/plugin-local-access.md) plugin, which the owner adds and turns on, folder by folder. It's never on by default, and never in **Essentials**.
+- The [herdr](docs/_completed/phases/herdr.md) plugin is the other way a bot's work reaches the owner's machines: through the owner's own coding agents, which herdr runs, never a shell. It sends no keys and answers no agent's approval. It's never on by default, never in **Essentials**, reaches a release's herdr only through a door the owner opens on the machine, and each bot reaches only the machines the owner gives it.
 - MCP servers are reached over the network. One on this machine, or on the owner's own network, is the owner's to allow, server by server, as today.
 - libfx turns on none of fx's own shell or file tools, and fxbot doesn't either.
 - The rule is about what bots do through tools. A plugin's own code runs in fxbot's process, as the owner installed it.

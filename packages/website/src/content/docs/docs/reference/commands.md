@@ -95,6 +95,7 @@ The command for an install made by `setup.sh`: `/opt/fxbot/fxbot`, linked as `/u
 | `sudo fxbot rotate-key` | Seals every stored secret again under a new key. See below. |
 | `sudo fxbot embedder cpu\|gpu\|off` | Runs memory search's local embedder on the CPU, on a GPU, or not at all. See below. |
 | `sudo fxbot computer on\|off` | Sets up the computer plugin's engine, or takes it away. See below. |
+| `sudo fxbot herdr on\|off` | Opens the herdr plugin's door to herdr, or closes it. See below. |
 | `sudo fxbot uninstall [--purge] [--yes]` | Takes fxbot off the machine. See below. |
 
 ### fxbot update
@@ -157,6 +158,23 @@ Sets up the [computer](/docs/reference/computer/) plugin's engine (`on`), or tak
 
 Adding the computer plugin asks for `on` through a request, which `fxbot apply` carries out, so you don't run it yourself. Remove the plugin before `off`, or it asks again when fxbot starts.
 
+### fxbot herdr
+
+```sh
+sudo fxbot herdr on
+sudo fxbot herdr on --user <login> --read-only
+sudo fxbot herdr off
+```
+
+Opens the [herdr](/docs/how-to/work-with-herdr-agents/) plugin's door to herdr (`on`), or closes it (`off`). The door is `/var/lib/fxbot/control/herdr.sock`, which fxbot's container already sees: systemd's `fxbot-herdr.socket` listens there, for the `fxbot` group only, and runs `/opt/fxbot/herdr-door` as herdr's user for each connection. The script comes with each release, and `fxbot update` brings the new one. It takes a short list of herdr's commands, checks every word, and refuses the rest: no pane commands, keys, environment, or an agent's own flags. Only root opens the door: the app can't ask for it.
+
+`on` checks that herdr's server runs for that user, asks each saved machine the way the door will, with no SSH agent, and names any it can't reach. `fxbot status` says whether the door is open, and `fxbot uninstall` closes it.
+
+| Option | What it does |
+| --- | --- |
+| `--user <login>` | herdr's user. Default `root` |
+| `--read-only` | Bots list and read agents, and send no work and start none |
+
 ### fxbot uninstall
 
 ```sh
@@ -164,7 +182,7 @@ sudo fxbot uninstall
 sudo fxbot uninstall --purge
 ```
 
-Says what it removes and keeps, then asks once, `[y/N]`. With **y**, it stops `fxbot-control.path`, backs up into `/var/lib/fxbot/backups/<date>-uninstall`, takes the computer away with its saved setup script (no network needed), and removes the units, the containers, the volumes, fxbot's images at every version, ufw's rules marked `fxbot`, `/opt/fxbot`, and the `fxbot` command. It keeps the backup, `/etc/fxbot` with the key, and the user `fxbot`, so `setup.sh` and `fxbot restore` bring it back. A failed backup stops it before it removes anything.
+Says what it removes and keeps, then asks once, `[y/N]`. With **y**, it stops `fxbot-control.path`, backs up into `/var/lib/fxbot/backups/<date>-uninstall`, takes the computer away with its saved setup script (no network needed), closes herdr's door, and removes the units, the containers, the volumes, fxbot's images at every version, ufw's rules marked `fxbot`, `/opt/fxbot`, and the `fxbot` command. It keeps the backup, `/etc/fxbot` with the key, and the user `fxbot`, so `setup.sh` and `fxbot restore` bring it back. A failed backup stops it before it removes anything.
 
 | Option | What it does |
 | --- | --- |

@@ -32,7 +32,7 @@ Records live in Postgres, and so do libfx's sessions, each chat's. No Next.js, a
 
 ## Phases
 
-In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Distribution, Mac support, herdr, and Phone call are.
+In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Distribution, Mac support, and Phone call are.
 
 - [x] [v1](docs/_completed/v1-plan.md) (core): bot profiles and a streaming chat
 - [x] [Provider logins](docs/_completed/phases/provider-logins.md) (core): ChatGPT, Grok, and Vercel accounts, API keys, and local model servers
@@ -44,7 +44,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Skills](docs/_completed/phases/skills.md) (core seam): instructions bots read when a task needs them, from fxbot's list and skills.sh
 - [x] [Containers](docs/_completed/phases/containers.md) (core): podman or docker, one compose file for fxbot and its database with pgvector, and updates through the machine's `fxbot` command
 - [x] [Memories](docs/_completed/phases/memories.md) (core): each bot keeps what it has learned, and search by meaning from a local or remote embedder
-- [x] [Plugins](docs/_completed/phases/plugins.md) (core: the plugin API): plugins that change the app, with hooks, tools, data, and screens of their own; fxbot's first two were chat rooms and herdr: [chat rooms](plugins/chat-rooms/README.md) is in `plugins/`, and herdr left in 0.4.1, planned again as [herdr](docs/phases/herdr.md)
+- [x] [Plugins](docs/_completed/phases/plugins.md) (core: the plugin API): plugins that change the app, with hooks, tools, data, and screens of their own; fxbot's first two were chat rooms and herdr: [chat rooms](plugins/chat-rooms/README.md) is in `plugins/`, and herdr left in 0.4.1, and came back in 0.11.0 as [herdr](docs/_completed/phases/herdr.md)
 - [x] [One kind of plugin](docs/_completed/phases/one-kind-of-plugin.md) (core seam): one name and one list. A plugin carries any mix of code, MCP servers, and skills, and only the ones fxbot vets show until a switch in Settings
 - [x] [Agent computer](docs/_completed/phases/computer.md) (plugin, one others build on): a Linux computer for each bot, in the machine's own podman or docker, run rootless; the [computer](plugins/computer/README.md) is in `plugins/`
 - [x] [Streams](docs/_completed/phases/streams.md) (core): chats in the Postgres fxbot already runs, so an open chat costs nothing while idle and a long one is as quick to send to as a new one
@@ -71,6 +71,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [/fresh in core](docs/_completed/phases/fresh-in-core.md) (core; 0.10.0): `/fresh` built into every bot's chat, and the fresh plugin retired, **Unsupported** with words to remove it
 - [x] [A room's computer, in the computer plugin](docs/_completed/phases/room-computers.md) (plugin, with optional needs in the plugin API; 0.10.0): Computer 0.5.0 gives rooms their computers when chat rooms is added, every room keeps its computer, and chat-rooms-computer retires
 - [x] [A room's context](docs/_completed/phases/room-context.md) (plugin, with the compaction setting for plugins in core; 0.10.0): idle compaction and `/fresh` in chat rooms, with chat rooms 0.5.0, from the one setting, with one summary for the whole room, and `chat_history` saying a match came from a room
+- [x] [herdr](docs/_completed/phases/herdr.md) (plugin, with a door on the machine that `sudo fxbot herdr on` opens; 0.11.0): bots see the coding agents [herdr](https://herdr.dev) runs, here and on every machine it reaches, read them, send them work, start new ones, and hear back when one is done, each bot on the machines its settings give it
 - [ ] [Claude's own API](docs/phases/claude-messages.md) (core; on hold until libfx is checked again): Claude by key over Anthropic's Messages API, with prompt caching, thinking at a bot's effort, cache counts in a turn's usage, and cache keys for the providers that want one ([#18](https://github.com/iammrduncan/fxbot/issues/18)). Meanwhile, Claude by key caches through AI Gateway
 - [ ] [Gateways](docs/phases/gateways.md) (plugins, with a small core hook): talk to bots from the chat apps you already use, as the owner, in the same conversation the app shows
 - [ ] [Telegram and Discord](docs/phases/telegram-and-discord.md) (plugins): the first two gateways
@@ -80,7 +81,6 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window, past the compaction libfx does
 - [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
 - [ ] [Knowledge base](docs/phases/knowledge-base.md) (plugin): knowledge the bots draw on
-- [ ] [herdr](docs/phases/herdr.md) (plugin, with a door on the machine that `sudo fxbot herdr on` opens): bots see the coding agents [herdr](https://herdr.dev) runs, here and on every machine it reaches, read them, prompt them, start new ones, and hear back when one is done
 - [ ] [herdr screen](docs/phases/herdr-screen.md) (plugin): the [herdr](https://herdr.dev) interface in the app, from a herdr plugin
 - [ ] [Web search](docs/phases/web-search.md) (plugin): bots search and read the web, and cite it
 - [ ] [X feed](docs/phases/plugin-x-feed.md) (plugins): bots read X (Twitter) for free with tools of their own, posts, search, mentions, followers, and lists, from X's public pages, its embeds, and FxTwitter, or through a signed-in tab on the bot's computer, and watches start a turn when someone posts or the owner is mentioned
