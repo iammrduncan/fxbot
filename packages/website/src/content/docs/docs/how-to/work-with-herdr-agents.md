@@ -61,7 +61,7 @@ A bot waits for an answer up to `hours`, 4 by default. Past that, it says the ag
 
 ## What it costs
 
-- **Each message to a bot it's on for:** four tools, about 450 tokens, cached with the rest, and the skill's line.
+- **Each message to a bot it's on for:** four tools, about 900 tokens, cached with the rest, and the skill's line.
 - **A call:** herdr's own time, about 2 ms on this machine and a few hundred on another. A list asks every machine at once.
 - **A prompt waiting for an answer:** one open connection to herdr until the agent settles.
 - **Idle:** nothing.
