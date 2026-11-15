@@ -174,6 +174,8 @@ export function line(relay: Relay, on: LineEvents): Line {
   let call: { id: string; node: string } | null = null;
   let answered = false;
   let over = false;
+  // Why the call ends, when the line ends it for a reason of its own: the call's record keeps it.
+  let why = "";
   // Whether the dial's own result came, and what closes the connection once it does.
   let dialed = false;
   let lastDial: (() => void) | null = null;
@@ -206,7 +208,7 @@ export function line(relay: Relay, on: LineEvents): Line {
     if (dialed) conn.close();
     else (lastDial = () => conn.close()), setTimeout(lastDial, 2000);
     settle?.({ outcome: "failed", error: how });
-    if (answered) on.ended(how);
+    if (answered) on.ended(why || how);
   }
 
   function pump() {
@@ -239,14 +241,16 @@ export function line(relay: Relay, on: LineEvents): Line {
     // A collect that keeps ending at once would start again forever: 5 in a minute is the most.
     const now = Date.now();
     listens = [...listens.filter((at) => now - at < 60_000), now];
-    if (listens.length > 5) return void relay.log("SignalWire kept ending its listening, so the call stopped listening.");
+    if (listens.length > 5) return deaf("SignalWire kept ending its listening.");
     collect = randomUUID();
     const control = collect;
     conn
       .request("calling.collect", {
         ...ids(),
         control_id: control,
-        speech: { end_silence_timeout: 0.8, language, ...(asked?.hints?.length ? { hints: asked.hints } : {}) },
+        // No end_silence_timeout: SignalWire refused 0.8 with "end_silence_timeout error" on a real call, and its default
+        // is 1 second.
+        speech: { language, ...(asked?.hints?.length ? { hints: asked.hints } : {}) },
         continuous: true,
         partial_results: true,
         send_start_of_input: true,
@@ -258,8 +262,17 @@ export function line(relay: Relay, on: LineEvents): Line {
           relay.log(`SignalWire didn't take ${language} (${error.message}), so the call listens with ${relay.language}.`);
           return listen(relay.language);
         }
-        relay.log(`SignalWire didn't listen: ${error.message}`);
+        deaf(`SignalWire didn't listen: ${error.message}`);
       });
+  }
+
+  // A call that can't hear the owner would leave them talking to no one: the bot says so and hangs up.
+  function deaf(reason: string) {
+    relay.log(reason);
+    if (over || why) return;
+    why = reason;
+    self.say("Sorry, I can't hear you on this call, so I'll hang up. The phone plugin's log says why.");
+    void self.hangUp();
   }
 
   // SignalWire named the call: what a new connection needs to end it goes to the caller at once.
@@ -360,7 +373,7 @@ export function line(relay: Relay, on: LineEvents): Line {
     end("left a voicemail");
   }
 
-  return {
+  const self: Line = {
     async place(call) {
       asked = call;
       const outcome = new Promise<{ outcome: Outcome; error?: string }>((resolve) => (settle = (result) => ((settle = null), resolve(result))));
@@ -406,6 +419,7 @@ export function line(relay: Relay, on: LineEvents): Line {
       return Boolean(playing || queue.length);
     },
   };
+  return self;
 }
 
 // Ends a call the last process left, from a new connection with that call's protocol. Answers whether SignalWire took it.

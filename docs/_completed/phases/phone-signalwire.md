@@ -9,7 +9,7 @@
 
 It's the first of two phone plugins. [Phone: Telnyx](../../phases/phone-telnyx.md), later, is a softphone with speech providers of the owner's own: more code, a third of the price, and better speech.
 
-Status: built on 2026-11-14 on `release/0.11.0`, at the owner's /goal, and checked against a fake RELAY, a mock model, and Chromium. The same day, on the owner's own SignalWire account, the confirming call went through after three fixes, and a conversation hasn't been tried yet ([What the build changed](#what-the-build-changed), [First real calls](#first-real-calls)). Planned the same day at the owner's word, it replaces the same day's plans for a call that only read a message out, and then for Twilio's ConversationRelay through a public path, which the owner ruled out: fxbot has no public endpoint. Researched against the research directive's references, OpenClaw, Hermes Agent and its phone plugins, Twring, the coding-agent phone projects, ChatGPT, Home Assistant, the phone services, ElevenLabs, xAI, Cartesia, the other speech providers, and the realtime voice models, read on 2026-11-14. It needed no change to the plugin API, and its first real calls added one: a setting's `options`, for the voice list.
+Status: built on 2026-11-14 on `release/0.11.0`, at the owner's /goal, and checked against a fake RELAY, a mock model, and Chromium. The same day, on the owner's own SignalWire account, the confirming call went through after three fixes. The first call with a bot, on 2026-11-15, connected but couldn't listen, which a fourth fix addresses, and a conversation hasn't happened yet ([What the build changed](#what-the-build-changed), [First real calls](#first-real-calls)). Planned the same day at the owner's word, it replaces the same day's plans for a call that only read a message out, and then for Twilio's ConversationRelay through a public path, which the owner ruled out: fxbot has no public endpoint. Researched against the research directive's references, OpenClaw, Hermes Agent and its phone plugins, Twring, the coding-agent phone projects, ChatGPT, Home Assistant, the phone services, ElevenLabs, xAI, Cartesia, the other speech providers, and the realtime voice models, read on 2026-11-14. It needed no change to the plugin API, and its first real calls added one: a setting's `options`, for the voice list.
 
 ## What the owner asked
 
@@ -268,10 +268,10 @@ A **line** is what `call.ts` holds a call through, in text:
 
    The bot's name comes from its profile.
 4. **Listening:** one `calling.collect` that keeps listening for the whole call, started with the greeting. It has:
-   - `speech: { end_silence_timeout: 0.8, language: "Deepgram:<language>", hints: [the bot's name] }`
+   - `speech: { language: "Deepgram:<language>", hints: [the bot's name] }`, with SignalWire's own `end_silence_timeout`, 1 second
    - `continuous`, `partial_results`, and `send_start_of_input`
 
-   If SignalWire refuses Deepgram by name, the collect starts again with the plain language, SignalWire's own pick, said in the plugin's log. A collect that ends starts again, at most 5 times a minute.
+   If SignalWire refuses Deepgram by name, the collect starts again with the plain language, SignalWire's own pick, said in the plugin's log. A collect that ends starts again, at most 5 times a minute. A call that can't listen at all, refused twice or ended more than that, tells the owner so and hangs up, and the call's row keeps why.
 5. **Ended** by a hang-up, the bot, **End call**, the idle or length limit, or SignalWire. `calling.call.state` says `ended` and why: `hangup`, `noAnswer`, `busy`, `decline`, or `error`.
 
 **A call the bot makes** runs `calling.detect` for a machine while the greeting plays:
@@ -488,7 +488,7 @@ The script wasn't run: there's no SignalWire account here, and the owner set the
 - [ ] A continuous `calling.collect` runs while a `calling.play` runs, and `start_of_input` and partials arrive during the play. `calling.play.stop` cuts the sound, in how many milliseconds.
 - [ ] A second `calling.play` sent during one: whether it queues, mixes, or replaces. The gap between back-to-back sentences.
 - [ ] On speaker and in a car, the bot's voice and road noise don't set off `start_of_input` or a partial of two words.
-- [ ] From the owner's last word to the final result, with `end_silence_timeout` at 1.0 and at 0.8, on Deepgram and on Google.
+- [ ] From the owner's last word to the final result, on Deepgram and on Google, with SignalWire's own `end_silence_timeout`. It refused 0.8 on the first call with the bot; whether it takes whole seconds only, or nothing under 1, isn't known.
 - [ ] A dropped connection connecting again mid-call, `calling.end`, and the owner hanging up. `max_duration` isn't sent since the first real calls, so its unit no longer matters.
 - [ ] After the script quits mid-call, a new connection with the old `protocol` can end the call. If it can't, say how long the call stays up.
 - [ ] The voice strings for Polly Neural, ElevenLabs Flash, and Cartesia Sonic.
@@ -593,4 +593,5 @@ On 2026-11-14 the owner added the plugin to their own fxbot and confirmed their 
 - **A project id with its first character lost** gave "Authentication service failed with status 401". The id is a UUID, 8-4-4-4-12.
 - **The confirming call saves when it was answered and how long it took.** It saved its answer as its end, with no length.
 - **`voice` and `language` are picked from lists.** The owner asked: "how am I supposed to just guess the voices available etc??? settings should show drop down on which model to use for the voice from a list of available on signalwire." SignalWire has no API that lists its voices, so the plugin carries 131 English voices from SignalWire's pages, on 14 engines, grouped by engine with what a 10-minute call costs in all, and the five English variants Deepgram hears. Smallest.ai and Fish Audio are left out, since SignalWire names one voice for each and no price. `amazon.Joanna:neural:en-US`, the default, is the form SignalWire's Polly page gives. The lists needed a small change to the core: a plugin's setting can offer `options`, each with a value, a label, and a group, shown as a drop-down with **Another, typed in…**, and the chosen option's group under it. A plugin on an older fxbot shows a text box, so `minFxbot` stays 0.9.0.
+- **A pause of 0.8 seconds was refused.** On the first call with a bot, 2026-11-15, SignalWire answered each `calling.collect` with "end_silence_timeout error", code 400, for Deepgram and the plain language both. The greeting played, the bot never heard, and the owner hung up at 35 seconds. The collect now leaves the pause to SignalWire, 1 second by its older SDK's docs; its current pages give a number of seconds and no range. A call that can't listen now says "Sorry, I can't hear you on this call, so I'll hang up. The phone plugin's log says why." and ends, with the reason on its row.
 - **A plugin's reload in a checkout re-imports only its `server.ts`.** Node keeps the files it imports, such as `relay.ts`, as they were, so a change to them runs only after the API restarts. That's fxbot's, not this plugin's, and it isn't fixed here.
