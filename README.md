@@ -92,7 +92,9 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Image and video generation](docs/phases/media-generation.md) (plugin): bots create images and video
 - [ ] [Voice memos](docs/phases/voice-memos.md) (plugin): send a bot a recorded voice memo
 - [x] [Phone: SignalWire](docs/_completed/phases/phone-signalwire.md) (plugin, built for 0.11.0): press Call me and the bot rings your phone through SignalWire, greets you, and talks with you, hands-free, with its own model, memory, and tools, and nothing reaching fxbot
-- [ ] [Phone: Telnyx](docs/phases/phone-telnyx.md) (plugin): the same call for about a third of the price, with fxbot as a softphone and speech providers of the owner's own
+- [x] [Phone](docs/_completed/phases/phone.md) (plugin, built for 0.11.0): the call in one plugin, `phone`, with what each bot gets, and providers as plugins that need it, phone-signalwire first
+- [ ] [Phone: Telnyx](docs/phases/phone-telnyx.md) (plugin): a provider for phone, the same call for about a third of the price, with fxbot as a softphone and speech providers of the owner's own
+- [ ] [Phone in the app](docs/phases/phone-in-app.md) (plugin): a call in fxbot's own page, with speech providers such as phone-elevenlabs
 - [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): talk with a bot by voice, in the app or over a phone line
 
 The previous design and spike are in [archive/](archive/README.md). The git host may still use the old repository name until the owner renames it.

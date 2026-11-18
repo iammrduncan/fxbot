@@ -1,6 +1,6 @@
 # Phone in the app
 
-Talk with a bot by voice in fxbot's own page, with no phone network: the app's microphone and speaker, over the connection the page already has, through web pairing too. It's a call as [Phone](phone.md) has them, with the same tools, rules, and conversation.
+Talk with a bot by voice in fxbot's own page, with no phone network: the app's microphone and speaker, over the connection the page already has, through web pairing too. It's a call as [Phone](../_completed/phases/phone.md) has them, with the same tools, rules, and conversation.
 
 **Plugins:**
 - **`phone`** gains the in-app call: a socket of its own for the page's audio, a call bar with the microphone, and a `cascade.ts`, which makes a line from audio and a speech provider. That file:

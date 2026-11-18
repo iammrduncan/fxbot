@@ -2,10 +2,10 @@
 
 `phone` is the phone call, apart from any phone service:
 - **Everything a call is, in one plugin:** Call me, the bot's tools to call and hang up, who may call and when, the owner's confirmed number, the conversation in the bot's own chat, and the last calls.
-- **A provider plugin carries the call,** such as [`phone-signalwire`](../_completed/phases/phone-signalwire.md). It holds the connection to its service, speaks the bot's words, and gives back what the owner said. It knows nothing of bots.
+- **A provider plugin carries the call,** such as [`phone-signalwire`](phone-signalwire.md). It holds the connection to its service, speaks the bot's words, and gives back what the owner said. It knows nothing of bots.
 - **Each bot gets what the owner gives it:** Call me, calls when asked, and calls on its own, each on or off, with a provider and a voice of its own.
 
-Status: planned on 2026-11-18 at the owner's word, and built the same day on `release/0.11.0` (What the build changed, once the checks pass).
+Status: planned on 2026-11-18 at the owner's word, and built the same day on `release/0.11.0`, checked against a fake RELAY, a mock model, a check-only second provider, and Chromium ([What the build changed](#what-the-build-changed)). In the owner's own fxbot both plugins run, SignalWire's settings stayed, and the owner's number waits to be typed in phone's settings and confirmed again.
 
 ## What the owner asked
 
@@ -14,7 +14,7 @@ Status: planned on 2026-11-18 at the owner's word, and built the same day on `re
 
 ## 0. Core or plugin
 
-**Two plugins, and no change to fxbot's core or plugin API** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). A phone call isn't what every bot needs, so `phone` is a plugin, and each service is a plugin that needs it.
+**Two plugins, and no change to fxbot's core or plugin API** ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). A phone call isn't what every bot needs, so `phone` is a plugin, and each service is a plugin that needs it.
 
 The plugin API has what this needs since 0.5.0:
 - A provider names `phone` under `needs` and offers itself with `fx.provide`.
@@ -33,7 +33,7 @@ The computer plugin finds the plugins that name computers of their own the same 
 
 - **The line is the boundary.** It's text both ways, and SignalWire does the speech. That's the contract a provider fills now.
 - **Providers as plugins, not a setting,** as the owner asked. OpenClaw's one plugin carries every carrier's code. Here each is added only by an owner who wants it, and someone else can write one.
-- **Kinds of provider, as Assist and Pipecat have them:** a line that rings a phone and speaks (SignalWire), a line that carries audio only (an in-app call, a Telnyx softphone), and speech to text and back (ElevenLabs, Deepgram, Cartesia). The last two meet in `phone`, in a later phase ([Phone in the app](phone-in-app.md)).
+- **Kinds of provider, as Assist and Pipecat have them:** a line that rings a phone and speaks (SignalWire), a line that carries audio only (an in-app call, a Telnyx softphone), and speech to text and back (ElevenLabs, Deepgram, Cartesia). The last two meet in `phone`, in a later phase ([Phone in the app](../../phases/phone-in-app.md)).
 - **Twilio needs a way in.** A live conversation over Twilio, by Media Streams or ConversationRelay, has Twilio connect to fxbot, which the owner ruled out: "I want no public endpoint of fxbot." OpenClaw needs a public webhook for Twilio, Telnyx's Call Control, and Plivo alike. So `phone-twilio` isn't planned.
 
 ## 3. Implementation
@@ -77,7 +77,7 @@ fxbot's own providers import these types from `phone`; Node erases a type-only i
   - **Call me**, on by default: the button, which hides when it's off.
   - **When asked**, on by default: calls the owner asks for, now or later.
   - **On its own**, off by default, as before.
-  
+
   The tool refuses what's off, in words for the bot, since a tool can't be hidden from one bot.
 - **After a restart,** a call left ringing or on is marked "fxbot restarted.", and its provider ends it.
 - **Unloading `phone`** ends a call that's on: "fxbot reloaded the plugin."
@@ -118,8 +118,8 @@ fxbot's own providers import these types from `phone`; Node erases a type-only i
 
 ### Not in this phase
 
-- **Calls in the app,** with speech providers, such as `phone-elevenlabs`: [Phone in the app](phone-in-app.md).
-- **[Phone: Telnyx](phone-telnyx.md),** a softphone, becomes a provider of `phone`.
+- **Calls in the app,** with speech providers, such as `phone-elevenlabs`: [Phone in the app](../../phases/phone-in-app.md).
+- **[Phone: Telnyx](../../phases/phone-telnyx.md),** a softphone, becomes a provider of `phone`.
 - **A provider's own per-bot settings,** beyond the voice.
 
 ### Size
@@ -130,21 +130,31 @@ About 300 to 400 new lines: phone's provider choice, a bot's features and voice,
 
 On a disposable fxbot with this branch's `phone`, `phone-signalwire`, `subagents`, and a check-only plugin, against the fake RELAY and a mock model:
 
-- [ ] Both load, and `phone-signalwire` can't be added without `phone`.
-- [ ] With no provider, the tab says to add one, and Call me opens the tab.
-- [ ] The confirming call, Call me, and a conversation work as before, through `phone-signalwire`, with the tools named `phone_call` and `phone_hang_up`.
-- [ ] With a second, check-only provider:
+- [x] Both load, and `phone` can't be removed while `phone-signalwire` needs it: "phone-signalwire and phone-test need phone. Remove them first.", a 409. fxbot's own check refuses to load a plugin whose need isn't added.
+- [x] With no provider running, Call me answers "Phone has no provider", which sends the page to the tab.
+- [x] The confirming call, Call me, and a conversation work as before, through `phone-signalwire`, with the tools named `phone_call` and `phone_hang_up`.
+- [x] With a second, check-only provider:
   - the default is picked in the tab
   - a bot's own provider carries its calls
   - a missing setting of the default's shows in the tab
-- [ ] A bot's voice reaches SignalWire's `calling.play`, and one its provider doesn't list falls back to the provider's own.
-- [ ] Call me off hides the button and refuses the route. When asked off refuses the owner's call now and later, and on its own works as before.
-- [ ] Reloading `phone` mid-call saves "fxbot reloaded the plugin."; reloading `phone-signalwire` mid-call saves "fxbot reloaded phone-signalwire."
-- [ ] A restart while ringing and while on: `phone-signalwire` ends the call from a new connection, and phone's row says "fxbot restarted."
-- [ ] The tab and a bot's section in Chromium, on a desktop in light and a phone in dark, with no page errors and nothing saved.
-- [ ] `npm run typecheck` and `npm run build-site` pass.
+- [x] A bot's voice reaches SignalWire's `calling.play`, and one its provider doesn't list falls back to the provider's own.
+- [x] Call me off hides the button and refuses the route. When asked off refuses the owner's call now and later, and on its own works as before.
+- [x] Reloading `phone` mid-call saves "fxbot reloaded the plugin."; reloading `phone-signalwire` mid-call saves "fxbot reloaded phone-signalwire."
+- [x] A restart while ringing and while on: `phone-signalwire` ends the call from a new connection, and phone's row says "fxbot restarted."
+- [x] The tab and a bot's section in Chromium, on a desktop in light and a phone in dark, with no page errors and nothing saved.
+- [x] `npm run typecheck` and `npm run build-site` pass.
 
 ## 5. Open questions
 
 1. **Twilio:** not planned, since a live call over it needs Twilio to reach fxbot. Recommended: leave it out while there's no public endpoint.
 2. **The owner's number:** it belongs to `phone`, so moving it means typing it once more and confirming it again in dev, with one short call. Recommended: as is, since nothing has shipped.
+
+## What the build changed
+
+Built on 2026-11-18, on `release/0.11.0`, as planned. The checks ran on a disposable fxbot with this branch's `phone`, `phone-signalwire`, and `subagents`, the check-only waiter, and `phone-test`, a check-only provider whose line answers at once and keeps what it was asked. Every check from [Phone: SignalWire](phone-signalwire.md) ran again on the split, with the tools' new names.
+
+- **`relay.ts` changed least:** its types come from `phone`. It takes what ends a call after a restart as a callback of its own, says null for it once the call is over, and speaks in the bot's voice when `place` carries one. It gained `drop(why)` for the provider's cleanup, and an unanswered call's result keeps that reason too.
+- **A provider's line forgets a call that wasn't answered,** so unloading the provider ends only calls still up.
+- **A plugin's page gets only the classes the app's own code uses.** A bot's switches first used a grid class the app doesn't have, and each name fell under its switch in Chromium. They use the flex the old section did.
+- **Writing any file in a plugin's folder reloads it in a checkout,** a README too. One run of the checks lost a call that way: its row said "fxbot reloaded the plugin." The checks run with the folders left alone.
+- **In the owner's dev,** `phone` was added before `phone-signalwire` in `FXBOT_PLUGIN_DIRS`, and the API restarted. `phone-signalwire` kept its id and settings, so SignalWire's project, token, number, and voice stayed. Its old tables stay in its schema, unused.

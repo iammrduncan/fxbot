@@ -1,15 +1,15 @@
 ---
 title: "Talk with a bot on the phone"
-description: "Press Call me and a bot rings your phone through SignalWire, greets you, and you talk with it, hands-free: its own model, memory, and tools answer."
+description: "Press Call me and a bot rings your phone, greets you, and you talk with it, hands-free: its own model, memory, and tools answer. SignalWire carries the call."
 ---
 
-With the phone-signalwire plugin, **Call me** in a bot's message box rings your phone. Answer and the bot says "Hey, this is your fxbot Bob. How can I help today?" Then you talk, as you'd chat by text: what you say goes to the bot's own chat, and its own model, memory, and tools answer, read out to you. The chat keeps the whole conversation.
+With the phone plugin, **Call me** in a bot's message box rings your phone. Answer and the bot says "Hey, this is your fxbot Bob. How can I help today?" Then you talk, as you'd chat by text: what you say goes to the bot's own chat, and its own model, memory, and tools answer, read out to you. The chat keeps the whole conversation.
 
-fxbot opens a connection to SignalWire for each call, and SignalWire places the call, hears you, and speaks the bot's words. SignalWire never connects to fxbot.
+A provider plugin carries the call. The one today is **phone-signalwire**: fxbot opens a connection to SignalWire for each call, and SignalWire places the call, hears you, and speaks the bot's words. SignalWire never connects to fxbot.
 
 1. Set up SignalWire, below.
-2. Add **phone-signalwire** from **Plugins**, on **Browse**. It isn't in **Essentials**. It needs fxbot 0.9.0 or newer.
-3. Fill in its settings, in **Settings** › **phone-signalwire**, and confirm your number there.
+2. Add **phone**, then **phone-signalwire**, from **Plugins**, on **Browse**. They aren't in **Essentials**. They need fxbot 0.9.0 or newer.
+3. Fill in phone-signalwire's settings, then phone's, and confirm your number in phone's tab.
 4. Press **Call me** in a bot's message box.
 
 ## Set up SignalWire
@@ -19,16 +19,23 @@ fxbot opens a connection to SignalWire for each call, and SignalWire places the 
 3. Buy a phone number, $0.50 a month in the US. Calls come from it.
 4. A trial account calls only numbers you've verified. Verify your own phone there, and you can try it before paying. Adding $5 ends the trial.
 
-## Fill in the plugin's settings
+## Fill in the settings
+
+In **Settings** › **phone-signalwire**:
 
 | Setting | What to put |
 | --- | --- |
 | `project` | The Project ID |
 | `token` | The API token, which fxbot keeps sealed |
 | `from` | The number you bought, such as `+15551234567` |
+
+In **Settings** › **phone**:
+
+| Setting | What to put |
+| --- | --- |
 | `to` | Your phone, such as `+15557654321` |
 
-Then press **Call me to confirm** in the plugin's tab. Your phone rings and reads a 4-digit code, twice. Type it in the tab. Until then, no call goes out, so a typo can't ring someone else. Changing `to` asks you to confirm again.
+phone's tab lists **Ways to call**, with SignalWire ready once its settings are in. Then press **Call me to confirm** there. Your phone rings and reads a 4-digit code, twice. Type it in the tab. Until then, no call goes out, so a typo can't ring someone else. Changing `to` asks you to confirm again.
 
 Save the number you bought as a contact on your phone, such as "Bob (fxbot)". Then it rings when **Silence Unknown Callers** is on, it's less likely to be marked as spam, and your car says who's calling.
 
@@ -47,11 +54,16 @@ The bar above the message box shows the call, ringing and then on, with **End ca
 
 Ask it: "Call me." Or "Call me when the build is done": the bot keeps one call-back, for 12 hours, and rings you when it's done, with why it called.
 
-To let a bot call when it decides to, turn on **May call me on its own** in its settings, under **Phone**. It calls at most `perDay` times a day, 3 by default, and never in your quiet hours, 22:00 to 07:00 by default. A call it makes listens for voicemail first, and leaves a short message there.
+Each bot's settings have a **Phone** section with what it gets:
+- **Call me**, the button in its message box, on by default.
+- **Calls when you ask**, now or later, on by default.
+- **Calls on its own**, when the bot decides to, off by default. It calls at most `perDay` times a day, 3 by default, and never in your quiet hours, 22:00 to 07:00 by default. A call it makes listens for voicemail first, and leaves a short message there.
+
+phone's `minutes`, `quiet`, and `perDay` settings change those limits.
 
 ## Pick a voice
 
-**voice**, in the plugin's settings, lists SignalWire's English voices by engine, and under each engine what a 10-minute call costs. Joanna, on Amazon Polly Neural, is the default. **language** says which English you speak, for SignalWire to hear. To use a voice the list doesn't have, pick **Another, typed in…** and type its ID from SignalWire's [voices](https://signalwire.com/docs/platform/voice/tts) page, as `engine.voice:model`. SignalWire plays its own default voice for an ID it doesn't know.
+**voice**, in phone-signalwire's settings, lists SignalWire's English voices by engine, and under each engine what a 10-minute call costs. Joanna, on Amazon Polly Neural, is the default. To give one bot a voice of its own, pick it under **Voice** in the bot's **Phone** section. **language** says which English you speak, for SignalWire to hear. To use a voice the list doesn't have, pick **Another, typed in…** and type its ID from SignalWire's [voices](https://signalwire.com/docs/platform/voice/tts) page, as `engine.voice:model`. SignalWire plays its own default voice for an ID it doesn't know.
 
 SignalWire bills a call, listening throughout so you can cut in:
 
