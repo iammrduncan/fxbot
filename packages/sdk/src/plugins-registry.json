@@ -53,9 +53,17 @@
       "docs": "/docs/how-to/work-with-herdr-agents/"
     },
     {
+      "name": "phone",
+      "description": "Press Call me and a bot rings your phone, and you talk with it, hands-free. Its own model, memory, and tools answer. A provider plugin carries the call.",
+      "note": "It needs a provider plugin, such as phone-signalwire, and your own number confirmed, in the plugin's tab.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/phone",
+      "docs": "/docs/how-to/talk-with-a-bot-on-the-phone/"
+    },
+    {
       "name": "phone-signalwire",
-      "description": "Press Call me and a bot rings your phone through SignalWire, and you talk with it, hands-free. Its own model, memory, and tools answer, and nothing reaches fxbot.",
-      "note": "It needs a SignalWire space, a number, and your own number confirmed, in the plugin's tab.",
+      "description": "SignalWire for phone: a bot rings your phone through SignalWire, and you talk with it, hands-free. fxbot connects out to SignalWire for each call, and nothing reaches fxbot.",
+      "note": "It needs the phone plugin, added first, and a SignalWire project and number.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/phone-signalwire",
       "docs": "/docs/how-to/talk-with-a-bot-on-the-phone/"

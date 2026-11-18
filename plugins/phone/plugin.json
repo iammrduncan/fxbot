@@ -1,0 +1,20 @@
+{
+  "name": "phone",
+  "version": "0.1.0",
+  "description": "Press Call me and a bot rings your phone, and you talk with it, hands-free. Its own model, memory, and tools answer. A provider plugin, such as phone-signalwire, carries the call.",
+  "license": "Apache-2.0",
+  "extensions": {
+    "sh.fxbot": {
+      "minFxbot": "0.9.0",
+      "server": "./fxbot/server.ts",
+      "page": "./fxbot/page.js",
+      "migrations": "./fxbot/migrations",
+      "settings": [
+        { "name": "to", "description": "Your phone, the only number bots call, such as +15557654321" },
+        { "name": "minutes", "description": "The longest call, 5 to 120 minutes", "default": "30" },
+        { "name": "quiet", "description": "Hours a bot doesn't call on its own, in your time zone", "default": "22:00-07:00" },
+        { "name": "perDay", "description": "The most calls one bot makes on its own in a day, 1 to 20", "default": "3" }
+      ]
+    }
+  }
+}

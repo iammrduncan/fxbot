@@ -1,10 +1,11 @@
 import type { PluginApi } from "@fxbot/sdk";
-import type { Line, LineEvents, Outcome, Place } from "./relay.ts";
+import type { Line, LineEvents, Outcome, Place } from "./line.ts";
 
-// A call's conversation (docs/phases/phone-signalwire.md, On the call). It names no phone service: it holds the call
-// through a line. What the owner says goes to the bot's own chat as a message, joining a turn that's running, and every
-// reply in that chat is spoken while the call lasts, sentence by sentence, made fit to hear. fx.chats.stream reads only a
-// plugin's own sessions, so the call follows the bot's own chat through fxbot's own API, at fx.localUrl, as the page does.
+// A call's conversation (docs/_completed/phases/phone-signalwire.md, On the call). It names no phone service: it holds
+// the call through a provider's line. What the owner says goes to the bot's own chat as a message, joining a turn that's
+// running, and every reply in that chat is spoken while the call lasts, sentence by sentence, made fit to hear.
+// fx.chats.stream reads only a plugin's own sessions, so the call follows the bot's own chat through fxbot's own API, at
+// fx.localUrl, as the page does.
 
 type StreamLine = {
   type: string;
@@ -43,7 +44,7 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const note = (greeting: string) =>
   `You're on a live phone call with the owner, who may be driving. You called them and said: "${greeting}" What they say comes to you as text, and what you write is read out to them. ` +
   "Answer in one to three short spoken sentences, with no lists, tables, links, code, or markdown. Before work that takes more than a few seconds, say in a few words what you'll do, and hand long work to a subagent if you have one. " +
-  "Anything that needs their OK shows on their screen, which they can't look at while driving. When they're done, say goodbye and use phone-signalwire_hang_up.";
+  "Anything that needs their OK shows on their screen, which they can't look at while driving. When they're done, say goodbye and use phone_hang_up.";
 
 // NDJSON lines from a stream of bytes, until it ends or is cancelled.
 async function* lines(reader: ReadableStreamDefaultReader<Uint8Array>) {

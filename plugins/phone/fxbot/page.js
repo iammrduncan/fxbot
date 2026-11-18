@@ -14,18 +14,21 @@ async function call(path, method = "GET", body) {
 	if (!res.ok) throw Object.assign(new Error(answer.error ?? `HTTP ${res.status}`), { answer });
 	return answer;
 }
-const settingsTab = "/settings/plugins/phone-signalwire";
+const settingsTab = "/settings/plugins/phone";
 const live = /* @__PURE__ */ new Map();
 const listeners = /* @__PURE__ */ new Map();
 const timers = /* @__PURE__ */ new Map();
 async function read(bot) {
 	clearTimeout(timers.get(bot));
 	if (document.visibilityState === "visible") {
-		const next = await call(`calls/live?bot=${bot}`).then((answer) => answer.call, () => live.get(bot) ?? null);
+		const next = await call(`calls/live?bot=${bot}`).then((answer) => ({
+			call: answer.call,
+			button: answer.button !== false
+		}), () => live.get(bot) ?? null);
 		live.set(bot, next);
 		listeners.get(bot)?.forEach((listen) => listen());
 	}
-	timers.set(bot, listeners.get(bot)?.size ? setTimeout(() => read(bot), live.get(bot) ? 2e3 : 15e3) : null);
+	timers.set(bot, listeners.get(bot)?.size ? setTimeout(() => read(bot), live.get(bot)?.call ? 2e3 : 15e3) : null);
 }
 function useLive(bot) {
 	return (0, react.useSyncExternalStore)((listen) => {
@@ -49,12 +52,14 @@ const Phone = () => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
 	children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" })
 });
 function CallButton({ bot }) {
-	const now = useLive(bot.id);
+	const state = useLive(bot.id);
+	const now = state?.call ?? null;
 	const [error, setError] = (0, react.useState)("");
 	const ring = () => {
 		setError("");
 		call("calls", "POST", { bot: bot.id }).then(() => void read(bot.id), (e) => e.answer?.missing || /confirm/i.test(e.message) ? (0, _fxbot_app.go)(settingsTab) : setError(e.message));
 	};
+	if (state && !state.button) return null;
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
 		type: "button",
 		variant: "ghost",
@@ -72,7 +77,7 @@ const clock = (from) => {
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 function CallBar({ bot }) {
-	const now = useLive(bot.id);
+	const now = useLive(bot.id)?.call ?? null;
 	const [, tick] = (0, react.useState)(0);
 	const [ending, setEnding] = (0, react.useState)(false);
 	(0, react.useEffect)(() => {
@@ -136,6 +141,61 @@ const outcome = {
 	failed: "Failed"
 };
 const length = (seconds) => seconds == null ? "" : seconds < 60 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
+function Providers({ status, onPick }) {
+	const running = status.providers.filter((p) => p.running);
+	if (!status.providers.length) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+		className: "text-muted-foreground",
+		children: "Add a provider plugin from Plugins, such as phone-signalwire: it carries the calls."
+	});
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "grid gap-1",
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", {
+				className: "font-medium",
+				children: "Ways to call"
+			}),
+			status.providers.map((p) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+				className: "flex flex-wrap items-center gap-x-2",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: p.label }), !p.running ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "text-muted-foreground",
+					children: "is off. Plugins says why."
+				}) : p.missing.length ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+					className: "text-muted-foreground",
+					children: [
+						"needs ",
+						p.missing.join(", "),
+						"."
+					]
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+					type: "button",
+					size: "xs",
+					variant: "ghost",
+					onClick: () => (0, _fxbot_app.go)(`/settings/plugins/${p.name}`),
+					children: "Its settings"
+				})] }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+					className: "text-muted-foreground",
+					children: [
+						"is ready",
+						running.length > 1 && status.provider === p.name ? ", and calls go through it unless a bot has its own" : "",
+						"."
+					]
+				})]
+			}, p.name)),
+			running.length > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+				className: "flex flex-wrap items-center gap-2",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "Calls go through" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelect, {
+					"aria-label": "The default provider",
+					value: status.provider ?? "",
+					onChange: (e) => onPick(e.target.value),
+					children: running.map((p) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+						value: p.name,
+						children: p.label
+					}, p.name))
+				})]
+			})
+		]
+	});
+}
 function Tab() {
 	const [status, setStatus] = (0, react.useState)(null);
 	const [calls, setCalls] = (0, react.useState)([]);
@@ -151,8 +211,11 @@ function Tab() {
 		className: "text-sm text-destructive",
 		children: error
 	}) : null;
+	const pick = (provider) => (setError(""), call("provider", "PUT", { provider }).then(load, (e) => setError(e.message)));
 	const ring = () => (setError(""), setNote(""), call("confirm", "POST").then(() => setNote(`Calling ${status.to}. Type the code it reads.`), (e) => setError(e.message)));
 	const check = () => (setError(""), call("confirm/code", "POST", { code }).then(() => (setNote("Your number is confirmed."), setCode(""), load()), (e) => setError(e.message)));
+	const using = status.providers.find((p) => p.name === status.provider);
+	const ready = using && using.running && !using.missing.length;
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 		className: "grid gap-3 text-sm",
 		"aria-label": "Your phone",
@@ -161,6 +224,10 @@ function Tab() {
 				className: "font-medium",
 				children: "Your phone"
 			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Providers, {
+				status,
+				onPick: pick
+			}),
 			status.missing.length ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 				className: "text-muted-foreground",
 				children: [
@@ -168,6 +235,9 @@ function Tab() {
 					status.missing.join(", "),
 					" above, then confirm your number here."
 				]
+			}) : !ready ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: "text-muted-foreground",
+				children: "Once a way to call is ready, confirm your number here."
 			}) : status.confirmed ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 				className: "text-muted-foreground",
 				children: [
@@ -182,7 +252,9 @@ function Tab() {
 					children: [
 						"Confirm ",
 						status.to,
-						" before a bot calls it: fxbot calls it and reads a code, which you type here."
+						" before a bot calls it: fxbot calls it through ",
+						using.label,
+						" and reads a code, which you type here."
 					]
 				}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 					className: "flex flex-wrap gap-2",
@@ -231,6 +303,10 @@ function Tab() {
 							className: "text-muted-foreground",
 							children: new Date(c.at).toLocaleString()
 						}),
+						status.providers.length > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "text-muted-foreground",
+							children: c.providerLabel
+						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: outcome[c.status] ?? c.status }),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 							className: "text-muted-foreground",
@@ -246,40 +322,108 @@ function Tab() {
 		]
 	});
 }
+function Toggle({ checked, label, hint, onChange }) {
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "grid gap-1",
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+			className: "flex items-center gap-2",
+			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Switch, {
+				checked,
+				onCheckedChange: onChange,
+				"aria-label": label
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: label })]
+		}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+			className: "text-muted-foreground",
+			children: hint
+		})]
+	});
+}
+function grouped(voices) {
+	const groups = /* @__PURE__ */ new Map();
+	for (const v of voices) groups.set(v.group ?? "", [...groups.get(v.group ?? "") ?? [], v]);
+	return [...groups];
+}
 function BotSection({ bot }) {
 	const [state, setState] = (0, react.useState)(null);
 	const [error, setError] = (0, react.useState)("");
 	const load = () => call(`bots/${bot.id}`).then(setState, (e) => setError(e.message));
 	(0, react.useEffect)(() => void load(), [bot.id]);
 	if (!state) return null;
-	const own = (onItsOwn) => call(`bots/${bot.id}`, "PUT", { onItsOwn }).then(() => load(), (e) => setError(e.message));
+	const save = (patch) => (setError(""), call(`bots/${bot.id}`, "PUT", patch).then((next) => (setState(next), void read(bot.id)), (e) => setError(e.message)));
+	const chosen = state.voices.find((v) => v.value === state.voice);
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-		className: "grid gap-2 text-sm",
+		className: "grid gap-3 text-sm",
 		"aria-label": "Phone",
 		children: [
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h2", {
 				className: "font-medium",
 				children: "Phone"
 			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
-				className: "flex items-center gap-2",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Switch, {
-					checked: state.onItsOwn,
-					onCheckedChange: own,
-					"aria-label": "May call me on its own"
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "May call me on its own" })]
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Toggle, {
+				checked: state.button,
+				label: "Call me",
+				hint: "The button beside the message box rings your phone.",
+				onChange: (button) => save({ button })
 			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
-				className: "text-muted-foreground",
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Toggle, {
+				checked: state.asked,
+				label: "Calls when you ask",
+				hint: `${bot.name} calls when you ask it to, now or when something is done.`,
+				onChange: (asked) => save({ asked })
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Toggle, {
+				checked: state.own,
+				label: "Calls on its own",
+				hint: `When ${bot.name} decides to, at most ${state.perDay} ${state.perDay === 1 ? "time" : "times"} a day, and never in your quiet hours, ${state.quiet}.`,
+				onChange: (own) => save({ own })
+			}),
+			state.providers.length > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+				className: "grid gap-1",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "Calls go through" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.NativeSelect, {
+					"aria-label": "Its provider",
+					className: "w-full",
+					value: state.provider ?? "",
+					onChange: (e) => save({ provider: e.target.value || null }),
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+						value: "",
+						children: "The default"
+					}), state.providers.map((p) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+						value: p.name,
+						children: p.label
+					}, p.name))]
+				})]
+			}),
+			state.using && state.voices.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+				className: "grid gap-1",
 				children: [
-					bot.name,
-					" calls when you ask it to. With this on, it may also call when it decides to, at most ",
-					state.perDay,
-					" ",
-					state.perDay === 1 ? "time" : "times",
-					" a day, and never in your quiet hours, ",
-					state.quiet,
-					"."
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "Voice" }),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.NativeSelect, {
+						"aria-label": "Its voice",
+						className: "w-full",
+						value: state.voice ?? "",
+						onChange: (e) => save({ voice: e.target.value || null }),
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.NativeSelectOption, {
+							value: "",
+							children: [
+								"The voice in ",
+								state.using.label,
+								"'s settings"
+							]
+						}), grouped(state.voices).map(([group, voices]) => group ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOptGroup, {
+							label: group,
+							children: voices.map((v) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+								value: v.value,
+								children: v.label
+							}, v.value))
+						}, group) : voices.map((v) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+							value: v.value,
+							children: v.label
+						}, v.value)))]
+					}),
+					chosen?.group && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "text-xs text-muted-foreground",
+						children: chosen.group
+					})
 				]
 			}),
 			state.callback && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {

@@ -1,50 +1,14 @@
 import { randomUUID } from "node:crypto";
+import type { Line, LineEvents, Outcome, Place } from "../../phone/fxbot/line.ts";
 
-// SignalWire's RELAY, the only file that knows SignalWire (docs/phases/phone-signalwire.md). A JSON-RPC client over one
-// WebSocket fxbot opens for a call, as SignalWire's RELAY_IMPLEMENTATION_GUIDE.md specifies it: sign in, ask and answer,
+// SignalWire's RELAY, a line for phone (docs/_completed/phases/phone-signalwire.md). A JSON-RPC client over one WebSocket
+// fxbot opens for a call, as SignalWire's RELAY_IMPLEMENTATION_GUIDE.md specifies it: sign in, ask and answer,
 // acknowledge every event, answer pings, and connect again with the protocol it gave. Nothing on the internet connects
 // to fxbot. Over it, the line a call runs on: dial, speak, listen, stop, detect voicemail, and hang up.
 
 export type Relay = { url: string; project: string; token: string; from: string; voice: string; language: string; log: (...parts: unknown[]) => void };
-export type Outcome = "answered" | "voicemail" | "missed" | "busy" | "declined" | "failed";
-/** What the line tells the call. */
-export type LineEvents = {
-  /** The owner finished something they said. */
-  heard: (text: string) => void;
-  /** The owner cut in while the bot spoke: what was playing stopped, and what was waiting was dropped. */
-  interrupted: () => void;
-  /** Those words were played to the end. */
-  played: (text: string) => void;
-  /** The call is over, and why. */
-  ended: (how: string) => void;
-};
 /** What's needed to end a call from a new connection, after fxbot restarts. */
 export type Kept = { id: string; node: string; protocol: string };
-export type Place = {
-  to: string;
-  /** Played the moment the owner answers. */
-  greeting: string;
-  /** For a call the bot makes: a machine gets this line at the beep instead, and the call ends. */
-  voicemail?: string;
-  /** Words the recognizer should expect, such as the bot's name. */
-  hints?: string[];
-  /** A call that only speaks, such as the code that confirms a number: nothing listens, so nothing is billed for it. */
-  quiet?: boolean;
-  /** Given once SignalWire names the call, so a restart can end it, ringing or on. */
-  kept?: (kept: Kept) => void;
-};
-export type Line = {
-  /** Rings the owner. Resolves once they answer, or don't. */
-  place(call: Place): Promise<{ outcome: Outcome; error?: string }>;
-  /** Speaks this after whatever is playing or waiting. */
-  say(text: string): void;
-  /** Stops what's playing, and drops what's waiting. */
-  stop(): void;
-  /** Ends the call once what's waiting has played, or at once with `now`. */
-  hangUp(now?: boolean): Promise<void>;
-  /** Whether something is playing or waiting to. */
-  readonly speaking: boolean;
-};
 
 type Pending = { method: string; resolve: (result: any) => void; reject: (error: Error) => void; timer: NodeJS.Timeout };
 
@@ -169,7 +133,8 @@ function echo(heard: string, playing: string) {
 }
 const outcomes: Record<string, Outcome> = { busy: "busy", noAnswer: "missed", decline: "declined" };
 
-export function line(relay: Relay, on: LineEvents): Line {
+// `kept` gets what ends the call after a restart once SignalWire names it, and null once the call is over.
+export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) => void): Line & { drop(why: string): Promise<void> } {
   const tag = randomUUID();
   let call: { id: string; node: string } | null = null;
   let answered = false;
@@ -207,7 +172,8 @@ export function line(relay: Relay, on: LineEvents): Line {
     // connection waits for it, 2 seconds at most, so it's acknowledged.
     if (dialed) conn.close();
     else (lastDial = () => conn.close()), setTimeout(lastDial, 2000);
-    settle?.({ outcome: "failed", error: how });
+    settle?.({ outcome: "failed", error: why || how });
+    if (call) kept?.(null);
     if (answered) on.ended(why || how);
   }
 
@@ -221,7 +187,7 @@ export function line(relay: Relay, on: LineEvents): Line {
     const text = queue.splice(0).join(" ");
     const control = randomUUID();
     playing = { control, text, cut: false, at: Date.now() };
-    conn.request("calling.play", { ...ids(), control_id: control, play: [{ type: "tts", params: { text, voice: relay.voice } }] }).catch((error) => {
+    conn.request("calling.play", { ...ids(), control_id: control, play: [{ type: "tts", params: { text, voice: asked?.voice || relay.voice } }] }).catch((error) => {
       relay.log(`SignalWire didn't play a line: ${error.message}`);
       if (playing?.control === control) ((playing = null), pump());
     });
@@ -278,7 +244,7 @@ export function line(relay: Relay, on: LineEvents): Line {
   // SignalWire named the call: what a new connection needs to end it goes to the caller at once.
   function named(found: { id: string; node: string }) {
     call = found;
-    if (conn.protocol) asked?.kept?.({ ...found, protocol: conn.protocol });
+    if (conn.protocol) kept?.({ ...found, protocol: conn.protocol });
   }
 
   function event(type: string, params: any) {
@@ -373,7 +339,7 @@ export function line(relay: Relay, on: LineEvents): Line {
     end("left a voicemail");
   }
 
-  const self: Line = {
+  const self: Line & { drop(why: string): Promise<void> } = {
     async place(call) {
       asked = call;
       const outcome = new Promise<{ outcome: Outcome; error?: string }>((resolve) => (settle = (result) => ((settle = null), resolve(result))));
@@ -417,6 +383,11 @@ export function line(relay: Relay, on: LineEvents): Line {
     },
     get speaking() {
       return Boolean(playing || queue.length);
+    },
+    // Ends the call at once, for a reason the call's row keeps, as when the plugin unloads.
+    drop(reason) {
+      why ||= reason;
+      return self.hangUp(true);
     },
   };
   return self;

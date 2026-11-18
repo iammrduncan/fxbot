@@ -1,19 +1,18 @@
 {
   "name": "phone-signalwire",
   "version": "0.1.0",
-  "description": "Press Call me and a bot rings your phone through SignalWire, and you talk with it, hands-free. Its own model, memory, and tools answer, and nothing reaches fxbot.",
+  "description": "SignalWire for phone: a bot rings your phone through SignalWire, and you talk with it, hands-free. fxbot connects out to SignalWire for each call, and nothing reaches fxbot.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {
       "minFxbot": "0.9.0",
+      "needs": { "phone": { "line": 1 } },
       "server": "./fxbot/server.ts",
-      "page": "./fxbot/page.js",
       "migrations": "./fxbot/migrations",
       "settings": [
         { "name": "project", "description": "Your SignalWire project id, from API Credentials" },
         { "name": "token", "description": "An API token of the project with the Voice scope", "isSecret": true },
         { "name": "from", "description": "Your SignalWire number calls come from, such as +15551234567" },
-        { "name": "to", "description": "Your phone, the only number bots call, such as +15557654321" },
         { "name": "voice", "description": "The bot's voice on calls. Each engine says what a 10-minute call costs in all, listening included", "default": "amazon.Joanna:neural:en-US", "options": [
           { "value": "amazon.Joanna:neural:en-US", "label": "Joanna (female, US)", "group": "Amazon Polly Neural: about $0.79 for 10 minutes" },
           { "value": "amazon.Matthew:neural:en-US", "label": "Matthew (male, US)", "group": "Amazon Polly Neural: about $0.79 for 10 minutes" },
@@ -153,10 +152,7 @@
           { "value": "en-AU", "label": "English (Australia)" },
           { "value": "en-IN", "label": "English (India)" },
           { "value": "en-NZ", "label": "English (New Zealand)" }
-        ] },
-        { "name": "minutes", "description": "The longest call, 5 to 120 minutes", "default": "30" },
-        { "name": "quiet", "description": "Hours a bot doesn't call on its own, in your time zone", "default": "22:00-07:00" },
-        { "name": "perDay", "description": "The most calls one bot makes on its own in a day, 1 to 20", "default": "3" }
+        ] }
       ]
     }
   }

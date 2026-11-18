@@ -1,5 +1,5 @@
-// phone-signalwire in the app: Call me in the message box, the call's bar above it, a call's card in the chat, the
-// plugin's tab, and a section in each bot's settings. Built into page.js; see the README.
+// phone in the app: Call me in the message box, the call's bar above it, a call's card in the chat, the plugin's tab,
+// and a section in each bot's settings. Built into page.js; see the README.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { api, go, ui } from "@fxbot/app";
 
@@ -9,9 +9,10 @@ async function call(path, method = "GET", body) {
   if (!res.ok) throw Object.assign(new Error(answer.error ?? `HTTP ${res.status}`), { answer });
   return answer;
 }
-const settingsTab = "/settings/plugins/phone-signalwire";
+const settingsTab = "/settings/plugins/phone";
 
-// Each bot's call that's ringing or on, read every 2 seconds while there is one, and every 15 while a chat is open.
+// Each bot's call that's ringing or on, and whether its Call me shows, read every 2 seconds while there's a call, and
+// every 15 while a chat is open.
 const live = new Map();
 const listeners = new Map();
 const timers = new Map();
@@ -19,13 +20,13 @@ async function read(bot) {
   clearTimeout(timers.get(bot));
   if (document.visibilityState === "visible") {
     const next = await call(`calls/live?bot=${bot}`).then(
-      (answer) => answer.call,
+      (answer) => ({ call: answer.call, button: answer.button !== false }),
       () => live.get(bot) ?? null,
     );
     live.set(bot, next);
     listeners.get(bot)?.forEach((listen) => listen());
   }
-  timers.set(bot, listeners.get(bot)?.size ? setTimeout(() => read(bot), live.get(bot) ? 2000 : 15000) : null);
+  timers.set(bot, listeners.get(bot)?.size ? setTimeout(() => read(bot), live.get(bot)?.call ? 2000 : 15000) : null);
 }
 function useLive(bot) {
   return useSyncExternalStore(
@@ -56,9 +57,11 @@ const Phone = () => (
   </svg>
 );
 
-// Call me, beside the message box. Until the plugin is set up and the number confirmed, it opens the plugin's tab.
+// Call me, beside the message box, unless it's off for the bot. Until phone and its provider are set up and the number
+// confirmed, it opens phone's tab.
 function CallButton({ bot }) {
-  const now = useLive(bot.id);
+  const state = useLive(bot.id);
+  const now = state?.call ?? null;
   const [error, setError] = useState("");
   const ring = () => {
     setError("");
@@ -67,6 +70,7 @@ function CallButton({ bot }) {
       (e) => (e.answer?.missing || /confirm/i.test(e.message) ? go(settingsTab) : setError(e.message)),
     );
   };
+  if (state && !state.button) return null;
   return (
     <ui.Button
       type="button"
@@ -90,7 +94,7 @@ const clock = (from) => {
 
 // Above the message box, while a call rings or is on: how long it's been, and End call.
 function CallBar({ bot }) {
-  const now = useLive(bot.id);
+  const now = useLive(bot.id)?.call ?? null;
   const [, tick] = useState(0);
   const [ending, setEnding] = useState(false);
   useEffect(() => {
@@ -115,7 +119,7 @@ function CallBar({ bot }) {
   );
 }
 
-// phone-signalwire_call in a reply: why the bot called, then how it went.
+// phone_call in a reply: why the bot called, then how it went.
 function CallCard({ call: tool }) {
   const reason = typeof tool.input?.reason === "string" ? tool.input.reason : "";
   const later = tool.input?.later === true;
@@ -133,7 +137,47 @@ function CallCard({ call: tool }) {
 const outcome = { ringing: "Ringing", on: "On", ended: "Ended", voicemail: "Voicemail", missed: "Missed", busy: "Busy", failed: "Failed" };
 const length = (seconds) => (seconds == null ? "" : seconds < 60 ? `${seconds} s` : `${Math.round(seconds / 60)} min`);
 
-// The plugin's tab: what's missing, confirming the owner's number, and the last calls.
+// Each provider added: ready, what it still needs in its own settings, or off. With two or more running, the default.
+function Providers({ status, onPick }) {
+  const running = status.providers.filter((p) => p.running);
+  if (!status.providers.length) return <p className="text-muted-foreground">Add a provider plugin from Plugins, such as phone-signalwire: it carries the calls.</p>;
+  return (
+    <div className="grid gap-1">
+      <h3 className="font-medium">Ways to call</h3>
+      {status.providers.map((p) => (
+        <p key={p.name} className="flex flex-wrap items-center gap-x-2">
+          <span>{p.label}</span>
+          {!p.running ? (
+            <span className="text-muted-foreground">is off. Plugins says why.</span>
+          ) : p.missing.length ? (
+            <>
+              <span className="text-muted-foreground">needs {p.missing.join(", ")}.</span>
+              <ui.Button type="button" size="xs" variant="ghost" onClick={() => go(`/settings/plugins/${p.name}`)}>
+                Its settings
+              </ui.Button>
+            </>
+          ) : (
+            <span className="text-muted-foreground">is ready{running.length > 1 && status.provider === p.name ? ", and calls go through it unless a bot has its own" : ""}.</span>
+          )}
+        </p>
+      ))}
+      {running.length > 1 && (
+        <label className="flex flex-wrap items-center gap-2">
+          <span>Calls go through</span>
+          <ui.NativeSelect aria-label="The default provider" value={status.provider ?? ""} onChange={(e) => onPick(e.target.value)}>
+            {running.map((p) => (
+              <ui.NativeSelectOption key={p.name} value={p.name}>
+                {p.label}
+              </ui.NativeSelectOption>
+            ))}
+          </ui.NativeSelect>
+        </label>
+      )}
+    </div>
+  );
+}
+
+// The plugin's tab: the ways to call, confirming the owner's number, and the last calls.
 function Tab() {
   const [status, setStatus] = useState(null);
   const [calls, setCalls] = useState([]);
@@ -146,6 +190,7 @@ function Tab() {
   };
   useEffect(load, []);
   if (!status) return error ? <p className="text-sm text-destructive">{error}</p> : null;
+  const pick = (provider) => (setError(""), call("provider", "PUT", { provider }).then(load, (e) => setError(e.message)));
   const ring = () => (
     setError(""),
     setNote(""),
@@ -161,16 +206,23 @@ function Tab() {
       (e) => setError(e.message),
     )
   );
+  const using = status.providers.find((p) => p.name === status.provider);
+  const ready = using && using.running && !using.missing.length;
   return (
     <section className="grid gap-3 text-sm" aria-label="Your phone">
       <h2 className="font-medium">Your phone</h2>
+      <Providers status={status} onPick={pick} />
       {status.missing.length ? (
         <p className="text-muted-foreground">Set {status.missing.join(", ")} above, then confirm your number here.</p>
+      ) : !ready ? (
+        <p className="text-muted-foreground">Once a way to call is ready, confirm your number here.</p>
       ) : status.confirmed ? (
         <p className="text-muted-foreground">Bots call {status.to}, and only it. Change the number above, and it needs confirming again.</p>
       ) : (
         <div className="grid gap-2">
-          <p className="text-muted-foreground">Confirm {status.to} before a bot calls it: fxbot calls it and reads a code, which you type here.</p>
+          <p className="text-muted-foreground">
+            Confirm {status.to} before a bot calls it: fxbot calls it through {using.label} and reads a code, which you type here.
+          </p>
           <div className="flex flex-wrap gap-2">
             <ui.Button type="button" size="sm" variant="outline" onClick={ring}>
               Call me to confirm
@@ -199,6 +251,7 @@ function Tab() {
             <p key={c.id} className="flex flex-wrap gap-x-2 text-xs">
               <span>{c.name}</span>
               <span className="text-muted-foreground">{new Date(c.at).toLocaleString()}</span>
+              {status.providers.length > 1 && <span className="text-muted-foreground">{c.providerLabel}</span>}
               <span>{outcome[c.status] ?? c.status}</span>
               <span className="text-muted-foreground">{length(c.seconds)}</span>
               {c.error && <span className="text-destructive">{c.error}</span>}
@@ -210,29 +263,91 @@ function Tab() {
   );
 }
 
-// A bot's section: whether it may call on its own, and the call-back it holds.
+// A switch with its name beside it and what it does under both. A plugin's page gets only the classes the app uses.
+function Toggle({ checked, label, hint, onChange }) {
+  return (
+    <div className="grid gap-1">
+      <label className="flex items-center gap-2">
+        <ui.Switch checked={checked} onCheckedChange={onChange} aria-label={label} />
+        <span>{label}</span>
+      </label>
+      <p className="text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
+// The voices by their group, in the provider's order.
+function grouped(voices) {
+  const groups = new Map();
+  for (const v of voices) groups.set(v.group ?? "", [...(groups.get(v.group ?? "") ?? []), v]);
+  return [...groups];
+}
+
+// A bot's section: what it gets, its provider with two or more, its voice, and the call-back it holds.
 function BotSection({ bot }) {
   const [state, setState] = useState(null);
   const [error, setError] = useState("");
   const load = () => call(`bots/${bot.id}`).then(setState, (e) => setError(e.message));
   useEffect(() => void load(), [bot.id]);
   if (!state) return null;
-  const own = (onItsOwn) =>
-    call(`bots/${bot.id}`, "PUT", { onItsOwn }).then(
-      () => load(),
+  const save = (patch) => (
+    setError(""),
+    call(`bots/${bot.id}`, "PUT", patch).then(
+      (next) => (setState(next), void read(bot.id)),
       (e) => setError(e.message),
-    );
+    )
+  );
+  const chosen = state.voices.find((v) => v.value === state.voice);
   return (
-    <section className="grid gap-2 text-sm" aria-label="Phone">
+    <section className="grid gap-3 text-sm" aria-label="Phone">
       <h2 className="font-medium">Phone</h2>
-      <label className="flex items-center gap-2">
-        <ui.Switch checked={state.onItsOwn} onCheckedChange={own} aria-label="May call me on its own" />
-        <span>May call me on its own</span>
-      </label>
-      <p className="text-muted-foreground">
-        {bot.name} calls when you ask it to. With this on, it may also call when it decides to, at most {state.perDay} {state.perDay === 1 ? "time" : "times"} a
-        day, and never in your quiet hours, {state.quiet}.
-      </p>
+      <Toggle checked={state.button} label="Call me" hint="The button beside the message box rings your phone." onChange={(button) => save({ button })} />
+      <Toggle checked={state.asked} label="Calls when you ask" hint={`${bot.name} calls when you ask it to, now or when something is done.`} onChange={(asked) => save({ asked })} />
+      <Toggle
+        checked={state.own}
+        label="Calls on its own"
+        hint={`When ${bot.name} decides to, at most ${state.perDay} ${state.perDay === 1 ? "time" : "times"} a day, and never in your quiet hours, ${state.quiet}.`}
+        onChange={(own) => save({ own })}
+      />
+      {state.providers.length > 1 && (
+        <label className="grid gap-1">
+          <span>Calls go through</span>
+          <ui.NativeSelect aria-label="Its provider" className="w-full" value={state.provider ?? ""} onChange={(e) => save({ provider: e.target.value || null })}>
+            <ui.NativeSelectOption value="">The default</ui.NativeSelectOption>
+            {state.providers.map((p) => (
+              <ui.NativeSelectOption key={p.name} value={p.name}>
+                {p.label}
+              </ui.NativeSelectOption>
+            ))}
+          </ui.NativeSelect>
+        </label>
+      )}
+      {state.using && state.voices.length > 0 && (
+        <label className="grid gap-1">
+          <span>Voice</span>
+          <ui.NativeSelect aria-label="Its voice" className="w-full" value={state.voice ?? ""} onChange={(e) => save({ voice: e.target.value || null })}>
+            <ui.NativeSelectOption value="">The voice in {state.using.label}'s settings</ui.NativeSelectOption>
+            {grouped(state.voices).map(([group, voices]) =>
+              group ? (
+                <ui.NativeSelectOptGroup key={group} label={group}>
+                  {voices.map((v) => (
+                    <ui.NativeSelectOption key={v.value} value={v.value}>
+                      {v.label}
+                    </ui.NativeSelectOption>
+                  ))}
+                </ui.NativeSelectOptGroup>
+              ) : (
+                voices.map((v) => (
+                  <ui.NativeSelectOption key={v.value} value={v.value}>
+                    {v.label}
+                  </ui.NativeSelectOption>
+                ))
+              ),
+            )}
+          </ui.NativeSelect>
+          {chosen?.group && <span className="text-xs text-muted-foreground">{chosen.group}</span>}
+        </label>
+      )}
       {state.callback && (
         <div className="flex flex-wrap items-center gap-2">
           <span>
