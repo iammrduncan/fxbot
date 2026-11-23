@@ -2,7 +2,7 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
-## Unreleased
+## 0.11.0 (2026-11-23)
 
 **Before upgrading.** Migration `0019_idle_compact_tokens` adds `idle_compact_tokens` to `settings`, how long a chat must be before it's compacted while idle: 30,000 tokens, as before. Then update from **Plugins**: Chat rooms to 0.5.1, so rooms follow it too, Messages to 0.2.1, Permissions to 0.1.2, Computer to 0.5.1, and Web pairing to 0.1.1. On a release install with herdr's door open, run `sudo fxbot herdr on` again after the update: the door now runs herdr's own screen for fxbot's page, which can open a shell as herdr's user, needs `python3` on the machine, and lets a connection last a day. `--read-only` keeps the screen and keys shut.
 
