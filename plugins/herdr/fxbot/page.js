@@ -13246,15 +13246,52 @@ const extras = [
 	["↑", "A"],
 	["↓", "B"],
 	["←", "D"],
-	["→", "C"]
+	["→", "C"],
+	["Enter", "\r"],
+	["^C", ""]
 ];
-function Live({ pane }) {
+const answers = [
+	"1",
+	"2",
+	"3",
+	"y",
+	"n"
+];
+function useMobile() {
+	const [on, setOn] = (0, react.useState)(() => {
+		try {
+			const kept = localStorage.getItem("herdr-mobile");
+			return kept === null ? touch : kept === "1";
+		} catch {
+			return touch;
+		}
+	});
+	const set = (next) => {
+		try {
+			localStorage.setItem("herdr-mobile", next ? "1" : "0");
+		} catch {}
+		setOn(next);
+	};
+	return [on, set];
+}
+function MobileSwitch({ on, set }) {
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+		className: "flex items-center gap-2 text-sm",
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Switch, {
+			checked: on,
+			onCheckedChange: set,
+			"aria-label": "Mobile"
+		}), "Mobile"]
+	});
+}
+function Live({ pane, mobile }) {
 	const { Button } = _fxbot_app.ui;
 	const box = (0, react.useRef)(null);
 	const line = (0, react.useRef)(null);
 	const [problem, setProblem] = (0, react.useState)("");
 	const [round, setRound] = (0, react.useState)(0);
 	const [ctrl, setCtrl] = (0, react.useState)(false);
+	const [text, setText] = (0, react.useState)("");
 	const held = (0, react.useRef)(false);
 	held.current = ctrl;
 	(0, react.useEffect)(() => {
@@ -13341,7 +13378,14 @@ function Live({ pane }) {
 		if (!live) return;
 		const arrow = /^[ABCD]$/.test(key);
 		live.send(arrow ? `\x1b${live.term.modes.applicationCursorKeysMode ? "O" : "["}${key}` : key);
-		live.term.focus();
+		if (!touch) live.term.focus();
+	};
+	const sendText = (event) => {
+		event.preventDefault();
+		const words = text.replace(/[\x00-\x1f\x7f]/g, " ");
+		if (!words.trim() || !line.current) return;
+		line.current.send(`${words}\r`);
+		setText("");
 	};
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		style: {
@@ -13387,33 +13431,62 @@ function Live({ pane }) {
 					children: "Connect again"
 				})]
 			})]
-		}), touch && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		}), mobile && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 			className: "flex flex-wrap gap-1",
 			role: "group",
 			"aria-label": "Keys",
-			children: [extras.map(([label, key]) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
-				type: "button",
-				size: "xs",
-				variant: "outline",
-				className: "font-mono",
-				onMouseDown: (e) => e.preventDefault(),
-				onClick: () => press(key),
-				children: label
-			}, label)), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
-				type: "button",
-				size: "xs",
-				variant: ctrl ? "default" : "outline",
-				className: "font-mono",
-				"aria-pressed": ctrl,
-				onMouseDown: (e) => e.preventDefault(),
-				onClick: () => (setCtrl(!ctrl), line.current?.term.focus()),
-				children: "Ctrl"
+			children: [
+				extras.map(([label, key]) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+					type: "button",
+					size: "sm",
+					variant: "outline",
+					className: "font-mono",
+					onMouseDown: (e) => e.preventDefault(),
+					onClick: () => press(key),
+					children: label
+				}, label)),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+					type: "button",
+					size: "sm",
+					variant: ctrl ? "default" : "outline",
+					className: "font-mono",
+					"aria-pressed": ctrl,
+					onMouseDown: (e) => e.preventDefault(),
+					onClick: () => setCtrl(!ctrl),
+					children: "Ctrl"
+				}),
+				answers.map((key) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+					type: "button",
+					size: "sm",
+					variant: "secondary",
+					className: "font-mono",
+					"aria-label": `Answer ${key}`,
+					onMouseDown: (e) => e.preventDefault(),
+					onClick: () => press(key),
+					children: key
+				}, key))
+			]
+		}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("form", {
+			className: "flex gap-2",
+			onSubmit: sendText,
+			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Input, {
+				value: text,
+				onChange: (e) => setText(e.target.value),
+				placeholder: "Text to send, then Enter",
+				"aria-label": "Text to send",
+				autoComplete: "off",
+				enterKeyHint: "send"
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+				type: "submit",
+				size: "sm",
+				children: "Send"
 			})]
-		})]
+		})] })]
 	});
 }
 function HerdrScreen() {
 	const { Button, Header } = _fxbot_app.ui;
+	const [mobile, setMobile] = useMobile();
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		style: {
 			display: "flex",
@@ -13421,14 +13494,17 @@ function HerdrScreen() {
 			height: "100%",
 			minHeight: 0
 		},
-		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Header, {
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(Header, {
 			title: "herdr",
-			children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(MobileSwitch, {
+				on: mobile,
+				set: setMobile
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
 				size: "sm",
 				variant: "ghost",
 				onClick: () => (0, _fxbot_app.go)("/herdr/agents"),
 				children: "Agents"
-			})
+			})]
 		}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 			style: {
 				display: "flex",
@@ -13436,7 +13512,7 @@ function HerdrScreen() {
 				minHeight: 0,
 				padding: "0 12px 12px"
 			},
-			children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Live, {})
+			children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Live, { mobile })
 		})]
 	});
 }
@@ -13444,6 +13520,7 @@ function AgentScreen({ params }) {
 	const { Button, Header } = _fxbot_app.ui;
 	const machine = params.machine || "local";
 	const [who, setWho] = (0, react.useState)(null);
+	const [mobile, setMobile] = useMobile();
 	(0, react.useEffect)(() => {
 		call(`agents?machine=${encodeURIComponent(machine)}`).then((list) => {
 			const named = params.pane.toLowerCase();
@@ -13463,16 +13540,14 @@ function AgentScreen({ params }) {
 		},
 		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(Header, {
 			title,
-			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(MobileSwitch, {
+				on: mobile,
+				set: setMobile
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
 				size: "sm",
 				variant: "ghost",
 				onClick: () => (0, _fxbot_app.go)("/herdr"),
 				children: "herdr"
-			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
-				size: "sm",
-				variant: "ghost",
-				onClick: () => (0, _fxbot_app.go)("/herdr/agents"),
-				children: "All agents"
 			})]
 		}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 			style: {
@@ -13481,7 +13556,10 @@ function AgentScreen({ params }) {
 				minHeight: 0,
 				padding: "0 12px 12px"
 			},
-			children: pane ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Live, { pane }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+			children: pane ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Live, {
+				pane,
+				mobile
+			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "text-sm text-muted-foreground",
 				children: who?.missing ? `herdr doesn't list ${params.pane} on Local.` : "Asking herdr…"
 			})

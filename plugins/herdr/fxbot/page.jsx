@@ -158,7 +158,8 @@ const keyRow = [
 // --- herdr's own client in a terminal: what it draws comes over the plugin's socket, and every key goes back.
 const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 const terminalSocket = (query) => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/plugins/herdr/terminal?${query}`;
-// What a phone's keyboard lacks, for herdr and the agents in it: Ctrl holds for the next key.
+// Mobile, for a phone: keys its keyboard lacks, quick answers, and a line to send text with the phone's own keyboard,
+// its corrections and dictation. On by default where the screen is touched, and kept for this device.
 const extras = [
   ["Esc", "\x1b"],
   ["Tab", "\t"],
@@ -166,14 +167,43 @@ const extras = [
   ["↓", "B"],
   ["←", "D"],
   ["→", "C"],
+  ["Enter", "\r"],
+  ["^C", "\x03"],
 ];
-function Live({ pane }) {
+const answers = ["1", "2", "3", "y", "n"];
+function useMobile() {
+  const [on, setOn] = useState(() => {
+    try {
+      const kept = localStorage.getItem("herdr-mobile");
+      return kept === null ? touch : kept === "1";
+    } catch {
+      return touch;
+    }
+  });
+  const set = (next) => {
+    try {
+      localStorage.setItem("herdr-mobile", next ? "1" : "0");
+    } catch {}
+    setOn(next);
+  };
+  return [on, set];
+}
+function MobileSwitch({ on, set }) {
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <ui.Switch checked={on} onCheckedChange={set} aria-label="Mobile" />
+      Mobile
+    </label>
+  );
+}
+function Live({ pane, mobile }) {
   const { Button } = ui;
   const box = useRef(null);
   const line = useRef(null);
   const [problem, setProblem] = useState("");
   const [round, setRound] = useState(0);
   const [ctrl, setCtrl] = useState(false);
+  const [text, setText] = useState("");
   const held = useRef(false);
   held.current = ctrl;
   useEffect(() => {
@@ -241,12 +271,20 @@ function Live({ pane }) {
       line.current = null;
     };
   }, [pane, round]);
+  // A key from the row. On a phone, focusing the terminal would bring up the keyboard, so it doesn't.
   const press = (key) => {
     const live = line.current;
     if (!live) return;
     const arrow = /^[ABCD]$/.test(key);
     live.send(arrow ? `\x1b${live.term.modes.applicationCursorKeysMode ? "O" : "["}${key}` : key);
-    live.term.focus();
+    if (!touch) live.term.focus();
+  };
+  const sendText = (event) => {
+    event.preventDefault();
+    const words = text.replace(/[\x00-\x1f\x7f]/g, " ");
+    if (!words.trim() || !line.current) return;
+    line.current.send(`${words}\r`);
+    setText("");
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, gap: 6 }}>
@@ -261,17 +299,30 @@ function Live({ pane }) {
           </div>
         )}
       </div>
-      {touch && (
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Keys">
-          {extras.map(([label, key]) => (
-            <Button key={label} type="button" size="xs" variant="outline" className="font-mono" onMouseDown={(e) => e.preventDefault()} onClick={() => press(key)}>
-              {label}
+      {mobile && (
+        <>
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Keys">
+            {extras.map(([label, key]) => (
+              <Button key={label} type="button" size="sm" variant="outline" className="font-mono" onMouseDown={(e) => e.preventDefault()} onClick={() => press(key)}>
+                {label}
+              </Button>
+            ))}
+            <Button type="button" size="sm" variant={ctrl ? "default" : "outline"} className="font-mono" aria-pressed={ctrl} onMouseDown={(e) => e.preventDefault()} onClick={() => setCtrl(!ctrl)}>
+              Ctrl
             </Button>
-          ))}
-          <Button type="button" size="xs" variant={ctrl ? "default" : "outline"} className="font-mono" aria-pressed={ctrl} onMouseDown={(e) => e.preventDefault()} onClick={() => (setCtrl(!ctrl), line.current?.term.focus())}>
-            Ctrl
-          </Button>
-        </div>
+            {answers.map((key) => (
+              <Button key={key} type="button" size="sm" variant="secondary" className="font-mono" aria-label={`Answer ${key}`} onMouseDown={(e) => e.preventDefault()} onClick={() => press(key)}>
+                {key}
+              </Button>
+            ))}
+          </div>
+          <form className="flex gap-2" onSubmit={sendText}>
+            <ui.Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Text to send, then Enter" aria-label="Text to send" autoComplete="off" enterKeyHint="send" />
+            <Button type="submit" size="sm">
+              Send
+            </Button>
+          </form>
+        </>
       )}
     </div>
   );
@@ -280,15 +331,17 @@ function Live({ pane }) {
 // The whole herdr screen, as in a terminal on the machine.
 function HerdrScreen() {
   const { Button, Header } = ui;
+  const [mobile, setMobile] = useMobile();
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <Header title="herdr">
+        <MobileSwitch on={mobile} set={setMobile} />
         <Button size="sm" variant="ghost" onClick={() => go("/herdr/agents")}>
           Agents
         </Button>
       </Header>
       <div style={{ display: "flex", flex: 1, minHeight: 0, padding: "0 12px 12px" }}>
-        <Live />
+        <Live mobile={mobile} />
       </div>
     </div>
   );
@@ -299,6 +352,7 @@ function AgentScreen({ params }) {
   const { Button, Header } = ui;
   const machine = params.machine || "local";
   const [who, setWho] = useState(null);
+  const [mobile, setMobile] = useMobile();
   useEffect(() => {
     call(`agents?machine=${encodeURIComponent(machine)}`).then(
       (list) => {
@@ -315,15 +369,13 @@ function AgentScreen({ params }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <Header title={title}>
+        <MobileSwitch on={mobile} set={setMobile} />
         <Button size="sm" variant="ghost" onClick={() => go("/herdr")}>
           herdr
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => go("/herdr/agents")}>
-          All agents
-        </Button>
       </Header>
       <div style={{ display: "flex", flex: 1, minHeight: 0, padding: "0 12px 12px" }}>
-        {pane ? <Live pane={pane} /> : <p className="text-sm text-muted-foreground">{who?.missing ? `herdr doesn't list ${params.pane} on Local.` : "Asking herdr…"}</p>}
+        {pane ? <Live pane={pane} mobile={mobile} /> : <p className="text-sm text-muted-foreground">{who?.missing ? `herdr doesn't list ${params.pane} on Local.` : "Asking herdr…"}</p>}
       </div>
     </div>
   );

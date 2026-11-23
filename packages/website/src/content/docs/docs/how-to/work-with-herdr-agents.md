@@ -68,7 +68,7 @@ The plugin keeps every agent it sees, on every machine, and syncs the list every
 
 **herdr** in the sidebar opens herdr itself, in a real terminal in the page: its own screen, as in a terminal on the machine, with its scrollback, the wheel, the mouse, copy, and its keys. **Agents** lists every machine's agents, and one there, or its tag, or a prompt's card's **Open its terminal**, opens that one agent full size, attached with herdr's own client. While you're attached, its pane takes your page's size in herdr, and goes back when you leave.
 
-- **On a phone,** a row of keys holds what the keyboard lacks: Esc, Tab, the arrows, and Ctrl, which holds for the next key. A drag scrolls, as the wheel does.
+- **Mobile,** a switch at the top, is on by default on a phone, and each device keeps your choice. It adds what a phone's keyboard lacks: Esc, Tab, the arrows, Enter, ^C, and Ctrl, which holds for the next key; quick answers, 1, 2, 3, y, and n, for a question or a menu; and a line to type in with your phone's keyboard, its corrections and dictation, which **Send** types and presses Enter. On a touch screen, a drag scrolls, as the wheel does.
 - **An agent on another machine** opens as its screen read from herdr, kept up to date, with a row of keys and a line to type in: herdr attaches only on its own machine.
 - **It needs `python3`** on the machine fxbot reaches herdr on, for the terminal.
 
