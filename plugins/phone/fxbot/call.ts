@@ -128,6 +128,9 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   const tools = new Map<string, string>();
   const speeches = new Map<string, ReturnType<typeof speech>>();
   let count = 0;
+  // A call's ids carry when it began: libfx skips an id a chat already holds, and a call's row id comes round again
+  // when the table starts over, as it did when phone-signalwire's calls moved to phone.
+  const stamp = Date.now().toString(36);
   let begun = false;
   let following = false;
   const stopFollowing = new AbortController();
@@ -172,7 +175,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
       if (mine) await fx.chats.cancel(o.bot);
       return say(mine ? "Okay, stopped." : running.size ? "That one isn't mine to stop from here." : "Okay.");
     }
-    const id = `phone-${o.id}-${++count}`;
+    const id = `phone-${o.id}-${stamp}-${++count}`;
     sent.add(id);
     const cut =
       cutAfter === null ? "" : cutAfter ? `(They cut you off after: "${cutAfter.slice(-300)}")\n` : "(They cut you off before you'd said anything.)\n";
