@@ -427,5 +427,8 @@ function startUpdate() {
   requestUpdate(latest!.version);
   return updateStatus();
 }
+// A plugin's promise that fails with nothing waiting for it is logged, and ends nothing: Node's default would end fxbot,
+// every bot and chat with it, for one plugin's slip.
+process.on("unhandledRejection", (reason) => console.error("Unhandled rejection, kept running:", reason));
 process.once("SIGINT", () => void shutdown());
 process.once("SIGTERM", () => void shutdown());
