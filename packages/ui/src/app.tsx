@@ -58,6 +58,7 @@ import { reload, useNewVersion } from "./pwa.ts";
 import { SettingsScreen } from "./settings.tsx";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { useTurnStream } from "./use-turn-stream.ts";
+import { keepForSplash } from "./splash.ts";
 import { leadingSkills, SkillChips, SkillMenu, useSkillPicker } from "./skill-picker.tsx";
 
 export function App() {
@@ -88,6 +89,8 @@ export function App() {
           if (start) (history.replaceState(null, "", `/profiles/${start.id}`), setPath(location.pathname));
           setProfiles(list);
           setOffline(false);
+          // The next launch's first screen shows one of them (splash.ts).
+          keepForSplash(list);
         },
         () => {
           if (stopped) return;

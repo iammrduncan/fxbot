@@ -10,17 +10,34 @@
     <title>fxbot</title>
     <!-- The page's background before its styles load, so a dark screen doesn't flash white. -->
     <style>html { background: #fff } @media (prefers-color-scheme: dark) { html { background: #0a0a0a } }</style>
-    <!-- fxbot's icon until the app draws, which replaces it: on a slow link its code takes seconds, and a blank page
-         reads as broken. -->
+    <!-- A bot, bouncing and looking around, until the app draws, which replaces it: on a slow link its code takes
+         seconds, and a blank page reads as broken. The script after the root picks one of the owner's bots, or a random
+         look; fxbot's icon is there without it. -->
     <style>
       .splash { position: fixed; inset: 0; display: grid; place-items: center }
-      .splash img { border-radius: 14px; animation: breathe 1.6s ease-in-out infinite }
-      @keyframes breathe { 50% { opacity: 0.55 } }
-      @media (prefers-reduced-motion: reduce) { .splash img { animation: none } }
+      .splash img { border-radius: 14px }
+      .splash svg { overflow: visible; transform-origin: 50% 100%; animation: hop 1.15s cubic-bezier(0.33, 0, 0.4, 1) infinite }
+      .splash .blob-eyes { transform-box: fill-box; animation: look 3.4s ease-in-out infinite }
+      .splash .blob-eye { transform-box: fill-box; transform-origin: center; animation: blink 3.4s infinite }
+      @keyframes hop {
+        0%, 100% { transform: translateY(0) scale(1.07, 0.93) }
+        14% { transform: translateY(0) scale(0.96, 1.05) }
+        50% { transform: translateY(-22px) scale(0.98, 1.02) }
+        86% { transform: translateY(0) scale(1.03, 0.97) }
+      }
+      @keyframes look {
+        0%, 16% { transform: translateX(0) }
+        24%, 42% { transform: translateX(-6px) }
+        50%, 68% { transform: translateX(6px) }
+        76%, 100% { transform: translateX(0) }
+      }
+      @keyframes blink { 0%, 86%, 92%, 100% { transform: scaleY(1) } 89% { transform: scaleY(0.1) } }
+      @media (prefers-reduced-motion: reduce) { .splash svg, .splash .blob-eyes, .splash .blob-eye { animation: none } }
     </style>
   </head>
   <body>
     <div id="root"><div class="splash" aria-hidden="true"><img src="/icon-192.png" alt="" width="56" height="56" /></div></div>
+    <!--splash-bots-->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

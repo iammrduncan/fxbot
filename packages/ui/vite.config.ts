@@ -7,8 +7,20 @@ import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import { VitePWA, type ManifestOptions } from "vite-plugin-pwa";
+import { outlines, tones } from "./src/blob-data.ts";
+import { splashSvg } from "./src/splash.ts";
 
 const repo = fileURLToPath(new URL("../..", import.meta.url));
+
+// The first screen's bot, in index.html, before the app's code arrives: one of the owner's, which the app keeps in
+// localStorage, or else one of six random looks drawn here. A small script picks one at random as the page parses.
+function splashBots(): Plugin {
+  const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)];
+  const faces = ["none", "none", "none", "glasses", "shades"];
+  const drawn = Array.from({ length: 6 }, (_, i) => splashSvg({ shape: pick(Object.keys(outlines)), color: pick(Object.keys(tones)), face: pick(faces) }, `fxsplashb${i}`));
+  const script = `<script>(function(){var built=${JSON.stringify(drawn).replace(/</g, "\\u003c")},kept=null;try{kept=JSON.parse(localStorage.getItem("fxbot-splash")||"null")}catch(e){}var all=(Array.isArray(kept)?kept:[]).filter(function(s){return typeof s==="string"&&s.indexOf("<svg ")===0});if(!all.length)all=built;var box=document.querySelector(".splash");if(box)box.innerHTML=all[Math.floor(Math.random()*all.length)]})()</script>`;
+  return { name: "fxbot-splash-bots", transformIndexHtml: (html) => html.replace("<!--splash-bots-->", script) };
+}
 
 // In development, Vite sends its modules uncompressed: about 13 MB before a chat shows, most of it React's and the
 // components' development builds, which a phone on Tailscale waits seconds for. So its script, styles, and page go
@@ -172,6 +184,7 @@ export default defineConfig({
   // The page knows the version it was built from, to notice a server that runs another.
   define: { __FXBOT_VERSION__: JSON.stringify(version) },
   plugins: [
+    splashBots(),
     gzipped(),
     lucideIcons(),
     api(),
