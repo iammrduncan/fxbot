@@ -15,12 +15,14 @@ import type { PluginApi } from "@fxbot/sdk";
 
 type Said = { ok: true; result: any; text: string } | { ok: false; code: string; message: string };
 type Watch = { id: number; bot: string; machine: string; agent: string; shown: string | null; prompt: string; asked: string | null; state: string; started_at: Date; told: boolean };
-type Agent = { machine: string; workspace: string; tab: string; label: string; target: string; pane: string; session: string; kind: string; status: string; folder: string; title: string };
+type Agent = { machine: string; workspace: string; tab: string; label: string; target: string; pane: string; session: string; sessionId: string; kind: string; status: string; folder: string; title: string };
+// An agent as the plugin keeps it for tags, `machine` "" for the one fxbot runs on.
+type Pane = { machine: string; pane: string; name: string; label: string; kind: string; session_id: string; session_name: string; tab: string; workspace: string; folder: string; title: string; status: string; seen_at: Date };
 type Row = Agent | { machine: string; unreachable: string };
 const isAgent = (r: Row): r is Agent => "target" in r;
 
 // Each setting's lowest, highest, and default. The owner sets them, and no tool can.
-const limits = { hours: [1, 24, 4], lines: [20, 400, 80], watches: [1, 16, 8] } as const;
+const limits = { hours: [1, 24, 4], lines: [20, 400, 80], watches: [1, 16, 8], sync: [30, 3600, 60] } as const;
 const kindsByDefault = "claude, codex, opencode, pi";
 const doorByDefault = "/var/lib/fxbot/control/herdr.sock";
 // The workspace the plugin makes on a machine for the agents its bots start. It's found by the id the plugin kept,
@@ -155,7 +157,9 @@ export default async function setup(fx: PluginApi) {
       throw new Error("Name an agent by its name, its pane id, its pane's label, or its session's name, as herdr_agents lists them.");
     const rows = (await agentsOn(machine)).filter(isAgent);
     const exact = rows.filter((r) => r.target === asked || r.pane === asked);
-    const fits = exact.length ? exact : rows.filter((r) => r.session === asked || r.label.toLowerCase() === asked.toLowerCase());
+    // A tag's name, herdr:patcher, is its name in the list, as tagNameOf gives it.
+    const word = asked.replace(/^herdr:/i, "").toLowerCase();
+    const fits = exact.length ? exact : rows.filter((r) => r.session === asked || r.label.toLowerCase() === word || tagNameOf(r).toLowerCase() === word);
     if (fits.length > 1)
       throw new Error(`${plural(fits.length, "agent")} on ${where(machine)} fit "${asked}": ${fits.map((r) => `${shown(r)}, as ${r.pane}`).join("; ")}. Ask the owner which one.`);
     if (fits.length) return fits[0];
@@ -188,8 +192,10 @@ export default async function setup(fx: PluginApi) {
       label: paneLabels.get(a.pane_id) ?? "",
       target: a.name || a.pane_id,
       pane: a.pane_id ?? "",
-      // The agent's own name for its session, such as Claude Code's thermite-e9, which its other sessions message it by.
+      // The agent's own name for its session, such as Claude Code's thermite-e9, which its other sessions message it by,
+      // and its id, which herdr's integrations report for Claude Code, Codex, and others.
       session: sessions?.get(a.agent_session?.value) ?? "",
+      sessionId: typeof a.agent_session?.value === "string" ? a.agent_session.value : "",
       kind: a.agent ?? "",
       status: a.agent_status ?? "unknown",
       folder: a.cwd ?? "",
@@ -507,12 +513,12 @@ export default async function setup(fx: PluginApi) {
     }
   };
   const machineProp = { type: "string", description: "One of herdr's saved machines, by label, or local for the machine fxbot runs on." };
-  const agentProp = { type: "string", description: "The agent: its target or pane id, its pane's label, or its session's name, as herdr_agents lists them" };
+  const agentProp = { type: "string", description: "The agent: its target or pane id, its pane's label, its session's name, or a tag's name, such as herdr:patcher, as herdr_agents lists them" };
 
   fx.tool({
     name: "agents",
     description:
-      "List the coding agents herdr runs, on the machine fxbot runs on (local) and on herdr's saved machines: each one's machine, workspace, and tab, as herdr names them, the target to use in calls (its name or pane id), its pane, kind, status (working; blocked, which means waiting for the owner; done or idle, which mean ready; unknown), folder, and title. Leave out machine to list every machine at once. An agent can have three names, and the owner may use any: the label they gave its pane in herdr, such as patcher; its session's own name, such as thermite-e9, which Claude Code gives each session and its other sessions message it by (on local only); and its title. They're different things: never take one agent's label for another's session. Tell the owner about an agent in a sentence, with herdr's names: \"Claude in the thermite tab of fxbot on Local is idle\", or with a label and a session, Claude \"patcher\" (thermite-e9) in the thermite tab of fxbot on Local is working. A target is for calls: say it only to tell apart two agents in one tab that have no labels.",
+      "List the coding agents herdr runs, on the machine fxbot runs on (local) and on herdr's saved machines: each one's machine, workspace, and tab, as herdr names them, the target to use in calls (its name or pane id), its pane, kind, status (working; blocked, which means waiting for the owner; done or idle, which mean ready; unknown), folder, and title. Leave out machine to list every machine at once. An agent can have three names, and the owner may use any: the label they gave its pane in herdr, such as patcher; its session's own name, such as thermite-e9, which Claude Code gives each session and its other sessions message it by (on local only); and its title. They're different things: never take one agent's label for another's session. A tag in the owner's words, such as [@herdr:patcher](/herdr/agents/local/w1%3Ap8 \"Claude · pane w1:p8 on Local · …\"), means exactly that agent: its machine and pane are in the link (local and w1:p8 here; pass the pane as agent), and its title is how it was when they wrote it, so read it again before you act. Tell the owner about an agent in a sentence, with herdr's names: \"Claude in the thermite tab of fxbot on Local is idle\", or with a label and a session, Claude \"patcher\" (thermite-e9) in the thermite tab of fxbot on Local is working. A target is for calls: say it only to tell apart two agents in one tab that have no labels.",
     inputSchema: { type: "object", properties: { machine: machineProp } },
     idempotent: true,
     safe: true,
@@ -697,6 +703,86 @@ export default async function setup(fx: PluginApi) {
     });
   });
 
+  // --- Tags: every agent on every machine herdr has, kept in `panes` and synced, so the message box's @ list answers at
+  // once. A machine that doesn't answer keeps its rows. A tag is resolved when it's picked: its link and title carry it.
+  // An agent's name in the list: its pane's label, else its session's name, else its kind and pane.
+  const tagNameOf = (r: { label: string; session: string; kind: string; pane: string }) => r.label || r.session || `${r.kind || "agent"}-${r.pane.replace(":", "")}`;
+  let syncedAt = 0;
+  let syncing: Promise<void> | null = null;
+  function sync() {
+    return (syncing ??= (async () => {
+      const all = ["", ...(await machines())];
+      await Promise.all(
+        all.map(async (machine) => {
+          const rows = await agentsOn(machine);
+          if (unloaded || rows.some((r) => "unreachable" in r)) return;
+          const agents = rows.filter(isAgent);
+          await fx.sql.begin(async (sql) => {
+            await sql`delete from panes where machine = ${machine} and pane <> all(${agents.map((a) => a.pane)}::text[])`;
+            for (const a of agents)
+              await sql`insert into panes (machine, pane, name, label, kind, session_id, session_name, tab, workspace, folder, title, status, seen_at)
+                values (${machine}, ${a.pane}, ${tagNameOf(a)}, ${a.label}, ${a.kind}, ${a.sessionId}, ${a.session}, ${a.tab}, ${a.workspace}, ${a.folder}, ${a.title}, ${a.status}, now())
+                on conflict (machine, pane) do update set name = excluded.name, label = excluded.label, kind = excluded.kind, session_id = excluded.session_id,
+                  session_name = excluded.session_name, tab = excluded.tab, workspace = excluded.workspace, folder = excluded.folder, title = excluded.title,
+                  status = excluded.status, seen_at = excluded.seen_at`;
+          });
+        }),
+      );
+      // A machine herdr no longer has.
+      await fx.sql`delete from panes where machine <> all(${all}::text[])`;
+      syncedAt = Date.now();
+    })()
+      .catch((error) => fx.log(`Syncing herdr's agents failed: ${error instanceof Error ? error.message : error}`))
+      .finally(() => (syncing = null)));
+  }
+  let syncTimer = setTimeout(function tick() {
+    void sync().finally(() => {
+      if (!unloaded) syncTimer = setTimeout(tick, limit("sync") * 1000);
+    });
+  }, 10_000);
+  // A tag as the box writes it: its link, the agent's terminal here, and a title with all it was when picked.
+  const kindWords = (kind: string) => (kind === "opencode" ? "OpenCode" : kind ? kind[0].toUpperCase() + kind.slice(1) : "An agent");
+  function choiceOf(p: Pane) {
+    const on = p.machine || "Local";
+    const tab = /^\d+$/.test(p.tab) ? `tab ${p.tab}` : p.tab ? `the ${p.tab} tab` : "";
+    const where = [tab, /^\d+$/.test(p.workspace) ? `workspace ${p.workspace}` : p.workspace].filter(Boolean).join(" of ");
+    const status = statusWords[p.status] ?? p.status;
+    const title = [
+      // A title is in double quotes, so a label is in single ones.
+      `${kindWords(p.kind)}${p.label ? ` '${p.label.replace(/'/g, "")}'` : ""}`,
+      `pane ${p.pane} on ${on}`,
+      where,
+      p.session_name ? `session ${p.session_name}` : "",
+      p.session_id ? `id ${p.session_id}` : "",
+      p.folder,
+      status,
+    ].filter(Boolean).join(" · ");
+    return {
+      key: `${p.machine}/${p.pane}`,
+      name: `herdr:${p.name}`,
+      link: `/herdr/agents/${encodeURIComponent(p.machine || "local")}/${encodeURIComponent(p.pane)}`,
+      title: title.replace(/["\n\r]/g, ""),
+      detail: [kindWords(p.kind), status && status[0].toUpperCase() + status.slice(1), `${where ? `${where} on ` : ""}${on}`].filter(Boolean).join(" · "),
+    };
+  }
+  async function panes() {
+    if (!syncedAt) await sync();
+    else if (Date.now() - syncedAt > 15_000) void sync();
+    return fx.sql<Pane[]>`select * from panes order by machine, pane`;
+  }
+  // The @ list's choices: a leading herdr: dropped, names that start with what follows, then those that hold it.
+  fx.route("GET", "/mentions", async (request) => {
+    const q = (new URL(request.url).searchParams.get("q") ?? "").trim().replace(/^herdr:/i, "").toLowerCase().slice(0, 64);
+    const score = (p: Pane) => {
+      const words = [p.name, p.label, p.session_name, p.title, p.tab].filter(Boolean).map((w) => w.toLowerCase());
+      return !q || words.some((w) => w.startsWith(q)) ? 0 : words.some((w) => w.includes(q)) ? 1 : 9;
+    };
+    const ranked = (await panes()).map((p) => [score(p), p] as const).filter(([n]) => n < 9).sort((a, b) => a[0] - b[0]);
+    return json(ranked.slice(0, 8).map(([, p]) => choiceOf(p)));
+  });
+  // Every agent kept, for a sent tag's status.
+  fx.route("GET", "/panes", async () => json((await panes()).map((p) => ({ machine: p.machine || "local", pane: p.pane, name: p.name, status: p.status, seenAt: p.seen_at }))));
+
   // --- After a load: watches still working go on, and an ended one not yet told is told. It waits 10 seconds, as
   // routines and subagents do, since fxbot takes no turns while it starts.
   const pickUp = setTimeout(async () => {
@@ -715,6 +801,7 @@ export default async function setup(fx: PluginApi) {
   return () => {
     unloaded = true;
     clearTimeout(pickUp);
+    clearTimeout(syncTimer);
     for (const timer of retries) clearTimeout(timer);
     for (const stop of running) stop.abort();
   };

@@ -2,7 +2,7 @@
 // machine, and each one's screen with a keyboard. A chat's stream carries only the start of a tool's result, so the
 // agents card shows the list's summary and loads the agents themselves on Show, and a prompt's card follows its watch
 // by the id its result starts with. Built into page.js; see the README.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { api, go, ui } from "@fxbot/app";
 
 async function call(path, method = "GET", body) {
@@ -334,9 +334,44 @@ function AgentsScreen() {
   );
 }
 
-function TerminalIcon({ className }) {
+// --- Tags: @herdr:<name> in the message box, from the agents the plugin keeps, and a sent tag as a chip.
+const herdrTag = /\[@herdr:([^\]\n]*)\]\(\/herdr\/agents\/([^/\s)"]+)\/([^/\s)"]+)(?: "([^"\n]*)")?\)/g;
+const search = (query) => call(`mentions?q=${encodeURIComponent(query)}`).catch(() => []);
+// The agents kept, read at most every 30 seconds while a chip shows, for each chip's status now.
+let kept = [];
+let keptAt = 0;
+const watchers = new Set();
+function keep(listen) {
+  watchers.add(listen);
+  if (Date.now() - keptAt > 30_000) {
+    keptAt = Date.now();
+    void call("panes").then((list) => ((kept = list), watchers.forEach((w) => w())), () => {});
+  }
+  return () => void watchers.delete(listen);
+}
+function Tag({ match }) {
+  const [, name, machine, pane, title] = match;
+  const where = decodeURIComponent(machine);
+  const id = decodeURIComponent(pane);
+  const now = useSyncExternalStore(keep, () => kept).find((p) => p.machine === where && p.pane === id);
+  const href = terminalOf(where, id);
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <a
+      href={href}
+      onClick={open(href)}
+      title={title || `${id} on ${where}`}
+      style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "0 6px 0 4px", borderRadius: 9999, background: "rgb(255 255 255 / 0.2)", fontWeight: 500, verticalAlign: "bottom", color: "inherit", textDecoration: "none" }}
+    >
+      <TerminalIcon style={{ width: 14, height: 14 }} />
+      {now && <span className={`shrink-0 rounded-full ${dot[now.status] ?? dot.unknown}`} style={{ width: 6, height: 6 }} aria-label={statusText[now.status] ?? now.status} />}
+      @herdr:{name}
+    </a>
+  );
+}
+
+function TerminalIcon({ className, style }) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="m4 17 6-6-6-6" />
       <path d="M12 19h8" />
     </svg>
@@ -528,4 +563,7 @@ export default function setup(app) {
   app.nav({ label: "herdr", path: "/agents", icon: TerminalIcon });
   app.route("/agents", AgentsScreen);
   app.route("/agents/:machine/:pane", Terminal);
+  // @herdr:<name> in the message box, and in a sent message. A box with an @ list, Messages', reads app.mention.
+  app.mention?.({ search });
+  app.said(herdrTag, Tag);
 }

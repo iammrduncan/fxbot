@@ -440,9 +440,63 @@ function AgentsScreen() {
 		})]
 	});
 }
-function TerminalIcon({ className }) {
+const herdrTag = /\[@herdr:([^\]\n]*)\]\(\/herdr\/agents\/([^/\s)"]+)\/([^/\s)"]+)(?: "([^"\n]*)")?\)/g;
+const search = (query) => call(`mentions?q=${encodeURIComponent(query)}`).catch(() => []);
+let kept = [];
+let keptAt = 0;
+const watchers = /* @__PURE__ */ new Set();
+function keep(listen) {
+	watchers.add(listen);
+	if (Date.now() - keptAt > 3e4) {
+		keptAt = Date.now();
+		call("panes").then((list) => (kept = list, watchers.forEach((w) => w())), () => {});
+	}
+	return () => void watchers.delete(listen);
+}
+function Tag({ match }) {
+	const [, name, machine, pane, title] = match;
+	const where = decodeURIComponent(machine);
+	const id = decodeURIComponent(pane);
+	const now = (0, react.useSyncExternalStore)(keep, () => kept).find((p) => p.machine === where && p.pane === id);
+	const href = terminalOf(where, id);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("a", {
+		href,
+		onClick: open(href),
+		title: title || `${id} on ${where}`,
+		style: {
+			display: "inline-flex",
+			alignItems: "center",
+			gap: 4,
+			padding: "0 6px 0 4px",
+			borderRadius: 9999,
+			background: "rgb(255 255 255 / 0.2)",
+			fontWeight: 500,
+			verticalAlign: "bottom",
+			color: "inherit",
+			textDecoration: "none"
+		},
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(TerminalIcon, { style: {
+				width: 14,
+				height: 14
+			} }),
+			now && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+				className: `shrink-0 rounded-full ${dot[now.status] ?? dot.unknown}`,
+				style: {
+					width: 6,
+					height: 6
+				},
+				"aria-label": statusText[now.status] ?? now.status
+			}),
+			"@herdr:",
+			name
+		]
+	});
+}
+function TerminalIcon({ className, style }) {
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
 		className,
+		style,
 		viewBox: "0 0 24 24",
 		fill: "none",
 		stroke: "currentColor",
@@ -707,5 +761,7 @@ function setup(app) {
 	});
 	app.route("/agents", AgentsScreen);
 	app.route("/agents/:machine/:pane", Terminal);
+	app.mention?.({ search });
+	app.said(herdrTag, Tag);
 }
 module.exports = setup;

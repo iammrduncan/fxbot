@@ -24,6 +24,7 @@ import { ModelField } from "./providers.tsx";
 import { client } from "./client.ts";
 import { Header } from "./header.tsx";
 import { go } from "./nav.ts";
+import { PluginIcon } from "./plugin-icon.tsx";
 import { useReorder } from "./reorder.ts";
 import { Reply } from "./steps.tsx";
 
@@ -45,6 +46,10 @@ export type Fold = {
 // fence is still open, as it is while a reply streams.
 export type CodeBlockProps = { code: string; language: string; meta?: string; incomplete: boolean };
 type Nav = { label: string; path: string; icon?: ComponentType<{ className?: string }> };
+// What a plugin offers a box's @ list, as herdr offers its agents: up to 8 choices for what follows the @, for the bot
+// whose box it is. `name` shows, and a pick is written `[@name](link "title")`, which a bot reads.
+export type MentionChoice = { key: string; name: string; link: string; title?: string; detail?: string };
+export type Mention = { search: (query: string, bot?: Profile) => MentionChoice[] | Promise<MentionChoice[]> };
 type Places = {
   routes: { path: string; parts: string[]; Component: ComponentType<{ params: Record<string, string> }> }[];
   sidebar: ComponentType[];
@@ -59,6 +64,7 @@ type Places = {
   box: ComponentType<any>[];
   fold: Fold[];
   said: { pattern: RegExp; Component: ComponentType<{ match: RegExpMatchArray }> }[];
+  mentions: Mention[];
   codeBlocks: { language: string; Component: ComponentType<CodeBlockProps> }[];
   // Places other plugins leave with Slot, by name, such as `chat-rooms.room-header`.
   slots: Map<string, ComponentType<any>[]>;
@@ -66,7 +72,7 @@ type Places = {
 // `key` is the URLs it loaded from, which change with its files.
 type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places; pageError?: string };
 
-const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], libraryItem: [], chat: [], box: [], fold: [], said: [], codeBlocks: [], slots: new Map() });
+const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], libraryItem: [], chat: [], box: [], fold: [], said: [], mentions: [], codeBlocks: [], slots: new Map() });
 
 // The loaded plugins, by name. A change makes a new array, which the places read through usePlugins.
 let loaded: Loaded[] = [];
@@ -99,6 +105,7 @@ const ui = () => ({
   Streamdown: Markdown,
   Header,
   Blob,
+  PluginIcon,
   Reply,
   ModelField,
   useReorder,
@@ -112,6 +119,8 @@ function appModule(name: string) {
     api: (path: string, init?: RequestInit) => fetch(`/api/plugins/${name}/${path.replace(/^\//, "")}`, init),
     go,
     useBots: useAppBots,
+    // Every plugin's @ sources, with its name and icon, for a box that lists them.
+    useMentions: () => usePlugins().flatMap(({ name, iconKey, places }) => places.mentions.map((source) => ({ ...source, plugin: name, iconKey }))),
     // React's, for a plugin that draws a component into DOM it doesn't render, such as an editor's node.
     createPortal,
     // A place in this plugin's page that other plugins fill with app.slot(name, Component), each part in its own
@@ -152,6 +161,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     box: (Component: ComponentType<any>) => places.box.push(Component),
     fold: (fold: Fold) => places.fold.push(fold),
     said: (pattern: RegExp, Component: ComponentType<{ match: RegExpMatchArray }>) => places.said.push({ pattern, Component }),
+    mention: (source: Mention) => places.mentions.push(source),
     codeBlock: (language: string, Component: ComponentType<CodeBlockProps>) => places.codeBlocks.push({ language: String(language).toLowerCase(), Component }),
     slot: (name: string, Component: ComponentType<any>) => places.slots.set(name, [...(places.slots.get(name) ?? []), Component]),
   });

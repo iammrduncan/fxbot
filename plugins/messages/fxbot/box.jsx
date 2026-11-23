@@ -2,9 +2,10 @@
 // tag is a chip with its face, which deletes as one piece. `@` at the start of a line or after a space lists the bots
 // this one can reach, filtered by what follows, and the pick replaces what was typed. To the app it acts as a textarea:
 // `value` is the text, with each chip as a link that holds the bot's id, so two Bobs can't be confused, and the rest of
-// its props are a textarea's. The link reads as a name to a bot, and in any Markdown, with or without this plugin.
+// its props are a textarea's. The link reads as a name to a bot, and in any Markdown, with or without this plugin. Other
+// plugins add to the list with app.mention, such as herdr's agents: their chip is their link, with its title.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { api, createPortal, ui, useBots } from "@fxbot/app";
+import { api, createPortal, ui, useBots, useMentions } from "@fxbot/app";
 import { baseKeymap, splitBlock } from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
@@ -13,6 +14,9 @@ import { EditorState, Selection, TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 
 export const tagLink = /\[@([^\]\n]*)\]\(\/profiles\/([0-9a-f]{12})\)/g;
+// Any tag: a bot's, or a plugin's link into the app, with a title.
+const anyTag = /\[@([^\]\n]*)\]\((\/[^\s)"]*)(?: "([^"\n]*)")?\)/g;
+const botPath = /^\/profiles\/([0-9a-f]{12})$/;
 
 const schema = new Schema({
   nodes: {
@@ -20,23 +24,25 @@ const schema = new Schema({
     paragraph: { content: "inline*", parseDOM: [{ tag: "p" }], toDOM: () => ["p", 0] },
     text: { group: "inline" },
     tag: {
-      attrs: { bot: {}, name: {} },
+      attrs: { bot: { default: "" }, name: {}, link: { default: "" }, title: { default: "" } },
       group: "inline",
       inline: true,
       atom: true,
       selectable: false,
-      parseDOM: [{ tag: "span[data-bot]", getAttrs: (dom) => ({ bot: dom.getAttribute("data-bot"), name: dom.getAttribute("data-name") }) }],
-      toDOM: (node) => ["span", { "data-bot": node.attrs.bot, "data-name": node.attrs.name }],
+      parseDOM: [{ tag: "span[data-bot]", getAttrs: (dom) => ({ bot: dom.getAttribute("data-bot"), name: dom.getAttribute("data-name"), link: dom.getAttribute("data-link") ?? "", title: dom.getAttribute("data-title") ?? "" }) }],
+      toDOM: (node) => ["span", { "data-bot": node.attrs.bot, "data-name": node.attrs.name, "data-link": node.attrs.link, "data-title": node.attrs.title }],
     },
   },
 });
 
+// A chip as its link: a bot's by its id, a plugin's as it gave it.
+const linkOf = ({ bot, name, link, title }) => (bot ? `[@${name}](/profiles/${bot})` : `[@${name}](${link}${title ? ` "${title}"` : ""})`);
 // The box's text, each chip as its link. A line is a paragraph.
 function textOf(doc) {
   const lines = [];
   doc.forEach((paragraph) => {
     let line = "";
-    paragraph.forEach((node) => (line += node.type.name === "tag" ? `[@${node.attrs.name}](/profiles/${node.attrs.bot})` : (node.text ?? "")));
+    paragraph.forEach((node) => (line += node.type.name === "tag" ? linkOf(node.attrs) : (node.text ?? "")));
     lines.push(line);
   });
   return lines.join("\n");
@@ -46,9 +52,10 @@ function docOf(text) {
   const paragraph = (line) => {
     const parts = [];
     let at = 0;
-    for (const m of line.matchAll(tagLink)) {
+    for (const m of line.matchAll(anyTag)) {
       if (m.index > at) parts.push(schema.text(line.slice(at, m.index)));
-      parts.push(schema.nodes.tag.create({ bot: m[2], name: m[1] }));
+      const bot = botPath.exec(m[2])?.[1];
+      parts.push(schema.nodes.tag.create(bot && !m[3] ? { bot, name: m[1] } : { name: m[1], link: m[2], title: m[3] ?? "" }));
       at = m.index + m[0].length;
     }
     if (at < line.length) parts.push(schema.text(line.slice(at)));
@@ -126,6 +133,11 @@ export function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur,
   const mount = useRef(null);
   const view = useRef(null);
   const bots = useBots() ?? [];
+  // Other plugins' choices, such as herdr's agents, for what follows the @, asked a moment after typing stops.
+  const sources = useRef([]);
+  sources.current = useMentions?.() ?? [];
+  const found = useRef(new Map());
+  const asking = useRef(null);
   // Who this bot can reach, with each one's line.
   const [reach, setReach] = useState(() => new Map());
   const choices = useRef([]);
@@ -136,7 +148,7 @@ export function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur,
   useEffect(load, [bot?.id]);
   // The app's handlers as they are now, for the editor, which is made once.
   const latest = useRef({});
-  latest.current = { onChange, onKeyDown, onPaste, onFocus, onBlur, load };
+  latest.current = { onChange, onKeyDown, onPaste, onFocus, onBlur, load, bot };
   // Each chip's DOM node in the box, and its bot, drawn with createPortal where the app has it.
   const [chips, setChips] = useState(() => new Map());
   const [list, setList] = useState(null);
@@ -152,17 +164,42 @@ export function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur,
     setEmpty(state.doc.childCount === 1 && first.childCount === 0);
     const at = typing(state);
     if (!at || at.from !== dismissed.current) dismissed.current = -1;
-    const matches = at && at.from !== dismissed.current ? rank(choices.current, at.query) : [];
+    const open = at && at.from !== dismissed.current;
+    const theirs = open ? found.current.get(at.query) : [];
+    if (open && !theirs && sources.current.length) ask(at.query);
+    const matches = open ? [...rank(choices.current, at.query), ...(theirs ?? [])] : [];
     const next = matches.length ? { ...at, matches, active: shown.current && shown.current.from === at.from && shown.current.query === at.query ? shown.current.active : 0 } : null;
     if (next && (!shown.current || shown.current.matches.length !== matches.length)) setSaid(`${matches.length} ${matches.length === 1 ? "match" : "matches"}`);
     setList(next);
+  }
+
+  // Each source's choices for a query, kept, then the list again if the @ is still that query.
+  function ask(query) {
+    clearTimeout(asking.current);
+    asking.current = setTimeout(async () => {
+      const lists = await Promise.all(
+        sources.current.map((source) =>
+          Promise.resolve()
+            .then(() => source.search(query, latest.current.bot))
+            .then((list) => (Array.isArray(list) ? list.slice(0, 8) : []).map((choice) => ({ ...choice, plugin: source.plugin, iconKey: source.iconKey, mention: true })), () => []),
+        ),
+      );
+      found.current.set(query, lists.flat());
+      if (found.current.size > 50) found.current.delete(found.current.keys().next().value);
+      const v = view.current;
+      if (v && typing(v.state)?.query === query) refresh(v.state);
+    }, 150);
   }
 
   function pick(choice) {
     const v = view.current;
     const at = shown.current;
     if (!v || !at) return;
-    const tr = v.state.tr.replaceWith(at.from, at.to, [schema.nodes.tag.create({ bot: choice.id, name: choice.name.replace(/[[\]\n]/g, "") }), schema.text(" ")]);
+    const clean = (text) => String(text ?? "").replace(/[[\]\n]/g, "");
+    const node = choice.mention
+      ? schema.nodes.tag.create({ name: clean(choice.name), link: String(choice.link).replace(/[\s)"]/g, ""), title: String(choice.title ?? "").replace(/["\n]/g, "") })
+      : schema.nodes.tag.create({ bot: choice.id, name: clean(choice.name) });
+    const tr = v.state.tr.replaceWith(at.from, at.to, [node, schema.text(" ")]);
     v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at.from + 2)));
     v.focus();
     setSaid(`Tagged ${choice.name}`);
@@ -273,10 +310,10 @@ export function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur,
       {list &&
         form &&
         createPortal(
-          <div id="tag-picker" role="listbox" aria-label="Bots" className="absolute right-4 bottom-full left-4 z-10 mb-2 max-h-72 overflow-y-auto rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md">
+          <div id="tag-picker" role="listbox" aria-label="Tags" className="absolute right-4 bottom-full left-4 z-10 mb-2 max-h-72 overflow-y-auto rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md">
             {list.matches.map((choice, i) => (
               <button
-                key={choice.id}
+                key={choice.mention ? `${choice.plugin}:${choice.key}` : choice.id}
                 id={`tag-option-${i}`}
                 type="button"
                 role="option"
@@ -286,10 +323,10 @@ export function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur,
                 onClick={() => pick(choice)}
                 className={`flex w-full min-w-0 items-start gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm ${i === list.active ? "bg-accent text-accent-foreground" : ""}`}
               >
-                <ui.Blob {...choice} size={20} />
+                {choice.mention ? ui.PluginIcon ? <ui.PluginIcon iconKey={choice.iconKey} size={20} /> : <span style={{ width: 20 }} /> : <ui.Blob {...choice} size={20} />}
                 <span className="grid min-w-0 flex-1">
                   <span className="font-medium">{choice.name}</span>
-                  <span className="line-clamp-1 text-xs text-muted-foreground">{choice.about || choice.id}</span>
+                  <span className="line-clamp-1 text-xs text-muted-foreground">{choice.mention ? choice.detail : choice.about || choice.id}</span>
                 </span>
               </button>
             ))}

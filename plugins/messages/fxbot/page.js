@@ -1,7 +1,7 @@
 let react = require("react");
 let _fxbot_app = require("@fxbot/app");
 let react_jsx_runtime = require("react/jsx-runtime");
-// node_modules/orderedmap/dist/index.js
+// ../../../../../../root/github/fxbot/plugins/messages/node_modules/orderedmap/dist/index.js
 function OrderedMap(content) {
 	this.content = content;
 }
@@ -82,7 +82,7 @@ OrderedMap.from = function(value) {
 	if (value) for (var prop in value) content.push(prop, value[prop]);
 	return new OrderedMap(content);
 };
-// node_modules/prosemirror-model/dist/index.js
+// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-model/dist/index.js
 function findDiffStart(a, b, pos) {
 	for (let i = 0;; i++) {
 		if (i == a.childCount || i == b.childCount) return a.childCount == b.childCount ? null : pos;
@@ -2217,7 +2217,7 @@ function renderSpec(doc, structure, xmlNS, blockArraysIn) {
 		contentDOM
 	};
 }
-// node_modules/prosemirror-transform/dist/index.js
+// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-transform/dist/index.js
 const lower16 = 65535;
 const factor16 = Math.pow(2, 16);
 function makeRecover(index, offset) {
@@ -3623,7 +3623,7 @@ var Transform = class {
 		return this;
 	}
 };
-// node_modules/prosemirror-state/dist/index.js
+// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-state/dist/index.js
 const classesById = Object.create(null);
 var Selection = class {
 	constructor($anchor, $head, ranges) {
@@ -4247,7 +4247,7 @@ var PluginKey = class {
 		return state[this.key];
 	}
 };
-// node_modules/prosemirror-commands/dist/index.js
+// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-commands/dist/index.js
 const deleteSelection = (state, dispatch) => {
 	if (state.selection.empty) return false;
 	if (dispatch) dispatch(state.tr.deleteSelection().scrollIntoView());
@@ -4563,7 +4563,7 @@ const macBaseKeymap = {
 };
 for (let key in pcBaseKeymap) macBaseKeymap[key] = pcBaseKeymap[key];
 const baseKeymap = (typeof navigator != "undefined" ? /Mac|iP(hone|[oa]d)/.test(navigator.platform) : typeof os != "undefined" && os.platform ? os.platform() == "darwin" : false) ? macBaseKeymap : pcBaseKeymap;
-// node_modules/rope-sequence/dist/index.js
+// ../../../../../../root/github/fxbot/plugins/messages/node_modules/rope-sequence/dist/index.js
 var GOOD_LEAF_SIZE = 200;
 var RopeSequence = function RopeSequence() {};
 RopeSequence.prototype.append = function append(other) {
@@ -4699,7 +4699,7 @@ var Append = function(RopeSequence) {
 	};
 	return Append;
 }(RopeSequence);
-// node_modules/prosemirror-history/dist/index.js
+// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-history/dist/index.js
 const max_empty_items = 500;
 var Branch = class Branch {
 	constructor(items, eventCount) {
@@ -4992,7 +4992,7 @@ function buildCommand(redo, scroll) {
 }
 const undo = buildCommand(false, true);
 const redo = buildCommand(true, true);
-// node_modules/w3c-keyname/index.js
+// ../../../../../../root/github/fxbot/plugins/messages/node_modules/w3c-keyname/index.js
 var base = {
 	8: "Backspace",
 	9: "Tab",
@@ -5092,7 +5092,7 @@ function keyName(event) {
 	if (name == "Down") name = "ArrowDown";
 	return name;
 }
-// node_modules/prosemirror-keymap/dist/index.js
+// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-keymap/dist/index.js
 const mac$1 = typeof navigator != "undefined" && /Mac|iP(hone|[oa]d)/.test(navigator.platform);
 const windows$1 = typeof navigator != "undefined" && /Win/.test(navigator.platform);
 function normalizeKeyName(name) {
@@ -5149,7 +5149,7 @@ function keydownHandler(bindings) {
 		return false;
 	};
 }
-// node_modules/prosemirror-view/dist/index.js
+// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-view/dist/index.js
 const domIndex = function(node) {
 	for (var index = 0;; index++) {
 		node = node.previousSibling;
@@ -9559,6 +9559,8 @@ function checkStateComponent(plugin) {
 }
 // fxbot/box.jsx
 const tagLink = /\[@([^\]\n]*)\]\(\/profiles\/([0-9a-f]{12})\)/g;
+const anyTag = /\[@([^\]\n]*)\]\((\/[^\s)"]*)(?: "([^"\n]*)")?\)/g;
+const botPath = /^\/profiles\/([0-9a-f]{12})$/;
 const schema = new Schema({ nodes: {
 	doc: { content: "paragraph+" },
 	paragraph: {
@@ -9569,8 +9571,10 @@ const schema = new Schema({ nodes: {
 	text: { group: "inline" },
 	tag: {
 		attrs: {
-			bot: {},
-			name: {}
+			bot: { default: "" },
+			name: {},
+			link: { default: "" },
+			title: { default: "" }
 		},
 		group: "inline",
 		inline: true,
@@ -9580,20 +9584,25 @@ const schema = new Schema({ nodes: {
 			tag: "span[data-bot]",
 			getAttrs: (dom) => ({
 				bot: dom.getAttribute("data-bot"),
-				name: dom.getAttribute("data-name")
+				name: dom.getAttribute("data-name"),
+				link: dom.getAttribute("data-link") ?? "",
+				title: dom.getAttribute("data-title") ?? ""
 			})
 		}],
 		toDOM: (node) => ["span", {
 			"data-bot": node.attrs.bot,
-			"data-name": node.attrs.name
+			"data-name": node.attrs.name,
+			"data-link": node.attrs.link,
+			"data-title": node.attrs.title
 		}]
 	}
 } });
+const linkOf = ({ bot, name, link, title }) => bot ? `[@${name}](/profiles/${bot})` : `[@${name}](${link}${title ? ` "${title}"` : ""})`;
 function textOf(doc) {
 	const lines = [];
 	doc.forEach((paragraph) => {
 		let line = "";
-		paragraph.forEach((node) => line += node.type.name === "tag" ? `[@${node.attrs.name}](/profiles/${node.attrs.bot})` : node.text ?? "");
+		paragraph.forEach((node) => line += node.type.name === "tag" ? linkOf(node.attrs) : node.text ?? "");
 		lines.push(line);
 	});
 	return lines.join("\n");
@@ -9602,11 +9611,16 @@ function docOf(text) {
 	const paragraph = (line) => {
 		const parts = [];
 		let at = 0;
-		for (const m of line.matchAll(tagLink)) {
+		for (const m of line.matchAll(anyTag)) {
 			if (m.index > at) parts.push(schema.text(line.slice(at, m.index)));
-			parts.push(schema.nodes.tag.create({
-				bot: m[2],
+			const bot = botPath.exec(m[2])?.[1];
+			parts.push(schema.nodes.tag.create(bot && !m[3] ? {
+				bot,
 				name: m[1]
+			} : {
+				name: m[1],
+				link: m[2],
+				title: m[3] ?? ""
 			}));
 			at = m.index + m[0].length;
 		}
@@ -9698,6 +9712,10 @@ function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur, placeh
 	const mount = (0, react.useRef)(null);
 	const view = (0, react.useRef)(null);
 	const bots = (0, _fxbot_app.useBots)() ?? [];
+	const sources = (0, react.useRef)([]);
+	sources.current = _fxbot_app.useMentions?.() ?? [];
+	const found = (0, react.useRef)(new Map());
+	const asking = (0, react.useRef)(null);
 	const [reach, setReach] = (0, react.useState)(() => new Map());
 	const choices = (0, react.useRef)([]);
 	choices.current = bots.filter((b) => reach.has(b.id)).map((b) => ({
@@ -9715,7 +9733,8 @@ function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur, placeh
 		onPaste,
 		onFocus,
 		onBlur,
-		load
+		load,
+		bot
 	};
 	const [chips, setChips] = (0, react.useState)(() => new Map());
 	const [list, setList] = (0, react.useState)(null);
@@ -9729,7 +9748,10 @@ function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur, placeh
 		setEmpty(state.doc.childCount === 1 && first.childCount === 0);
 		const at = typing(state);
 		if (!at || at.from !== dismissed.current) dismissed.current = -1;
-		const matches = at && at.from !== dismissed.current ? rank(choices.current, at.query) : [];
+		const open = at && at.from !== dismissed.current;
+		const theirs = open ? found.current.get(at.query) : [];
+		if (open && !theirs && sources.current.length) ask(at.query);
+		const matches = open ? [...rank(choices.current, at.query), ...theirs ?? []] : [];
 		const next = matches.length ? {
 			...at,
 			matches,
@@ -9738,14 +9760,35 @@ function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur, placeh
 		if (next && (!shown.current || shown.current.matches.length !== matches.length)) setSaid(`${matches.length} ${matches.length === 1 ? "match" : "matches"}`);
 		setList(next);
 	}
+	function ask(query) {
+		clearTimeout(asking.current);
+		asking.current = setTimeout(async () => {
+			const lists = await Promise.all(sources.current.map((source) => Promise.resolve().then(() => source.search(query, latest.current.bot)).then((list) => (Array.isArray(list) ? list.slice(0, 8) : []).map((choice) => ({
+				...choice,
+				plugin: source.plugin,
+				iconKey: source.iconKey,
+				mention: true
+			})), () => [])));
+			found.current.set(query, lists.flat());
+			if (found.current.size > 50) found.current.delete(found.current.keys().next().value);
+			const v = view.current;
+			if (v && typing(v.state)?.query === query) refresh(v.state);
+		}, 150);
+	}
 	function pick(choice) {
 		const v = view.current;
 		const at = shown.current;
 		if (!v || !at) return;
-		const tr = v.state.tr.replaceWith(at.from, at.to, [schema.nodes.tag.create({
+		const clean = (text) => String(text ?? "").replace(/[[\]\n]/g, "");
+		const node = choice.mention ? schema.nodes.tag.create({
+			name: clean(choice.name),
+			link: String(choice.link).replace(/[\s)"]/g, ""),
+			title: String(choice.title ?? "").replace(/["\n]/g, "")
+		}) : schema.nodes.tag.create({
 			bot: choice.id,
-			name: choice.name.replace(/[[\]\n]/g, "")
-		}), schema.text(" ")]);
+			name: clean(choice.name)
+		});
+		const tr = v.state.tr.replaceWith(at.from, at.to, [node, schema.text(" ")]);
 		v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at.from + 2)));
 		v.focus();
 		setSaid(`Tagged ${choice.name}`);
@@ -9870,7 +9913,7 @@ function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur, placeh
 			list && form && (0, _fxbot_app.createPortal)((0, react_jsx_runtime.jsx)("div", {
 				id: "tag-picker",
 				role: "listbox",
-				"aria-label": "Bots",
+				"aria-label": "Tags",
 				className: "absolute right-4 bottom-full left-4 z-10 mb-2 max-h-72 overflow-y-auto rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md",
 				children: list.matches.map((choice, i) => (0, react_jsx_runtime.jsxs)("button", {
 					id: `tag-option-${i}`,
@@ -9880,7 +9923,10 @@ function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur, placeh
 					onMouseDown: (e) => e.preventDefault(),
 					onClick: () => pick(choice),
 					className: `flex w-full min-w-0 items-start gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm ${i === list.active ? "bg-accent text-accent-foreground" : ""}`,
-					children: [(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
+					children: [choice.mention ? _fxbot_app.ui.PluginIcon ? (0, react_jsx_runtime.jsx)(_fxbot_app.ui.PluginIcon, {
+						iconKey: choice.iconKey,
+						size: 20
+					}) : (0, react_jsx_runtime.jsx)("span", { style: { width: 20 } }) : (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
 						...choice,
 						size: 20
 					}), (0, react_jsx_runtime.jsxs)("span", {
@@ -9890,10 +9936,10 @@ function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur, placeh
 							children: choice.name
 						}), (0, react_jsx_runtime.jsx)("span", {
 							className: "line-clamp-1 text-xs text-muted-foreground",
-							children: choice.about || choice.id
+							children: choice.mention ? choice.detail : choice.about || choice.id
 						})]
 					})]
-				}, choice.id))
+				}, choice.mention ? `${choice.plugin}:${choice.key}` : choice.id))
 			}), form),
 			[...chips].map(([dom, { id, name }], i) => (0, _fxbot_app.createPortal)((0, react_jsx_runtime.jsx)(Chip, {
 				id,
