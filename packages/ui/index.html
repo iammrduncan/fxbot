@@ -10,9 +10,17 @@
     <title>fxbot</title>
     <!-- The page's background before its styles load, so a dark screen doesn't flash white. -->
     <style>html { background: #fff } @media (prefers-color-scheme: dark) { html { background: #0a0a0a } }</style>
+    <!-- fxbot's icon until the app draws, which replaces it: on a slow link its code takes seconds, and a blank page
+         reads as broken. -->
+    <style>
+      .splash { position: fixed; inset: 0; display: grid; place-items: center }
+      .splash img { border-radius: 14px; animation: breathe 1.6s ease-in-out infinite }
+      @keyframes breathe { 50% { opacity: 0.55 } }
+      @media (prefers-reduced-motion: reduce) { .splash img { animation: none } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="splash" aria-hidden="true"><img src="/icon-192.png" alt="" width="56" height="56" /></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

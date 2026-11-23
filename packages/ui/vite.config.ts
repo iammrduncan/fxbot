@@ -2,11 +2,55 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
+import type { ServerResponse } from "node:http";
+import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import { VitePWA, type ManifestOptions } from "vite-plugin-pwa";
 
 const repo = fileURLToPath(new URL("../..", import.meta.url));
+
+// In development, Vite sends its modules uncompressed: about 13 MB before a chat shows, most of it React's and the
+// components' development builds, which a phone on Tailscale waits seconds for. So its script, styles, and page go
+// gzipped, from a few kept copies. /api isn't touched: the API compresses its own, and its streams can't wait.
+function gzipped(): Plugin {
+  const kept = new Map<string, Buffer>();
+  const compressible = /^(text\/|application\/(javascript|json)|image\/svg)/;
+  return {
+    name: "fxbot-dev-gzip",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use((req, res: ServerResponse, next) => {
+        if (req.method !== "GET" || req.url?.startsWith("/api/") || !/\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""))) return next();
+        const chunks: Buffer[] = [];
+        const write = res.write.bind(res) as (chunk: unknown) => boolean;
+        const end = res.end.bind(res) as (chunk?: unknown) => ServerResponse;
+        const take = (chunk: unknown, encoding?: unknown) => {
+          if (chunk && typeof chunk !== "function") chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string, typeof encoding === "string" ? (encoding as BufferEncoding) : "utf8"));
+        };
+        // Headers already sent, as a file streamed, go on as they were.
+        res.write = ((chunk: unknown, encoding?: unknown) => (res.headersSent ? write(chunk) : (take(chunk, encoding), true))) as typeof res.write;
+        res.end = ((chunk?: unknown, encoding?: unknown) => {
+          if (res.headersSent) return end(chunk);
+          take(chunk, encoding);
+          const body = Buffer.concat(chunks);
+          const type = String(res.getHeader("content-type") ?? "");
+          if (res.statusCode !== 200 || res.getHeader("content-encoding") || body.length < 1024 || !compressible.test(type)) return end(body);
+          const key = `${req.url} ${res.getHeader("etag") ?? body.length}`;
+          const zipped = kept.get(key) ?? gzipSync(body, { level: 4 });
+          kept.delete(key);
+          kept.set(key, zipped);
+          if (kept.size > 400) kept.delete(kept.keys().next().value!);
+          res.setHeader("content-encoding", "gzip");
+          res.setHeader("vary", "accept-encoding");
+          res.setHeader("content-length", zipped.length);
+          return end(zipped);
+        }) as typeof res.end;
+        next();
+      });
+    },
+  };
+}
 
 // In development, Vite serves lucide-react as one file of all its icons, 5 MB that a phone parses at each load, for the
 // few dozen the app uses. So each icon the app imports comes from its own file instead, by lucide's own list. The
@@ -128,6 +172,7 @@ export default defineConfig({
   // The page knows the version it was built from, to notice a server that runs another.
   define: { __FXBOT_VERSION__: JSON.stringify(version) },
   plugins: [
+    gzipped(),
     lucideIcons(),
     api(),
     devManifest(),
