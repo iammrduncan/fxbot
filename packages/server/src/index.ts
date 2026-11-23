@@ -5,7 +5,7 @@ import { delimiter, extname, join, normalize } from "node:path";
 import { Readable, type Duplex } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
-import { constants, createGzip } from "node:zlib";
+import { constants, createGzip, gzipSync } from "node:zlib";
 import { WebSocketServer, type WebSocket } from "ws";
 import { canUpdate, lastUpdate, localEmbedder, machine, repository, requestEmbedder, requestUpdate, version, waiting } from "./control.ts";
 
@@ -52,6 +52,24 @@ const types: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".woff2": "font/woff2",
 };
+
+// A file of the page's, or of a plugin's page code, gzipped for a browser that takes it, from a few kept copies named by
+// what names their content. A phone on a slow link waited for megabytes of script that compress to a quarter.
+const zipped = new Map<string, Buffer>();
+const compressible = /^(text\/|application\/(json|manifest\+json)|image\/svg)/;
+function sendFile(req: IncomingMessage, res: ServerResponse, type: string, data: Buffer, cache: string, key?: string) {
+  const gzip = compressible.test(type) && data.length > 1024 && /\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""));
+  let body = data;
+  if (gzip) {
+    body = (key && zipped.get(key)) || gzipSync(data, { level: 6 });
+    if (key) {
+      zipped.delete(key);
+      zipped.set(key, body);
+      if (zipped.size > 64) zipped.delete(zipped.keys().next().value!);
+    }
+  }
+  res.writeHead(200, { "content-type": type, "x-content-type-options": "nosniff", "cache-control": cache, vary: "accept-encoding", ...(gzip ? { "content-encoding": "gzip" } : {}) }).end(body);
+}
 
 const fail = (status: number, message: string): never => {
   throw Object.assign(new Error(message), { status });
@@ -172,10 +190,13 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
       if (action === "sign-in" && method === "POST") return json(res, 201, await fxbot.oauth.start(id, req.headers.origin));
       return fail(404, "not found");
     }
-    // A package's page code and CSS. A pinned package's URL names its commit, so the browser keeps it.
+    // A package's page code and CSS. Its URL names its commit, or its file's time for a local one (`v`), so the browser
+    // keeps it: a local plugin's code was fetched whole at every load.
     if (id && action === "files" && method === "GET") {
-      const { type, data, pinned } = await fxbot.plugins.file(id, url.pathname.split("/").slice(5).join("/"));
-      return void res.writeHead(200, { "content-type": type, "x-content-type-options": "nosniff", "cache-control": pinned ? "public, max-age=31536000, immutable" : "no-cache" }).end(data);
+      const path = url.pathname.split("/").slice(5).join("/");
+      const { type, data, pinned } = await fxbot.plugins.file(id, path);
+      const version = url.searchParams.get("v");
+      return void sendFile(req, res, type, data, pinned || version ? "public, max-age=31536000, immutable" : "no-cache", version ? `${id}/${path}?${version}` : undefined);
     }
     if (id) return pluginRoute(req, res, url, id);
     return fail(405, "method not allowed");
@@ -317,13 +338,15 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
 }
 
 // The built page. Paths that are not files get index.html, so the app's routes load.
-function page(res: ServerResponse, pathname: string) {
+function page(req: IncomingMessage, res: ServerResponse, pathname: string) {
   let file = normalize(join(dist, pathname));
   if (!file.startsWith(dist) || !statSync(file, { throwIfNoEntry: false })?.isFile()) file = join(dist, "index.html");
   try {
     const data = readFileSync(file);
-    res.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache" });
-    res.end(data);
+    const { mtimeMs } = statSync(file);
+    // A build's assets are named by their content, so the browser keeps them; the rest it asks about each time.
+    const kept = pathname.startsWith("/assets/") && file !== join(dist, "index.html");
+    sendFile(req, res, types[extname(file)] ?? "application/octet-stream", data, kept ? "public, max-age=31536000, immutable" : "no-cache", `${file}:${mtimeMs}:${data.length}`);
   } catch {
     json(res, 404, { error: "no build in packages/ui/dist/; run npm run build" });
   }
@@ -343,7 +366,7 @@ const server = createServer(async (req, res) => {
     else if (url.pathname === "/callback" && req.method === "GET") await signedIn(res, url.searchParams);
     // Only reads get the page, so a write elsewhere, such as the sessions queue's delivery over HTTP if it ever fell back
     // to one, is refused instead of answered and taken as done.
-    else if (req.method === "GET" || req.method === "HEAD") page(res, url.pathname);
+    else if (req.method === "GET" || req.method === "HEAD") page(req, res, url.pathname);
     else json(res, 405, { error: "method not allowed" });
   } catch (error) {
     const status = (error as { status?: number }).status ?? 500;
