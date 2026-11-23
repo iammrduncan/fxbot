@@ -4,7 +4,8 @@
 # one herdr command, its words separated by NUL bytes, checks every word against the commands below, and runs herdr's
 # CLI with them, or answers `refused` in herdr's own shape. No word is ever read by a shell. It sources nothing, so it
 # never sees fxbot's .env. It types only into a pane with an agent in it. With --read-only it takes only the commands
-# that look (docs/_completed/phases/herdr.md and herdr-terminals.md).
+# that look (docs/_completed/phases/herdr.md and herdr-terminals.md). Its `terminal` runs herdr's own client for a
+# terminal in fxbot's page, which can open a pane, a shell as herdr's user (docs/phases/herdr-screen.md).
 set -uo pipefail
 export LC_ALL=C
 read_only=0
@@ -15,15 +16,19 @@ refuse() {
   printf '{"error":{"code":"refused","message":"%s"}}\n' "fxbot's door to herdr refuses that: $1"
   exit 0
 }
-writes() { [ "$read_only" = 0 ] || refuse "it's read-only, so it takes no prompts, keys, text, workspaces, tabs, or starts"; }
+writes() { [ "$read_only" = 0 ] || refuse "it's read-only, so it takes no prompts, keys, text, terminals, workspaces, tabs, or starts"; }
 # A pane with an agent in it, on the same machine, as herdr sees it now: never one with only a shell.
 agent_in() { [[ $("$herdr" "${machine[@]}" agent get "$1" 2>&1) == *'"result":{"agent":{'* ]] || refuse "no agent is in pane $1"; }
 
-# One command of at most 64 KiB.
-mapfile -d '' -t words < <(head -c 65537)
-size=${#words[@]}
-for word in "${words[@]}"; do size=$((size + ${#word})); done
-[ "$size" -le 65536 ] || refuse "a command is at most 64 KiB"
+# One command of at most 64 KiB: words, each ended by a NUL, up to an empty one or the end. A terminal's bytes follow
+# its empty word, for herdr's client: bash reads a socket a byte at a time, so they're left for it.
+words=() size=0
+while IFS= read -r -d '' -n 65537 -t 30 word; do
+  [ -n "$word" ] || break
+  size=$((size + ${#word} + 1))
+  [ "$size" -le 65536 ] || refuse "a command is at most 64 KiB"
+  words+=("$word")
+done
 [ "${#words[@]}" -gt 0 ] || refuse "no command"
 
 # Each kind of word. herdr counts ids past 9 with letters, as in wB:pA.
@@ -38,6 +43,63 @@ kinds=' pi claude codex gemini cursor devin agy cline omp mastracode opencode co
 plain() { [[ -n $1 && ${#1} -le $2 && $1 != -* && ! $1 =~ [[:cntrl:]] ]]; }
 path() { [[ ${#1} -le 1024 && ! $1 =~ [[:cntrl:]] && ( $1 == /* || $1 == "~" || $1 == "~/"* ) ]]; }
 within() { [[ $1 =~ $number ]] && [ "$1" -ge "$2" ] && [ "$1" -le "$3" ]; }
+
+# herdr's client in a pseudo-terminal, for `terminal`: the plugin's fxbot/terminal.py, the same. Its input is framed:
+# a byte for the kind, four for the length, then the payload; kind 0 is typed bytes, and kind 1 a new size.
+read -r -d '' terminal_py <<'PY'
+import fcntl, os, pty, select, signal, struct, sys, termios
+
+def size(fd, rows, cols):
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", max(1, min(rows, 500)), max(1, min(cols, 500)), 0, 0))
+
+def send(fd, data):
+    while data:
+        data = data[os.write(fd, data):]
+
+rows, cols, argv = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3:]
+pid, fd = pty.fork()
+if pid == 0:
+    size(0, rows, cols)
+    os.environ["TERM"] = "xterm-256color"
+    os.execvp(argv[0], argv)
+waiting = b""
+try:
+    while True:
+        ready, _, _ = select.select([fd, 0], [], [])
+        if fd in ready:
+            try:
+                drawn = os.read(fd, 65536)
+            except OSError:
+                drawn = b""
+            if not drawn:
+                break
+            send(1, drawn)
+        if 0 in ready:
+            got = os.read(0, 65536)
+            if not got:
+                break
+            waiting += got
+            while len(waiting) >= 5:
+                kind, length = waiting[0], struct.unpack(">I", waiting[1:5])[0]
+                if length > 1 << 20:
+                    raise SystemExit(1)
+                if len(waiting) < 5 + length:
+                    break
+                payload, waiting = waiting[5 : 5 + length], waiting[5 + length :]
+                if kind == 0:
+                    send(fd, payload)
+                elif kind == 1 and length == 4:
+                    size(fd, *struct.unpack(">HH", payload))
+except (BrokenPipeError, ConnectionResetError):
+    pass
+finally:
+    for sig in (signal.SIGHUP, signal.SIGKILL):
+        try:
+            os.kill(pid, sig)
+            os.waitpid(pid, 0) if sig == signal.SIGKILL else None
+        except (ProcessLookupError, ChildProcessError):
+            break
+PY
 
 machine=()
 if [ "${words[0]}" = --machine ]; then
@@ -105,6 +167,17 @@ case "${w[0]} ${w[1]}" in
   "pane rename")
     writes
     [ "$n" = 4 ] && [[ ${w[2]} =~ $pane ]] && plain "${w[3]}" 60 || refuse "pane rename <pane id> <label of up to 60 characters>"
+    ;;
+  "terminal "*)
+    # herdr's own client in a pseudo-terminal: the whole screen, or one agent attached, with the rows and columns given.
+    writes
+    [ ${#machine[@]} = 0 ] && within "${w[1]}" 1 500 && within "${w[2]}" 1 500 && { [ "$n" = 3 ] || { [ "$n" = 4 ] && [[ ${w[3]} =~ $pane ]]; }; } ||
+      refuse "terminal <rows> <cols> [<pane>], on this machine only"
+    [ "$n" = 3 ] || agent_in "${w[3]}"
+    command -v python3 >/dev/null || refuse "herdr's terminal needs python3 on this machine"
+    attach=()
+    [ "$n" = 3 ] || attach=(agent attach "${w[3]}")
+    exec python3 -I -c "$terminal_py" "${w[1]}" "${w[2]}" "$herdr" "${attach[@]}"
     ;;
   "pane read")
     [ "$n" = 9 ] && [[ ${w[2]} =~ $pane ]] && [ "${w[3]}" = --source ] && [[ ${w[4]} == visible || ${w[4]} == recent ]] && [ "${w[5]}" = --format ] &&

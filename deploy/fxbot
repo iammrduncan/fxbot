@@ -424,14 +424,16 @@ herdr_door() {
   printf '%s\n' "[Unit]" "Description=fxbot's door to herdr" "" "[Socket]" "ListenStream=$control/herdr.sock" "Accept=yes" \
     "SocketUser=root" "SocketGroup=${group:-$FXBOT_GID}" "SocketMode=0660" "MaxConnections=64" "" "[Install]" "WantedBy=sockets.target" >"$unit.socket"
   printf '%s\n' "[Unit]" "Description=fxbot's door to herdr" "" "[Service]" "User=$user" "Environment=HERDR_BIN=$bin" \
-    "ExecStart=$here/herdr-door$read_only" "StandardInput=socket" "StandardOutput=socket" "StandardError=journal" "RuntimeMaxSec=15min" >"$unit@.service"
+    "ExecStart=$here/herdr-door$read_only" "StandardInput=socket" "StandardOutput=socket" "StandardError=journal" "RuntimeMaxSec=1d" >"$unit@.service"
   systemctl daemon-reload
   systemctl enable fxbot-herdr.socket >/dev/null 2>&1
   systemctl restart fxbot-herdr.socket || die "the door's socket didn't start. See: journalctl -u fxbot-herdr.socket"
   if [ -n "$read_only" ]; then
     echo "fxbot's app can now list and read herdr's agents, as $user, here and on herdr's saved machines. It can't send them work or start them."
   else
-    echo "fxbot's app can now list and read herdr's agents, send them work, and start new ones, as $user, here and on herdr's saved machines."
+    echo "fxbot's app can now list and read herdr's agents, send them work, start new ones, and press keys in them, as $user, here and on herdr's saved machines."
+    echo "It can also open herdr's own screen in its page, which can open a shell as $user. To let it only look, run: sudo fxbot herdr on --read-only"
+    runuser -u "$user" -- bash -c 'command -v python3' >/dev/null 2>&1 || echo "herdr's screen in fxbot needs python3 on this machine, which $user doesn't have."
   fi
   echo "Close it with: sudo fxbot herdr off"
 }

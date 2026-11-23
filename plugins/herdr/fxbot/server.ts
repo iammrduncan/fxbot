@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { connect } from "node:net";
@@ -11,7 +11,7 @@ import type { PluginApi } from "@fxbot/sdk";
 // herdr-terminals.md). The owner sees each agent's terminal in the page and types into it. It runs only herdr's CLI:
 // through the door that `sudo fxbot herdr on` opens in a release, or directly in a checkout run by herdr's own user. It
 // builds each command from checked input, and the door checks every word again on the machine. It types only into a
-// pane with an agent in it, and never closes anything.
+// pane with an agent in it, and never closes anything. The owner's terminal in the page is herdr's own client.
 
 type Said = { ok: true; result: any; text: string } | { ok: false; code: string; message: string };
 type Watch = { id: number; bot: string; machine: string; agent: string; shown: string | null; prompt: string; asked: string | null; state: string; started_at: Date; told: boolean };
@@ -783,6 +783,85 @@ export default async function setup(fx: PluginApi) {
   // Every agent kept, for a sent tag's status.
   fx.route("GET", "/panes", async () => json((await panes()).map((p) => ({ machine: p.machine || "local", pane: p.pane, name: p.name, status: p.status, seenAt: p.seen_at }))));
 
+  // --- herdr's own client, in a terminal in the page: the whole screen, or one agent attached, on the machine fxbot runs
+  // on (docs/phases/herdr-screen.md). Through the door when it's open, or fxbot/terminal.py here, in a pseudo-terminal.
+  // What the page sends is typed, and a text message {"cols","rows"} is a new size. Either side's end ends the other.
+  const terminals = new Set<(code?: number, why?: string) => void>();
+  const frame = (kind: number, payload: Buffer) => {
+    const head = Buffer.alloc(5);
+    head[0] = kind;
+    head.writeUInt32BE(payload.length, 1);
+    return Buffer.concat([head, payload]);
+  };
+  const sized = (n: unknown, fallback: number) => Math.min(500, Math.max(1, Math.trunc(Number(n)) || fallback));
+  fx.socket("/terminal", (page, request) => {
+    const query = new URL(request.url).searchParams;
+    const rows = sized(query.get("rows"), 40);
+    const cols = sized(query.get("cols"), 120);
+    const pane = query.get("pane") ?? "";
+    if (pane && !paneId.test(pane)) return page.close(1008, "Name a pane by its id, such as w1:p2.");
+    if (terminals.size >= 8) return page.close(1013, "Eight herdr terminals are open, the most at once.");
+    let input: { write(data: Buffer): unknown; end(): unknown } | null = null;
+    let stop = () => {};
+    let ended = false;
+    let first = true;
+    const end = (code = 1000, why = "") => {
+      if (ended) return;
+      ended = true;
+      terminals.delete(end);
+      try {
+        input?.end();
+      } catch {}
+      stop();
+      page.close(code, why.slice(0, 120));
+    };
+    terminals.add(end);
+    const drawn = (chunk: Buffer) => {
+      // The door answers a refusal in herdr's shape before any terminal: it's said as the socket's end.
+      if (first && chunk[0] === 0x7b) {
+        const said = parse(chunk.toString("utf8"), true);
+        if (!said.ok) return end(1011, failed(said));
+      }
+      first = false;
+      page.send(chunk);
+    };
+    const path = door();
+    if (existsSync(path)) {
+      const socket = connect(path);
+      socket.on("connect", () => socket.write(["terminal", String(rows), String(cols), ...(pane ? [pane] : []), ""].map((word) => `${word}\0`).join("")));
+      socket.on("data", drawn);
+      socket.on("close", () => end());
+      socket.on("error", (error: NodeJS.ErrnoException) => end(1011, error.code === "EACCES" ? `fxbot may not use herdr's door at ${path}.` : `herdr's door: ${error.message}`));
+      input = socket;
+      stop = () => socket.destroy();
+    } else {
+      // herdr's client started in one of herdr's own panes would be inside it, so the pane's own variables go.
+      const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^HERDR_(PANE_ID|TAB_ID|WORKSPACE_ID|ENV|STARTUP_CWD)$/.test(name)));
+      const command = (fx.settings.herdr ?? "").trim() || "herdr";
+      const child = spawn("python3", ["-I", join(import.meta.dirname, "terminal.py"), String(rows), String(cols), command, ...(pane ? ["agent", "attach", pane] : [])], { env, stdio: ["pipe", "pipe", "pipe"] });
+      let said = "";
+      child.stdout.on("data", drawn);
+      child.stderr.on("data", (chunk: Buffer) => (said = (said + chunk.toString("utf8")).slice(-300)));
+      child.stdin.on("error", () => {});
+      child.on("error", (error: NodeJS.ErrnoException) => end(1011, error.code === "ENOENT" ? "herdr's screen needs python3 on this machine." : error.message));
+      child.on("close", () => end(1000, said.trim().split("\n").at(-1) ?? ""));
+      input = child.stdin;
+      stop = () => child.kill("SIGTERM");
+    }
+    page.onmessage = (data) => {
+      if (ended || !input) return;
+      if (typeof data !== "string") return void input.write(frame(0, Buffer.from(data)));
+      try {
+        const size = JSON.parse(data);
+        const both = Buffer.alloc(4);
+        both.writeUInt16BE(sized(size.rows, rows), 0);
+        both.writeUInt16BE(sized(size.cols, cols), 2);
+        input.write(frame(1, both));
+      } catch {}
+    };
+    page.onclose = () => end();
+  });
+
   // --- After a load: watches still working go on, and an ended one not yet told is told. It waits 10 seconds, as
   // routines and subagents do, since fxbot takes no turns while it starts.
   const pickUp = setTimeout(async () => {
@@ -802,6 +881,7 @@ export default async function setup(fx: PluginApi) {
     unloaded = true;
     clearTimeout(pickUp);
     clearTimeout(syncTimer);
+    for (const end of terminals) end(1001, "fxbot reloaded herdr's plugin.");
     for (const timer of retries) clearTimeout(timer);
     for (const stop of running) stop.abort();
   };

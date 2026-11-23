@@ -1,13 +1,14 @@
 {
   "name": "herdr",
   "version": "0.3.0",
-  "description": "Bots see the coding agents herdr runs, here and on its saved machines, send them work, start new ones, press keys in them, and hear back when one is done. You see each agent's terminal and type into it, and tag one in a chat with @herdr:.",
+  "description": "Bots see the coding agents herdr runs, here and on its saved machines, send them work, start new ones, press keys in them, and hear back when one is done. herdr's own screen opens in the page, and you tag an agent in a chat with @herdr:.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {
       "minFxbot": "0.9.0",
       "server": "./fxbot/server.ts",
       "page": "./fxbot/page.js",
+      "css": "./fxbot/page.css",
       "migrations": "./fxbot/migrations",
       "settings": [
         { "name": "kinds", "description": "The agents bots may start, comma-separated", "default": "claude, codex, opencode, pi" },

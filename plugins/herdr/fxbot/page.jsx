@@ -1,9 +1,12 @@
-// How herdr's tools show in a reply, the plugin's tab in Settings, and the owner's terminals: the agents on every
-// machine, and each one's screen with a keyboard. A chat's stream carries only the start of a tool's result, so the
+// How herdr's tools show in a reply, the plugin's tab in Settings, and herdr's own screen in a terminal: the whole of
+// it, or one agent attached, where herdr draws everything and takes every key (docs/phases/herdr-screen.md). An agent
+// on another machine, which herdr can't attach to from here, has a screen read from herdr, with keys. A chat's stream carries only the start of a tool's result, so the
 // agents card shows the list's summary and loads the agents themselves on Show, and a prompt's card follows its watch
 // by the id its result starts with. Built into page.js; see the README.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { api, go, ui } from "@fxbot/app";
+import { Terminal as XTerm } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
 
 async function call(path, method = "GET", body) {
   const res = await api(path, { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
@@ -152,8 +155,182 @@ const keyRow = [
   ["3", "3"],
 ];
 
-// One agent's terminal: its screen, asked every second while it's in view, and what the owner types, in order.
-function Terminal({ params }) {
+// --- herdr's own client in a terminal: what it draws comes over the plugin's socket, and every key goes back.
+const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+const terminalSocket = (query) => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/plugins/herdr/terminal?${query}`;
+// What a phone's keyboard lacks, for herdr and the agents in it: Ctrl holds for the next key.
+const extras = [
+  ["Esc", "\x1b"],
+  ["Tab", "\t"],
+  ["↑", "A"],
+  ["↓", "B"],
+  ["←", "D"],
+  ["→", "C"],
+];
+function Live({ pane }) {
+  const { Button } = ui;
+  const box = useRef(null);
+  const line = useRef(null);
+  const [problem, setProblem] = useState("");
+  const [round, setRound] = useState(0);
+  const [ctrl, setCtrl] = useState(false);
+  const held = useRef(false);
+  held.current = ctrl;
+  useEffect(() => {
+    const term = new XTerm({ fontSize: touch ? 12 : 13, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", cursorBlink: true, theme: { background: "#0f1115" } });
+    const fit = new FitAddon();
+    term.loadAddon(fit);
+    term.open(box.current);
+    fit.fit();
+    const socket = new WebSocket(terminalSocket(new URLSearchParams({ rows: String(term.rows), cols: String(term.cols), ...(pane ? { pane } : {}) })));
+    socket.binaryType = "arraybuffer";
+    const send = (data) => socket.readyState === WebSocket.OPEN && socket.send(typeof data === "string" ? new TextEncoder().encode(data) : data);
+    const resize = () => {
+      if (!box.current?.offsetWidth) return;
+      fit.fit();
+      if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ rows: term.rows, cols: term.cols }));
+    };
+    socket.onopen = () => (setProblem(""), resize(), touch || term.focus());
+    socket.onmessage = (event) => term.write(typeof event.data === "string" ? event.data : new Uint8Array(event.data));
+    socket.onclose = (event) => setProblem(event.reason || "herdr's screen closed.");
+    const typed = term.onData((data) => {
+      if (held.current && data.length === 1) (setCtrl(false), (data = String.fromCharCode(data.toUpperCase().charCodeAt(0) & 0x1f)));
+      send(data);
+    });
+    const raw = term.onBinary((data) => send(Uint8Array.from(data, (c) => c.charCodeAt(0))));
+    const watch = new ResizeObserver(resize);
+    watch.observe(box.current);
+    // A drag on a touch screen scrolls as the wheel does: herdr's client asks for the mouse, and a wheel's report goes.
+    const el = box.current;
+    let y = null;
+    let moved = 0;
+    const start = (event) => ((y = event.touches[0].clientY), (moved = 0));
+    const move = (event) => {
+      if (y === null) return;
+      const at = event.touches[0];
+      moved += at.clientY - y;
+      y = at.clientY;
+      const cell = el.clientHeight / term.rows;
+      while (Math.abs(moved) >= cell) {
+        const back = moved > 0;
+        moved += back ? -cell : cell;
+        if (term.modes.mouseTrackingMode === "none") term.scrollLines(back ? -1 : 1);
+        else {
+          const rect = el.getBoundingClientRect();
+          const col = Math.min(term.cols, Math.max(1, Math.floor(((at.clientX - rect.left) / el.clientWidth) * term.cols) + 1));
+          const row = Math.min(term.rows, Math.max(1, Math.floor((at.clientY - rect.top) / cell) + 1));
+          send(`\x1b[<${back ? 64 : 65};${col};${row}M`);
+        }
+      }
+      event.preventDefault();
+    };
+    const stop = () => void (y = null);
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", move, { passive: false });
+    el.addEventListener("touchend", stop);
+    line.current = { send, term };
+    return () => {
+      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchmove", move);
+      el.removeEventListener("touchend", stop);
+      watch.disconnect();
+      typed.dispose();
+      raw.dispose();
+      socket.close();
+      term.dispose();
+      line.current = null;
+    };
+  }, [pane, round]);
+  const press = (key) => {
+    const live = line.current;
+    if (!live) return;
+    const arrow = /^[ABCD]$/.test(key);
+    live.send(arrow ? `\x1b${live.term.modes.applicationCursorKeysMode ? "O" : "["}${key}` : key);
+    live.term.focus();
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, gap: 6 }}>
+      <div style={{ position: "relative", flex: 1, minHeight: 0, background: "#0f1115", borderRadius: 8, overflow: "hidden" }}>
+        <div ref={box} style={{ position: "absolute", inset: 6 }} aria-label={pane ? "The agent's terminal, in herdr" : "herdr"} />
+        {problem && (
+          <div style={{ position: "absolute", inset: "auto 0 12px 0", display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }} className="text-sm">
+            <span style={{ color: "#d4d4d4" }}>{problem}</span>
+            <Button size="sm" variant="secondary" onClick={() => setRound((n) => n + 1)}>
+              Connect again
+            </Button>
+          </div>
+        )}
+      </div>
+      {touch && (
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Keys">
+          {extras.map(([label, key]) => (
+            <Button key={label} type="button" size="xs" variant="outline" className="font-mono" onMouseDown={(e) => e.preventDefault()} onClick={() => press(key)}>
+              {label}
+            </Button>
+          ))}
+          <Button type="button" size="xs" variant={ctrl ? "default" : "outline"} className="font-mono" aria-pressed={ctrl} onMouseDown={(e) => e.preventDefault()} onClick={() => (setCtrl(!ctrl), line.current?.term.focus())}>
+            Ctrl
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The whole herdr screen, as in a terminal on the machine.
+function HerdrScreen() {
+  const { Button, Header } = ui;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      <Header title="herdr">
+        <Button size="sm" variant="ghost" onClick={() => go("/herdr/agents")}>
+          Agents
+        </Button>
+      </Header>
+      <div style={{ display: "flex", flex: 1, minHeight: 0, padding: "0 12px 12px" }}>
+        <Live />
+      </div>
+    </div>
+  );
+}
+
+// One agent: attached, with herdr's own client, on the machine fxbot runs on; read from herdr, with keys, on another.
+function AgentScreen({ params }) {
+  const { Button, Header } = ui;
+  const machine = params.machine || "local";
+  const [who, setWho] = useState(null);
+  useEffect(() => {
+    call(`agents?machine=${encodeURIComponent(machine)}`).then(
+      (list) => {
+        const named = params.pane.toLowerCase();
+        const rows = list.rows.filter((r) => r.pane);
+        setWho(rows.find((r) => r.pane === params.pane || r.target === params.pane) ?? rows.find((r) => r.session === params.pane || r.label.toLowerCase() === named) ?? { missing: true });
+      },
+      () => setWho({ missing: true }),
+    );
+  }, [machine, params.pane]);
+  if (machine !== "local") return <Snapshot params={params} />;
+  const pane = /^w[0-9A-Za-z]+:p[0-9A-Za-z]+$/.test(params.pane) ? params.pane : who?.pane;
+  const title = who && !who.missing ? `${who.kind ? who.kind[0].toUpperCase() + who.kind.slice(1) : "An agent"}${who.label ? ` "${who.label}"` : ""}${who.session ? ` (${who.session})` : ""}` : params.pane;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      <Header title={title}>
+        <Button size="sm" variant="ghost" onClick={() => go("/herdr")}>
+          herdr
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => go("/herdr/agents")}>
+          All agents
+        </Button>
+      </Header>
+      <div style={{ display: "flex", flex: 1, minHeight: 0, padding: "0 12px 12px" }}>
+        {pane ? <Live pane={pane} /> : <p className="text-sm text-muted-foreground">{who?.missing ? `herdr doesn't list ${params.pane} on Local.` : "Asking herdr…"}</p>}
+      </div>
+    </div>
+  );
+}
+
+// An agent on another machine: its screen, asked every second while it's in view, and what the owner types, in order.
+function Snapshot({ params }) {
   const { Button, Header, Input } = ui;
   const machine = params.machine || "local";
   const [screen, setScreen] = useState(null);
@@ -560,9 +737,10 @@ export default function setup(app) {
   app.toolView("start", Sent, { open: true });
   app.settings(Tab);
   // The owner's terminals: a button in the sidebar, the agents, and each one's terminal.
-  app.nav({ label: "herdr", path: "/agents", icon: TerminalIcon });
+  app.nav({ label: "herdr", path: "/", icon: TerminalIcon });
+  app.route("/", HerdrScreen);
   app.route("/agents", AgentsScreen);
-  app.route("/agents/:machine/:pane", Terminal);
+  app.route("/agents/:machine/:pane", AgentScreen);
   // @herdr:<name> in the message box, and in a sent message. A box with an @ list, Messages', reads app.mention.
   app.mention?.({ search });
   app.said(herdrTag, Tag);
