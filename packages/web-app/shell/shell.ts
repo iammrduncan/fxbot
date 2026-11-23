@@ -283,6 +283,12 @@ export class Link {
     this.set("failed", why);
     this.timer = setTimeout(() => void this.connect(), 500);
   }
+  // Back after the app was away 30 seconds or more, when the connection is gone whatever it looks like: fxbot gives one
+  // up after 30 seconds without an answer. So it connects again at once, without waiting on a ping.
+  renew() {
+    if (this.status === "connected") this.lost("The app was away, so it's connecting again.");
+    else if (this.status !== "connecting") void this.connect();
+  }
   // A connection that looks fine may have died while the page was frozen, as iOS does to an app in the background. A
   // ping with no answer in 3 seconds means connect again. One at a time, however many ask.
   private probing: Promise<void> | null = null;
@@ -699,6 +705,10 @@ function pairingScreen(p: Progress) {
 }
 
 function open(link: Link) {
+  // The app opens to it next time.
+  try {
+    localStorage.setItem("fxbot-last", link.p.rid);
+  } catch {}
   if (!link.iframe) {
     // Camera and microphone for the UI's own uses; clipboard for its copy buttons.
     link.iframe = h("iframe", { src: `${frameOrigin(link.p)}/__fxbot/start?path=/`, allow: "camera; microphone; clipboard-read; clipboard-write; fullscreen", title: link.p.name }) as HTMLIFrameElement;
@@ -874,11 +884,27 @@ if (location.pathname === "/pair" && location.hash.length > 1) {
   void pairByLink(fragment);
 } else if (location.pathname === "/pair") view = { name: "pair" };
 render();
-// Coming back to the app, or to a network: each open fxbot checks its connection, and connects again if it must.
-const revive = () => {
-  for (const l of links.values()) if (l.iframe) void l.probe();
+// Launched at its start, the app opens the fxbot used last, so it connects at once. Back goes to the list.
+if (view.name === "home") {
+  let last: string | null = null;
+  try {
+    last = localStorage.getItem("fxbot-last");
+  } catch {}
+  const link = last ? links.get(last) : undefined;
+  if (link) open(link);
+}
+// Coming back to the app, or to a network: each open fxbot checks its connection, and connects again if it must. Back
+// after 30 seconds away, it connects again at once.
+const revive = (away = 0) => {
+  for (const l of links.values()) if (l.iframe) void (away >= 30_000 ? l.renew() : l.probe());
 };
-document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && revive());
-addEventListener("online", revive);
-(navigator as any).connection?.addEventListener?.("change", revive);
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") return void (hiddenAt = Date.now());
+  const away = hiddenAt ? Date.now() - hiddenAt : 0;
+  hiddenAt = 0;
+  revive(away);
+});
+addEventListener("online", () => revive());
+(navigator as any).connection?.addEventListener?.("change", () => revive());
 if ("serviceWorker" in navigator) void navigator.serviceWorker.register("/sw.js").catch(() => {});

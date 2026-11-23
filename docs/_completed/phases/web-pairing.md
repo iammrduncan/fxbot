@@ -911,3 +911,21 @@ Checked in Chromium against the disposable fxbot and the relay under `wrangler d
 - **Regressions:** the end-to-end check passes 16 of 16 in Chromium, Firefox, and WebKit, and the check of a drop with no notice passes.
 
 It reaches devices when the app at web.fxbot.sh is deployed again, apart from a release of fxbot.
+
+### Slow starts and drops (0.11.0, issue #20)
+
+The owner's words in [issue #20](https://github.com/iammrduncan/fxbot/issues/20): "Web PWA doesn't cache well. Cause long startup times on mobile" and "Web pairing webrtc is inconsistent and needs logs to be reviewed for drops and failure to connect. Sometimes have to fallback to tailscale still". What the logs and the code showed:
+
+- **web.fxbot.sh still serves the app from before the fix above.** Its `shell.js` has none of that fix's words, such as "The relay didn't answer", so a phone can still stay on **Connecting…** until the app is closed, which fits needing Tailscale. Deploying the app again brings it, and what's below.
+- **The log, in dev:** 52 connections, 48 direct and 4 over Tailscale, and 52 ends, every one "its path stopped answering", 15 of them within a minute. One attempt in about 50 found no path. The line to the relay was opened 193 times, about once every 1.5 hours. Most ends were the app going to the background, not the network: fxbot gives a connection up 30 seconds after its last answer, and an app in the background doesn't answer, so a locked phone, a switch of apps, and a dropped network all logged the same line.
+- **Every launch waited on the network.** The shell's worker fetched each of its files from the network first, and the frame fetched each plugin's page code over the connection, 20 files and about 1.6 MB, one after another, before the chat could show its folds.
+
+What changed:
+- **The shell's worker answers from its cache.** Its files are the build's, named by its version, and a new build is a new worker, which the browser checks for at each launch. Checked with the app's local Worker in Chromium: a reload takes the page and `shell.js` from the worker with no request to the network, and the app draws with the network off.
+- **A plugin's page code, named by its version, goes through the frame's worker, which keeps it,** as it keeps the build's assets, and the app loads every plugin's at once (in the app's own commit).
+- **The app opens the fxbot used last,** so it connects at launch. Back goes to the list.
+- **Back after 30 seconds away, it connects again at once,** without a 3-second ping that can't answer.
+- **The log says more** (web pairing 0.1.1): each close of the line to the relay, with its code and how long it was up, and an end that came because the device had connected again, as an app back from the background does, says so in place of "its path stopped answering".
+- **Not in this:** compressing what crosses the connection, which both ends of the bridge need; a device's own report of its events, such as going to the background; and caching the frame's own files. They're later work.
+
+The app's changes reach devices when web.fxbot.sh is deployed again: `npm run deploy` in `packages/web-app`, the owner's step.

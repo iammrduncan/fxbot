@@ -5,6 +5,9 @@ export const SHELL = "__FXBOT_SHELL__";
 type Head = { status: number; headers: [string, string][]; protocol?: string; error?: string };
 type Pending = { head?: (h: Head) => void; chunk?: (b: ArrayBuffer) => void; end?: () => void; error?: (e: string) => void; open?: (p: string) => void; msg?: (d: string | ArrayBuffer) => void; close?: (code: number, reason: string) => void };
 
+// A plugin's file named by its version, which never changes under that name, so it's kept like a build's assets.
+export const versioned = (url: URL) => /^\/api\/plugins\/[^/]+\/files\//.test(url.pathname) && url.searchParams.has("v");
+
 // Statuses whose response has no body.
 const empty = new Set([101, 103, 204, 205, 304]);
 

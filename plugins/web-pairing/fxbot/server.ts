@@ -45,7 +45,7 @@ type Ticket = {
   call?: Call;
   timer: ReturnType<typeof setTimeout>;
 };
-type Conn = { pc: RTCPeerConnection; device: string; control?: RTCDataChannel; ready: boolean; connected: boolean; route?: string; since?: number; answered?: number; found?: number };
+type Conn = { pc: RTCPeerConnection; device: string; control?: RTCDataChannel; ready: boolean; connected: boolean; route?: string; since?: number; answered?: number; found?: number; replaced?: boolean };
 
 const TICKET_MS = 10 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
@@ -178,16 +178,20 @@ export default async function webPairing(fx: PluginApi) {
       return fx.log(`Couldn't sign for the relay: ${error}`);
     }
     if (!wanted || listener) return;
+    let opened = 0;
     listener = line(url, () => {
       retry = 1000;
+      opened = Date.now();
       fx.log(`Listening at ${config.relay} as ${rid}.`);
-    }, (l) => {
+    }, (l, code) => {
       if (listener === l) listener = null;
       if (!wanted) return;
       // With jitter, since a deploy of the relay drops every fxbot at once.
       const wait = retry / 2 + Math.random() * retry;
       retry = Math.min(retry * 2, 60_000);
       retryTimer = setTimeout(connectListener, wait);
+      // While it's closed, a device can't reach this fxbot, so each close is said, with how long the line was up.
+      fx.log(`The line to the relay closed (${code})${opened ? ` after ${lasted(Date.now() - opened)}` : " before it opened"}; listening again in ${Math.max(1, Math.round(wait / 1000))} seconds.`);
     });
   }
   function settle() {
@@ -447,8 +451,10 @@ export default async function webPairing(fx: PluginApi) {
     if (!Number.isSafeInteger(seq) || seq <= Number(device.last_seq)) return stop(c, "replay");
     const moved = await fx.sql`update devices set last_seq = ${seq}, last_seen = now() where id = ${device.id} and last_seq < ${seq}`;
     if (!moved.count) return stop(c, "replay");
-    // A device that connects again is done with its attempts that never connected: they'd only hold ports.
+    // A device that connects again is done with its attempts that never connected: they'd only hold ports. One that's
+    // still connected, it gave up on, such as when the app came back from the background: its end says so.
     for (const old of [...conns]) if (old.device === device.id && !old.connected) (old.pc.close(), conns.delete(old));
+    for (const old of conns) if (old.device === device.id && old.connected) old.replaced = true;
     if (conns.size >= 20) return stop(c, "busy");
     const servers = await iceServers(config.ice, fetch, fx.log);
     if (!reach || Date.now() - reachAt > SIX_HOURS) await checkNow().catch(() => null);
@@ -493,7 +499,8 @@ export default async function webPairing(fx: PluginApi) {
         conns.delete(conn);
         end(c);
         if (state === "failed") pc.close();
-        if (conn.since && !ended) fx.log(`${device.name} disconnected after ${lasted(Date.now() - conn.since)}${state === "failed" ? ": its path stopped answering" : ""}.`);
+        if (conn.since && !ended)
+          fx.log(`${device.name} disconnected after ${lasted(Date.now() - conn.since)}${state !== "failed" ? "" : conn.replaced ? ": it had connected again, as an app back from the background does" : ": its path stopped answering"}.`);
         ended = true;
       }
       if (state === "disconnected") {

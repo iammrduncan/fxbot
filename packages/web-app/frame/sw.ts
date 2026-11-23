@@ -1,7 +1,8 @@
 // The frame's service worker: everything the frame's pages load by address, it fetches from fxbot through the shell.
 // fxbot's page itself, its scripts and styles, images in the library, plugins' files, and the pages plugin's frames.
-// Content-hashed assets are kept, so a reopened app draws at once while it connects.
-import { Line, SHELL } from "./port.ts";
+// Content-hashed assets, and plugins' files named by their version, are kept, so a reopened app draws at once while it
+// connects.
+import { Line, SHELL, versioned } from "./port.ts";
 
 declare const self: ServiceWorkerGlobalScope;
 let line: Line | null = null;
@@ -68,7 +69,7 @@ async function handle(request: Request): Promise<Response> {
   // A page of fxbot's only ever loads by GET. Another site that knew this frame's name could send the browser here
   // with a form, and its POST would reach fxbot through the open connection; so a page load that isn't a GET stops here.
   if (request.mode === "navigate" && request.method !== "GET" && request.method !== "HEAD") return new Response("Not here.", { status: 405 });
-  const asset = request.method === "GET" && url.pathname.startsWith("/assets/");
+  const asset = request.method === "GET" && (url.pathname.startsWith("/assets/") || versioned(url));
   if (asset) {
     const kept = await caches.match(request);
     if (kept) return kept;

@@ -2,7 +2,7 @@
 // direct line to the shell for this origin, so a chat's endless stream doesn't wait on the service worker; replaces
 // WebSocket for this host; keeps the service worker in place; and hands the worker a new port when it asks.
 import { askShell } from "./ask.ts";
-import { Line } from "./port.ts";
+import { Line, versioned } from "./port.ts";
 
 const w = window as any;
 if (!w.__fxbotFrame) {
@@ -13,7 +13,11 @@ if (!w.__fxbotFrame) {
   const nativeFetch = window.fetch.bind(window);
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);
-    if (new URL(request.url).origin !== location.origin) return nativeFetch(request);
+    const url = new URL(request.url);
+    if (url.origin !== location.origin) return nativeFetch(request);
+    // A plugin's page code, named by its version, goes through the service worker, which keeps it: it crossed the
+    // connection at every launch before.
+    if (request.method === "GET" && navigator.serviceWorker?.controller && versioned(url)) return nativeFetch(request);
     return (await get()).fetch(request);
   };
 
