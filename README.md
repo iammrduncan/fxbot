@@ -84,7 +84,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
 - [ ] [Knowledge base](docs/phases/knowledge-base.md) (plugin): knowledge the bots draw on
 - [ ] [hc](docs/phases/hc.md) (plugin, with a second door on the machine; deferred until after 0.11.0): bots run coding agents of their own, such as Claude Code, in terminals that stay alive on any of the owner's machines, through herdr-core, hear back when one's turn ends, and the owner watches them live in fxbot
-- [ ] [herdr screen](docs/phases/herdr-screen.md) (plugin): the whole [herdr](https://herdr.dev) interface in the app, live, beyond each agent's terminal
+- [ ] [herdr screen](docs/phases/herdr-screen.md) (plugin, with its door; 0.11.0): herdr itself in the app, a real terminal running herdr's own client, the whole screen or one agent attached
 - [ ] [Web search](docs/phases/web-search.md) (plugin): bots search and read the web, and cite it
 - [ ] [X feed](docs/phases/plugin-x-feed.md) (plugins): bots read X (Twitter) for free with tools of their own, posts, search, mentions, followers, and lists, from X's public pages, its embeds, and FxTwitter, or through a signed-in tab on the bot's computer, and watches start a turn when someone posts or the owner is mentioned
 - [ ] [Embedded links](docs/phases/embedded-links.md) (plugin, with a small core hook): a link on its own line, pasted or in a bot's reply, shows as a preview card, an X post as the post, and a YouTube video as its player, and stays a link to right-click and copy
