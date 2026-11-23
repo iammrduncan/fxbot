@@ -23,7 +23,7 @@ Open a bot's computer from the dot on its screen button, which shows while the c
 
 To use the desktop yourself, choose **Take over**. The mouse and keyboard are yours, and the bot's desktop and terminal tools wait; its shell and file tools go on. Choose **Hand back** when you're done. Closing the screen hands it back too. A computer someone watches doesn't stop while it's open.
 
-When a bot needs you for something only you can do, such as a sign-in, a passkey, or a CAPTCHA, it asks: the dot turns orange, and the computer's screen says what it needs. Do it, then choose **Hand back**. The bot hears, looks at the screen, and carries on.
+When a bot needs you for something only you can do, such as a sign-in, a passkey, or a human check like an "I'm not a robot" box, it asks: the dot turns orange, and the computer's screen says what it needs. A bot doesn't try a human check itself: it hands it to you at once. Do it, then choose **Hand back**. The bot hears, looks at the screen, and carries on.
 
 ## Give a room a computer
 

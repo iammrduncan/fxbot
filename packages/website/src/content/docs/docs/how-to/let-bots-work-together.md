@@ -30,7 +30,7 @@ A tag doesn't wake the bot you tag. The bot you're talking to sends the message:
 
 A message wakes a bot that's idle, and joins what a working bot is doing. Either way the bot is told who it's from, and that a bot's words aren't yours.
 
-A message expects a reply. The bot can say "got it, on it" first and carry on working. When its turn ends, its last message goes to whoever asked, unless it has just sent them its answer. If it had nothing to say, or it failed, they're told so.
+A message expects a reply. The bot can say "got it, on it" first and carry on working. When its turn ends, its last message goes to whoever asked, unless it has just sent them its answer. If it had nothing to say, or it failed, they're told so. A bot that asked several others hears who's still to answer after each reply, and after the last one, it answers you once, with what everyone found.
 
 A bot can also send a message that needs no reply, such as "got it" or a finished result. A no-reply message can't be answered from the turn it wakes, so two bots can't thank each other forever.
 
