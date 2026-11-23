@@ -166,7 +166,7 @@ sudo fxbot herdr on --user <login> --read-only
 sudo fxbot herdr off
 ```
 
-Opens the [herdr](/docs/how-to/work-with-herdr-agents/) plugin's door to herdr (`on`), or closes it (`off`). The door is `/var/lib/fxbot/control/herdr.sock`, which fxbot's container already sees: systemd's `fxbot-herdr.socket` listens there, for the `fxbot` group only, and runs `/opt/fxbot/herdr-door` as herdr's user for each connection. The script comes with each release, and `fxbot update` brings the new one. It takes a short list of herdr's commands, checks every word, and refuses the rest: no pane commands, keys, environment, or an agent's own flags. Only root opens the door: the app can't ask for it.
+Opens the [herdr](/docs/how-to/work-with-herdr-agents/) plugin's door to herdr (`on`), or closes it (`off`). The door is `/var/lib/fxbot/control/herdr.sock`, which fxbot's container already sees: systemd's `fxbot-herdr.socket` listens there, for the `fxbot` group only, and runs `/opt/fxbot/herdr-door` as herdr's user for each connection. The script comes with each release, and `fxbot update` brings the new one. It takes a short list of herdr's commands, checks every word, and refuses the rest: no pane commands but reading one and typing into one with an agent in it, no environment, and no agent's own flags. Only root opens the door: the app can't ask for it.
 
 `on` checks that herdr's server runs for that user, asks each saved machine the way the door will, with no SSH agent, and names any it can't reach. `fxbot status` says whether the door is open, and `fxbot uninstall` closes it.
 

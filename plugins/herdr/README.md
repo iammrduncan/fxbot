@@ -1,21 +1,26 @@
 # herdr
 
-A plugin for [fxbot](https://fxbot.sh): bots see the coding agents [herdr](https://herdr.dev) runs, on fxbot's machine and on herdr's saved machines, send them work, start new ones, and hear back when one is done.
+A plugin for [fxbot](https://fxbot.sh): bots see the coding agents [herdr](https://herdr.dev) runs, on fxbot's machine and on herdr's saved machines, send them work, start new ones, press keys in them, and hear back when one is done. You see each agent's terminal in fxbot, and type into it.
 
-- `herdr_agents` lists the agents on a bot's machines: each one's machine, workspace, and tab, as herdr names them, its name or pane id for calls, kind, status, folder, and title. The chat shows how many, and **Show agents now** lists them.
+- `herdr_agents` lists the agents on a bot's machines: each one's machine, workspace, and tab, as herdr names them, its name or pane id for calls, its pane, its session's own name, kind, status, folder, and title. The chat shows how many, and **Show agents now** lists them.
 - `herdr_read` reads an agent's recent lines.
 - `herdr_prompt` sends a ready agent work and answers at once. When the agent finishes or stops to wait for you, its last lines reach the bot's own chat, from **herdr**, which wakes it.
 - `herdr_start` starts an agent in a folder, in a tab of its own in herdr's **fxbot bots** workspace on that machine, with a label on its pane if the bot gives one, and with a prompt, sends it work.
+- `herdr_keys` types text and presses keys in an agent's terminal, such as `1` and Enter at its question, or Escape to stop it, and answers with its screen after. When the keys leave it working, its answer comes back as a prompt's does.
 - The `herdr` skill tells bots how to use them, and how to answer what the agents are doing. A bot says where an agent is in a sentence, with herdr's names: \"Claude in the thermite tab of fxbot on Local is idle.\"
 
-The two that read are safe, so [Permissions](https://fxbot.sh/docs/how-to/choose-what-a-bot-can-do-alone/) runs them without asking. Sending work and starting agents go through the bot's mode. No tool presses keys, answers an agent's approval, interrupts an agent, or closes anything: you do those in herdr.
+The two that read are safe, so [Permissions](https://fxbot.sh/docs/how-to/choose-what-a-bot-can-do-alone/) runs them without asking. Sending work, starting agents, and keys go through the bot's mode. The skill tells a bot to answer another agent's question or approval only with your word. No tool closes anything, or types into a pane with only a shell in it.
+
+**An agent's names.** The owner calls an agent by the label they gave its pane in herdr, and Claude Code names each of its sessions, such as `thermite-e9`, which its other sessions message it by. The plugin finds that name in Claude Code's own file for each running session, `~/.claude/sessions/<pid>.json`, on the machine fxbot runs on, reading only its id and name. Every tool's `agent` takes a target, a pane's label, or a session's name.
+
+**Its terminal, for you.** **herdr** in the sidebar lists every machine's agents. Pick one to see its terminal as herdr draws it, asked again every second while it's open, with a row of keys, a line to type in, and on a computer, the keyboard once you click the screen. **Earlier lines** shows 400 recent lines. A prompt's card in the chat opens its agent's terminal.
 
 Add it from **Plugins**. It needs fxbot 0.9.0 or newer. It runs inside fxbot: read its code there before you add it. See [Work with your herdr agents](https://fxbot.sh/docs/how-to/work-with-herdr-agents/).
 
 ## Reaching herdr
 
 The plugin runs only herdr's CLI:
-- **Through the door,** when its socket exists. In a release install, `sudo fxbot herdr on` opens it, from `deploy/herdr-door` in fxbot's own repository: it checks every word of each command, and runs the allowed ones as herdr's user.
+- **Through the door,** when its socket exists. In a release install, `sudo fxbot herdr on` opens it, from `deploy/herdr-door` in fxbot's own repository: it checks every word of each command, and runs the allowed ones as herdr's user. It reads a pane, or types into one, only when herdr says an agent is in it.
 - **Directly,** otherwise: a checkout run by herdr's own user.
 
 ## Each bot's machines
@@ -49,8 +54,8 @@ Removing the plugin drops the schema.
 | File | What it is |
 | --- | --- |
 | `plugin.json` | Its name, version, parts, and settings |
-| `fxbot/server.ts` | The tools, herdr's CLI through the door or directly, the watches, and the routes |
-| `fxbot/page.jsx` | The cards, a bot's machines, and the plugin's tab |
+| `fxbot/server.ts` | The tools, herdr's CLI through the door or directly, the watches, the sessions' names, and the routes |
+| `fxbot/page.jsx` | The cards, a bot's machines, the plugin's tab, the agents, and each agent's terminal |
 | `fxbot/page.js` | `page.jsx`, built |
 | `fxbot/migrations/` | Its three tables, and how a prompt's agent is shown |
 | `skills/herdr/SKILL.md` | How bots use the tools |

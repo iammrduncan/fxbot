@@ -1,9 +1,9 @@
 ---
 title: "Work with your herdr agents"
-description: "Bots see the coding agents herdr runs, on fxbot's machine and on herdr's saved machines, send them work, start new ones, and hear back when one is done. You choose each bot's machines."
+description: "Bots see the coding agents herdr runs, on fxbot's machine and on herdr's saved machines, send them work, start new ones, press keys in them, and hear back when one is done. You see each agent's terminal and type into it, and choose each bot's machines."
 ---
 
-[herdr](https://herdr.dev) runs coding agents, such as Claude Code and Codex, in terminal panes, on your machine and on the machines you saved in it. With the herdr plugin, a bot sees those agents, reads what they show, sends them work, starts new ones, and hears back when one is done.
+[herdr](https://herdr.dev) runs coding agents, such as Claude Code and Codex, in terminal panes, on your machine and on the machines you saved in it. With the herdr plugin, a bot sees those agents, reads what they show, sends them work, starts new ones, answers their questions when you say so, and hears back when one is done. You see each agent's terminal in fxbot, and type into it.
 
 1. Add **herdr** from **Plugins**, on **Browse**. It isn't in **Essentials**. It needs fxbot 0.9.0 or newer.
 2. Let fxbot reach herdr, below.
@@ -24,7 +24,7 @@ It runs as root, and herdr runs as root there. When herdr runs as another user, 
 sudo fxbot herdr on --user <login>
 ```
 
-The door is a socket in fxbot's control folder that takes a short list of herdr's commands, checks each word, and runs them as herdr's user: list and read agents, send one a prompt, wait for it, and start one. It never types into a terminal, presses keys, passes an agent flags of its own, or changes herdr. To let bots look but not send work or start agents, add `--read-only`. `sudo fxbot status` says whether it's open, and `sudo fxbot herdr off` closes it.
+The door is a socket in fxbot's control folder that takes a short list of herdr's commands, checks each word, and runs them as herdr's user: list and read agents, send one a prompt, wait for it, start one, and type and press keys in one. It reads a pane, or types into one, only when herdr says an agent is in it, never a shell. It never passes an agent flags of its own, or changes herdr. To let bots and you look but not send work, keys, or start agents, add `--read-only`. Opened by an older fxbot, the door takes keys once `fxbot update` brings the new one. `sudo fxbot status` says whether it's open, and `sudo fxbot herdr off` closes it.
 
 `fxbot herdr on` also asks each saved machine the way the door will, with no SSH agent, and names any it can't reach. A machine whose SSH key has a passphrase needs it loaded where the door sees it.
 
@@ -48,13 +48,25 @@ herdr pane rename w1:p8 patcher
 
 Then a bot says: Claude "patcher" in the thermite tab of fxbot on Local is working. A label stays with the pane, so a new agent there keeps it. A bot that starts an agent gives its pane a label of its own, saying what it's for.
 
+Claude Code names its sessions too, such as `thermite-e9`, and its sessions message each other by those names. The plugin reads each running Claude's name on the machine fxbot runs on, so a bot lists it beside the label, Claude "patcher" (thermite-e9), and you can use either: "ask thermite-e9 what's left." On other machines, it has the label and the title.
+
 ## Work it hands on
 
 A bot says where an agent is in a sentence, with herdr's names, so you can find it in herdr: "Claude in the thermite tab of fxbot on Local is idle." Local is the machine fxbot runs on.
 
 - **A prompt** goes to an agent that's ready. The bot gets an answer at once, and carries on. When the agent finishes, or stops to wait for you, its last lines reach the bot's chat as a message from **herdr**, which wakes the bot, and it tells you what happened. A card in the chat follows the prompt, from **Working on it** to **Answered**.
 - **An agent it starts** opens in a tab of its own, in a workspace named **fxbot bots** on that machine, so it stays out of your own tabs. It starts with its own settings there: one that asks before acting still asks.
-- **An agent waiting for you,** at an approval or a question, is yours to answer in herdr. The bot tells you which one is waiting, and where. It never answers one, and it never presses keys, interrupts an agent, or closes a tab: you do those in herdr.
+- **An agent waiting for you,** at an approval or a question: the bot tells you which one is waiting, where, and what it asks. Answer it yourself in its terminal, below, or in herdr, or tell the bot what to answer: "say yes", "pick 2". Only then does it press keys, and it tells you what it pressed and what the agent shows now. It can stop an agent with Escape the same way. It never closes a tab.
+
+## See an agent's terminal
+
+**herdr** in the sidebar lists every machine's agents. Pick one to see its terminal as herdr draws it, kept up to date while it's open. Type into it there:
+
+- **The keys** below it: Esc, Tab, the arrows, Enter, Ctrl+C, 1, 2, and 3, for a question or a menu.
+- **The line** below them: type, and **Send** types it and presses Enter.
+- **On a computer,** click the screen, and your keyboard goes to the agent until you click outside it.
+
+**Earlier lines** shows the last 400 lines instead of the screen. A prompt's card in the chat has **Open its terminal**.
 
 A bot waits for an answer up to `hours`, 4 by default. Past that, it says the agent is still working, and stops waiting. If fxbot restarts meanwhile, it picks the wait up again, and the answer still comes once.
 
@@ -71,7 +83,8 @@ A bot waits for an answer up to `hours`, 4 by default. Past that, it says the ag
 
 ## What it costs
 
-- **Each message to a bot it's on for:** four tools, about 900 tokens, cached with the rest, and the skill's line.
+- **Each message to a bot it's on for:** five tools, about 1,200 tokens, cached with the rest, and the skill's line.
 - **A call:** herdr's own time, about 2 ms on this machine and a few hundred on another. A list asks every machine at once.
 - **A prompt waiting for an answer:** one open connection to herdr until the agent settles.
+- **A terminal open in the page:** two herdr calls a second, while it's in view.
 - **Idle:** nothing.

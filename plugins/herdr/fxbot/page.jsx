@@ -1,8 +1,9 @@
-// How herdr's tools show in a reply, and the plugin's tab in Settings. A chat's stream carries only the start of a tool's
-// result, so the agents card shows the list's summary and loads the agents themselves on Show, and a prompt's card
-// follows its watch by the id its result starts with. Built into page.js; see the README.
-import { useEffect, useState } from "react";
-import { api, ui } from "@fxbot/app";
+// How herdr's tools show in a reply, the plugin's tab in Settings, and the owner's terminals: the agents on every
+// machine, and each one's screen with a keyboard. A chat's stream carries only the start of a tool's result, so the
+// agents card shows the list's summary and loads the agents themselves on Show, and a prompt's card follows its watch
+// by the id its result starts with. Built into page.js; see the README.
+import { useEffect, useRef, useState } from "react";
+import { api, go, ui } from "@fxbot/app";
 
 async function call(path, method = "GET", body) {
   const res = await api(path, { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
@@ -15,7 +16,16 @@ const statusText = { working: "Working", blocked: "Waiting for you", done: "Done
 const dot = { working: "bg-primary", blocked: "bg-destructive", done: "bg-muted-foreground", idle: "bg-muted-foreground", unknown: "bg-border" };
 const firstLine = (text) => (text ?? "").split("\n")[0];
 
-function Table({ rows }) {
+// An agent's terminal, in the page: /herdr/agents/<machine>/<pane>.
+const terminalOf = (machine, pane) => `/herdr/agents/${encodeURIComponent(machine || "local")}/${encodeURIComponent(pane)}`;
+const open = (href) => (event) => {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+  event.preventDefault();
+  go(href);
+};
+
+// Each machine's agents, and with `big`, roomier rows for the agents screen. Each row opens the agent's terminal.
+function Table({ rows, big = false }) {
   const machines = [...new Set(rows.map((r) => r.machine))];
   return (
     <div className="grid gap-3">
@@ -30,20 +40,306 @@ function Table({ rows }) {
                   Didn't answer: {r.unreachable}
                 </p>
               ) : (
-                <div key={r.target} className="flex min-w-0 items-center gap-2 text-xs">
+                <a
+                  key={r.pane || r.target}
+                  href={terminalOf(r.machine, r.pane || r.target)}
+                  onClick={open(terminalOf(r.machine, r.pane || r.target))}
+                  className={`flex min-w-0 items-center gap-2 rounded-md hover:bg-muted ${big ? "px-2 py-2 text-sm" : "text-xs"}`}
+                  title="Open its terminal"
+                >
                   <span className={`size-2 shrink-0 rounded-full ${dot[r.status] ?? dot.unknown}`} />
-                  <span className="shrink-0">{[r.workspace, r.tab].filter(Boolean).join(" · ") || r.target}{r.label ? ` "${r.label}"` : ""}</span>
+                  <span className="shrink-0">
+                    {[r.workspace, r.tab].filter(Boolean).join(" · ") || r.target}
+                    {r.label ? ` "${r.label}"` : ""}
+                    {r.session ? ` (${r.session})` : ""}
+                  </span>
                   <span className="shrink-0 text-muted-foreground">{r.kind}</span>
                   <span className={`shrink-0 ${r.status === "blocked" ? "font-medium text-destructive" : ""}`}>{statusText[r.status] ?? r.status}</span>
                   <span className="min-w-0 truncate text-muted-foreground" title={r.folder}>
                     {r.title || r.folder}
                   </span>
-                </div>
+                </a>
               ),
             )}
         </div>
       ))}
     </div>
+  );
+}
+
+// --- The owner's terminals.
+// herdr's screen is text with colors (SGR) only: no cursor moves. Each run of text keeps its style; any other escape
+// a terminal could send is dropped.
+const palette = ["#1e1e1e", "#e06c75", "#98c379", "#e5c07b", "#61afef", "#c678dd", "#56b6c2", "#d4d4d4", "#7f848e", "#f47c86", "#a8d68a", "#f0cf8a", "#7cc0f5", "#d79ce8", "#6fd0dc", "#ffffff"];
+const screenColors = { background: "#0f1115", color: "#d4d4d4" };
+function color256(n) {
+  if (n < 16) return palette[n];
+  if (n >= 232) return `rgb(${8 + (n - 232) * 10},${8 + (n - 232) * 10},${8 + (n - 232) * 10})`;
+  const c = (x) => (x ? 55 + x * 40 : 0);
+  const m = n - 16;
+  return `rgb(${c(Math.floor(m / 36))},${c(Math.floor(m / 6) % 6)},${c(m % 6)})`;
+}
+function sgr(style, codes) {
+  let next = { ...style };
+  for (let i = 0; i < codes.length; i++) {
+    const n = codes[i];
+    if (n === 0) next = {};
+    else if (n === 1) next.bold = true;
+    else if (n === 2) next.dim = true;
+    else if (n === 3) next.italic = true;
+    else if (n === 4) next.underline = true;
+    else if (n === 7) next.inverse = true;
+    else if (n === 22) next.bold = next.dim = false;
+    else if (n === 23) next.italic = false;
+    else if (n === 24) next.underline = false;
+    else if (n === 27) next.inverse = false;
+    else if (n >= 30 && n <= 37) next.fg = palette[n - 30];
+    else if (n >= 90 && n <= 97) next.fg = palette[n - 82];
+    else if (n >= 40 && n <= 47) next.bg = palette[n - 40];
+    else if (n >= 100 && n <= 107) next.bg = palette[n - 92];
+    else if (n === 39) next.fg = undefined;
+    else if (n === 49) next.bg = undefined;
+    else if ((n === 38 || n === 48) && codes[i + 1] === 5) (next[n === 38 ? "fg" : "bg"] = color256(codes[i + 2] ?? 0)), (i += 2);
+    else if ((n === 38 || n === 48) && codes[i + 1] === 2) (next[n === 38 ? "fg" : "bg"] = `rgb(${codes[i + 2] ?? 0},${codes[i + 3] ?? 0},${codes[i + 4] ?? 0})`), (i += 4);
+  }
+  return next;
+}
+function runs(text) {
+  const out = [];
+  const escape = /\x1b\[([0-9;:]*)([@-~])|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[@-_]?|[\r\x00-\x08\x0b-\x1f\x7f]/g;
+  let style = {};
+  let at = 0;
+  for (let m; (m = escape.exec(text)); ) {
+    if (m.index > at) out.push({ text: text.slice(at, m.index), style });
+    at = escape.lastIndex;
+    if (m[2] === "m") style = sgr(style, (m[1] || "0").split(/[;:]/).map((n) => Number(n) || 0));
+  }
+  if (at < text.length) out.push({ text: text.slice(at), style });
+  return out;
+}
+function Screen({ text }) {
+  return runs(text).map((run, i) => {
+    const s = run.style;
+    const fg = s.inverse ? (s.bg ?? screenColors.background) : s.fg;
+    const bg = s.inverse ? (s.fg ?? screenColors.color) : s.bg;
+    const css = { color: fg, background: bg, fontWeight: s.bold ? 700 : undefined, opacity: s.dim ? 0.6 : undefined, fontStyle: s.italic ? "italic" : undefined, textDecoration: s.underline ? "underline" : undefined };
+    return Object.values(css).some((v) => v !== undefined) ? <span key={i} style={css}>{run.text}</span> : run.text;
+  });
+}
+
+// A key from the keyboard, as herdr names it, or text to type. Null for what herdr has no name for.
+function keyOf(event) {
+  if (event.metaKey || event.isComposing) return null;
+  const shift = event.shiftKey ? "shift+" : "";
+  const named = { Enter: "enter", Escape: "esc", Backspace: "backspace", Tab: event.shiftKey ? "shift+tab" : "tab", ArrowUp: `${shift}up`, ArrowDown: `${shift}down`, ArrowLeft: `${shift}left`, ArrowRight: `${shift}right` }[event.key];
+  if (named && !event.ctrlKey && !event.altKey) return { key: named };
+  if (/^F([1-9]|1[0-2])$/.test(event.key)) return { key: event.key.toLowerCase() };
+  if (event.key.length !== 1) return null;
+  if (event.ctrlKey || event.altKey) return /^[!-~]$/.test(event.key) ? { key: `${event.ctrlKey ? "ctrl" : "alt"}+${event.key.toLowerCase()}` } : null;
+  return { text: event.key };
+}
+const keyRow = [
+  ["Esc", "esc"],
+  ["Tab", "tab"],
+  ["↑", "up"],
+  ["↓", "down"],
+  ["←", "left"],
+  ["→", "right"],
+  ["Enter", "enter"],
+  ["Ctrl+C", "ctrl+c"],
+  ["1", "1"],
+  ["2", "2"],
+  ["3", "3"],
+];
+
+// One agent's terminal: its screen, asked every second while it's in view, and what the owner types, in order.
+function Terminal({ params }) {
+  const { Button, Header, Input } = ui;
+  const machine = params.machine || "local";
+  const [screen, setScreen] = useState(null);
+  const [who, setWho] = useState(null);
+  const [error, setError] = useState("");
+  const [earlier, setEarlier] = useState(false);
+  const [line, setLine] = useState("");
+  const [focused, setFocused] = useState(false);
+  const queue = useRef([]);
+  const sending = useRef(false);
+  const poke = useRef(() => {});
+  const box = useRef(null);
+  const stick = useRef(true);
+  // A link may name the agent by its name: its pane comes from its machine's list.
+  const pane = /^w[0-9A-Za-z]+:p[0-9A-Za-z]+$/.test(params.pane) ? params.pane : who?.pane;
+  const query = `machine=${encodeURIComponent(machine)}&pane=${encodeURIComponent(pane ?? "")}`;
+
+  useEffect(() => {
+    if (!pane) return;
+    let stopped = false;
+    let timer;
+    const look = async () => {
+      clearTimeout(timer);
+      if (stopped) return;
+      if (document.visibilityState === "visible")
+        await call(`screen?${query}${earlier ? "&earlier=1" : ""}`).then(
+          (s) => !stopped && (setScreen(s), setError("")),
+          (e) => !stopped && setError(e.message),
+        );
+      if (!stopped) timer = setTimeout(look, 1000);
+    };
+    poke.current = () => (clearTimeout(timer), (timer = setTimeout(look, 150)));
+    look();
+    const shown = () => document.visibilityState === "visible" && poke.current();
+    document.addEventListener("visibilitychange", shown);
+    return () => ((stopped = true), clearTimeout(timer), document.removeEventListener("visibilitychange", shown));
+  }, [query, earlier, pane]);
+  // Who it is, in herdr's words, from its machine's list.
+  useEffect(() => {
+    call(`agents?machine=${encodeURIComponent(machine)}`).then(
+      (list) => {
+        const named = params.pane.toLowerCase();
+        const rows = list.rows.filter((r) => r.pane);
+        setWho(rows.find((r) => r.pane === params.pane || r.target === params.pane) ?? rows.find((r) => r.session === params.pane || r.label.toLowerCase() === named) ?? { missing: true });
+      },
+      (e) => setError(e.message),
+    );
+  }, [machine, params.pane]);
+  // A screen stays at its bottom, as a terminal does, unless the owner scrolled up.
+  useEffect(() => {
+    const el = box.current;
+    if (el && stick.current) el.scrollTop = el.scrollHeight;
+  }, [screen?.text]);
+
+  // What the owner types goes out in order: runs of text together, then runs of keys together.
+  async function flush() {
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      while (queue.current.length) {
+        const first = queue.current[0];
+        const run = [];
+        while (queue.current.length && ("text" in queue.current[0]) === ("text" in first) && run.length < 32) run.push(queue.current.shift());
+        const body = "text" in first ? { text: run.map((r) => r.text).join("") } : { keys: run.map((r) => r.key) };
+        await call("keys", "POST", { machine, pane, ...body }).then(() => setError(""), (e) => setError(e.message));
+      }
+    } finally {
+      sending.current = false;
+      poke.current();
+    }
+  }
+  const send = (...items) => pane && (queue.current.push(...items), void flush());
+  const onKeyDown = (event) => {
+    const item = keyOf(event);
+    if (!item) return;
+    event.preventDefault();
+    send(item);
+  };
+  const onPaste = (event) => {
+    const text = event.clipboardData.getData("text").replace(/\r?\n/g, " ").replace(/[\x00-\x1f\x7f]/g, "");
+    event.preventDefault();
+    if (text) send(...(text.match(/[\s\S]{1,4000}/g) ?? []).map((t) => ({ text: t })));
+  };
+  const submit = (event) => {
+    event.preventDefault();
+    const text = line.replace(/[\x00-\x1f\x7f]/g, "");
+    setLine("");
+    send(...(text ? [{ text }] : []), { key: "enter" });
+  };
+
+  const status = screen?.status ?? who?.status;
+  const title = who && !who.missing ? `${who.kind ? who.kind[0].toUpperCase() + who.kind.slice(1) : "An agent"}${who.label ? ` "${who.label}"` : ""}${who.session ? ` (${who.session})` : ""}` : params.pane;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      <Header title={title}>
+        <Button size="sm" variant="ghost" onClick={() => go("/herdr/agents")}>
+          All agents
+        </Button>
+      </Header>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minHeight: 0, padding: "0 12px 12px" }}>
+        <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <span className={`size-2 shrink-0 rounded-full ${dot[status] ?? dot.unknown}`} />
+          <span className={status === "blocked" ? "font-medium text-destructive" : "text-foreground"}>{statusText[status] ?? "…"}</span>
+          <span>
+            {[who?.tab && (/^\d+$/.test(who.tab) ? `tab ${who.tab}` : who.tab), who?.workspace, machine === "local" ? "Local" : machine].filter(Boolean).join(" · ")}
+          </span>
+          <label className="ml-auto flex items-center gap-2">
+            <ui.Switch checked={earlier} onCheckedChange={setEarlier} aria-label="Earlier lines" />
+            Earlier lines
+          </label>
+        </p>
+        <pre
+          ref={box}
+          tabIndex={0}
+          role="textbox"
+          aria-label="The agent's terminal: click, then type"
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onScroll={(e) => (stick.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 24)}
+          className={`min-h-0 flex-1 overflow-auto rounded-md p-3 font-mono text-xs leading-snug outline-none ${focused ? "ring-2 ring-primary" : ""}`}
+          style={{ ...screenColors, whiteSpace: "pre", margin: 0 }}
+        >
+          {screen ? <Screen text={screen.text} /> : who?.missing && !pane ? `herdr doesn't list ${params.pane} on ${machine === "local" ? "Local" : machine}.` : error ? "" : "Asking herdr…"}
+        </pre>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Keys">
+          {keyRow.map(([label, key]) => (
+            <Button key={key} type="button" size="xs" variant="outline" className="font-mono" onClick={() => send({ key })}>
+              {label}
+            </Button>
+          ))}
+        </div>
+        <form className="flex gap-2" onSubmit={submit}>
+          <Input value={line} onChange={(e) => setLine(e.target.value)} placeholder="Type to it, then Send presses Enter" aria-label="Type to the agent" autoComplete="off" autoCapitalize="off" />
+          <Button type="submit" size="sm">
+            Send
+          </Button>
+        </form>
+        <p className="text-xs text-muted-foreground">{focused ? "Your keys go to the agent. Click outside the screen to stop." : "Click the screen to type into it, or use the keys and the line below."}</p>
+      </div>
+    </div>
+  );
+}
+
+// Every machine's agents, asked again every 5 seconds while the screen is in view.
+function AgentsScreen() {
+  const { Header } = ui;
+  const [now, setNow] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let stopped = false;
+    let timer;
+    const look = async () => {
+      if (stopped) return;
+      if (document.visibilityState === "visible") await call("agents").then((list) => !stopped && (setNow(list), setError("")), (e) => !stopped && setError(e.message));
+      if (!stopped) timer = setTimeout(look, 5000);
+    };
+    look();
+    return () => ((stopped = true), clearTimeout(timer));
+  }, []);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      <Header title="herdr" />
+      <div className="grid content-start gap-3 overflow-auto px-3 pb-3 text-sm" style={{ flex: 1, minHeight: 0 }}>
+        {now ? (
+          <>
+            <p className="text-muted-foreground">{now.summary} Pick one to see its terminal and type into it.</p>
+            <Table rows={now.rows} big />
+          </>
+        ) : (
+          !error && <p className="text-muted-foreground">Asking herdr…</p>
+        )}
+        {error && <p className="text-destructive">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
+function TerminalIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m4 17 6-6-6-6" />
+      <path d="M12 19h8" />
+    </svg>
   );
 }
 
@@ -78,7 +374,7 @@ function Agents({ call: tool }) {
 const watchText = {
   working: "Working on it",
   done: "Answered: its last lines went to the chat",
-  blocked: "Waiting for you, in herdr",
+  blocked: "Waiting for you: answer it in its terminal",
   timeout: "Still working when fxbot stopped waiting",
   gone: "Gone before it answered",
   failed: "Couldn't be followed",
@@ -105,6 +401,9 @@ function Sent({ call: tool }) {
     return () => ((stopped = true), clearTimeout(timer));
   }, [id]);
   const who = watch?.shown ?? `${input.agent ?? input.name ?? "An agent"}${input.machine ? ` on ${input.machine}` : ""}`;
+  // The agent as the call named it, which its terminal finds on that machine.
+  const agent = typeof (input.agent ?? input.name) === "string" ? (input.agent ?? input.name).trim() : "";
+  const machine = watch?.machine ?? (typeof input.machine === "string" && input.machine.trim() ? input.machine.trim() : "local");
   const text = input.text ?? input.prompt;
   return (
     <div className="grid gap-1.5 text-sm">
@@ -113,6 +412,11 @@ function Sent({ call: tool }) {
       <p className={tool.error ? "text-destructive" : "text-muted-foreground"}>
         {!tool.done ? "Sending…" : watch ? (watchText[watch.state] ?? watch.state) : firstLine(tool.output)}
       </p>
+      {tool.done && agent && (
+        <a href={terminalOf(machine, agent)} onClick={open(terminalOf(machine, agent))} className="justify-self-start text-xs underline underline-offset-2">
+          Open its terminal
+        </a>
+      )}
     </div>
   );
 }
@@ -220,4 +524,8 @@ export default function setup(app) {
   app.toolView("prompt", Sent, { open: true });
   app.toolView("start", Sent, { open: true });
   app.settings(Tab);
+  // The owner's terminals: a button in the sidebar, the agents, and each one's terminal.
+  app.nav({ label: "herdr", path: "/agents", icon: TerminalIcon });
+  app.route("/agents", AgentsScreen);
+  app.route("/agents/:machine/:pane", Terminal);
 }

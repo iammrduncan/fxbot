@@ -1,17 +1,23 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
+import { readdir, readFile } from "node:fs/promises";
 import { connect } from "node:net";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { PluginApi } from "@fxbot/sdk";
 
-// herdr: bots list, read, prompt, and start the coding agents herdr runs, locally and on its saved machines, and hear back
-// when one they prompted settles (docs/phases/herdr.md). It runs only herdr's CLI: through the door that
-// `sudo fxbot herdr on` opens in a release, or directly in a checkout run by herdr's own user. It builds each command
-// from checked input, and the door checks every word again on the machine. It never sends keys, answers an agent's
-// approval, or closes anything.
+// herdr: bots list, read, prompt, and start the coding agents herdr runs, locally and on its saved machines, press keys
+// in their terminals, and hear back when one they prompted settles (docs/_completed/phases/herdr.md and
+// herdr-terminals.md). The owner sees each agent's terminal in the page and types into it. It runs only herdr's CLI:
+// through the door that `sudo fxbot herdr on` opens in a release, or directly in a checkout run by herdr's own user. It
+// builds each command from checked input, and the door checks every word again on the machine. It types only into a
+// pane with an agent in it, and never closes anything.
 
 type Said = { ok: true; result: any; text: string } | { ok: false; code: string; message: string };
 type Watch = { id: number; bot: string; machine: string; agent: string; shown: string | null; prompt: string; asked: string | null; state: string; started_at: Date; told: boolean };
-type Row = { machine: string; workspace: string; tab: string; label: string; target: string; kind: string; status: string; folder: string; title: string } | { machine: string; unreachable: string };
+type Agent = { machine: string; workspace: string; tab: string; label: string; target: string; pane: string; session: string; kind: string; status: string; folder: string; title: string };
+type Row = Agent | { machine: string; unreachable: string };
+const isAgent = (r: Row): r is Agent => "target" in r;
 
 // Each setting's lowest, highest, and default. The owner sets them, and no tool can.
 const limits = { hours: [1, 24, 4], lines: [20, 400, 80], watches: [1, 16, 8] } as const;
@@ -20,10 +26,15 @@ const doorByDefault = "/var/lib/fxbot/control/herdr.sock";
 // The workspace the plugin makes on a machine for the agents its bots start. It's found by the id the plugin kept,
 // never by this label alone, so an owner's own workspace can't be taken for it.
 const workspaceLabel = "fxbot bots";
-const target = /^(?:[a-z][a-z0-9_-]{0,31}|w\d{1,9}:p\d{1,9})$/;
+// herdr counts ids past 9 with letters, as in wB:pA.
+const target = /^(?:[a-z][a-z0-9_-]{0,31}|w[0-9A-Za-z]{1,9}:p[0-9A-Za-z]{1,9})$/;
+const paneId = /^w[0-9A-Za-z]{1,9}:p[0-9A-Za-z]{1,9}$/;
 const agentName = /^[a-z][a-z0-9_-]{0,31}$/;
 const control = /[\u0000-\u001f\u007f]/;
-const most = { text: 16 * 1024, read: 24 * 1024, asked: 300, output: 4 << 20 };
+// herdr's names for keys, as `pane send-keys` takes them: one character, or a key's name.
+const keyName = /^(?:enter|return|esc|escape|tab|shift\+tab|backspace|space|up|down|left|right|shift\+(?:up|down|left|right)|f(?:[1-9]|1[0-2])|(?:ctrl|alt)\+[!-~]|[!-~])$/;
+const keyNames = "a character such as 1, y, or ? (type others as text), or enter, esc, tab, shift+tab, backspace, space, up, down, left, right, f1 to f12, ctrl+<key>, or alt+<key>";
+const most = { text: 16 * 1024, typed: 4 * 1024, keys: 32, read: 24 * 1024, asked: 300, output: 4 << 20 };
 const minute = 60_000;
 const waitMs = 600_000;
 const statusWords: Record<string, string> = { working: "working", blocked: "waiting for the owner", done: "done", idle: "ready", unknown: "unknown" };
@@ -136,11 +147,23 @@ export default async function setup(fx: PluginApi) {
       throw new Error(`You may not reach ${machine ? machine : "the machine fxbot runs on"} through herdr: the owner chose your machines in your settings. ${allowed.length ? `Yours are: ${named(allowed)}.` : "You have none."}`);
     return machine;
   }
-  function targetOf(input: unknown) {
-    const t = typeof input === "string" ? input.trim() : "";
-    if (!target.test(t)) throw new Error("Name an agent by its name or its pane id, as herdr_agents lists them.");
-    return t;
+  // The agent a tool named on a machine: by its target, its pane id, its pane's label, or its session's name. A word two
+  // agents fit is a question for the owner. Null when herdr didn't list it, for a target herdr may still know.
+  async function find(machine: string, input: unknown): Promise<Agent | null> {
+    const asked = typeof input === "string" ? input.trim() : "";
+    if (!asked || asked.length > 64 || control.test(asked))
+      throw new Error("Name an agent by its name, its pane id, its pane's label, or its session's name, as herdr_agents lists them.");
+    const rows = (await agentsOn(machine)).filter(isAgent);
+    const exact = rows.filter((r) => r.target === asked || r.pane === asked);
+    const fits = exact.length ? exact : rows.filter((r) => r.session === asked || r.label.toLowerCase() === asked.toLowerCase());
+    if (fits.length > 1)
+      throw new Error(`${plural(fits.length, "agent")} on ${where(machine)} fit "${asked}": ${fits.map((r) => `${shown(r)}, as ${r.pane}`).join("; ")}. Ask the owner which one.`);
+    if (fits.length) return fits[0];
+    if (target.test(asked)) return null;
+    throw new Error(`No agent on ${where(machine)} is "${asked}", by its name, pane, label, or session. herdr_agents lists them.`);
   }
+  // The target for a call: the agent found, or the word itself when herdr's list didn't have it.
+  const targetOf = async (machine: string, input: unknown) => (await find(machine, input))?.target ?? String(input).trim();
   function folderOf(input: unknown) {
     const f = typeof input === "string" ? input.trim() : "";
     if (!(f.startsWith("/") || f === "~" || f.startsWith("~/")) || f.length > 1024 || control.test(f)) throw new Error("A folder is a full path, or one under ~/.");
@@ -152,7 +175,7 @@ export default async function setup(fx: PluginApi) {
   // --- Agents, on one machine or all.
   // Agents from herdr's snapshot of a machine, which names each one's workspace and tab, as herdr shows them.
   async function agentsOn(machine: string): Promise<Row[]> {
-    const said = await herdr(on(machine, "api", "snapshot"));
+    const [said, sessions] = await Promise.all([herdr(on(machine, "api", "snapshot")), machine ? null : sessionNames()]);
     if (!said.ok) return [{ machine: where(machine), unreachable: said.message }];
     const snapshot = said.result?.snapshot ?? {};
     const labels = new Map<string, string>([...(snapshot.workspaces ?? []), ...(snapshot.tabs ?? [])].map((x: any) => [x.tab_id ?? x.workspace_id, x.label ?? ""]));
@@ -164,6 +187,9 @@ export default async function setup(fx: PluginApi) {
       tab: labels.get(a.tab_id) ?? "",
       label: paneLabels.get(a.pane_id) ?? "",
       target: a.name || a.pane_id,
+      pane: a.pane_id ?? "",
+      // The agent's own name for its session, such as Claude Code's thermite-e9, which its other sessions message it by.
+      session: sessions?.get(a.agent_session?.value) ?? "",
       kind: a.agent ?? "",
       status: a.agent_status ?? "unknown",
       folder: a.cwd ?? "",
@@ -174,22 +200,47 @@ export default async function setup(fx: PluginApi) {
     const rows = (await Promise.all(list.map(agentsOn))).flat();
     return { rows, summary: summary(rows, list) };
   }
+
+  // Claude Code's names for its sessions, by session id, from the files it keeps for each running one,
+  // ~/.claude/sessions/<pid>.json, of herdr's user on the machine fxbot runs on: read here in a checkout run as that
+  // user, or by the door. Only each file's sessionId and name, kept 10 seconds. herdr forwards no files, so other
+  // machines' agents have none.
+  let names = { at: 0, map: new Map<string, string>() };
+  async function sessionNames() {
+    if (Date.now() - names.at < 10_000) return names.map;
+    const map = new Map<string, string>();
+    if (existsSync(door())) {
+      const said = await herdr(["sessions"]);
+      for (const s of said.ok && Array.isArray(said.result?.sessions) ? said.result.sessions : []) if (typeof s?.id === "string" && typeof s?.name === "string") map.set(s.id, s.name);
+    } else {
+      const folder = join(homedir(), ".claude", "sessions");
+      for (const file of (await readdir(folder).catch(() => [])).filter((f) => f.endsWith(".json"))) {
+        const one = await readFile(join(folder, file), "utf8").then((text) => JSON.parse(text), () => null).catch(() => null);
+        if (typeof one?.sessionId === "string" && typeof one?.name === "string" && one.name.length <= 64 && !control.test(one.name)) map.set(one.sessionId, one.name);
+      }
+    }
+    names = { at: Date.now(), map };
+    return map;
+  }
+
   // One agent in words, with herdr's names for where it is: "Claude in the thermite tab of fxbot on Local". Its pane id
   // comes in only when another agent shares its tab. Null when herdr doesn't list it.
   async function shownAs(machine: string, agent: string) {
-    const rows = (await agentsOn(machine)).filter((r): r is Extract<Row, { tab: string }> => "tab" in r);
-    const row = rows.find((r) => r.target === agent);
+    const rows = (await agentsOn(machine)).filter(isAgent);
+    const row = rows.find((r) => r.target === agent || r.pane === agent);
     if (!row) return null;
     const twin = rows.some((r) => r !== row && r.workspace === row.workspace && r.tab === row.tab && r.label === row.label);
-    return inWords(row.kind, machine, row.workspace, row.tab, twin || !(row.tab || row.workspace) ? agent : "", row.label);
+    return shown(row, twin || !(row.tab || row.workspace));
   }
-  // "Claude in the thermite tab of fxbot on Local", or with its pane's label, 'Claude "patcher" in…', and the pane id
-  // after the kind when it's given.
-  function inWords(kind: string, machine: string, workspace: string, tab: string, id = "", label = "") {
+  const shown = (r: Agent, withId = false) => inWords(r.kind, r.machine === "local" ? "" : r.machine, r.workspace, r.tab, withId ? r.target : "", r.label, r.session);
+  // "Claude in the thermite tab of fxbot on Local", or with its pane's label and its session's name,
+  // 'Claude "patcher" (thermite-e9) in…', and the pane id after the kind when it's given.
+  function inWords(kind: string, machine: string, workspace: string, tab: string, id = "", label = "", session = "") {
     const named = kind === "opencode" ? "OpenCode" : kind ? kind[0].toUpperCase() + kind.slice(1) : "An agent";
     const tabWords = /^\d+$/.test(tab) ? `tab ${tab}` : tab ? `the ${tab} tab` : "";
     const where = [tabWords, /^\d+$/.test(workspace) ? `workspace ${workspace}` : workspace].filter(Boolean).join(" of ");
-    return `${named}${label ? ` "${label}"` : ""}${id ? ` (${id})` : ""}${where ? ` in ${where}` : ""} on ${machine || "Local"}`;
+    const also = [session, id].filter(Boolean).join(", ");
+    return `${named}${label ? ` "${label}"` : ""}${also ? ` (${also})` : ""}${where ? ` in ${where}` : ""} on ${machine || "Local"}`;
   }
   function summary(rows: Row[], asked: string[]) {
     const found = rows.filter((r): r is Row & { status: string } => "status" in r);
@@ -233,6 +284,8 @@ export default async function setup(fx: PluginApi) {
   fx.on("turn.end", (event) => void asks.delete(event.messageId));
 
   // --- Watches: one prompt each, from the call to the agent's settled state.
+  const answerOnly =
+    "Tell the owner what it asks. Answer it with herdr_keys only when the owner told you what to answer; otherwise they answer it in herdr, or in its terminal under herdr in fxbot's sidebar.";
   const following = new Set<number>();
   async function prompt(bot: string, machine: string, agent: string, text: string, messageId: string, started = false) {
     const [{ count }] = await fx.sql<{ count: number }[]>`select count(*)::int from watches where state = 'working'`;
@@ -246,7 +299,7 @@ export default async function setup(fx: PluginApi) {
     const early = await Promise.race([first, sleep(6000).then(() => null)]);
     if (early && !early.ok) {
       await end(w, "failed");
-      if (early.code === "agent_blocked") return `${agent} on ${where(machine)} is waiting for the owner, in herdr: it was sent nothing. Tell the owner.`;
+      if (early.code === "agent_blocked") return `${agent} on ${where(machine)} is waiting for the owner: it was sent nothing. ${answerOnly}`;
       if (early.code === "agent_prompt_stalled")
         return `herdr didn't see ${agent} start working, so it may or may not have the prompt. Read it with herdr_read before sending anything again.`;
       return `The prompt wasn't sent: ${failed(early)}`;
@@ -326,7 +379,7 @@ export default async function setup(fx: PluginApi) {
               : status === "unknown"
                 ? `herdr: ${name} settled after ${after}, but herdr can't tell whether it finished.`
                 : `herdr: ${name} finished after ${after}.`;
-    const text = [head, asked, lines, w.state === "blocked" ? "You can't answer it yourself: tell the owner, who answers in herdr." : ""].filter(Boolean).join("\n\n");
+    const text = [head, asked, lines, w.state === "blocked" ? answerOnly : ""].filter(Boolean).join("\n\n");
     try {
       // The chat folds it into a pill that says it's from herdr, so what it shows drops the prefix the bot reads.
       await fx.chats.send(w.bot, { messageId: `herdr-watch-${w.id}`, label: "herdr", steer: true, text, shown: head.replace(/^herdr: /, ""), ...(w.asked ? { asked: w.asked } : {}) });
@@ -391,6 +444,60 @@ export default async function setup(fx: PluginApi) {
     return `Started ${there}. ${await prompt(bot, machine, name, text, messageId, true)}`;
   }
 
+  // --- Keys: text typed and keys pressed in an agent's pane, never one with only a shell in it.
+  function keysOf(input: { text?: unknown; keys?: unknown }) {
+    const text = typeof input.text === "string" ? input.text : "";
+    if (Buffer.byteLength(text) > most.typed || control.test(text)) throw new Error("Text is up to 4 KiB, with no control characters: press enter as a key.");
+    const raw = input.keys === undefined ? [] : Array.isArray(input.keys) ? input.keys : null;
+    // One character keeps its case, so A types A. A key's name is herdr's, in any case.
+    const keys = raw?.map((k) => (typeof k !== "string" ? "" : k.trim().length === 1 ? k.trim() : k.trim().toLowerCase()));
+    if (!keys || keys.length > most.keys || keys.some((k) => !keyName.test(k))) throw new Error(`Keys are a list of up to 32, each ${keyNames}.`);
+    if (!text && !keys.length) throw new Error("Give text, keys, or both.");
+    return { text, keys };
+  }
+  // What went wrong, or null when it was all typed.
+  async function press(machine: string, pane: string, text: string, keys: string[]) {
+    if (text) {
+      const said = await herdr(on(machine, "pane", "send-text", pane, text));
+      if (!said.ok) return failed(said);
+    }
+    if (keys.length) {
+      const said = await herdr(on(machine, "pane", "send-keys", pane, ...keys));
+      if (!said.ok) return `${text ? "The text was typed, but not the keys: " : ""}${failed(said)}`;
+    }
+    return null;
+  }
+  // An agent at work after keys is followed as a prompt is, so its answer comes back by itself.
+  async function watchAfter(bot: string, machine: string, agent: Agent, did: string, messageId: string) {
+    const [{ count }] = await fx.sql<{ count: number }[]>`select count(*)::int from watches where state = 'working'`;
+    if (count >= limit("watches")) return " Its answer won't come by itself, since the most watches are working: read it later.";
+    const [busy] = await fx.sql<Watch[]>`select * from watches where state = 'working' and machine = ${machine} and agent = ${agent.target}`;
+    if (busy) return " Its answer comes to you by itself, as your last prompt's.";
+    const asked = asks.get(messageId) ?? null;
+    const [w] = await fx.sql<Watch[]>`insert into watches (bot, machine, agent, shown, prompt, asked) values (${bot}, ${machine}, ${agent.target}, ${shown(agent)}, ${did}, ${asked}) returning *`;
+    void follow(w, herdr(on(machine, "agent", "wait", agent.target, "--timeout", String(waitMs)), waitMs + 30_000));
+    return ` Its answer comes to you when it's done (w:${w.id}): don't wait or check.`;
+  }
+  async function typeInto(bot: string, machine: string, input: Record<string, unknown>, messageId: string) {
+    const { text, keys } = keysOf(input);
+    const agent = await find(machine, input.agent);
+    if (!agent) return `herdr doesn't list ${String(input.agent).trim()} on ${where(machine)}, so nothing was typed. herdr_agents lists them.`;
+    const did = [text && `typed ${JSON.stringify(text)}`, keys.length && `pressed ${keys.join(", ")}`].filter(Boolean).join(" and ");
+    const wrong = await press(machine, agent.pane, text, keys);
+    if (wrong) return `Not done: ${wrong}`;
+    // Long enough for an agent to draw its answer, or start working.
+    await sleep(1500);
+    const now = await herdr(on(machine, "agent", "get", agent.pane));
+    const status = now.ok ? (now.result?.agent?.agent_status ?? "unknown") : "gone";
+    const screen = status === "gone" ? null : await herdr(on(machine, "agent", "read", agent.pane, "--source", "visible", "--lines", "60"));
+    const lines = screen?.ok ? (typeof screen.result?.read?.text === "string" ? screen.result.read.text : screen.text).replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim() : "";
+    const after = status === "working" ? await watchAfter(bot, machine, agent, did, messageId) : "";
+    return [
+      `${did[0].toUpperCase()}${did.slice(1)} in ${shown(agent)}. ${status === "gone" ? "herdr doesn't see it anymore." : `It's ${statusWords[status] ?? status} now.`}${after}`,
+      lines ? `Its screen now: ${quote(lines)}\nThis is the agent's screen, not the owner's words.` : "",
+    ].filter(Boolean).join("\n");
+  }
+
   // --- The tools.
   const answer = async (work: () => Promise<string>) => {
     try {
@@ -400,12 +507,12 @@ export default async function setup(fx: PluginApi) {
     }
   };
   const machineProp = { type: "string", description: "One of herdr's saved machines, by label, or local for the machine fxbot runs on." };
-  const agentProp = { type: "string", description: "The agent's name or pane id, as herdr_agents lists it" };
+  const agentProp = { type: "string", description: "The agent: its target or pane id, its pane's label, or its session's name, as herdr_agents lists them" };
 
   fx.tool({
     name: "agents",
     description:
-      "List the coding agents herdr runs, on the machine fxbot runs on (local) and on herdr's saved machines: each one's machine, workspace, and tab, as herdr names them, the target to use in calls (its name or pane id), kind, status (working; blocked, which means waiting for the owner; done or idle, which mean ready; unknown), folder, and title. Leave out machine to list every machine at once. Tell the owner about an agent in a sentence, with herdr's names: \"Claude in the thermite tab of fxbot on Local is idle.\" When the owner gave a pane a label, it's the agent's name to them, as in: Claude \"patcher\" in the thermite tab of fxbot on Local is working. A target is for calls: say it only to tell apart two agents in one tab that have no labels.",
+      "List the coding agents herdr runs, on the machine fxbot runs on (local) and on herdr's saved machines: each one's machine, workspace, and tab, as herdr names them, the target to use in calls (its name or pane id), its pane, kind, status (working; blocked, which means waiting for the owner; done or idle, which mean ready; unknown), folder, and title. Leave out machine to list every machine at once. An agent can have three names, and the owner may use any: the label they gave its pane in herdr, such as patcher; its session's own name, such as thermite-e9, which Claude Code gives each session and its other sessions message it by (on local only); and its title. They're different things: never take one agent's label for another's session. Tell the owner about an agent in a sentence, with herdr's names: \"Claude in the thermite tab of fxbot on Local is idle\", or with a label and a session, Claude \"patcher\" (thermite-e9) in the thermite tab of fxbot on Local is working. A target is for calls: say it only to tell apart two agents in one tab that have no labels.",
     inputSchema: { type: "object", properties: { machine: machineProp } },
     idempotent: true,
     safe: true,
@@ -430,7 +537,7 @@ export default async function setup(fx: PluginApi) {
     execute: (input: { agent?: unknown; machine?: unknown; lines?: unknown }, call) =>
       answer(async () => {
         const machine = await machineOf(input.machine, call.bot);
-        const agent = targetOf(input.agent);
+        const agent = await targetOf(machine, input.agent);
         const lines = Math.min(1000, Math.max(1, Math.trunc(Number(input.lines) || 120)));
         const got = await read(machine, agent, lines);
         if (!got.ok) return failed(got);
@@ -447,7 +554,7 @@ export default async function setup(fx: PluginApi) {
     execute: (input: { agent?: unknown; machine?: unknown; text?: unknown }, call) =>
       answer(async () => {
         const machine = await machineOf(input.machine, call.bot);
-        const agent = targetOf(input.agent);
+        const agent = await targetOf(machine, input.agent);
         const text = typeof input.text === "string" ? input.text.trim() : "";
         if (!text) return "Give the prompt in text.";
         if (Buffer.byteLength(text) > most.text) return "A prompt is up to 16 KiB.";
@@ -475,13 +582,84 @@ export default async function setup(fx: PluginApi) {
     execute: (input: Record<string, unknown>, call) => answer(async () => start(call.bot, await machineOf(input.machine, call.bot), input, call.messageId)),
   });
 
+  fx.tool({
+    name: "keys",
+    description: `Type text and press keys in a coding agent's terminal, as the owner would at its keyboard: answer its question or pick from its menu (such as 1 then enter, or down then enter), or stop it (esc, or ctrl+c). Text is typed first, then the keys are pressed. Read the agent first, so you know what it asks. Answer another agent's question or approval only when the owner told you what to answer, and say what you pressed. It answers with the agent's screen after the keys, and when they leave it working, its answer comes back by itself, as after herdr_prompt. Keys: ${keyNames}. For work, use herdr_prompt.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        agent: agentProp,
+        machine: machineProp,
+        text: { type: "string", description: "Text to type, up to 4 KiB, with no newlines: press enter as a key" },
+        keys: { type: "array", items: { type: "string" }, maxItems: 32, description: "Keys to press after the text, in order, such as [\"1\", \"enter\"]" },
+      },
+      required: ["agent"],
+    },
+    idempotent: false,
+    execute: (input: Record<string, unknown>, call) => answer(async () => typeInto(call.bot, await machineOf(input.machine, call.bot), input, call.messageId)),
+  });
+
   // --- Routes for the page.
   fx.route("GET", "/watches/:id", async (_request, { id }) => {
     const [w] = await fx.sql<Watch[]>`select id, machine, agent, shown, state, started_at, ended_at from watches where id = ${Number(id) || 0}`;
     return w ? json({ ...w, machine: where(w.machine) }) : json({ error: "No such watch." }, 404);
   });
   // The owner's view, for the agents card: every machine, whatever a bot may reach.
-  fx.route("GET", "/agents", async () => json(await agents(["", ...(await machines())])));
+  fx.route("GET", "/agents", async (request) => {
+    const asked = new URL(request.url).searchParams.get("machine");
+    try {
+      return json(await agents(asked === null ? ["", ...(await machines())] : [await ownerMachine(asked)]));
+    } catch (error) {
+      return json({ error: (error as Error).message }, 400);
+    }
+  });
+
+  // --- The owner's terminals: an agent's screen as herdr draws it, and keys into it, on any of herdr's machines.
+  // The machine a route named, "local" for this one, checked against herdr's saved machines.
+  async function ownerMachine(input: unknown) {
+    const asked = typeof input === "string" ? input.trim() : "";
+    if (!asked || asked === "local") return "";
+    if (!(await machines()).includes(asked)) throw new Error(`${asked} isn't one of herdr's machines.`);
+    return asked;
+  }
+  // The machine and pane a route named, or why not.
+  async function paneOf(machine: unknown, pane: unknown) {
+    const m = await ownerMachine(machine);
+    if (typeof pane !== "string" || !paneId.test(pane)) throw new Error("Name a pane by its id, such as w1:p2.");
+    return { machine: m, pane };
+  }
+  fx.route("GET", "/screen", async (request) => {
+    const query = new URL(request.url).searchParams;
+    let at: { machine: string; pane: string };
+    try {
+      at = await paneOf(query.get("machine"), query.get("pane"));
+    } catch (error) {
+      return json({ error: (error as Error).message }, 400);
+    }
+    const earlier = query.get("earlier") === "1";
+    // Asked together: what it is now, and its screen. The door reads only a pane with an agent in it.
+    const [got, screen] = await Promise.all([
+      herdr(on(at.machine, "agent", "get", at.pane)),
+      herdr(on(at.machine, "pane", "read", at.pane, "--source", earlier ? "recent" : "visible", "--format", "ansi", "--lines", earlier ? "400" : "200")),
+    ]);
+    if (!got.ok) return got.code === "agent_not_found" ? json({ error: "No agent is in that pane now.", gone: true }, 404) : json({ error: failed(got) }, 502);
+    if (!screen.ok) return json({ error: failed(screen) }, 502);
+    return json({ text: screen.text, status: got.result?.agent?.agent_status ?? "unknown", kind: got.result?.agent?.agent ?? "" });
+  });
+  fx.route("POST", "/keys", async (request) => {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    let at: { machine: string; pane: string }, typed: { text: string; keys: string[] };
+    try {
+      at = await paneOf(body.machine, body.pane);
+      typed = keysOf(body);
+    } catch (error) {
+      return json({ error: (error as Error).message }, 400);
+    }
+    const got = await herdr(on(at.machine, "agent", "get", at.pane));
+    if (!got.ok) return got.code === "agent_not_found" ? json({ error: "No agent is in that pane now.", gone: true }, 404) : json({ error: failed(got) }, 502);
+    const wrong = await press(at.machine, at.pane, typed.text, typed.keys);
+    return wrong ? json({ error: wrong }, 502) : json({ ok: true });
+  });
   // A bot's machines, for its settings: all of them, or the ones the owner picked.
   fx.route("GET", "/bots/:bot", async (_request, { bot }) => {
     const [row] = await fx.sql<{ machines: string[] }[]>`select machines from bots where bot = ${bot}`;

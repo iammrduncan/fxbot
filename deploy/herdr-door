@@ -3,7 +3,8 @@
 # user, with the connection as stdin and stdout: `fxbot herdr on` writes those units, and only root runs that. It reads
 # one herdr command, its words separated by NUL bytes, checks every word against the commands below, and runs herdr's
 # CLI with them, or answers `refused` in herdr's own shape. No word is ever read by a shell. It sources nothing, so it
-# never sees fxbot's .env. With --read-only it takes only the commands that look (docs/phases/herdr.md).
+# never sees fxbot's .env. It types only into a pane with an agent in it. With --read-only it takes only the commands
+# that look (docs/_completed/phases/herdr.md and herdr-terminals.md).
 set -uo pipefail
 export LC_ALL=C
 read_only=0
@@ -14,7 +15,9 @@ refuse() {
   printf '{"error":{"code":"refused","message":"%s"}}\n' "fxbot's door to herdr refuses that: $1"
   exit 0
 }
-writes() { [ "$read_only" = 0 ] || refuse "it's read-only, so it takes no prompts, workspaces, tabs, or starts"; }
+writes() { [ "$read_only" = 0 ] || refuse "it's read-only, so it takes no prompts, keys, text, workspaces, tabs, or starts"; }
+# A pane with an agent in it, on the same machine, as herdr sees it now: never one with only a shell.
+agent_in() { [[ $("$herdr" "${machine[@]}" agent get "$1" 2>&1) == *'"result":{"agent":{'* ]] || refuse "no agent is in pane $1"; }
 
 # One command of at most 64 KiB.
 mapfile -d '' -t words < <(head -c 65537)
@@ -23,13 +26,14 @@ for word in "${words[@]}"; do size=$((size + ${#word})); done
 [ "$size" -le 65536 ] || refuse "a command is at most 64 KiB"
 [ "${#words[@]}" -gt 0 ] || refuse "no command"
 
-# Each kind of word.
-target='^([a-z][a-z0-9_-]{0,31}|w[0-9]{1,9}:p[0-9]{1,9})$'
+# Each kind of word. herdr counts ids past 9 with letters, as in wB:pA.
+target='^([a-z][a-z0-9_-]{0,31}|w[0-9A-Za-z]{1,9}:p[0-9A-Za-z]{1,9})$'
 name='^[a-z][a-z0-9_-]{0,31}$'
-workspace='^w[0-9]{1,9}$'
-pane='^w[0-9]{1,9}:p[0-9]{1,9}$'
-tab='^w[0-9]{1,9}:t[0-9]{1,9}$'
+workspace='^w[0-9A-Za-z]{1,9}$'
+pane='^w[0-9A-Za-z]{1,9}:p[0-9A-Za-z]{1,9}$'
+tab='^w[0-9A-Za-z]{1,9}:t[0-9A-Za-z]{1,9}$'
 number='^[1-9][0-9]{0,8}$'
+key='^([!-~]|enter|return|esc|escape|tab|shift\+tab|backspace|space|up|down|left|right|shift\+(up|down|left|right)|f([1-9]|1[0-2])|(ctrl|alt)\+[!-~])$'
 kinds=' pi claude codex gemini cursor devin agy cline omp mastracode opencode copilot kimi kiro droid amp grok hermes kilo qodercli qwen letta maki muse '
 plain() { [[ -n $1 && ${#1} -le $2 && $1 != -* && ! $1 =~ [[:cntrl:]] ]]; }
 path() { [[ ${#1} -le 1024 && ! $1 =~ [[:cntrl:]] && ( $1 == /* || $1 == "~" || $1 == "~/"* ) ]]; }
@@ -48,6 +52,21 @@ case "${w[0]} ${w[1]}" in
   "door ")
     [ "$n" = 1 ] && [ ${#machine[@]} = 0 ] || refuse "door takes nothing more"
     printf '{"door":{"readOnly":%s,"user":"%s"}}\n' "$([ "$read_only" = 1 ] && echo true || echo false)" "$(id -un)"
+    exit 0
+    ;;
+  "sessions ")
+    # Claude Code's own names for its running sessions, by id, from the file it keeps for each: only those two fields.
+    [ "$n" = 1 ] && [ ${#machine[@]} = 0 ] || refuse "sessions takes nothing more, on this machine only"
+    id_re='"sessionId": *"([0-9a-f-]{36})"' name_re='"name": *"([A-Za-z0-9._-]{1,64})"' out=""
+    for file in "$HOME"/.claude/sessions/*.json; do
+      [ -f "$file" ] || continue
+      json=$(head -c 65536 "$file")
+      [[ $json =~ $id_re ]] || continue
+      id=${BASH_REMATCH[1]}
+      [[ $json =~ $name_re ]] || continue
+      out+="${out:+,}{\"id\":\"$id\",\"name\":\"${BASH_REMATCH[1]}\"}"
+    done
+    printf '{"sessions":[%s]}\n' "$out"
     exit 0
     ;;
   "status server") [ "$n" = 3 ] && [ "${w[2]}" = --json ] || refuse "status server --json only" ;;
@@ -86,6 +105,23 @@ case "${w[0]} ${w[1]}" in
   "pane rename")
     writes
     [ "$n" = 4 ] && [[ ${w[2]} =~ $pane ]] && plain "${w[3]}" 60 || refuse "pane rename <pane id> <label of up to 60 characters>"
+    ;;
+  "pane read")
+    [ "$n" = 9 ] && [[ ${w[2]} =~ $pane ]] && [ "${w[3]}" = --source ] && [[ ${w[4]} == visible || ${w[4]} == recent ]] && [ "${w[5]}" = --format ] &&
+      [ "${w[6]}" = ansi ] && [ "${w[7]}" = --lines ] && within "${w[8]}" 1 1000 || refuse "pane read <pane> --source visible|recent --format ansi --lines 1-1000"
+    agent_in "${w[2]}"
+    ;;
+  "pane send-keys")
+    writes
+    [ "$n" -ge 4 ] && [ "$n" -le 34 ] && [[ ${w[2]} =~ $pane ]] || refuse "pane send-keys <pane> and 1 to 32 keys"
+    for k in "${words[@]:3}"; do [[ ${#k} -le 16 && $k =~ $key ]] || refuse "a key is one character or one of herdr's key names"; done
+    agent_in "${w[2]}"
+    ;;
+  "pane send-text")
+    writes
+    [ "$n" = 4 ] && [[ ${w[2]} =~ $pane ]] && [ -n "${w[3]}" ] && [ ${#w[3]} -le 4096 ] && [[ ! ${w[3]} =~ [[:cntrl:]] ]] ||
+      refuse "pane send-text <pane> <text of up to 4 KiB, with no control characters>"
+    agent_in "${w[2]}"
     ;;
   "agent start")
     writes

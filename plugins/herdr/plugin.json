@@ -1,7 +1,7 @@
 {
   "name": "herdr",
-  "version": "0.2.0",
-  "description": "Bots see the coding agents herdr runs, here and on its saved machines, send them work, start new ones, and hear back when one is done.",
+  "version": "0.3.0",
+  "description": "Bots see the coding agents herdr runs, here and on its saved machines, send them work, start new ones, press keys in them, and hear back when one is done. You see each agent's terminal and type into it.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {
