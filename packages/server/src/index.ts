@@ -18,6 +18,11 @@ const { FXBOT_DATABASE_URL: databaseUrl, FXBOT_SECRET_KEY_FILE: keyFile } = proc
 if (!databaseUrl) throw new Error("FXBOT_DATABASE_URL is required: fxbot keeps its records in Postgres (see the README)");
 if (!keyFile) throw new Error("FXBOT_SECRET_KEY_FILE is required: a file outside the repo with 32 random bytes in base64 (see the README)");
 
+// A plugin's promise that fails with nothing waiting for it is logged, and ends nothing: Node's default would end fxbot,
+// every bot and chat with it, for one plugin's slip. It's set before plugins load, so a plugin that slips while it
+// starts can't stop fxbot at every start.
+process.on("unhandledRejection", (reason) => console.error("Unhandled rejection, kept running:", reason));
+
 const fxbot = await createFxbot({
   databaseUrl,
   secretKey: readFileSync(keyFile, "utf8"),
@@ -400,7 +405,15 @@ server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
 function adapt(ws: WebSocket): PluginSocket {
   const socket: PluginSocket = {
     send: (data) => void (ws.readyState === ws.OPEN && ws.send(data)),
-    close: (code, reason) => ws.close(code, reason),
+    // `ws` throws on a code a close can't carry, or a reason over 123 bytes, in whatever called it, and a throw in an
+    // event listener would end fxbot. That socket closes as an error instead.
+    close: (code, reason) => {
+      try {
+        ws.close(code, reason);
+      } catch {
+        ws.close(1011);
+      }
+    },
     onmessage: null,
     onclose: null,
     get bufferedAmount() {
@@ -450,8 +463,5 @@ function startUpdate() {
   requestUpdate(latest!.version);
   return updateStatus();
 }
-// A plugin's promise that fails with nothing waiting for it is logged, and ends nothing: Node's default would end fxbot,
-// every bot and chat with it, for one plugin's slip.
-process.on("unhandledRejection", (reason) => console.error("Unhandled rejection, kept running:", reason));
 process.once("SIGINT", () => void shutdown());
 process.once("SIGTERM", () => void shutdown());

@@ -17,7 +17,7 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
   - A chat opens at its newest message, where plugins' page code arriving late scrolled it up to an older one. Plugins' page code loads all at once.
   - "Cannot reach the server" no longer stays until fxbot restarts. When plugins or MCP servers change, a chat waited on any turn of its provider that didn't end, such as one at a permission card. Now it waits 15 seconds at most.
   - A permission card shows without reloading the page. Update Permissions to 0.1.2.
-  - A plugin's failing promise no longer ends fxbot.
+  - A plugin's failing promise no longer ends fxbot, even as fxbot starts, and neither does a plugin's socket closing with a long reason.
   - An error while the app draws shows what broke, with **Reload**, in place of a white screen.
   - The app loads faster, and while it does, one of your bots bounces and looks around. The server gzips the page and plugins' code, and a browser keeps what doesn't change. The computer and herdr load their terminal's code only when one shows, which takes about 600 KB off each one's page code. A second load of the plugins while one runs waits for it, instead of loading each plugin twice.
   - A bot hands you a human check, such as an "I'm not a robot" box, at once, to take over and tick, instead of trying it. Update Computer to 0.5.1.
