@@ -359,7 +359,7 @@ Both file routes, the new one and the old upload URL, send:
 **The footer.**
 - The sidebar footer becomes one row: Settings, then at its right a bento icon button (`LayoutDashboardIcon`, labelled "Library").
 - The button opens `/library`, and shows as active there.
-- The [herdr button](../../phases/herdr-screen.md) joins the row later.
+- The [herdr button](herdr-screen.md) joins the row later.
 
 **The bot panel** (`packages/ui/src/bot-panel.tsx`) is a right panel beside a bot's chat.
 - **Opening it.**

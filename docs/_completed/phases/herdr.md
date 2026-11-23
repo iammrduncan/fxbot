@@ -7,7 +7,7 @@
 - **The machine opens one door, and only when the owner says so.** fxbot's app runs in a sealed container. `sudo fxbot herdr on` gives it a socket that takes only a short list of herdr commands, checks every word of each, and runs them as herdr's user. It never types into a shell, sends keys, or changes herdr's own setup. `sudo fxbot herdr off` closes it.
 - **Each bot has its machines.** A bot reaches every machine, with any herdr adds later, until the owner picks its machines in its settings, this machine among them.
 
-Status: built on 2026-11-14, for 0.11.0, as planned the same day at the owner's word, with the open questions' recommendations, and with each bot's machines, which the owner asked for during the build. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. The checklist's boxes are what ran here, against a herdr session of its own, a mock model, and a disposable machine for the door; what only a person can check is listed there too. It takes over the Remote control stub, heavy work handed to coding agents through herdr, which it replaces, and leaves [herdr screen](../../phases/herdr-screen.md) for later. Researched against the research directive's references, herdr's own docs and source (v0.9.5), its CLI on this machine (0.9.3, protocol 22), fxbot's first herdr plugin (0.1.0, which left in 0.4.1), and the drovr design in [archive/](../../../archive/README.md). The measurements in [herdr, on this machine](#herdr-on-this-machine) ran here on 2026-11-14, read-only, from a pane inside herdr.
+Status: built on 2026-11-14, for 0.11.0, as planned the same day at the owner's word, with the open questions' recommendations, and with each bot's machines, which the owner asked for during the build. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. The checklist's boxes are what ran here, against a herdr session of its own, a mock model, and a disposable machine for the door; what only a person can check is listed there too. It takes over the Remote control stub, heavy work handed to coding agents through herdr, which it replaces, and leaves [herdr screen](herdr-screen.md) for later. Researched against the research directive's references, herdr's own docs and source (v0.9.5), its CLI on this machine (0.9.3, protocol 22), fxbot's first herdr plugin (0.1.0, which left in 0.4.1), and the drovr design in [archive/](../../../archive/README.md). The measurements in [herdr, on this machine](#herdr-on-this-machine) ran here on 2026-11-14, read-only, from a pane inside herdr.
 
 ## What the owner asked
 
@@ -226,7 +226,7 @@ A bot can do something with the answer: tell the owner, prompt again, or call th
 - **A bot's machines,** with `app.botSettings`: **Every machine, and any herdr adds later**, and with it off, a box for each machine, **Local** first, saved at once to `/bots/:bot`.
 - **The settings tab,** with `app.settings`, read from a route of its own when the tab opens: whether fxbot reaches herdr and how (the door, the CLI, or neither, with the command to run), herdr's version, whether the door is read-only, Local and each saved machine and whether it answers, all asked at once, and the watches working now.
 
-No screen of its own: that's the [herdr screen](../../phases/herdr-screen.md), later.
+No screen of its own: that's the [herdr screen](herdr-screen.md), later.
 
 ### The skill
 
@@ -286,7 +286,7 @@ A watch is kept 30 days: each one that ends removes those older, so cleaning up 
 
 - **Sending keys, answering approvals, interrupting, and closing,** for the owner in herdr ([open question 4](#5-open-questions)).
 - **herdr's events.** `events.subscribe` would tell the plugin the moment a status changes, but only on this machine, and the door would have to hold it open. A watch's wait does the job for the one agent it's about.
-- **The [herdr screen](../../phases/herdr-screen.md)**, herdr's interface in the app.
+- **The [herdr screen](herdr-screen.md)**, herdr's interface in the app.
 - **A turn when any agent blocks**, without a prompt from the bot first: a [trigger](../../phases/triggers.md).
 - **Narrowing machines on the machine itself:** each bot's settings narrow them, and herdr's own profiles say which exist. [Open question 5](#5-open-questions).
 

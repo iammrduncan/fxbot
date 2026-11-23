@@ -5,7 +5,7 @@ herdr 0.3.0 gives the owner and their bots more hands on the agents herdr runs:
 - **A bot presses keys when the owner says so.** `herdr_keys` types text and presses keys in an agent's terminal, such as `1` and Enter at a question, or Escape to stop it. Permissions asks or judges each call, and the skill says to answer another agent only with the owner's word.
 - **An agent's other name.** Claude Code names its sessions, such as `thermite-e9`, and its sessions message each other by those names. herdr shows the pane's label and the agent's title instead. The agents list now gives each Claude agent's own name too, and a bot can name an agent by any of the three.
 
-Status: planned and built on 2026-11-23, for 0.11.0, at the owner's `/goal` from [issue #20](https://github.com/iammrduncan/fxbot/issues/20): "Bots get confused on named panes vs agent identities like Claude's agent names for same machine Claude messaging", "Herdr needs more power for interactions. Prompt and read only don't work for direct commands or answering pop up questions etc", and "look at adding terminal panes for herdr agents into fxbot UI somewhere via plugin so that I can do manual intervention to herdr". It builds on [herdr](herdr.md) 0.2.0, as herdr 0.3.0, and takes the nearer half of the [herdr screen](../../phases/herdr-screen.md) stub: the agents' terminals, not herdr's whole interface. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so.
+Status: planned and built on 2026-11-23, for 0.11.0, at the owner's `/goal` from [issue #20](https://github.com/iammrduncan/fxbot/issues/20): "Bots get confused on named panes vs agent identities like Claude's agent names for same machine Claude messaging", "Herdr needs more power for interactions. Prompt and read only don't work for direct commands or answering pop up questions etc", and "look at adding terminal panes for herdr agents into fxbot UI somewhere via plugin so that I can do manual intervention to herdr". It builds on [herdr](herdr.md) 0.2.0, as herdr 0.3.0, and takes the nearer half of the [herdr screen](herdr-screen.md) stub: the agents' terminals, not herdr's whole interface. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so.
 
 ## 0. Core or plugin
 
@@ -72,7 +72,7 @@ One `pane read` and one `agent get` a second for each terminal open in the page,
 
 ### Not in this phase
 
-- A live stream of a pane, and herdr's whole interface: [herdr screen](../../phases/herdr-screen.md).
+- A live stream of a pane, and herdr's whole interface: [herdr screen](herdr-screen.md).
 - Typing into a pane with only a shell in it.
 - Claude Code's names on other machines: herdr forwards no files.
 

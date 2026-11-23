@@ -281,7 +281,7 @@ The [release workflow](.github/workflows/release.yml) runs only on `main`. Relea
 
 The [Phases](#phases) list marks what's built, each linked to its phase doc in `docs/_completed/phases/`, which records what was planned, what was built, and what was checked. Each release's changes are in the [changelog](CHANGELOG.md).
 
-Everything was checked against mock servers, stubbed sign-in services, and Chromium, not with real accounts, models, or phones. Each phase doc lists what only a person can check.
+Nearly everything was checked against mock servers, stubbed sign-in services, and Chromium, not with real accounts, models, or phones. Phone's calls were also made on a real SignalWire account, to a real phone. Each phase doc lists what only a person can check.
 
 ## License
 

@@ -344,7 +344,7 @@ A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins 
 - Claude-format plugins and marketplaces. A plugin's own skills and remote servers already use the shared format.
 - Hooks inside a model request, which libfx doesn't offer.
 - Hooks for compaction. [Context management](../../phases/context-management.md) adds one when it builds compaction.
-- Any page place a first plugin doesn't need, such as a full-screen route for the [herdr screen](../../phases/herdr-screen.md).
+- Any page place a first plugin doesn't need, such as a full-screen route for the [herdr screen](herdr-screen.md).
 
 ### Size
 
