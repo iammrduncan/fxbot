@@ -2,7 +2,7 @@
 
 The sidebar's **herdr** button opens herdr itself: a real terminal in the page running herdr's own client, so herdr draws everything and handles everything, its scrollback, the wheel, the mouse, copy, its keys, and every agent and pane. An agent's tag, card, or row opens that one agent full size, with `herdr agent attach`.
 
-Status: planned on 2026-11-23, at the owner's word, replacing the terminal [herdr terminals](../_completed/phases/herdr-terminals.md) built from `pane read` and `send-keys`. On that screen: "why do we have these? Shouldn't it just be a terminal? Why can i not scroll back in history like I can on a herdr pane?", then "why don't you do a real terminal with herdr running in it? let herdr itself handle everything? Why go through herdr read etc?" The owner chose the whole herdr screen and each agent's own, and that the door runs it whenever it's open, as it runs prompts.
+Status: planned and built on 2026-11-23, for 0.11.0, at the owner's word, replacing the terminal [herdr terminals](herdr-terminals.md) built from `pane read` and `send-keys`. On that screen: "why do we have these? Shouldn't it just be a terminal? Why can i not scroll back in history like I can on a herdr pane?", then "why don't you do a real terminal with herdr running in it? let herdr itself handle everything? Why go through herdr read etc?" The owner chose the whole herdr screen and each agent's own, and that the door runs it whenever it's open, as it runs prompts. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so.
 
 ## 0. Core or plugin
 
@@ -51,11 +51,20 @@ Status: planned on 2026-11-23, at the owner's word, replacing the terminal [herd
 
 ## 4. Checklist
 
-- [ ] The helper runs `herdr` and `herdr agent attach` in the check session, draws, takes typed bytes, and a new size reaches the client.
-- [ ] Through the socket, in Chromium on a desktop and a phone: the whole screen draws, typing reaches herdr, the wheel scrolls, and a new window size reaches the client. An agent's attach shows only that agent, and keys reach it.
-- [ ] The door: `terminal` runs as herdr's user, a terminal's bytes follow its words, the old commands still answer, and read-only refuses it.
-- [ ] `npm run typecheck`, `npm run build-site`, `git diff --check`.
+- [x] The helper runs `herdr` and `herdr agent attach` in herdr's check session: each draws, a typed `x` reached the stand-in agent, and herdr turns on the mouse and bracketed paste.
+- [x] Through the socket, in Chromium on a desktop in light and a phone in dark, with non-GET writes blocked and no page errors: an agent attached draws at the page's size, herdr's pane 52 rows and the terminal 52; typing reaches it; a smaller window reaches herdr, 34 rows; a desktop has no key row, and a phone's row's Esc reaches the agent; and the sidebar's **herdr** opens the whole screen. The wheel was not checked by hand: xterm.js sends it as a mouse report, which herdr asks for.
+- [x] The door, as a script against the check session: `terminal 24 90 w1:p1` attached, and a typed `7` reached the agent after the empty word. An old command, `agent get`, still answers. Read-only refuses `terminal`, and so do a shell pane, `--machine`, and a size of 0. `bash -n` passes on the door and `deploy/fxbot`.
+- [x] `npm run typecheck`, with "fxbot's plugins fit 0.11.0", `npm run build-site`, where all 14,856 links in 125 pages resolve, and `git diff --check`.
 
 ## 5. Open questions
 
 1. **Phone scrolling by drag:** recommended, as a wheel. herdr's client and Claude Code then scroll as they do for a mouse.
+
+## What the build changed
+
+- **The helper is `terminal.py`, run with `python3 -I`.** Named `pty.py`, it took the place of Python's own `pty` module, since a script's folder comes first on the path; `-I` leaves the folder off it too.
+- **The door's connections last a day.** Its service had `RuntimeMaxSec=15min`, which would have ended a terminal at 15 minutes. The other commands keep their own limit, 630 seconds. A door opened before this keeps its 15 minutes until `sudo fxbot herdr on` runs again.
+- **A door refusal ends the socket,** with its words as the close's reason, in place of JSON drawn in the terminal.
+- **The pane's own variables go.** Dev's fxbot was started in one of herdr's panes, so herdr's client would have started inside it; `HERDR_PANE_ID` and its kin are left out of the helper's environment.
+- **herdr's client reaches the owner's saved machines.** The whole screen, in the check session, connected to them over SSH, as the owner's own herdr does at start. It did nothing on them.
+- **`herdr on`** now says it opens herdr's screen to fxbot's app, which can open a shell as herdr's user, with how to keep it shut, and says when herdr's user has no `python3`.

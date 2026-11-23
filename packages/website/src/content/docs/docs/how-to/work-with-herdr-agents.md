@@ -64,15 +64,15 @@ Tag an agent in a bot's chat as you tag a bot: type `@herdr:` and pick it, or `@
 
 The plugin keeps every agent it sees, on every machine, and syncs the list every minute, or as you set `sync`, so the list is there as you type. Tags need the [Messages](/docs/how-to/let-bots-work-together/) plugin's box, where `@` tags a bot.
 
-## See an agent's terminal
+## Use herdr in fxbot
 
-**herdr** in the sidebar lists every machine's agents. Pick one to see its terminal as herdr draws it, kept up to date while it's open. Type into it there:
+**herdr** in the sidebar opens herdr itself, in a real terminal in the page: its own screen, as in a terminal on the machine, with its scrollback, the wheel, the mouse, copy, and its keys. **Agents** lists every machine's agents, and one there, or its tag, or a prompt's card's **Open its terminal**, opens that one agent full size, attached with herdr's own client. While you're attached, its pane takes your page's size in herdr, and goes back when you leave.
 
-- **The keys** below it: Esc, Tab, the arrows, Enter, Ctrl+C, 1, 2, and 3, for a question or a menu.
-- **The line** below them: type, and **Send** types it and presses Enter.
-- **On a computer,** click the screen, and your keyboard goes to the agent until you click outside it.
+- **On a phone,** a row of keys holds what the keyboard lacks: Esc, Tab, the arrows, and Ctrl, which holds for the next key. A drag scrolls, as the wheel does.
+- **An agent on another machine** opens as its screen read from herdr, kept up to date, with a row of keys and a line to type in: herdr attaches only on its own machine.
+- **It needs `python3`** on the machine fxbot reaches herdr on, for the terminal.
 
-**Earlier lines** shows the last 400 lines instead of the screen. A prompt's card in the chat has **Open its terminal**.
+herdr's screen can open a pane, a shell as herdr's user, so a release's door opens it whenever the door is open. `--read-only` keeps it shut, with the rest of what types.
 
 A bot waits for an answer up to `hours`, 4 by default. Past that, it says the agent is still working, and stops waiting. If fxbot restarts meanwhile, it picks the wait up again, and the answer still comes once.
 
@@ -93,6 +93,6 @@ A bot waits for an answer up to `hours`, 4 by default. Past that, it says the ag
 - **Each message to a bot it's on for:** five tools, about 1,200 tokens, cached with the rest, and the skill's line.
 - **A call:** herdr's own time, about 2 ms on this machine and a few hundred on another. A list asks every machine at once.
 - **A prompt waiting for an answer:** one open connection to herdr until the agent settles.
-- **A terminal open in the page:** two herdr calls a second, while it's in view.
+- **herdr's screen open in the page:** one herdr client while it's open, and nothing to herdr in between: it sends what changes. An agent on another machine, two herdr calls a second while it's in view.
 - **The list for tags:** herdr's list on every machine every minute, as `herdr_agents` asks for it.
 - **Idle:** nothing else.

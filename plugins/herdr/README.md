@@ -15,14 +15,16 @@ The two that read are safe, so [Permissions](https://fxbot.sh/docs/how-to/choose
 
 **Tags.** `@herdr:` in the message box lists your agents after your bots, each named by its pane's label, else its Claude Code session's name, else its kind and pane, such as `claude-w1p8`. `@` alone lists them too. A pick is a link that carries the agent's machine, pane, tab, session name and id, folder, and status, so the bot knows exactly which agent you mean, and the sent tag shows its status and opens its terminal. The plugin keeps every agent it sees in its own table, `panes`, synced every `sync` seconds. It needs a box with an `@` list, as [Messages](../messages/)' has.
 
-**Its terminal, for you.** **herdr** in the sidebar lists every machine's agents. Pick one to see its terminal as herdr draws it, asked again every second while it's open, with a row of keys, a line to type in, and on a computer, the keyboard once you click the screen. **Earlier lines** shows 400 recent lines. A prompt's card in the chat opens its agent's terminal.
+**herdr itself, for you.** **herdr** in the sidebar opens herdr's own screen in a real terminal, xterm.js, running herdr's client on the machine fxbot runs on, so herdr draws everything and takes every key: its scrollback, the wheel, the mouse, copy, and its own keys. **Agents** lists every machine's agents, and an agent there, or its tag, or a prompt's card, opens that one agent full size with `herdr agent attach`. While it's attached, its pane takes your page's size in herdr. On a phone, a row of keys holds what its keyboard lacks, Esc, Tab, the arrows, and Ctrl, and a drag scrolls as the wheel does. An agent on another machine, which herdr doesn't attach to from here, shows its screen read from herdr every second, with keys.
+
+herdr's client runs in a pseudo-terminal that `fxbot/terminal.py` makes, so the machine needs `python3`. herdr's screen can open a pane, a shell as herdr's user, so the door opens it whenever it's open, as it does prompts: `--read-only` keeps it shut.
 
 Add it from **Plugins**. It needs fxbot 0.9.0 or newer. It runs inside fxbot: read its code there before you add it. See [Work with your herdr agents](https://fxbot.sh/docs/how-to/work-with-herdr-agents/).
 
 ## Reaching herdr
 
 The plugin runs only herdr's CLI:
-- **Through the door,** when its socket exists. In a release install, `sudo fxbot herdr on` opens it, from `deploy/herdr-door` in fxbot's own repository: it checks every word of each command, and runs the allowed ones as herdr's user. It reads a pane, or types into one, only when herdr says an agent is in it.
+- **Through the door,** when its socket exists. In a release install, `sudo fxbot herdr on` opens it, from `deploy/herdr-door` in fxbot's own repository: it checks every word of each command, and runs the allowed ones as herdr's user. It reads a pane, or types into one, only when herdr says an agent is in it. Its `terminal` runs herdr's client for the page, with its own copy of `terminal.py`.
 - **Directly,** otherwise: a checkout run by herdr's own user.
 
 ## Each bot's machines
@@ -59,16 +61,20 @@ Removing the plugin drops the schema.
 | --- | --- |
 | `plugin.json` | Its name, version, parts, and settings |
 | `fxbot/server.ts` | The tools, herdr's CLI through the door or directly, the watches, the sessions' names, and the routes |
-| `fxbot/page.jsx` | The cards, a bot's machines, the plugin's tab, the agents, and each agent's terminal |
-| `fxbot/page.js` | `page.jsx`, built |
+| `fxbot/terminal.py` | herdr's client in a pseudo-terminal, for the page's terminal: framed input, sizes, and what it draws |
+| `fxbot/page.jsx` | The cards, a bot's machines, the plugin's tab, herdr's screen, the agents, and each agent's terminal |
+| `fxbot/page.js` | `page.jsx`, built, with xterm.js |
+| `fxbot/page.css` | xterm.js's styles |
+| `package.json` | xterm.js, for the build |
 | `fxbot/migrations/` | Its four tables, and how a prompt's agent is shown |
 | `skills/herdr/SKILL.md` | How bots use the tools |
 
 ## Building it
 
-`fxbot/page.js` is `fxbot/page.jsx` bundled with [rolldown](https://rolldown.rs), which comes with fxbot's packages. Run this in this folder, in a checkout of fxbot, after changing `page.jsx`:
+`fxbot/page.js` is `fxbot/page.jsx` bundled with [rolldown](https://rolldown.rs), which comes with fxbot's packages, and [xterm.js](https://xtermjs.org), from `package.json`. `fxbot/page.css` is xterm.js's `css/xterm.css`. Run these in this folder, in a checkout of fxbot, after changing `page.jsx` or `package.json`:
 
 ```sh
+npm ci
 npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app --file fxbot/page.js
 ```
 
