@@ -117,7 +117,8 @@ export default async function setup(fx: PluginApi) {
     for (const bot of new Set((await fx.sql<{ bot: string }[]>`select distinct bot from asks where state = 'open'`).map((row) => row.bot)))
       if (!fx.bots.on(bot)) await close(fx.sql`bot = ${bot}`, "closed", () => said.changed);
     if (Date.now() - born > minute) {
-      const orphans = (await fx.sql<{ id: number }[]>`select id from asks where state = 'open'`).map((row) => row.id).filter((id) => !held.has(id));
+      // Not one still being made: its call is held a moment after its row is written.
+      const orphans = (await fx.sql<{ id: number }[]>`select id from asks where state = 'open' and at < now() - interval '10 seconds'`).map((row) => row.id).filter((id) => !held.has(id));
       if (orphans.length) await close(fx.sql`id in ${fx.sql(orphans)}`, "closed", () => said.gone);
     }
   }

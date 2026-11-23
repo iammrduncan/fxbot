@@ -22,9 +22,10 @@ const listeners = /* @__PURE__ */ new Set();
 const tell = () => listeners.forEach((listen) => listen());
 async function read() {
 	clearTimeout(timer);
+	timer = null;
 	const mine = ++reads;
 	if (document.visibilityState === "visible") {
-		const next = await call("asks").catch(() => null);
+		const next = await (0, _fxbot_app.api)("asks", { signal: AbortSignal.timeout(1e4) }).then((res) => res.ok ? res.json() : null, () => null);
 		if (next && mine === reads) asks = next, tell();
 	}
 	if (mine !== reads) return;
@@ -35,6 +36,7 @@ const subscribe = (listen) => {
 	if (!timer) read();
 	return () => void listeners.delete(listen);
 };
+document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && listeners.size && void read());
 function useAsks() {
 	const working = Boolean((0, _fxbot_app.useBots)()?.some((bot) => bot.busy));
 	(0, react.useEffect)(() => {

@@ -11,7 +11,8 @@ async function call(path, method = "GET", body) {
 }
 
 // The cards, shared by every place that shows them. Read often while a bot works or a card is open, and at once when one
-// starts, or a card would wait for the slow read. Only the newest read goes on to schedule the next.
+// starts, or a card would wait for the slow read, and when the page comes back into view. Only the newest read goes on to
+// schedule the next, and a read gives up after 10 seconds, so one that never answers can't stop the rest.
 let asks = [];
 let busy = false;
 let timer = null;
@@ -20,9 +21,10 @@ const listeners = new Set();
 const tell = () => listeners.forEach((listen) => listen());
 async function read() {
   clearTimeout(timer);
+  timer = null;
   const mine = ++reads;
   if (document.visibilityState === "visible") {
-    const next = await call("asks").catch(() => null);
+    const next = await api("asks", { signal: AbortSignal.timeout(10_000) }).then((res) => (res.ok ? res.json() : null), () => null);
     if (next && mine === reads) (asks = next), tell();
   }
   if (mine !== reads) return;
@@ -33,6 +35,7 @@ const subscribe = (listen) => {
   if (!timer) void read();
   return () => void listeners.delete(listen);
 };
+document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && listeners.size && void read());
 function useAsks() {
   const working = Boolean(useBots()?.some((bot) => bot.busy));
   useEffect(() => {

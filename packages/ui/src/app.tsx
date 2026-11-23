@@ -745,6 +745,11 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   useEffect(() => {
     if (finished) onChange();
   }, [finished]); // Only the count matters; onChange is a new function on every render.
+  // And when a turn starts that the owner didn't send, such as an agent's answer or another bot's message, so the bot
+  // shows busy, and what waits on that, such as a plugin's cards, looks sooner.
+  useEffect(() => {
+    if (running) onChange();
+  }, [running]);
 
   // An unsent turn keeps its files' data, so Retry sends them again.
   async function send(text: string, messageId: string, files: Upload[]) {
