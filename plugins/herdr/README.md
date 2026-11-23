@@ -19,7 +19,7 @@ The two that read are safe, so [Permissions](https://fxbot.sh/docs/how-to/choose
 
 herdr's client runs in a pseudo-terminal that `fxbot/terminal.py` makes, so the machine needs `python3`. herdr's screen can open a pane, a shell as herdr's user, so the door opens it whenever it's open, as it does prompts: `--read-only` keeps it shut.
 
-Add it from **Plugins**. It needs fxbot 0.9.0 or newer. It runs inside fxbot: read its code there before you add it. See [Work with your herdr agents](https://fxbot.sh/docs/how-to/work-with-herdr-agents/).
+Add it from **Plugins**. It needs fxbot 0.11.0 or newer, which has its door. It runs inside fxbot: read its code there before you add it. See [Work with your herdr agents](https://fxbot.sh/docs/how-to/work-with-herdr-agents/).
 
 ## Reaching herdr
 

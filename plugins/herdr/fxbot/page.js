@@ -1090,7 +1090,7 @@ function BotMachines({ bot }) {
 }
 function setup(app) {
 	version = app.version;
-	app.fold({ message: (id) => /^herdr-watch-\d+$/.test(id) ? { fold: "message" } : void 0 });
+	app.fold({ message: (id) => /^herdr-watch-\d+(-\d+)?$/.test(id) ? { fold: "message" } : void 0 });
 	app.botSettings(BotMachines);
 	app.toolView("agents", Agents, { open: true });
 	app.toolView("prompt", Sent, { open: true });

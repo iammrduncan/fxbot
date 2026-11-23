@@ -805,7 +805,7 @@ export default function setup(app) {
   version = app.version;
   // A watched agent's news folds into a pill in the middle of the chat, "1 received · herdr", so it doesn't read like the
   // owner's own message. What the bot says about it is for the owner, so it stays in view.
-  app.fold({ message: (id) => (/^herdr-watch-\d+$/.test(id) ? { fold: "message" } : undefined) });
+  app.fold({ message: (id) => (/^herdr-watch-\d+(-\d+)?$/.test(id) ? { fold: "message" } : undefined) });
   app.botSettings(BotMachines);
   app.toolView("agents", Agents, { open: true });
   app.toolView("prompt", Sent, { open: true });

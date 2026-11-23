@@ -5,7 +5,7 @@ description: "Bots see the coding agents herdr runs, on fxbot's machine and on h
 
 [herdr](https://herdr.dev) runs coding agents, such as Claude Code and Codex, in terminal panes, on your machine and on the machines you saved in it. With the herdr plugin, a bot sees those agents, reads what they show, sends them work, starts new ones, answers their questions when you say so, and hears back when one is done. You see each agent's terminal in fxbot, and type into it.
 
-1. Add **herdr** from **Plugins**, on **Browse**. It isn't in **Essentials**. A release install needs fxbot 0.11.0 or newer, which has its door, and tags need Messages 0.2.1.
+1. Add **herdr** from **Plugins**, on **Browse**. It isn't in **Essentials**. It needs fxbot 0.11.0 or newer, and tags need Messages 0.2.1.
 2. Let fxbot reach herdr, below.
 3. Choose each bot's machines, below, or leave them all on.
 4. Ask a bot: "What are my agents doing?", "Have the Codex on lab-2 run the tests and tell me what fails", or "Start a Claude in ~/api and have it review the open diff."

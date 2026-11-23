@@ -388,8 +388,10 @@ export default async function setup(fx: PluginApi) {
                 : `herdr: ${name} finished after ${after}.`;
     const text = [head, asked, lines, w.state === "blocked" ? answerOnly : ""].filter(Boolean).join("\n\n");
     try {
-      // The chat folds it into a pill that says it's from herdr, so what it shows drops the prefix the bot reads.
-      await fx.chats.send(w.bot, { messageId: `herdr-watch-${w.id}`, label: "herdr", steer: true, text, shown: head.replace(/^herdr: /, ""), ...(w.asked ? { asked: w.asked } : {}) });
+      // The chat folds it into a pill that says it's from herdr, so what it shows drops the prefix the bot reads. Its id
+      // carries when the watch began: libfx skips an id a chat already holds, and a watch's row id comes round again when
+      // the plugin is removed and added back.
+      await fx.chats.send(w.bot, { messageId: `herdr-watch-${w.id}-${new Date(w.started_at).getTime()}`, label: "herdr", steer: true, text, shown: head.replace(/^herdr: /, ""), ...(w.asked ? { asked: w.asked } : {}) });
       await fx.sql`update watches set told = true where id = ${w.id}`;
     } catch (error) {
       // libfx refuses a message id it has seen: the message went, and only its row wasn't marked.
@@ -824,7 +826,14 @@ export default async function setup(fx: PluginApi) {
         input?.end();
       } catch {}
       stop();
-      page.close(code, why.slice(0, 120));
+      // A close reason is at most 123 bytes, and the socket throws past that: an error's message or herdr's last line
+      // can be longer, in any script.
+      let reason = "";
+      for (const char of why) {
+        if (Buffer.byteLength(reason + char) > 123) break;
+        reason += char;
+      }
+      page.close(code, reason);
     };
     terminals.add(end);
     const drawn = (chunk: Buffer) => {
