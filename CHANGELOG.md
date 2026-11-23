@@ -4,7 +4,7 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
-**Before upgrading.** Migration `0019_idle_compact_tokens` adds `idle_compact_tokens` to `settings`, how long a chat must be before it's compacted while idle: 30,000 tokens, as before. Then update Chat rooms, to 0.5.1, so rooms follow it too.
+**Before upgrading.** Migration `0019_idle_compact_tokens` adds `idle_compact_tokens` to `settings`, how long a chat must be before it's compacted while idle: 30,000 tokens, as before. Then update from **Plugins**: Chat rooms to 0.5.1, so rooms follow it too, Messages to 0.2.1, Permissions to 0.1.2, Computer to 0.5.1, and Web pairing to 0.1.1. On a release install with herdr's door open, run `sudo fxbot herdr on` again after the update: the door now runs herdr's own screen for fxbot's page, which can open a shell as herdr's user, needs `python3` on the machine, and lets a connection last a day. `--read-only` keeps the screen and keys shut.
 
 - **Choose how long a chat must be before it's compacted while idle.** **Only chats**, under **Idle compaction** in **Settings** › **General**, offers 5,000 to 100,000 tokens. It was fixed at about 30,000, so a shorter chat that sat idle was left as it was, with nothing to say why. Chat rooms 0.5.1 compacts rooms by it too. See [Idle compaction](https://fxbot.sh/docs/explanation/bots-and-chats/#idle-compaction).
 - **Baseten, by key.** **Add provider** has a card for Baseten's Model APIs, open models such as GLM, Kimi, and DeepSeek, which walks you through a team key that doesn't stop after 90 days. See [Baseten](https://fxbot.sh/docs/providers/baseten/).
@@ -18,6 +18,7 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
   - "Cannot reach the server" no longer stays until fxbot restarts. When plugins or MCP servers change, a chat waited on any turn of its provider that didn't end, such as one at a permission card. Now it waits 15 seconds at most.
   - A permission card shows without reloading the page. Update Permissions to 0.1.2.
   - A plugin's failing promise no longer ends fxbot.
+  - An error while the app draws shows what broke, with **Reload**, in place of a white screen.
   - The app loads faster, and while it does, one of your bots bounces and looks around. The server gzips the page and plugins' code, and a browser keeps what doesn't change. herdr and the computer load their terminal's code only when one shows, about 1.3 MB less on every load. Plugins load once at a time.
   - A bot hands you a human check, such as an "I'm not a robot" box, at once, to take over and tick, instead of trying it. Update Computer to 0.5.1.
   - Web pairing: the app opens from its cache, opens the fxbot you used last, connects again at once after 30 seconds away, and keeps plugins' page code, once web.fxbot.sh is deployed again. Web pairing 0.1.1 logs each close of its line to the relay, and says when a device replaced its own connection.

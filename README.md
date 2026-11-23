@@ -74,6 +74,9 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [herdr](docs/_completed/phases/herdr.md) (plugin, with a door on the machine that `sudo fxbot herdr on` opens; 0.11.0): bots see the coding agents [herdr](https://herdr.dev) runs, here and on every machine it reaches, read them, send them work, start new ones, and hear back when one is done, each bot on the machines its settings give it
 - [x] [herdr terminals](docs/_completed/phases/herdr-terminals.md) (plugin; 0.11.0): each herdr agent's terminal in the app, to type into, bots that press keys in one when the owner says, and an agent known by its Claude Code session's name
 - [x] [herdr tags](docs/_completed/phases/herdr-tags.md) (plugin, with a place in the page's plugin API; 0.11.0): `@herdr:<name>` in the message box tags a herdr agent, its pane, session, and status in the tag, from a list the herdr plugin keeps in sync
+- [x] [herdr screen](docs/_completed/phases/herdr-screen.md) (plugin, with its door; 0.11.0): herdr itself in the app, a real terminal running herdr's own client, the whole screen or one agent attached
+- [x] [Phone](docs/_completed/phases/phone.md) (plugin; 0.11.0): the call in one plugin, `phone`, with what each bot gets, and providers as plugins that need it, phone-signalwire first
+- [x] [Phone: SignalWire](docs/_completed/phases/phone-signalwire.md) (plugin; 0.11.0): press Call me and the bot rings your phone through SignalWire, greets you, and talks with you, hands-free, with its own model, memory, and tools, and nothing reaching fxbot
 - [ ] [Claude's own API](docs/phases/claude-messages.md) (core; on hold until libfx is checked again): Claude by key over Anthropic's Messages API, with prompt caching, thinking at a bot's effort, cache counts in a turn's usage, and cache keys for the providers that want one ([#18](https://github.com/iammrduncan/fxbot/issues/18)). Meanwhile, Claude by key caches through AI Gateway
 - [ ] [Gateways](docs/phases/gateways.md) (plugins, with a small core hook): talk to bots from the chat apps you already use, as the owner, in the same conversation the app shows
 - [ ] [Telegram and Discord](docs/phases/telegram-and-discord.md) (plugins): the first two gateways
@@ -84,7 +87,6 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
 - [ ] [Knowledge base](docs/phases/knowledge-base.md) (plugin): knowledge the bots draw on
 - [ ] [hc](docs/phases/hc.md) (plugin, with a second door on the machine; deferred until after 0.11.0): bots run coding agents of their own, such as Claude Code, in terminals that stay alive on any of the owner's machines, through herdr-core, hear back when one's turn ends, and the owner watches them live in fxbot
-- [x] [herdr screen](docs/_completed/phases/herdr-screen.md) (plugin, with its door; 0.11.0): herdr itself in the app, a real terminal running herdr's own client, the whole screen or one agent attached
 - [ ] [Web search](docs/phases/web-search.md) (plugin): bots search and read the web, and cite it
 - [ ] [X feed](docs/phases/plugin-x-feed.md) (plugins): bots read X (Twitter) for free with tools of their own, posts, search, mentions, followers, and lists, from X's public pages, its embeds, and FxTwitter, or through a signed-in tab on the bot's computer, and watches start a turn when someone posts or the owner is mentioned
 - [ ] [Embedded links](docs/phases/embedded-links.md) (plugin, with a small core hook): a link on its own line, pasted or in a bot's reply, shows as a preview card, an X post as the post, and a YouTube video as its player, and stays a link to right-click and copy
@@ -93,8 +95,6 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Local access](docs/phases/plugin-local-access.md) (plugin): bots reach folders the owner picks on the machine itself, off until the owner turns it on
 - [ ] [Image and video generation](docs/phases/media-generation.md) (plugin): bots create images and video
 - [ ] [Voice memos](docs/phases/voice-memos.md) (plugin): send a bot a recorded voice memo
-- [x] [Phone: SignalWire](docs/_completed/phases/phone-signalwire.md) (plugin, built for 0.11.0): press Call me and the bot rings your phone through SignalWire, greets you, and talks with you, hands-free, with its own model, memory, and tools, and nothing reaching fxbot
-- [x] [Phone](docs/_completed/phases/phone.md) (plugin, built for 0.11.0): the call in one plugin, `phone`, with what each bot gets, and providers as plugins that need it, phone-signalwire first
 - [ ] [Phone: Telnyx](docs/phases/phone-telnyx.md) (plugin): a provider for phone, the same call for about a third of the price, with fxbot as a softphone and speech providers of the owner's own
 - [ ] [Phone in the app](docs/phases/phone-in-app.md) (plugin): a call in fxbot's own page, with speech providers such as phone-elevenlabs
 - [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): talk with a bot by voice, in the app or over a phone line
