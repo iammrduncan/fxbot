@@ -12,7 +12,7 @@ description: Use for a web page on your computer, to open it, read it, fill form
 - Run `agent-browser <command>` as it is: it's connected to the desktop's Chromium already. Don't give it `--session`, `--cdp`, `--headed`, `--profile`, or `--engine`, or set `AGENT_BROWSER_SESSION`, and don't run `install` or `upgrade`. agent-browser's own guide says to start a session of your own: here, that's done for you.
 - Leave the browser open when you're done. Don't run `agent-browser close`: your owner uses it too.
 - As a subagent, your commands use a tab of your own. Stay in it.
-- For a sign-in, a CAPTCHA, or a passkey you can't do yourself, call `computer_ask_owner`. Don't type a password you were given into a command, and don't save one with `agent-browser auth`.
+- For a sign-in, a CAPTCHA, or a passkey you can't do yourself, call `computer_ask_owner`. A human check, such as an "I'm not a robot" box or a page checking your browser, is always your owner's: don't click it or try to get past it, hand it over at once. Don't type a password you were given into a command, and don't save one with `agent-browser auth`.
 
 ## The loop
 
