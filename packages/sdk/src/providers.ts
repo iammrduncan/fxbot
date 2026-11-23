@@ -233,10 +233,16 @@ export async function createProviders({ store, secretKey, durability, vercelClie
     return stopping.get(id);
   }
 
-  // Closing an agent waits for its running turns. A turn asking for it meanwhile waits for the new one.
+  // Closing an agent waits for its running turns. A turn asking for it meanwhile waits for the new one. A turn that
+  // doesn't end, such as one waiting on the owner's answer, would leave the provider with no agent, every chat on it
+  // empty and every message waiting, until fxbot restarted: so after 15 seconds, as removing one waits, the new agent
+  // starts, and the old one finishes its turns beside it. libfx's agents of one name are copies, sharing their turns.
   const restarts = new Map<string, Promise<void>>();
   function restart(record: ProviderRecord) {
-    const next = (restarts.get(record.id) ?? Promise.resolve()).then(async () => (await stop(record.id), await start(record)));
+    const next = (restarts.get(record.id) ?? Promise.resolve()).then(async () => {
+      await Promise.race([stop(record.id), new Promise((done) => setTimeout(done, 15_000).unref())]);
+      await start(record);
+    });
     restarts.set(record.id, next.catch(() => {}));
     return next;
   }

@@ -94,6 +94,9 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
   async function* stream(id: string, { cursor = 0, session, signal, onConnection, onCaughtUp }: StreamOptions = {}): AsyncGenerator<StreamLine> {
     let epoch = 0;
     while (!signal?.aborted) {
+      // Only a stream that couldn't open, or broke, is a lost connection. One the server closed, such as while a bot's
+      // provider restarts, is opened again without saying so.
+      let failed = false;
       try {
         const res = await fetch(`${baseUrl}/api/profiles/${id}/stream?${new URLSearchParams({ cursor: String(cursor), ...(session ? { session } : {}) })}`, { signal });
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
@@ -130,9 +133,11 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
             caughtUp();
           }
         }
-      } catch {}
+      } catch {
+        failed = true;
+      }
       if (signal?.aborted) return;
-      onConnection?.(false);
+      if (failed) onConnection?.(false);
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
