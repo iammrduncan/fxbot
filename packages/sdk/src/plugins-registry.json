@@ -46,7 +46,7 @@
     },
     {
       "name": "herdr",
-      "description": "Bots see the coding agents herdr runs, here and on its saved machines, send them work, start new ones, press keys in them, and hear back when one is done. You see each agent's terminal and type into it.",
+      "description": "Bots see the coding agents herdr runs, here and on its saved machines, send them work, start new ones, press keys in them, and hear back when one is done. You see each agent's terminal and type into it, and tag one in a chat with @herdr:.",
       "note": "In a release install, run sudo fxbot herdr on, on the machine, to let fxbot reach herdr.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/herdr",

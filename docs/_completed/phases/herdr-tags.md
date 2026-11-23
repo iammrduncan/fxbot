@@ -6,16 +6,16 @@ Tag a herdr agent in a chat as you tag a bot: `@herdr:patcher`. The tag carries 
 - **`@` in the message box lists your bots, then herdr's agents,** each named by its pane's label, else its Claude Code session's name, else its kind and pane. `@herdr:` lists only agents.
 - **A plugin can add to the `@` list,** with a new place in the page's plugin API, `app.mention`. herdr is the first.
 
-Status: planned on 2026-11-23, at the owner's word: "named herdr panes should be stored in our herdr plugin itself and auto sync'd. then I can `@hc:<pane-name>` to reference it in a chat just like I can on messages to reference a bot. Then that resolves to the pane, pane id, and claude id or codex id etc all at once to give fxbot." The owner chose the prefix `@herdr:`, leaving `hc` to the [hc](hc.md) plugin, and every agent, not only labeled ones. It builds on [herdr terminals](../_completed/phases/herdr-terminals.md), herdr 0.3.0, on the same branch.
+Status: planned and built on 2026-11-23, for 0.11.0, at the owner's word: "named herdr panes should be stored in our herdr plugin itself and auto sync'd. then I can `@hc:<pane-name>` to reference it in a chat just like I can on messages to reference a bot. Then that resolves to the pane, pane id, and claude id or codex id etc all at once to give fxbot." The owner chose the prefix `@herdr:`, leaving `hc` to the [hc](../../phases/hc.md) plugin, and every agent, not only labeled ones. It builds on [herdr terminals](herdr-terminals.md), herdr 0.3.0, on the same branch. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so.
 
 ## 0. Core or plugin
 
-**A plugin, with one new place in the page's plugin API.** The `@` list is the [messages](../_completed/phases/cross-bot-messaging.md) plugin's: its box, ProseMirror through `app.box`, lists the bots one can reach, and writes a pick as a link, `[@Bob](/profiles/<id>)`. Another plugin can't add to it today. The smallest widening is a page-side place, `app.mention(source)`, which any plugin fills with a search, and `useMentions()` in `@fxbot/app`, which the box reads. It only adds, so nothing breaks. No SDK, server, or hook changes: the tag is resolved when it's picked, and the bot reads it.
+**A plugin, with one new place in the page's plugin API.** The `@` list is the [messages](cross-bot-messaging.md) plugin's: its box, ProseMirror through `app.box`, lists the bots one can reach, and writes a pick as a link, `[@Bob](/profiles/<id>)`. Another plugin can't add to it today. The smallest widening is a page-side place, `app.mention(source)`, which any plugin fills with a search, and `useMentions()` in `@fxbot/app`, which the box reads. It only adds, so nothing breaks. No SDK, server, or hook changes: the tag is resolved when it's picked, and the bot reads it.
 
 ## 1. Research
 
 - **fxbot's bot tags** (Messages): a chip in the box is a ProseMirror atom, written to the text as a Markdown link with the bot's id, so two Bobs can't be confused, and the text reads as a name in any Markdown. `app.said` draws a link in a sent message as a chip with the bot's face. The tag wakes no one: it's words the bot reads.
-- **herdr's snapshot** names each agent's pane, tab, workspace, kind, status, folder, and title, and `agent_session`, the agent's own session id, which herdr's integrations report: Claude Code's and Codex's alike. Claude Code's own name for a session, such as `thermite-e9`, is in its file for each running session, on the machine it runs on ([herdr terminals](../_completed/phases/herdr-terminals.md#1-research)).
+- **herdr's snapshot** names each agent's pane, tab, workspace, kind, status, folder, and title, and `agent_session`, the agent's own session id, which herdr's integrations report: Claude Code's and Codex's alike. Claude Code's own name for a session, such as `thermite-e9`, is in its file for each running session, on the machine it runs on ([herdr terminals](herdr-terminals.md#1-research)).
 - **A pane id isn't forever:** herdr gives new ids after its server restarts, and an agent's session id changes when it starts over. So a tag holds what was true when it was sent, and the bot reads the agent again before it acts.
 - **The cost of asking every machine:** a list of herdr's agents takes about as long as its slowest machine, about 420 ms for 10 here, and a machine that doesn't answer takes up to the timeout. Typing can't wait for that, so the list comes from what the plugin keeps.
 
@@ -57,15 +57,25 @@ Every minute, herdr's list on each machine, as `herdr_agents` asks for it: about
 
 ## 4. Checklist
 
-On a check fxbot with herdr, Messages, and Permissions, and herdr's check session, `fxbot-check`, with stand-in agents: one labeled, one with only a session, and one with neither. Never the owner's herdr.
+On a check fxbot with herdr, Messages, and Permissions, and herdr's check session, `fxbot-check`, with stand-in agents: one labeled, one with only a session, and one with neither, and a shell. The check fxbot's `herdr` on its PATH is the check session's, so from its first load it never reaches the owner's herdr.
 
-- [ ] The table fills within 10 seconds of a load, each agent named by the rules. A pane's new label shows within one sync, and a closed workspace's agents go.
-- [ ] `/mentions?q=herdr:as` and `?q=as` find the labeled one, with its link and title, and the session's name finds the other.
-- [ ] In Chromium, a desktop in light and a phone in dark: `@herdr:as` lists it below the bots, Enter makes a chip, and Send sends the link with its title, which the model gets. The sent chip opens the terminal. `@Ann` still makes a bot's chip, and the skills list still rewrites the box.
-- [ ] A bot's `herdr_read` with the tag's pane and machine reads that agent, and with `herdr:<name>` too.
-- [ ] `npm run typecheck`, `npm run build-site`, `git diff --check`.
+- [x] The table fills, each agent named by the rules: `herdr:asker` by its label, the session's own name for the one with only a session, and `herdr:claude-w4p3` for the one with neither. The shell isn't offered. A pane's new label showed within a sync, and a closed workspace's agents went.
+- [x] `/mentions?q=herdr:as` and `?q=as` find the labeled one, with its link, `/herdr/agents/local/w4%3Ap1`, and its title, and the session's name finds the other, with Claude Code's session id in its title.
+- [x] In Chromium, a desktop in light and a phone in dark, with writes outside the chat's send and herdr's routes blocked, and no page errors: `@herdr:as` lists `herdr:asker` with "Claude · Waiting for the owner · tab 1 of ui on Local", Enter makes a chip, and Send sends `[@herdr:asker](/herdr/agents/local/w8%3Ap1 "Claude 'asker' · pane w8:p1 on Local · tab 1 of ui · /tmp · waiting for the owner")`, which the model gets as written. The sent chip opens the terminal. The skills list's pick, which takes `$herdr` out of the text, keeps the chip, and `@Ann` still makes a bot's chip, sent as `/profiles/<id>`.
+- [x] A bot's `herdr_read` with the tag's pane and machine reads that agent, and with `herdr:asker` too.
+- [x] `npm run typecheck`, with "fxbot's plugins fit 0.11.0", `npm run build-site`, where all 14,855 links in 125 pages resolve, and `git diff --check`.
 
 ## 5. Open questions
 
 1. **The list's order:** bots first, then agents. Recommended, so a bot's tag stays where the owner's hand knows it.
 2. **How often to sync:** every minute. Recommended: a minute old is fresh enough for a name, and the list syncs when it's asked for and older than 15 seconds.
+
+## What the build changed
+
+- **`ui.PluginIcon`** is new in the page's `ui`, so a box shows a plugin's choices with its icon, as the plan's list asked.
+- **A label is in single quotes in a tag's title,** `Claude 'patcher' · …`, since a Markdown link's title is in double ones, and a status in a choice's line is capitalized.
+- **A sent tag's status** comes from `GET /panes`, every agent kept, read at most every 30 seconds while a tag shows, shared by every tag on the page.
+- **The first list:** before the plugin's first sync, `/mentions` waits for one, so the box never shows an empty list for agents that are there.
+- **The check fxbot read the owner's herdr once.** Its herdr loads before its settings can be set, and its first sync ran herdr's own command against the owner's session, reading their four agents' names, and writing nothing to herdr. Later syncs replaced those rows. The checks then put the check session's wrapper first on the check fxbot's `PATH` as `herdr`, so from its first load it reaches only the check session.
+- **A session's name changes.** Claude Code names a session from its work, so the session the stand-in borrows went from `split-phone-signalwire-plugin` to `herdr-pane-tags` during the build, and the list followed. The checks read the name from Claude Code's file.
+- **In dev,** the migration ran, and the first sync listed the owner's four agents on Local by their labels, with each one's session name and id.

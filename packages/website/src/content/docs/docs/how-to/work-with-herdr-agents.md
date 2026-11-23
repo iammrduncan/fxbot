@@ -58,6 +58,12 @@ A bot says where an agent is in a sentence, with herdr's names, so you can find 
 - **An agent it starts** opens in a tab of its own, in a workspace named **fxbot bots** on that machine, so it stays out of your own tabs. It starts with its own settings there: one that asks before acting still asks.
 - **An agent waiting for you,** at an approval or a question: the bot tells you which one is waiting, where, and what it asks. Answer it yourself in its terminal, below, or in herdr, or tell the bot what to answer: "say yes", "pick 2". Only then does it press keys, and it tells you what it pressed and what the agent shows now. It can stop an agent with Escape the same way. It never closes a tab.
 
+## Tag an agent
+
+Tag an agent in a bot's chat as you tag a bot: type `@herdr:` and pick it, or `@` and its name. Each agent is named by its pane's label, else its Claude Code session's name, else its kind and pane, such as `claude-w1p8`. The tag carries which agent it is: its machine, pane, tab, session name and id, folder, and status as you sent it, so the bot doesn't have to guess, and it reads the agent again before it acts. In your message, the tag shows the agent's status now, and opens its terminal.
+
+The plugin keeps every agent it sees, on every machine, and syncs the list every minute, or as you set `sync`, so the list is there as you type. Tags need the [Messages](/docs/how-to/let-bots-work-together/) plugin's box, where `@` tags a bot.
+
 ## See an agent's terminal
 
 **herdr** in the sidebar lists every machine's agents. Pick one to see its terminal as herdr draws it, kept up to date while it's open. Type into it there:
@@ -78,6 +84,7 @@ A bot waits for an answer up to `hours`, 4 by default. Past that, it says the ag
 | `hours` | The most hours a bot waits for an agent's answer, 1 to 24 | `4` |
 | `lines` | How many of an agent's last lines its answer carries, 20 to 400 | `80` |
 | `watches` | The most prompts waiting for an answer at once, 1 to 16 | `8` |
+| `sync` | How often, in seconds, the list of agents for tags syncs, 30 to 3,600 | `60` |
 | `door` | The door's socket, as fxbot sees it | `/var/lib/fxbot/control/herdr.sock` |
 | `herdr` | herdr's command, for a checkout | `herdr` |
 
@@ -87,4 +94,5 @@ A bot waits for an answer up to `hours`, 4 by default. Past that, it says the ag
 - **A call:** herdr's own time, about 2 ms on this machine and a few hundred on another. A list asks every machine at once.
 - **A prompt waiting for an answer:** one open connection to herdr until the agent settles.
 - **A terminal open in the page:** two herdr calls a second, while it's in view.
-- **Idle:** nothing.
+- **The list for tags:** herdr's list on every machine every minute, as `herdr_agents` asks for it.
+- **Idle:** nothing else.

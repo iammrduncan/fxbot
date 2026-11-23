@@ -22,7 +22,7 @@ When a message expects a reply, that work and that answer go in the pill, since 
 
 ## Tag a bot
 
-In a bot's chat, type `@` to list the bots it can reach, and pick one. It goes in your message as a chip with its face. The bot then knows exactly which one you mean, which matters when two have the same name: each shows the line from its settings, to tell them apart.
+In a bot's chat, type `@` to list the bots it can reach, and pick one. It goes in your message as a chip with its face. The bot then knows exactly which one you mean, which matters when two have the same name: each shows the line from its settings, to tell them apart. Other plugins add to the list after the bots, such as [herdr](/docs/how-to/work-with-herdr-agents/#tag-an-agent)'s agents.
 
 A tag doesn't wake the bot you tag. The bot you're talking to sends the message: "ask @Philly what broke staging". A name you type out without picking it stays plain text.
 

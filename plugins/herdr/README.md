@@ -13,6 +13,8 @@ The two that read are safe, so [Permissions](https://fxbot.sh/docs/how-to/choose
 
 **An agent's names.** The owner calls an agent by the label they gave its pane in herdr, and Claude Code names each of its sessions, such as `thermite-e9`, which its other sessions message it by. The plugin finds that name in Claude Code's own file for each running session, `~/.claude/sessions/<pid>.json`, on the machine fxbot runs on, reading only its id and name. Every tool's `agent` takes a target, a pane's label, or a session's name.
 
+**Tags.** `@herdr:` in the message box lists your agents after your bots, each named by its pane's label, else its Claude Code session's name, else its kind and pane, such as `claude-w1p8`. `@` alone lists them too. A pick is a link that carries the agent's machine, pane, tab, session name and id, folder, and status, so the bot knows exactly which agent you mean, and the sent tag shows its status and opens its terminal. The plugin keeps every agent it sees in its own table, `panes`, synced every `sync` seconds. It needs a box with an `@` list, as [Messages](../messages/)' has.
+
 **Its terminal, for you.** **herdr** in the sidebar lists every machine's agents. Pick one to see its terminal as herdr draws it, asked again every second while it's open, with a row of keys, a line to type in, and on a computer, the keyboard once you click the screen. **Earlier lines** shows 400 recent lines. A prompt's card in the chat opens its agent's terminal.
 
 Add it from **Plugins**. It needs fxbot 0.9.0 or newer. It runs inside fxbot: read its code there before you add it. See [Work with your herdr agents](https://fxbot.sh/docs/how-to/work-with-herdr-agents/).
@@ -35,6 +37,7 @@ A bot reaches every machine herdr has, and any it adds later, until you pick its
 | `hours` | The most hours a bot waits for an agent's answer, 1 to 24 | `4` |
 | `lines` | How many of an agent's last lines its answer carries, 20 to 400 | `80` |
 | `watches` | The most prompts waiting for an answer at once, 1 to 16 | `8` |
+| `sync` | How often, in seconds, the list of agents for `@herdr:` tags syncs, 30 to 3,600 | `60` |
 | `door` | The door's socket, as fxbot sees it | `/var/lib/fxbot/control/herdr.sock` |
 | `herdr` | herdr's command, for a checkout | `herdr` |
 
@@ -46,6 +49,7 @@ In the plugin's own schema, `plugin_herdr`, from `fxbot/migrations/`:
 - `watches`: each prompt, from the call to the agent's settled state, how herdr shows its agent, and whether the bot was told. Ended ones are kept 30 days.
 - `workspaces`: the **fxbot bots** workspace on each machine, by its id there.
 - `bots`: the machines a bot reaches, when you picked them.
+- `panes`: every agent herdr has, on every machine, as the plugin last saw it, for tags. A machine that answers has its rows written and its gone agents removed, and one that doesn't keeps its rows.
 
 Removing the plugin drops the schema.
 
@@ -57,7 +61,7 @@ Removing the plugin drops the schema.
 | `fxbot/server.ts` | The tools, herdr's CLI through the door or directly, the watches, the sessions' names, and the routes |
 | `fxbot/page.jsx` | The cards, a bot's machines, the plugin's tab, the agents, and each agent's terminal |
 | `fxbot/page.js` | `page.jsx`, built |
-| `fxbot/migrations/` | Its three tables, and how a prompt's agent is shown |
+| `fxbot/migrations/` | Its four tables, and how a prompt's agent is shown |
 | `skills/herdr/SKILL.md` | How bots use the tools |
 
 ## Building it
