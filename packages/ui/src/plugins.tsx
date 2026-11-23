@@ -163,24 +163,24 @@ async function run(name: string, version: string, url: string): Promise<Places> 
 export async function loadPlugins() {
   const list = await client.plugins.pages().catch(() => null);
   if (!list) return;
-  const next: Loaded[] = [];
-  for (const { name, iconKey, version, page, css } of list) {
-    const now = loaded.find((p) => p.name === name);
-    const key = `${page ?? ""} ${css ?? ""}`;
-    if (now && now.key === key) {
-      next.push({ ...now, iconKey });
-      continue;
-    }
-    now?.css?.remove();
-    let link: HTMLLinkElement | undefined;
-    if (css) {
-      link = Object.assign(document.createElement("link"), { rel: "stylesheet", href: css });
-      document.head.append(link);
-    }
-    let pageError: string | undefined;
-    const places = page ? await run(name, version, page).catch((error: Error) => (console.error(`Plugin ${name}:`, error), (pageError = error.message), emptyPlaces())) : emptyPlaces();
-    next.push({ name, iconKey, key, css: link, places, ...(pageError ? { pageError } : {}) });
-  }
+  // All at once, each into its own places, and kept in the list's order: one after another, a cold start over a slow
+  // link waited for every page in turn.
+  const next: Loaded[] = await Promise.all(
+    list.map(async ({ name, iconKey, version, page, css }): Promise<Loaded> => {
+      const now = loaded.find((p) => p.name === name);
+      const key = `${page ?? ""} ${css ?? ""}`;
+      if (now && now.key === key) return { ...now, iconKey };
+      now?.css?.remove();
+      let link: HTMLLinkElement | undefined;
+      if (css) {
+        link = Object.assign(document.createElement("link"), { rel: "stylesheet", href: css });
+        document.head.append(link);
+      }
+      let pageError: string | undefined;
+      const places = page ? await run(name, version, page).catch((error: Error) => (console.error(`Plugin ${name}:`, error), (pageError = error.message), emptyPlaces())) : emptyPlaces();
+      return { name, iconKey, key, css: link, places, ...(pageError ? { pageError } : {}) };
+    }),
+  );
   for (const gone of loaded.filter((p) => !list.some((l) => l.name === p.name))) gone.css?.remove();
   publish(next);
 }

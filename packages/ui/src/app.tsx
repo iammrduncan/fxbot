@@ -678,6 +678,9 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   // A chat that started over, here or on another page, is read again: its new session, and its handoff.
   const reread = () => void client.profiles.get(id).then(setProfile, () => {});
   const { turns, setTurns, connected, ready } = useTurnStream(id, profile?.sessionId ?? null, reread);
+  // The turns there when the chat caught up, which aren't scroll anchors: see Thread.
+  const replayed = useRef<Set<string> | null>(null);
+  if (ready && !replayed.current) replayed.current = new Set(turns.map((turn) => turn.messageId));
   const following = useRef(profile?.sessionId);
   following.current = profile?.sessionId;
   // A long chat shows its newest turns, and more each time it's scrolled near its top, or while they all fit. Turns
@@ -873,7 +876,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                   <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 py-4">
                     {first === 0 && <Thread turns={earlier} color={profile?.color} skills={skillNames} />}
                     {first === 0 && profile?.handoff && <Handoff text={profile.handoff} />}
-                    <Thread turns={turns.slice(first)} color={profile?.color} skills={skillNames} retry={(turn) => send(turn.text, turn.messageId, turn.files ?? [])} />
+                    <Thread turns={turns.slice(first)} color={profile?.color} skills={skillNames} retry={(turn) => send(turn.text, turn.messageId, turn.files ?? [])} anchored={(messageId) => ready && !replayed.current?.has(messageId)} />
                   </MessageScrollerContent>
                 </MessageScrollerViewport>
                 <MessageScrollerButton />
@@ -1044,7 +1047,10 @@ function TurnReply({ turn, color, skills, retry }: { turn: Turn; color?: Color; 
 // A chat's turns: the person's message as the scroll anchor, then the reply. What a plugin folds is one pill between the
 // things said to the owner: a run of turns folded whole, and perhaps one whose message alone folds, since its reply is for
 // the owner. The owner's words inside a turn keep it in view, so they never go into a pill.
-function Thread({ turns, color, skills, retry }: { turns: Turn[]; color?: Color; skills: Set<string>; retry?: (turn: Turn) => void }) {
+// `anchored` says which of the owner's messages the scroller brings to the top as they arrive: only what came after the
+// chat caught up. A message from before, whose turn a plugin's fold swaps for a pill once the plugins load, would
+// otherwise pull a chat that opened at its end back up to it.
+function Thread({ turns, color, skills, retry, anchored }: { turns: Turn[]; color?: Color; skills: Set<string>; retry?: (turn: Turn) => void; anchored?: (messageId: string) => boolean }) {
   const fold = useFold();
   const runs: { folded: Turn[]; shown?: Turn }[] = [];
   for (const turn of turns) {
@@ -1088,7 +1094,7 @@ function Thread({ turns, color, skills, retry }: { turns: Turn[]; color?: Color;
           </MessageScrollerItem>
         )}
         {!first && shown && (shown.text || shown.files?.length) ? (
-          <MessageScrollerItem messageId={`${shown.messageId}-user`} scrollAnchor>
+          <MessageScrollerItem messageId={`${shown.messageId}-user`} scrollAnchor={anchored?.(shown.messageId) ?? false}>
             <Said text={shown.text} files={shown.files} from={shown.from} color={color} skills={skills} />
           </MessageScrollerItem>
         ) : null}
