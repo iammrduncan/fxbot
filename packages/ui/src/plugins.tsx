@@ -170,7 +170,24 @@ async function run(name: string, version: string, url: string): Promise<Places> 
 
 // Reads the list of running plugins, and loads the ones that are new or changed. A plugin that's gone loses its
 // places; its code stays in the page until it reloads. Adding, updating, or removing one calls this again.
-export async function loadPlugins() {
+// One load at a time. A second ask while one runs, as the app's start does twice in development, or after a change,
+// reads the list once more when it ends, when the plugins it loaded are kept, rather than running each one twice.
+let loading: Promise<void> | null = null;
+let again = false;
+export function loadPlugins(): Promise<void> {
+  if (loading) {
+    again = true;
+    return loading;
+  }
+  loading = (async () => {
+    do {
+      again = false;
+      await loadOnce();
+    } while (again);
+  })().finally(() => (loading = null));
+  return loading;
+}
+async function loadOnce() {
   const list = await client.plugins.pages().catch(() => null);
   if (!list) return;
   // All at once, each into its own places, and kept in the list's order: one after another, a cold start over a slow

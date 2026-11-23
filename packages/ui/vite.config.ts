@@ -7,6 +7,39 @@ import { defineConfig, type Plugin } from "vite";
 import { VitePWA, type ManifestOptions } from "vite-plugin-pwa";
 
 const repo = fileURLToPath(new URL("../..", import.meta.url));
+
+// In development, Vite serves lucide-react as one file of all its icons, 5 MB that a phone parses at each load, for the
+// few dozen the app uses. So each icon the app imports comes from its own file instead, by lucide's own list. The
+// build keeps only those it uses anyway.
+function lucideIcons(): Plugin {
+  let files: Map<string, string> | undefined;
+  const fileOf = (name: string) => {
+    files ??= new Map(
+      [...readFileSync(`${repo}node_modules/lucide-react/dist/esm/lucide-react.mjs`, "utf8").matchAll(/export \{([^}]*)\} from '\.\/icons\/([^']+)'/g)].flatMap(([, names, file]) =>
+        [...names.matchAll(/default as (\w+)/g)].map(([, name]) => [name, file] as [string, string]),
+      ),
+    );
+    return files.get(name);
+  };
+  return {
+    name: "fxbot-lucide-icons",
+    apply: "serve",
+    enforce: "pre",
+    transform(code, id) {
+      if (!id.includes("/packages/ui/src/") || !code.includes('"lucide-react"')) return;
+      return code.replace(/import \{([^}]*)\} from "lucide-react";?/g, (whole, list: string) => {
+        const parts = list.split(",").map((part) => part.trim()).filter(Boolean);
+        const lines = parts.map((part) => {
+          const [name, alias] = part.split(/\s+as\s+/);
+          const file = !name.startsWith("type ") && fileOf(name);
+          return file ? `import ${alias ?? name} from "lucide-react/dist/esm/icons/${file}";` : null;
+        });
+        return lines.every(Boolean) ? lines.join("\n") : whole;
+      });
+    },
+  };
+}
+
 const { version } = JSON.parse(readFileSync(`${repo}package.json`, "utf8")) as { version: string };
 // The development API's port. A release that setup.sh installs takes 8787, so both can run on one machine.
 const apiPort = process.env.FXBOT_PORT ?? "8788";
@@ -95,6 +128,7 @@ export default defineConfig({
   // The page knows the version it was built from, to notice a server that runs another.
   define: { __FXBOT_VERSION__: JSON.stringify(version) },
   plugins: [
+    lucideIcons(),
     api(),
     devManifest(),
     react(),
@@ -109,6 +143,8 @@ export default defineConfig({
     }),
   ],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
+  // Its icons come one by one in development (lucideIcons), so the whole set isn't bundled up front.
+  optimizeDeps: { exclude: ["lucide-react"] },
   server: {
     // IPv4 loopback, like the API server, so `tailscale serve 5173` reaches it. Tailnet names end in .ts.net.
     host: "127.0.0.1",
