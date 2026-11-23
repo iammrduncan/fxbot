@@ -1,7 +1,7 @@
 let react = require("react");
 let _fxbot_app = require("@fxbot/app");
 let react_jsx_runtime = require("react/jsx-runtime");
-// ../../../../../../root/github/fxbot/plugins/messages/node_modules/orderedmap/dist/index.js
+// node_modules/orderedmap/dist/index.js
 function OrderedMap(content) {
 	this.content = content;
 }
@@ -82,7 +82,7 @@ OrderedMap.from = function(value) {
 	if (value) for (var prop in value) content.push(prop, value[prop]);
 	return new OrderedMap(content);
 };
-// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-model/dist/index.js
+// node_modules/prosemirror-model/dist/index.js
 function findDiffStart(a, b, pos) {
 	for (let i = 0;; i++) {
 		if (i == a.childCount || i == b.childCount) return a.childCount == b.childCount ? null : pos;
@@ -2217,7 +2217,7 @@ function renderSpec(doc, structure, xmlNS, blockArraysIn) {
 		contentDOM
 	};
 }
-// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-transform/dist/index.js
+// node_modules/prosemirror-transform/dist/index.js
 const lower16 = 65535;
 const factor16 = Math.pow(2, 16);
 function makeRecover(index, offset) {
@@ -3623,7 +3623,7 @@ var Transform = class {
 		return this;
 	}
 };
-// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-state/dist/index.js
+// node_modules/prosemirror-state/dist/index.js
 const classesById = Object.create(null);
 var Selection = class {
 	constructor($anchor, $head, ranges) {
@@ -4247,7 +4247,7 @@ var PluginKey = class {
 		return state[this.key];
 	}
 };
-// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-commands/dist/index.js
+// node_modules/prosemirror-commands/dist/index.js
 const deleteSelection = (state, dispatch) => {
 	if (state.selection.empty) return false;
 	if (dispatch) dispatch(state.tr.deleteSelection().scrollIntoView());
@@ -4563,7 +4563,7 @@ const macBaseKeymap = {
 };
 for (let key in pcBaseKeymap) macBaseKeymap[key] = pcBaseKeymap[key];
 const baseKeymap = (typeof navigator != "undefined" ? /Mac|iP(hone|[oa]d)/.test(navigator.platform) : typeof os != "undefined" && os.platform ? os.platform() == "darwin" : false) ? macBaseKeymap : pcBaseKeymap;
-// ../../../../../../root/github/fxbot/plugins/messages/node_modules/rope-sequence/dist/index.js
+// node_modules/rope-sequence/dist/index.js
 var GOOD_LEAF_SIZE = 200;
 var RopeSequence = function RopeSequence() {};
 RopeSequence.prototype.append = function append(other) {
@@ -4699,7 +4699,7 @@ var Append = function(RopeSequence) {
 	};
 	return Append;
 }(RopeSequence);
-// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-history/dist/index.js
+// node_modules/prosemirror-history/dist/index.js
 const max_empty_items = 500;
 var Branch = class Branch {
 	constructor(items, eventCount) {
@@ -4992,7 +4992,7 @@ function buildCommand(redo, scroll) {
 }
 const undo = buildCommand(false, true);
 const redo = buildCommand(true, true);
-// ../../../../../../root/github/fxbot/plugins/messages/node_modules/w3c-keyname/index.js
+// node_modules/w3c-keyname/index.js
 var base = {
 	8: "Backspace",
 	9: "Tab",
@@ -5092,7 +5092,7 @@ function keyName(event) {
 	if (name == "Down") name = "ArrowDown";
 	return name;
 }
-// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-keymap/dist/index.js
+// node_modules/prosemirror-keymap/dist/index.js
 const mac$1 = typeof navigator != "undefined" && /Mac|iP(hone|[oa]d)/.test(navigator.platform);
 const windows$1 = typeof navigator != "undefined" && /Win/.test(navigator.platform);
 function normalizeKeyName(name) {
@@ -5149,7 +5149,7 @@ function keydownHandler(bindings) {
 		return false;
 	};
 }
-// ../../../../../../root/github/fxbot/plugins/messages/node_modules/prosemirror-view/dist/index.js
+// node_modules/prosemirror-view/dist/index.js
 const domIndex = function(node) {
 	for (var index = 0;; index++) {
 		node = node.previousSibling;

@@ -1,7 +1,7 @@
 Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 // \0rolldown/runtime.js
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod, mod.exports), cb = null), mod.exports);
-// ../../../../../../root/github/fxbot/plugins/computer/node_modules/@xterm/xterm/lib/xterm.js
+// node_modules/@xterm/xterm/lib/xterm.js
 var require_xterm = __commonJSMin(((exports, module) => {
 	(function(e, t) {
 		if ("object" == typeof exports && "object" == typeof module) module.exports = t();
@@ -12998,7 +12998,7 @@ var require_xterm = __commonJSMin(((exports, module) => {
 		})(), s;
 	})()));
 }));
-// ../../../../../../root/github/fxbot/plugins/computer/node_modules/@xterm/addon-fit/lib/addon-fit.js
+// node_modules/@xterm/addon-fit/lib/addon-fit.js
 var require_addon_fit = __commonJSMin(((exports, module) => {
 	(function(e, t) {
 		"object" == typeof exports && "object" == typeof module ? module.exports = t() : "function" == typeof define && define.amd ? define([], t) : "object" == typeof exports ? exports.FitAddon = t() : e.FitAddon = t();
