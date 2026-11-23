@@ -86,19 +86,22 @@ A computer made before a change to its sizes or its screen is made again with th
 | `fxbot/agent-browser` | Copied into the image: starts the desktop's Chromium, then runs agent-browser on it |
 | `fxbot/page.jsx` | The Computer screen, its sections in Settings and in each bot's settings, the view of `computer_desktop` calls, and the screen button |
 | `fxbot/page.js` | `page.jsx`, built |
+| `fxbot/xterm.js` | xterm.js and its fit addon, built as one file, which the page loads from a route, gzipped, once the computer's screen opens |
+| `xterm.entry.js` | What `fxbot/xterm.js` is built from |
 | `fxbot/novnc.js` | noVNC 1.7.0, built as one module, which the page loads from a route |
 | `fxbot/page.css` | xterm.js's CSS |
-| `fxbot/page-licenses.txt` | The licenses of what `page.js`, `page.css`, and `novnc.js` bundle: xterm.js, MIT, and noVNC 1.7.0, MPL-2.0, with where its source is |
+| `fxbot/page-licenses.txt` | The licenses of what `xterm.js`, `page.css`, and `novnc.js` bundle: xterm.js, MIT, and noVNC 1.7.0, MPL-2.0, with where its source is |
 | `skills/` | The `computer`, `browser`, and `desktop` skills |
 | `host/setup.sh` | The engine, set up once on the machine |
 
 ## Build the page
 
-`page.js` is `page.jsx` bundled with [rolldown](https://rolldown.rs), which comes with fxbot's packages, and `novnc.js` is noVNC's `RFB` as one ES module. Run these in this folder, in a checkout of fxbot, after changing `page.jsx` or `package.json`:
+`page.js` is `page.jsx` bundled with [rolldown](https://rolldown.rs), which comes with fxbot's packages, `xterm.js` is xterm.js and its fit addon, kept apart so a page that shows no computer doesn't carry them, and `novnc.js` is noVNC's `RFB` as one ES module. Run these in this folder, in a checkout of fxbot, after changing `page.jsx` or `package.json`:
 
 ```sh
 npm install
 npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app --file fxbot/page.js
+npx rolldown xterm.entry.js --format cjs --no-comments --file fxbot/xterm.js
 npx rolldown node_modules/@novnc/novnc/core/rfb.js --format esm --file fxbot/novnc.js
 cp node_modules/@xterm/xterm/css/xterm.css fxbot/page.css
 ```

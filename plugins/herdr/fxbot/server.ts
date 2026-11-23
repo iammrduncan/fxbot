@@ -1,9 +1,10 @@
 import { execFile, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { connect } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 import type { PluginApi } from "@fxbot/sdk";
 
 // herdr: bots list, read, prompt, and start the coding agents herdr runs, locally and on its saved machines, press keys
@@ -794,6 +795,16 @@ export default async function setup(fx: PluginApi) {
     return Buffer.concat([head, payload]);
   };
   const sized = (n: unknown, fallback: number) => Math.min(500, Math.max(1, Math.trunc(Number(n)) || fallback));
+  // xterm.js, for the page's terminal, which loads it once one opens: most of what the page would carry. The page asks
+  // with the plugin's version in the address, so a browser keeps it.
+  const xterm = readFileSync(join(import.meta.dirname, "xterm.js"));
+  const zipped = gzipSync(xterm, { level: 9 });
+  fx.route("GET", "/xterm.js", (request) => {
+    const gzip = /\bgzip\b/.test(request.headers.get("accept-encoding") ?? "");
+    return new Response(gzip ? zipped : xterm, {
+      headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=31536000, immutable", vary: "accept-encoding", ...(gzip ? { "content-encoding": "gzip" } : {}) },
+    });
+  });
   fx.socket("/terminal", (page, request) => {
     const query = new URL(request.url).searchParams;
     const rows = sized(query.get("rows"), 40);

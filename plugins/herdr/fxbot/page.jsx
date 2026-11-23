@@ -5,8 +5,20 @@
 // by the id its result starts with. Built into page.js; see the README.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { api, go, ui } from "@fxbot/app";
-import { Terminal as XTerm } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
+
+// xterm.js, loaded once a terminal opens, since most pages never show one: it's most of the plugin's page code. The
+// server keeps it, fxbot/xterm.js, gzipped, at an address with the plugin's version, which a browser keeps.
+let version = "";
+let xterm;
+const loadXterm = () =>
+  (xterm ??= api(`xterm.js?v=${encodeURIComponent(version)}`)
+    .then((res) => (res.ok ? res.text() : Promise.reject(new Error(`xterm.js didn't load: HTTP ${res.status}`))))
+    .then((code) => {
+      const module = { exports: {} };
+      new Function("module", "exports", code)(module, module.exports);
+      return module.exports;
+    })
+    .catch((error) => ((xterm = undefined), Promise.reject(error))));
 
 async function call(path, method = "GET", body) {
   const res = await api(path, { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
@@ -207,6 +219,16 @@ function Live({ pane, mobile }) {
   const held = useRef(false);
   held.current = ctrl;
   useEffect(() => {
+    let gone = false;
+    let stop = () => {};
+    loadXterm().then(
+      ({ Terminal, FitAddon }) => void (gone || (stop = start(Terminal, FitAddon))),
+      (error) => setProblem(error.message),
+    );
+    return () => ((gone = true), stop());
+  }, [pane, round]);
+  // The terminal and its socket, once xterm.js is here. It answers its own cleanup.
+  function start(XTerm, FitAddon) {
     const term = new XTerm({ fontSize: touch ? 12 : 13, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", cursorBlink: true, theme: { background: "#0f1115" } });
     const fit = new FitAddon();
     term.loadAddon(fit);
@@ -234,7 +256,7 @@ function Live({ pane, mobile }) {
     const el = box.current;
     let y = null;
     let moved = 0;
-    const start = (event) => ((y = event.touches[0].clientY), (moved = 0));
+    const begin = (event) => ((y = event.touches[0].clientY), (moved = 0));
     const move = (event) => {
       if (y === null) return;
       const at = event.touches[0];
@@ -254,15 +276,15 @@ function Live({ pane, mobile }) {
       }
       event.preventDefault();
     };
-    const stop = () => void (y = null);
-    el.addEventListener("touchstart", start, { passive: true });
+    const end = () => void (y = null);
+    el.addEventListener("touchstart", begin, { passive: true });
     el.addEventListener("touchmove", move, { passive: false });
-    el.addEventListener("touchend", stop);
+    el.addEventListener("touchend", end);
     line.current = { send, term };
     return () => {
-      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchstart", begin);
       el.removeEventListener("touchmove", move);
-      el.removeEventListener("touchend", stop);
+      el.removeEventListener("touchend", end);
       watch.disconnect();
       typed.dispose();
       raw.dispose();
@@ -270,7 +292,7 @@ function Live({ pane, mobile }) {
       term.dispose();
       line.current = null;
     };
-  }, [pane, round]);
+  }
   // A key from the row. On a phone, focusing the terminal would bring up the keyboard, so it doesn't.
   const press = (key) => {
     const live = line.current;
@@ -780,6 +802,7 @@ function BotMachines({ bot }) {
 }
 
 export default function setup(app) {
+  version = app.version;
   // A watched agent's news folds into a pill in the middle of the chat, "1 received · herdr", so it doesn't read like the
   // owner's own message. What the bot says about it is for the owner, so it stays in view.
   app.fold({ message: (id) => (/^herdr-watch-\d+$/.test(id) ? { fold: "message" } : undefined) });

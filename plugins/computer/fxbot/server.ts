@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 import { request, type IncomingHttpHeaders } from "node:http";
 import { userInfo } from "node:os";
 import { join, posix, resolve } from "node:path";
@@ -1056,6 +1057,16 @@ export default async function setup(fx: PluginApi) {
     },
   );
   // noVNC is an ES module of its own, with a top-level await, so it can't join page.js. The page imports it from here.
+  // xterm.js, for the page's terminal, which loads it once one shows. The page asks with the plugin's version in the
+  // address, so a browser keeps it.
+  const xterm = readFileSync(join(import.meta.dirname, "xterm.js"));
+  const zippedXterm = gzipSync(xterm, { level: 9 });
+  fx.route("GET", "/xterm.js", (request) => {
+    const gzip = /\bgzip\b/.test(request.headers.get("accept-encoding") ?? "");
+    return new Response(gzip ? zippedXterm : xterm, {
+      headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=31536000, immutable", vary: "accept-encoding", ...(gzip ? { "content-encoding": "gzip" } : {}) },
+    });
+  });
   const novnc = join(import.meta.dirname, "novnc.js");
   fx.route("GET", "/novnc.js", () => new Response(readFileSync(novnc), { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "max-age=86400" } }));
 

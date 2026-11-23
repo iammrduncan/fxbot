@@ -8,8 +8,6 @@
 // Built into page.js, and noVNC into novnc.js, which the plugin serves; see the README.
 import { useEffect, useRef, useState } from "react";
 import { api, client, go, ui, useBots } from "@fxbot/app";
-import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
 
 async function call(path, method = "GET", body) {
   const res = await api(path, { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
@@ -128,6 +126,20 @@ function Cursors({ computer, hidden }) {
   );
 }
 
+// xterm.js, loaded once a terminal first shows, since most pages never show one: it's most of the plugin's page code.
+// The server keeps it, fxbot/xterm.js, gzipped, at an address with the plugin's version, which a browser keeps.
+let version = "";
+let xterm;
+const loadXterm = () =>
+  (xterm ??= api(`xterm.js?v=${encodeURIComponent(version)}`)
+    .then((res) => (res.ok ? res.text() : Promise.reject(new Error(`xterm.js didn't load: HTTP ${res.status}`))))
+    .then((code) => {
+      const module = { exports: {} };
+      new Function("module", "exports", code)(module, module.exports);
+      return module.exports;
+    })
+    .catch((error) => ((xterm = undefined), Promise.reject(error))));
+
 // noVNC is an ES module of its own, which the plugin serves; it's loaded once, when a desktop first shows.
 let novnc;
 const load = (url) => import(url);
@@ -192,6 +204,16 @@ function TerminalView({ computer, hidden }) {
   const box = useRef(null);
   const [problem, setProblem] = useState("");
   useEffect(() => {
+    let gone = false;
+    let stop = () => {};
+    loadXterm().then(
+      ({ Terminal, FitAddon }) => void (gone || (stop = start(Terminal, FitAddon))),
+      (error) => setProblem(error.message),
+    );
+    return () => ((gone = true), stop());
+  }, [computer]);
+  // The terminal and its socket, once xterm.js is here. It answers its own cleanup.
+  function start(Terminal, FitAddon) {
     const term = new Terminal({ fontSize: 13, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", cursorBlink: true, theme: { background: "#1e1e1e" } });
     const fit = new FitAddon();
     term.loadAddon(fit);
@@ -215,7 +237,7 @@ function TerminalView({ computer, hidden }) {
       socket.close();
       term.dispose();
     };
-  }, [computer]);
+  }
   return (
     <div style={{ ...pane, display: hidden ? "none" : "block" }} aria-label="The computer's terminal">
       <div ref={box} style={{ position: "absolute", inset: 8 }} />
@@ -631,6 +653,7 @@ function RoomComputer({ room }) {
 }
 
 export default function setup(app) {
+  version = app.version;
   app.route("/computers/:key", ComputerScreen);
   // Where a bot's computer was before 0.3.0, so old links still work.
   app.route("/bots/:id", ComputerScreen);

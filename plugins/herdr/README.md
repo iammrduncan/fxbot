@@ -63,19 +63,24 @@ Removing the plugin drops the schema.
 | `fxbot/server.ts` | The tools, herdr's CLI through the door or directly, the watches, the sessions' names, and the routes |
 | `fxbot/terminal.py` | herdr's client in a pseudo-terminal, for the page's terminal: framed input, sizes, and what it draws |
 | `fxbot/page.jsx` | The cards, a bot's machines, the plugin's tab, herdr's screen, the agents, and each agent's terminal |
-| `fxbot/page.js` | `page.jsx`, built, with xterm.js |
+| `fxbot/page.js` | `page.jsx`, built |
+| `fxbot/xterm.js` | xterm.js and its fit addon, built as one file, which the page loads from a route, gzipped, once a terminal opens |
+| `fxbot/xterm-licenses.txt` | Their licenses, MIT |
 | `fxbot/page.css` | xterm.js's styles |
+| `xterm.entry.js` | What `fxbot/xterm.js` is built from |
 | `package.json` | xterm.js, for the build |
 | `fxbot/migrations/` | Its four tables, and how a prompt's agent is shown |
 | `skills/herdr/SKILL.md` | How bots use the tools |
 
 ## Building it
 
-`fxbot/page.js` is `fxbot/page.jsx` bundled with [rolldown](https://rolldown.rs), which comes with fxbot's packages, and [xterm.js](https://xtermjs.org), from `package.json`. `fxbot/page.css` is xterm.js's `css/xterm.css`. Run these in this folder, in a checkout of fxbot, after changing `page.jsx` or `package.json`:
+`fxbot/page.js` is `fxbot/page.jsx` bundled with [rolldown](https://rolldown.rs), which comes with fxbot's packages. `fxbot/xterm.js` is [xterm.js](https://xtermjs.org) and its fit addon, from `package.json`, kept apart so a page that shows no terminal doesn't carry it, and `fxbot/page.css` is xterm.js's `css/xterm.css`. Run these in this folder, in a checkout of fxbot, after changing `page.jsx` or `package.json`:
 
 ```sh
 npm ci
 npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app --file fxbot/page.js
+npx rolldown xterm.entry.js --format cjs --no-comments --file fxbot/xterm.js
+cp node_modules/@xterm/xterm/css/xterm.css fxbot/page.css
 ```
 
 Commit both.
