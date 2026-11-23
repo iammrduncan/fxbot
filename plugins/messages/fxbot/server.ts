@@ -95,14 +95,14 @@ export default async function setup(fx: PluginApi) {
   // What the model gets. A bot's words are quoted, so they can't pass for the frame around them. When the owner's words
   // began the conversation, it quotes them too, from the chat of the bot they asked, which no bot can write.
   type Asked = { words: string; of: string; you: boolean };
-  function frame({ id, from, words, reply, answers, joining, named, asked }: { id: number; from: string; words: string; reply: Reply; answers?: number; joining: boolean; named: string[]; asked?: Asked }) {
+  function frame({ id, from, words, reply, answers, joining, named, asked, after }: { id: number; from: string; words: string; reply: Reply; answers?: number; joining: boolean; named: string[]; asked?: Asked; after?: string }) {
     const who = reply === "maybe" && answers ? `It's ${from}'s answer to your message m:${answers}.` : `It's message m:${id} from ${from}, another of the owner's bots.`;
     const end = {
       yes: joining
         ? `${from} expects a reply: send it with messages_send, when you can, and carry on with what you were doing.`
         : `${from} expects a reply. If this takes a while, send a short one first with reply: false, then do the work in this turn. Your last message goes to ${from}, unless you've just sent it. Say what ${from} needs, from what you know.`,
       no: `${from} needs no reply, so you can't message ${from} from this turn. Carry on, and tell the owner what matters.`,
-      maybe: `Tell the owner what matters. Reply to ${from} only if you need more.`,
+      maybe: after ?? `Tell the owner what matters. Reply to ${from} only if you need more.`,
     }[reply];
     const theirs = asked
       ? [
@@ -165,7 +165,8 @@ export default async function setup(fx: PluginApi) {
       const files = (post.files ?? []).map(({ name }) => ({ name }));
       const [row] = await sql<Row[]>`insert into messages (conversation, from_bot, to_bot, text, reply, answers, key, files)
         values (${post.conversation}, ${post.from.id}, ${post.to.id}, ${post.text}, ${post.reply}, ${post.answers ?? null}, ${post.key}, ${sql.json(files)}) returning *`;
-      if (post.answers) await sql`update messages set answered_at = coalesce(answered_at, now()) where id = ${post.answers}`;
+      // A "got it" with reply: false isn't the answer: the turn's last message still goes back when it ends.
+      if (post.answers && post.reply !== "no") await sql`update messages set answered_at = coalesce(answered_at, now()) where id = ${post.answers}`;
       return { row };
     });
   }
@@ -174,7 +175,8 @@ export default async function setup(fx: PluginApi) {
   async function deliver(row: Row, post: Post) {
     const busy = (await fx.bots.get(post.to.id)).busy;
     const asked = await askedOf(post.conversation, post.to);
-    const text = frame({ id: row.id, from: post.from.name, words: post.text, reply: post.reply, answers: post.answers, joining: busy, named: post.named ?? [], asked: asked.frame });
+    const after = post.reply === "maybe" && post.answers ? await still(post, asked) : undefined;
+    const text = frame({ id: row.id, from: post.from.name, words: post.text, reply: post.reply, answers: post.answers, joining: busy, named: post.named ?? [], asked: asked.frame, after });
     // "ask" is a message whose turn answers its sender, so a chat can fold the two together. The sender is for its face.
     const turn = `messages-${post.reply === "yes" ? "ask" : "in"}-${row.id}-${post.from.id}`;
     await fx.sql`update messages set turn = ${turn} where id = ${row.id}`;
@@ -184,6 +186,17 @@ export default async function setup(fx: PluginApi) {
     await fx.sql`update messages set turn = ${joined}, state = 'working' where id = ${row.id} and state = 'waiting'`;
     // It joined as the turn ended: that turn.end looked for it too soon.
     if (over.has(joined)) await settle(joined, { reply: "" });
+  }
+
+  // After an answer: whether it was the last one its receiver waited for in this conversation, so it answers the owner
+  // once, with everything, or who's still to answer. The state, not answered_at, says who's still at work.
+  async function still(post: Post, asked: { words?: string; frame?: Asked }) {
+    const open = await fx.sql<{ id: number; to_bot: string }[]>`select id, to_bot from messages
+      where conversation = ${post.conversation} and from_bot = ${post.to.id} and reply = 'yes' and id <> ${post.answers!} and state in ('waiting', 'working') order by id`;
+    const more = `Reply to ${post.from.name} only if you need more.`;
+    if (open.length) return `Still to answer: ${joinNames(await Promise.all(open.map(async (r) => `${await nameOf(r.to_bot)} (m:${r.id})`)))}. Tell the owner what's new only if it helps them now, and answer them in full when the last answer comes. ${more}`;
+    const owner = asked.words && !asked.frame ? ` They asked:\n\n${quote(asked.words)}` : "";
+    return `That's the last answer you were waiting for. Now answer the owner in one reply that brings together what you found and what the other bots said.${owner} ${more}`;
   }
 
   // A message the server sends, a last message or a note: under the same budget, and it can't fail the turn that ended.
@@ -356,7 +369,10 @@ export default async function setup(fx: PluginApi) {
     if (theirs.some((row) => row.reply === "no") && (!asked || asked.reply === "no")) return { answer: `${to.name} said no reply is needed, so you can't message ${to.name} from this turn.` };
     await fx.sql`delete from conversations where at < now() - interval '30 days'`;
     const from = bots.find((bot) => bot.id === call.bot)!;
-    const post: Post = { conversation, from, to, text, reply: input.reply === false ? "no" : "yes", answers: asked?.id, key: hash(call.messageId, to.id, text), ...packed };
+    // A message that answers one waiting for this bot's reply is that answer, as its last message would be, unless it
+    // asks back with reply: true.
+    const answering = asked?.reply === "yes" && !asked.answered_at && input.reply !== true;
+    const post: Post = { conversation, from, to, text, reply: input.reply === false ? "no" : answering ? "maybe" : "yes", answers: asked?.id, key: hash(call.messageId, to.id, text), ...packed };
     const written = await write(post);
     if (written.refused) return { answer: written.refused };
     const row = written.row ?? written.same!;
@@ -379,7 +395,7 @@ export default async function setup(fx: PluginApi) {
       properties: {
         to: { type: "string", description: "The bot's name or id" },
         text: { type: "string", description: "Everything it needs, in one message: what you want, and what to send back" },
-        reply: { type: "boolean", description: 'False when you need nothing back, such as "got it" or a finished result' },
+        reply: { type: "boolean", description: 'False when you need nothing back, such as "got it". A message that answers one waiting for your reply is your answer by itself: true only to ask back' },
         files: { type: "array", items: { type: "string" }, description: "library:<id> of files to send, at most 5" },
       },
       required: ["to", "text"],
