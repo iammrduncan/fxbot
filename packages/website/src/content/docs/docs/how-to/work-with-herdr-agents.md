@@ -5,7 +5,7 @@ description: "Bots see the coding agents herdr runs, on fxbot's machine and on h
 
 [herdr](https://herdr.dev) runs coding agents, such as Claude Code and Codex, in terminal panes, on your machine and on the machines you saved in it. With the herdr plugin, a bot sees those agents, reads what they show, sends them work, starts new ones, answers their questions when you say so, and hears back when one is done. You see each agent's terminal in fxbot, and type into it.
 
-1. Add **herdr** from **Plugins**, on **Browse**. It isn't in **Essentials**. It needs fxbot 0.9.0 or newer.
+1. Add **herdr** from **Plugins**, on **Browse**. It isn't in **Essentials**. A release install needs fxbot 0.11.0 or newer, which has its door, and tags need Messages 0.2.1.
 2. Let fxbot reach herdr, below.
 3. Choose each bot's machines, below, or leave them all on.
 4. Ask a bot: "What are my agents doing?", "Have the Codex on lab-2 run the tests and tell me what fails", or "Start a Claude in ~/api and have it review the open diff."
@@ -24,7 +24,7 @@ It runs as root, and herdr runs as root there. When herdr runs as another user, 
 sudo fxbot herdr on --user <login>
 ```
 
-The door is a socket in fxbot's control folder that takes a short list of herdr's commands, checks each word, and runs them as herdr's user: list and read agents, send one a prompt, wait for it, start one, and type and press keys in one. It reads a pane, or types into one, only when herdr says an agent is in it, never a shell. It never passes an agent flags of its own, or changes herdr. To let bots and you look but not send work, keys, or start agents, add `--read-only`. Opened by an older fxbot, the door takes keys once `fxbot update` brings the new one. `sudo fxbot status` says whether it's open, and `sudo fxbot herdr off` closes it.
+The door is a socket in fxbot's control folder that takes a short list of herdr's commands, checks each word, and runs them as herdr's user: list and read agents, send one a prompt, wait for it, start one, and type and press keys in one. Its commands read a pane, or type into one, only when herdr says an agent is in it, never a shell. herdr's own screen, for [herdr in fxbot](#use-herdr-in-fxbot), is the exception. It never passes an agent flags of its own, or changes herdr. To let bots and you look but not send work, keys, or start agents, add `--read-only`. Opened by an older fxbot, the door takes keys once `fxbot update` brings the new one. `sudo fxbot status` says whether it's open, and `sudo fxbot herdr off` closes it.
 
 `fxbot herdr on` also asks each saved machine the way the door will, with no SSH agent, and names any it can't reach. A machine whose SSH key has a passphrase needs it loaded where the door sees it.
 

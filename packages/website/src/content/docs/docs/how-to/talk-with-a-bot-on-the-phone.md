@@ -63,7 +63,7 @@ phone's `minutes`, `quiet`, and `perDay` settings change those limits.
 
 ## Pick a voice
 
-**voice**, in phone-signalwire's settings, lists SignalWire's English voices by engine, and under each engine what a 10-minute call costs. Joanna, on Amazon Polly Neural, is the default. To give one bot a voice of its own, pick it under **Voice** in the bot's **Phone** section. **language** says which English you speak, for SignalWire to hear. To use a voice the list doesn't have, pick **Another, typed in…** and type its ID from SignalWire's [voices](https://signalwire.com/docs/platform/voice/tts) page, as `engine.voice:model`. SignalWire plays its own default voice for an ID it doesn't know.
+**voice**, in phone-signalwire's settings, lists SignalWire's English voices by engine, and under each engine what a 10-minute call costs. Joanna, on Amazon Polly Neural, is the default. The lists need fxbot 0.11.0 or newer; an older one has a box to type a voice's name in. To give one bot a voice of its own, pick it under **Voice** in the bot's **Phone** section. **language** says which English you speak, for SignalWire to hear. To use a voice the list doesn't have, pick **Another, typed in…** and type its ID from SignalWire's [voices](https://signalwire.com/docs/platform/voice/tts) page, as `engine.voice:model`. SignalWire plays its own default voice for an ID it doesn't know.
 
 SignalWire bills a call, listening throughout so you can cut in:
 
