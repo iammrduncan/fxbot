@@ -207,7 +207,10 @@ async function scriptedModel() {
       let at = -1, entry = null;
       json.messages.forEach((m, i) => {
         if (m.role !== "user") return;
-        const found = mine.find((s) => text(m).includes(s.when));
+        // The step whose words come first in the message: an answer quotes what the owner asked at its end, since
+        // Messages 0.2.1, and those words would start the asker's own step over.
+        const said = text(m);
+        const found = mine.filter((s) => said.includes(s.when)).sort((x, y) => said.indexOf(x.when) - said.indexOf(y.when))[0];
         if (found) (at = i), (entry = found);
       });
       if (entry) {
