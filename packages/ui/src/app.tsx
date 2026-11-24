@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
-import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, MessageCircleDashedIcon, PanelRightIcon, PaperclipIcon, PencilIcon, PinIcon, PinOffIcon, PlusIcon, PuzzleIcon, SettingsIcon, SquareIcon, StarIcon, Trash2Icon, XIcon } from "lucide-react";
+import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, Maximize2Icon, MessageCircleDashedIcon, Minimize2Icon, PanelRightIcon, PaperclipIcon, PencilIcon, PinIcon, PinOffIcon, PlusIcon, PuzzleIcon, SettingsIcon, SquareIcon, StarIcon, Trash2Icon, XIcon } from "lucide-react";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -715,13 +715,20 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   // A bot with no provider cannot send: it points to Settings instead of offering the composer.
   const stuck = !profile || !profile.provider;
 
-  // The box starts one line tall and grows with its text up to its max height, where it scrolls. Only the app's textarea:
-  // a plugin's box grows on its own, and one measured as it mounts, before its styles, would keep a height too short.
+  // On a narrow screen the box's buttons fold behind one, and open in a row above the text, so the text has the width.
+  const [tools, setTools] = useState(false);
+  // The box made tall, for reading and editing a long message, which it offers once the message is a few lines long.
+  const [tall, setTall] = useState(false);
+  const long = tall || draft.includes("\n") || draft.length > 80;
+
+  // The box starts one line tall and grows with its text up to its max height, where it scrolls; made tall, its class
+  // sets its height. Only the app's textarea: a plugin's box grows on its own, and one measured as it mounts, before its
+  // styles, would keep a height too short.
   useLayoutEffect(() => {
     if (!(box.current instanceof HTMLTextAreaElement)) return;
     box.current.style.height = "auto";
-    box.current.style.height = `${box.current.scrollHeight}px`;
-  }, [draft]);
+    box.current.style.height = tall ? "" : `${box.current.scrollHeight}px`;
+  }, [draft, tall]);
 
   // Keeps trying, so the chat comes back on its own when the server does.
   useEffect(() => {
@@ -785,6 +792,8 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
     skills.setPicked([]);
     skills.close();
     setNotice("");
+    setTall(false);
+    setTools(false);
   }
 
   // From the picker, a paste, or a drop. The list is copied first, since the browser empties it after the event.
@@ -904,19 +913,25 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                     {attached.length > 0 && <Files files={attached} remove={(i) => setAttached((all) => all.toSpliced(i, 1))} />}
                   </div>
                 )}
-                <InputGroupAddon align="inline-start" className="pb-1.5">
+                {/* The buttons, mounted once: beside the text on a wide screen, and on a narrow one a row above it, shown by +. */}
+                <InputGroupAddon align="inline-start" className={`pb-1.5 ${tools ? "max-sm:w-full max-sm:justify-start max-sm:pt-2 max-sm:pb-0" : "max-sm:hidden"}`}>
                   <input ref={picker} type="file" multiple hidden onChange={(e) => attach([...(e.target.files ?? [])]).then(() => (e.target.value = ""))} />
                   <InputGroupButton size="icon-sm" className="rounded-full" disabled={stuck} aria-label="Attach files" onClick={() => picker.current?.click()}>
                     <PaperclipIcon />
                   </InputGroupButton>
                   {profile && <Place pick={(places) => places.composer} props={{ bot: profile, setDraft, attach: (files: File[]) => void attach(files) }} />}
                 </InputGroupAddon>
+                <InputGroupAddon align="inline-start" className="pb-1.5 sm:hidden">
+                  <InputGroupButton size="icon-sm" className="rounded-full" aria-label={tools ? "Hide the buttons" : "More: attach files and more"} aria-expanded={tools} onClick={() => setTools(!tools)}>
+                    {tools ? <XIcon /> : <PlusIcon />}
+                  </InputGroupButton>
+                </InputGroupAddon>
                 <MessageBox
                   bot={profile}
                   ref={box}
                   rows={1}
                   aria-label="Message"
-                  className="max-h-48 min-h-0 py-3"
+                  className={tall ? "h-[45dvh] max-h-[45dvh] min-h-0 py-3 sm:h-[60dvh] sm:max-h-[60dvh]" : "max-h-48 min-h-0 py-3"}
                   placeholder={profile ? (stuck ? "No provider yet" : `Message ${profile.name}${skills.skills.length ? ", or $ for a skill" : ""}`) : "Loading…"}
                   value={draft}
                   role="combobox"
@@ -927,7 +942,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                   onChange={(e) => (setDraft(e.target.value), skills.track(e.target.value, e.target.selectionStart))}
                   onFocus={() => void skills.load()}
                   onBlur={() => skills.close()}
-                  onKeyDown={(e) => skills.key(e) || (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && submit(e))}
+                  onKeyDown={(e) => skills.key(e) || (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && (!touch || e.metaKey || e.ctrlKey) && submit(e))}
                   onPaste={(e) => {
                     if (!e.clipboardData.files.length) return;
                     // Text pasted with a picture of itself, as from a spreadsheet, keeps the text as well.
@@ -936,7 +951,12 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                   }}
                   disabled={stuck}
                 />
-                <InputGroupAddon align="inline-end" className="pb-1.5">
+                <InputGroupAddon align="inline-end" className={`pb-1.5 ${long ? "flex-col justify-between self-stretch pt-1.5" : ""}`}>
+                  {long && (
+                    <InputGroupButton size="icon-sm" className="rounded-full" aria-label={tall ? "Make the box small" : "Make the box tall"} aria-pressed={tall} onClick={() => setTall(!tall)}>
+                      {tall ? <Minimize2Icon /> : <Maximize2Icon />}
+                    </InputGroupButton>
+                  )}
                   {/* With a turn running, a message joins it, and an empty box can stop it. */}
                   {running && !draft.trim() && !attached.length && !skills.picked.length ? (
                     <InputGroupButton variant="default" size="icon-sm" className="rounded-full" aria-label="Stop" onClick={() => void client.profiles.stop(id).catch(() => {})}>
@@ -957,6 +977,10 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
     </div>
   );
 }
+
+// A touch screen's Return makes a new line, as Shift+Enter does on a computer, so a long message can be written in lines;
+// its send button sends, and so does Cmd or Ctrl+Enter, as on a keyboard plugged into a tablet.
+const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 
 // A message's bubble: the bot's hue, only as dark as white text needs, so it's at least 4.5:1 by WCAG and Lc 75 by APCA.
 // Bots' own colors are mid-tones, picked for their blobs, and on amber, green, and teal neither white nor black reads.

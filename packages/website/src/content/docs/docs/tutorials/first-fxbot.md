@@ -108,7 +108,7 @@ To check it'll connect away from home, see **Settings** › **Web pairing** › 
 
 ## Chat
 
-On your phone, send `Hello! What can you do?`. The reply streams in as it is written, and the same chat on the machine shows it too.
+On your phone, send `Hello! What can you do?` with the send button: on a phone, Return starts a new line. The reply streams in as it is written, and the same chat on the machine shows it too.
 
 Now close the app and open it again. The chat is still there, because it lives on your fxbot, not in the app. A reply still being written when you leave carries on without you.
 
