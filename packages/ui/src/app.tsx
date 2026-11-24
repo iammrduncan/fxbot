@@ -719,7 +719,13 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   const [tools, setTools] = useState(false);
   // The box made tall, for reading and editing a long message, which it offers once the message is a few lines long.
   const [tall, setTall] = useState(false);
-  const long = tall || draft.includes("\n") || draft.length > 80;
+  // Counted without the blank lines around the words, which Messages' box keeps as empty paragraphs, so a box left with
+  // only line breaks doesn't count as long; emptied, the box is small again.
+  const words = draft.trim();
+  const long = tall || words.includes("\n") || words.length > 80;
+  useEffect(() => {
+    if (!words) setTall(false);
+  }, [words]);
 
   // The box starts one line tall and grows with its text up to its max height, where it scrolls; made tall, its class
   // sets its height. Only the app's textarea: a plugin's box grows on its own, and one measured as it mounts, before its
