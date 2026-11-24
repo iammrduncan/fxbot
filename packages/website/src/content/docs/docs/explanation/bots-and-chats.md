@@ -18,6 +18,8 @@ Each bot has one long-running chat, a durable libfx session on the server. The p
 
 Everything in a chat is also kept in Postgres: what you and other bots said, the bot's replies, its thinking, and its tool calls with their results. Each bot has a `chat_history` tool that searches all of that, across all its chats, and reads it in full around a match, in the order it happened. So a bot can look up what was said in an earlier chat, or long ago, and what it did about it. Each result says who it's from, so another bot's words don't read as yours. It reaches only its own chats. Thinking and tool calls are kept since 0.6.0, each up to 64 KiB.
 
+**A bot knows when each message was sent.** What it reads of each message starts with the time, in your time zone, such as `[Tue, Nov 24, 2026, 11:18 AM CST]`, and its instructions say what that is: the newest message's time is about now, and what's older may be out of date. A chat can sit for days, and without the times, what it said then read as if it came just before. The chat shows each message as written, without the time. `chat_history` gives each match's time the same way. Since 0.11.1.
+
 ## A message to a working bot
 
 You don't wait for a bot to finish. A message you write while it works joins what it's doing: a reply it's writing is cut short, and it goes on with your words in mind. While a tool runs, your message waits for the tool, then joins, so the chat shows it where the bot took it in, among its steps. If nothing is running, it's an ordinary turn.
@@ -114,8 +116,9 @@ Only the bot's own chat counts and is compacted here. A room, a routine's run, o
 A chat room is compacted too, with chat rooms 0.5.0, by the same setting and the same rules, as a whole: one summary for the room, which its lead writes, unless **Summarize with** names a model. Each bot's next turn there starts from it. See [Start a room over](/docs/how-to/talk-in-a-room/#start-a-room-over).
 
 What the bot keeps, in its own chat's instructions, in place of the chat. Its rooms, routines, and subagents don't get it:
-- the summary, which keeps your requests and instructions in your words, what was decided and why, facts about you and your work, and each open task
-- the last messages word for word, up to 6,000 characters
+- a heading that says when the chat it sums up began and ended, and when the summary was written, as every start-over's does since 0.11.1
+- the summary, which keeps your requests and instructions in your words, what was decided and why, facts about you and your work, and each open task, with when each was said or done
+- the last messages word for word, each with its time, up to 6,000 characters
 - a line that says the summary is for reference, and not to act on it alone
 
 **Summarize with**, under it, picks the model that writes the summary: each bot's own, or a cheaper one you choose. A model on the bot's provider reads the chat as the bot does; one on another provider reads its stored messages. When the model you chose has a window smaller than the chat, the bot's own model writes the summary, and fxbot's log says so.

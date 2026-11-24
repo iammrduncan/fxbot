@@ -1,7 +1,7 @@
 import type { FxAgentTool, FxResumeTurn, FxSessionPromptInput, FxTurn } from "libfx";
 import { createArchives } from "./archive.ts";
 import { createEmbeddings, type EmbeddingSettings } from "./embeddings.ts";
-import { createHistory, freshAsk, freshCommand, idleAsk, summarize, switchAsk } from "./history.ts";
+import { createHistory, freshAsk, freshCommand, idleAsk, sentLine, summarize, switchAsk, unstamped, when } from "./history.ts";
 import { createLibrary, pdf } from "./library.ts";
 import { createMcp } from "./mcp.ts";
 import { createMemories } from "./memories.ts";
@@ -130,7 +130,10 @@ export async function createFxbot(options: FxbotOptions) {
   const releases = createReleases({ version, url: options.releasesUrl, fetch });
   // Memory search's vectors: from the machine's local embedder, a provider's /embeddings, or none.
   const embeddings = createEmbeddings({ sql: store.sql, fetch, localUrl: options.embedUrl?.replace(/\/+$/, ""), target: (id) => providers.embeddingsTarget(id) });
-  const history = createHistory(store.sql, embeddings);
+  // The owner's time zone, kept here so plugins and the times bots read need no query. Empty is the machine's.
+  let { timeZone } = await store.settings.get();
+  const zone = () => timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const history = createHistory(store.sql, embeddings, zone);
   const memories = createMemories(store.sql, embeddings);
   const library = createLibrary(store.sql);
   // MCP servers' tools join every agent, and the skill tool once there are skills. A change to them makes the agents
@@ -175,8 +178,6 @@ export async function createFxbot(options: FxbotOptions) {
   // A plugin that starts turns from its setup is told to wait: the agents come after it.
   let ready = false;
   const started = () => ready || fail(400, "fxbot is still starting. Start turns after setup.");
-  // The owner's time zone, kept here so plugins read it without a query. Empty is the machine's.
-  let { timeZone } = await store.settings.get();
   const packages = await createPlugins({
     store,
     hold: holding,
@@ -217,7 +218,7 @@ export async function createFxbot(options: FxbotOptions) {
       },
       machine: options.machine ?? null,
       localUrl: options.localUrl ?? "http://127.0.0.1:8787",
-      timeZone: () => timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone: zone,
       async compaction() {
         const { idleCompactMinutes: idleMinutes, idleCompactTokens: minTokens, compactProvider: provider, compactModel: model } = await store.settings.get();
         return { idleMinutes, minTokens, provider, model };
@@ -309,6 +310,10 @@ export async function createFxbot(options: FxbotOptions) {
   const instructionsFor = (profile: StoredProfile, sessionId = profile.sessionId) =>
     [profile.instructions, profile.handoff && sessionId === profile.sessionId ? `${profile.handoff}\n\nSearch earlier messages with chat_history.` : ""].filter(Boolean);
 
+  // Each message a bot reads starts with when it was sent, so it can tell what's old: a chat can sit for days, and what
+  // it said then reads as if it came just before.
+  const sentNote = "Each message starts with when it was sent, in brackets, in the owner's time zone. The newest message's time is about now; what's older may be out of date.";
+
   async function modelFor(profile: StoredProfile) {
     if (!profile.provider) return fail(400, "This bot has no provider. Add one in Settings, then pick it in the bot's settings.");
     return profile.model || (await providers.get(profile.provider)).model;
@@ -355,7 +360,7 @@ export async function createFxbot(options: FxbotOptions) {
     const room = 64 * 1024 - 1024 - Buffer.byteLength([...instructionsFor(profile, sessionId), catalog].join("\n\n"));
     const memory = await memories.section(profile.id, Math.min(share(0.02), room));
     const team = await memories.teamSection(Math.min(window ? share(0.01) : 4000, room - Buffer.byteLength(memory)));
-    let instructions = [...instructionsFor(profile, sessionId), memory, team, catalog].filter(Boolean);
+    let instructions = [...instructionsFor(profile, sessionId), sentNote, memory, team, catalog].filter(Boolean);
     if (packages.hooked("instructions")) {
       const event = { bot: profile.id, session: sessionId, instructions };
       await packages.run("instructions", event);
@@ -589,12 +594,13 @@ export async function createFxbot(options: FxbotOptions) {
       const refusal = line?.type === "turn_end" && (refusedKey.get(line.messageId!) ?? (await refusedNow(line, id)));
       if (refusal) return JSON.stringify({ ...line, error: { ...line?.error, message: refusal } }) + "\n";
       // A message that joined a turn has a line of its own, named by `id`.
+      // The time a message starts with is the bot's: the page shows the message as it was written.
       if (line?.type === "user_message") {
         const joined = line.id ? await store.sent.get(id, line.id) : null;
-        return joined ? JSON.stringify({ ...line, text: joined.input, files: joined.files, ...(joined.plugin ? { from: joined.plugin } : {}) }) + "\n" : part + "\n";
+        return JSON.stringify(joined ? { ...line, text: joined.input, files: joined.files, ...(joined.plugin ? { from: joined.plugin } : {}) } : { ...line, text: unstamped(line.text ?? "") }) + "\n";
       }
       const sent = line?.type === "turn_start" && (line.input === undefined || byPlugin.has(`${id}:${line.messageId}`)) && (await store.sent.get(id, line.messageId!));
-      if (!sent) return part + "\n";
+      if (!sent) return line?.type === "turn_start" && typeof line.input === "string" ? JSON.stringify({ ...line, input: unstamped(line.input) }) + "\n" : part + "\n";
       const { plugin, ...saved } = sent;
       return JSON.stringify({ ...line, ...saved, ...(plugin ? { from: plugin } : {}) }) + "\n";
     };
@@ -653,7 +659,12 @@ export async function createFxbot(options: FxbotOptions) {
       summary = await summarize(await providers.options(to), newModel, [profile.instructions].filter(Boolean), ask, undefined, [...previous, transcript].join("\n\n"))
         .catch((error: Error) => fail(502, `The chat could not be summarized: ${error.message}`));
     }
-    return restart(profile, provider, model, `${heading(from?.name ?? "a removed provider", to.name)}:\n\n${summary}`);
+    return restart(profile, provider, model, `${heading(from?.name ?? "a removed provider", to.name)}${await covering(profile.id, profile.sessionId!)}:\n\n${summary}`);
+  }
+  // What a summary covers, and when it was written, for its heading: a bot reads it as old as it is.
+  async function covering(id: string, sessionId: string) {
+    const span = await history.span(id, sessionId);
+    return ` (${span ? `from ${span.first} to ${span.last}; ` : ""}written ${when(new Date(), zone())})`;
   }
   // The bot's own chat, begun again: a new session on `provider`, whose handoff goes in the bot's instructions. Each
   // open stream of the chat ends with a moved line.
@@ -736,7 +747,7 @@ export async function createFxbot(options: FxbotOptions) {
       if (call.signal.aborted) return;
       const words = await history.lastWords(id, profile.sessionId, 6000);
       const handoff = [
-        `Earlier conversation, summarized after ${settings.idleCompactMinutes} minutes idle:`,
+        `Earlier conversation, summarized after ${settings.idleCompactMinutes} minutes idle${await covering(id, profile.sessionId)}:`,
         summary,
         ...(words ? [`The last messages, word for word:\n${words}`] : []),
         "This summary is for reference. Don't act on it by itself: answer the next message.",
@@ -882,6 +893,9 @@ export async function createFxbot(options: FxbotOptions) {
     if (from) byPlugin.add(`${id}:${messageId}`);
     const names = files.length ? `\n[files: ${files.map((f) => f.name).join(", ")}]` : "";
     const sent: Sent = { text, ...by, steer };
+    // What the bot reads starts with when it was sent. History, hooks, and the page keep the message as it was.
+    const at = sentLine(new Date(), zone());
+    const read: typeof input = typeof input === "string" ? `${at}\n${input}` : [{ type: "text", text: at }, ...input];
     try {
       // A message to a chat with a turn running joins it, when the turn takes messages and this one may: the owner's
       // always, and a plugin's that asks, in the bot's own chat or a session of the plugin's own, unless it has an image,
@@ -892,7 +906,7 @@ export async function createFxbot(options: FxbotOptions) {
         const chat = await open(profile, sessionId, messageId);
         steers.set(messageId, { ...sent, session: sessionId });
         // Only text joins a turn, so a skill goes as text. libfx would end the turn for it, as for an image.
-        const joining = Array.isArray(input) ? input.map((block) => (block.type === "resource" ? { type: "text" as const, text: block.resource.text } : block)) : input;
+        const joining = Array.isArray(read) ? read.map((block) => (block.type === "resource" ? { type: "text" as const, text: block.resource.text } : block)) : read;
         // A reader on each side of it. One reads from the stream's end, and a steer that came too late can start its turn
         // at once, which the one after it would miss. The one before it ends first if the chat has gone quiet.
         const before = chat.resume();
@@ -911,7 +925,7 @@ export async function createFxbot(options: FxbotOptions) {
       if (own && !working.get(sessionId)?.some((t) => t.messageId === messageId)) working.set(sessionId, [...(working.get(sessionId) ?? []), own]);
       // A messageId the session already accepted runs nothing new and resolves to the same ids.
       const chat = await open(profile, sessionId, messageId);
-      const turn = chat.prompt(input, { messageId });
+      const turn = chat.prompt(read, { messageId });
       const accepted = await turn.accepted;
       await history.record(id, accepted.sessionId, messageId, "user", text + names);
       // A turn behind another starts when that one ends.
