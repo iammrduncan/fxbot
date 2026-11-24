@@ -132,7 +132,17 @@ export async function createFxbot(options: FxbotOptions) {
   const embeddings = createEmbeddings({ sql: store.sql, fetch, localUrl: options.embedUrl?.replace(/\/+$/, ""), target: (id) => providers.embeddingsTarget(id) });
   // The owner's time zone, kept here so plugins and the times bots read need no query. Empty is the machine's.
   let { timeZone } = await store.settings.get();
-  const zone = () => timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // The machine's, when it's one Intl can use: with TZ set but empty, Node's is "Etc/Unknown", and that's UTC instead.
+  const machineZone = (() => {
+    const found = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: found });
+      return found;
+    } catch {
+      return "UTC";
+    }
+  })();
+  const zone = () => timeZone || machineZone;
   const history = createHistory(store.sql, embeddings, zone);
   const memories = createMemories(store.sql, embeddings);
   const library = createLibrary(store.sql);

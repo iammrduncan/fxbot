@@ -306,8 +306,10 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
       // A collect that ends with a result starts again too, below.
       if (!ending) return;
     }
-    // A collect that ended, on an error or after its longest wait, starts again while the call lasts.
-    if (ending || ["finished", "error"].includes(result.type)) if (!over) listen();
+    // A collect that ended, on an error or after its longest wait, starts again while the call lasts, a second later: when
+    // the owner hangs up, the collect ends just before the call does, and listening again then could be refused, which
+    // kept "didn't listen" as the call's error and tried to say so on a call already over.
+    if (ending || ["finished", "error"].includes(result.type)) if (!over) setTimeout(() => over || listen(), 1000);
   }
 
   async function begin() {

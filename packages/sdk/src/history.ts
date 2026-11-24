@@ -61,12 +61,16 @@ export function cutBytes(text: string, max: number) {
 
 // When something happened, as a bot reads it: in the owner's time zone, or the machine's, such as "Mon, Nov 24, 2026,
 // 11:18 AM CST". Its pieces are joined by plain spaces, which Intl's own format doesn't always use.
+// A zone Intl can't use, as Node's "Etc/Unknown" with TZ set but empty, is UTC: it threw, and every message failed.
 export function when(at: Date, timeZone = "") {
-  const part = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", { timeZone: timeZone || undefined, weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })
-      .formatToParts(at)
-      .map((p) => [p.type, p.value]),
-  );
+  const options = { weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" } as const;
+  let format: Intl.DateTimeFormat;
+  try {
+    format = new Intl.DateTimeFormat("en-US", { ...options, timeZone: timeZone || undefined });
+  } catch {
+    format = new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" });
+  }
+  const part = Object.fromEntries(format.formatToParts(at).map((p) => [p.type, p.value]));
   return `${part.weekday}, ${part.month} ${part.day}, ${part.year}, ${part.hour}:${part.minute} ${part.dayPeriod} ${part.timeZoneName}`;
 }
 // The line before each message a bot reads, saying when it was sent, which the page leaves off what it shows.
