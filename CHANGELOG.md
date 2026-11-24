@@ -6,7 +6,7 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 **Before upgrading.** Nothing changes in the database. Then update Web pairing to 0.1.2 from **Plugins**.
 
-- **A device reaches its fxbot again after fxbot's line to the relay dies without a word.** A new iPad paired, then kept trying to connect and timing out, for minutes. fxbot's line to web.fxbot.sh had died on the way, with nothing said to either end. fxbot noticed the silence, but then waited for a close that never came. And the relay kept sending every device's call to that dead line, though a newer one had arrived. Web pairing 0.1.2 ends a silent line itself and opens a new one, within about 90 seconds, and the relay sends calls to the newest line, from its next deploy.
+- **A device reaches its fxbot again after fxbot's line to the relay dies without a word.** A new iPad paired, then kept trying to connect and timing out, for minutes. fxbot's line to web.fxbot.sh had died on the way, with nothing said to either end. fxbot noticed the silence, but then waited for a close that never came. And the relay kept sending every device's call to that dead line, though a newer one had arrived. Web pairing 0.1.2 ends a silent line itself and opens a new one, within about 90 seconds, and web.fxbot.sh's relay now sends calls to the newest line.
 
 ## 0.11.1 (2026-11-24)
 
