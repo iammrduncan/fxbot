@@ -2,7 +2,7 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
-## Unreleased
+## 0.11.1 (2026-11-24)
 
 **Before upgrading.** Nothing changes in the database. Then update from **Plugins**: herdr to 0.3.1, and Phone and phone-signalwire to 0.1.1.
 
