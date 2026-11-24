@@ -255,6 +255,16 @@ function MobileSwitch({ on, set }) {
 		}), "Mobile"]
 	});
 }
+function useShown() {
+	const [shown, setShown] = (0, react.useState)(() => document.visibilityState !== "hidden");
+	(0, react.useEffect)(() => {
+		const changed = () => setShown(document.visibilityState !== "hidden");
+		document.addEventListener("visibilitychange", changed);
+		return () => document.removeEventListener("visibilitychange", changed);
+	}, []);
+	return shown;
+}
+const reconnecting = "Connecting again…";
 function Live({ pane, mobile }) {
 	const { Button } = _fxbot_app.ui;
 	const box = (0, react.useRef)(null);
@@ -265,12 +275,23 @@ function Live({ pane, mobile }) {
 	const [text, setText] = (0, react.useState)("");
 	const held = (0, react.useRef)(false);
 	held.current = ctrl;
+	const shown = useShown();
+	const tries = (0, react.useRef)(0);
 	(0, react.useEffect)(() => {
+		tries.current = 0;
+		setProblem("");
+	}, [shown]);
+	(0, react.useEffect)(() => {
+		if (!shown) return;
 		let gone = false;
 		let stop = () => {};
 		loadXterm().then(({ Terminal, FitAddon }) => void (gone || (stop = start(Terminal, FitAddon))), (error) => setProblem(error.message));
 		return () => (gone = true, stop());
-	}, [pane, round]);
+	}, [
+		pane,
+		round,
+		shown
+	]);
 	function start(XTerm, FitAddon) {
 		const term = new XTerm({
 			fontSize: touch ? 12 : 13,
@@ -297,9 +318,17 @@ function Live({ pane, mobile }) {
 				cols: term.cols
 			}));
 		};
-		socket.onopen = () => (setProblem(""), resize(), touch || term.focus());
+		let mine = true;
+		let again;
+		socket.onopen = () => (tries.current = 0, setProblem(""), resize(), touch || term.focus());
 		socket.onmessage = (event) => term.write(typeof event.data === "string" ? event.data : new Uint8Array(event.data));
-		socket.onclose = (event) => setProblem(event.reason || "herdr's screen closed.");
+		socket.onclose = (event) => {
+			if (!mine) return;
+			if ((event.code === 1006 || event.code === 1001) && tries.current < 5) {
+				setProblem(reconnecting);
+				again = setTimeout(() => setRound((n) => n + 1), 1e3 * 2 ** tries.current++);
+			} else setProblem(event.reason || "herdr's screen closed.");
+		};
 		const typed = term.onData((data) => {
 			if (held.current && data.length === 1) setCtrl(false), data = String.fromCharCode(data.toUpperCase().charCodeAt(0) & 31);
 			send(data);
@@ -342,6 +371,8 @@ function Live({ pane, mobile }) {
 			el.removeEventListener("touchstart", begin);
 			el.removeEventListener("touchmove", move);
 			el.removeEventListener("touchend", end);
+			mine = false;
+			clearTimeout(again);
 			watch.disconnect();
 			typed.dispose();
 			raw.dispose();
@@ -400,11 +431,12 @@ function Live({ pane, mobile }) {
 				className: "text-sm",
 				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 					style: { color: "#d4d4d4" },
+					role: "status",
 					children: problem
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+				}), problem !== reconnecting && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
 					size: "sm",
 					variant: "secondary",
-					onClick: () => setRound((n) => n + 1),
+					onClick: () => (tries.current = 0, setRound((n) => n + 1)),
 					children: "Connect again"
 				})]
 			})]

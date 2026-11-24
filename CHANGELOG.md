@@ -8,7 +8,10 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
   - "Cannot reach the server" says what went wrong when something did answer. A chat shows fxbot's own error, and the bots list and the Plugins page show what answered in fxbot's place, such as a proxy's HTTP status or web pairing's "Not connected to your fxbot." The words stay only when nothing answered at all.
   - A chat's connection from a device that went away without closing it, as a phone that sleeps or loses its network can, now ends once fxbot's next write to it fails, where a quiet chat kept it until fxbot restarted. A blank line crosses each chat's stream every 25 seconds, so a proxy that cuts quiet connections keeps it too.
   - A request the browser gave up on, as when a page reloads, no longer shows in fxbot's log as `Error: aborted`.
+- **herdr's terminal picks up where it was.** Back in the app after the phone slept, or after another app or tab, herdr's screen and an agent's terminal open again by themselves, with herdr as it is now. They showed "herdr's screen closed." until you chose **Connect again**. A connection that drops while you're looking connects again by itself, too. Update herdr to 0.3.1.
+- A plugin's socket from a device that went away without closing it, as a phone that sleeps or loses its network can, now ends within a minute: fxbot pings each one every 30 seconds. A herdr terminal kept herdr's client running, and took one of its eight places, until fxbot restarted.
 - **For the SDK:** `client.stream`'s `onConnection` hears why a connection dropped, and a call's `Error` gives what answered in fxbot's place. The chat stream's blank lines are skipped by the client; a reader of `GET /api/profiles/<id>/stream` of its own should skip them too.
+- **For plugins:** fxbot pings each socket `fx.socket` opens every 30 seconds, and closes one that didn't answer the last ping, so `onclose` runs for a device that left without closing it. Browsers answer pings by themselves.
 
 ## 0.11.0 (2026-11-23)
 

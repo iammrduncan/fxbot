@@ -428,8 +428,18 @@ function adapt(ws: WebSocket): PluginSocket {
       return ws.bufferedAmount;
     },
   };
+  // A ping every 30 seconds, which browsers answer by themselves. A device that went away without closing the socket, as
+  // a phone that sleeps or loses its network can, misses one, and its socket ends, so its plugin lets go of it: a herdr
+  // terminal held herdr's client, and one of its eight places, until fxbot restarted.
+  let answered = true;
+  const beat = setInterval(() => {
+    if (!answered) return void ws.terminate();
+    answered = false;
+    ws.ping();
+  }, 30_000);
+  ws.on("pong", () => (answered = true));
   ws.on("message", (data, binary) => socket.onmessage?.(binary ? (data as Buffer) : data.toString()));
-  ws.on("close", () => socket.onclose?.());
+  ws.on("close", () => (clearInterval(beat), socket.onclose?.()));
   ws.on("error", () => ws.terminate());
   return socket;
 }

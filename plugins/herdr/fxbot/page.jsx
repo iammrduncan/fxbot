@@ -208,6 +208,22 @@ function MobileSwitch({ on, set }) {
     </label>
   );
 }
+// Whether the page is on screen: not a background tab, a minimized window, or a phone's locked screen or other app.
+function useShown() {
+  const [shown, setShown] = useState(() => document.visibilityState !== "hidden");
+  useEffect(() => {
+    const changed = () => setShown(document.visibilityState !== "hidden");
+    document.addEventListener("visibilitychange", changed);
+    return () => document.removeEventListener("visibilitychange", changed);
+  }, []);
+  return shown;
+}
+const reconnecting = "Connecting again…";
+// The terminal is open while the page is on screen. Hidden, it closes, so a phone in a pocket holds no herdr client,
+// and shown again it opens a new one, which draws herdr as it is now: a connection left open while the app slept could
+// look open and carry nothing, as web pairing's could after it connected again. One that drops, or fxbot reloading the
+// plugin, connects again by itself, up to five times, a little later each time. herdr's client ending, or a refusal,
+// says why, with Connect again.
 function Live({ pane, mobile }) {
   const { Button } = ui;
   const box = useRef(null);
@@ -218,7 +234,14 @@ function Live({ pane, mobile }) {
   const [text, setText] = useState("");
   const held = useRef(false);
   held.current = ctrl;
+  const shown = useShown();
+  const tries = useRef(0);
   useEffect(() => {
+    tries.current = 0;
+    setProblem("");
+  }, [shown]);
+  useEffect(() => {
+    if (!shown) return;
     let gone = false;
     let stop = () => {};
     loadXterm().then(
@@ -226,7 +249,7 @@ function Live({ pane, mobile }) {
       (error) => setProblem(error.message),
     );
     return () => ((gone = true), stop());
-  }, [pane, round]);
+  }, [pane, round, shown]);
   // The terminal and its socket, once xterm.js is here. It answers its own cleanup.
   function start(XTerm, FitAddon) {
     const term = new XTerm({ fontSize: touch ? 12 : 13, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", cursorBlink: true, theme: { background: "#0f1115" } });
@@ -242,9 +265,17 @@ function Live({ pane, mobile }) {
       fit.fit();
       if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ rows: term.rows, cols: term.cols }));
     };
-    socket.onopen = () => (setProblem(""), resize(), touch || term.focus());
+    let mine = true;
+    let again;
+    socket.onopen = () => ((tries.current = 0), setProblem(""), resize(), touch || term.focus());
     socket.onmessage = (event) => term.write(typeof event.data === "string" ? event.data : new Uint8Array(event.data));
-    socket.onclose = (event) => setProblem(event.reason || "herdr's screen closed.");
+    socket.onclose = (event) => {
+      if (!mine) return;
+      if ((event.code === 1006 || event.code === 1001) && tries.current < 5) {
+        setProblem(reconnecting);
+        again = setTimeout(() => setRound((n) => n + 1), 1000 * 2 ** tries.current++);
+      } else setProblem(event.reason || "herdr's screen closed.");
+    };
     const typed = term.onData((data) => {
       if (held.current && data.length === 1) (setCtrl(false), (data = String.fromCharCode(data.toUpperCase().charCodeAt(0) & 0x1f)));
       send(data);
@@ -285,6 +316,8 @@ function Live({ pane, mobile }) {
       el.removeEventListener("touchstart", begin);
       el.removeEventListener("touchmove", move);
       el.removeEventListener("touchend", end);
+      mine = false;
+      clearTimeout(again);
       watch.disconnect();
       typed.dispose();
       raw.dispose();
@@ -314,10 +347,14 @@ function Live({ pane, mobile }) {
         <div ref={box} style={{ position: "absolute", inset: 6 }} aria-label={pane ? "The agent's terminal, in herdr" : "herdr"} />
         {problem && (
           <div style={{ position: "absolute", inset: "auto 0 12px 0", display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }} className="text-sm">
-            <span style={{ color: "#d4d4d4" }}>{problem}</span>
-            <Button size="sm" variant="secondary" onClick={() => setRound((n) => n + 1)}>
-              Connect again
-            </Button>
+            <span style={{ color: "#d4d4d4" }} role="status">
+              {problem}
+            </span>
+            {problem !== reconnecting && (
+              <Button size="sm" variant="secondary" onClick={() => ((tries.current = 0), setRound((n) => n + 1))}>
+                Connect again
+              </Button>
+            )}
           </div>
         )}
       </div>

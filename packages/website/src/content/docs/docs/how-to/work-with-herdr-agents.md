@@ -70,6 +70,7 @@ The plugin keeps every agent it sees, on every machine, and syncs the list every
 
 - **Mobile,** a switch at the top, is on by default on a phone, and each device keeps your choice. It adds what a phone's keyboard lacks: Esc, Tab, the arrows, Enter, ^C, and Ctrl, which holds for the next key; quick answers, 1, 2, 3, y, and n, for a question or a menu; and a line to type in with your phone's keyboard, its corrections and dictation, which **Send** types and presses Enter. On a touch screen, a drag scrolls, as the wheel does.
 - **An agent on another machine** opens as its screen read from herdr, kept up to date, with a row of keys and a line to type in: herdr attaches only on its own machine.
+- **Away and back:** a terminal closes when you leave the app or its tab, and opens again when you're back, with herdr as it is then. One whose connection drops connects again by itself. When herdr's client ends, **Connect again** starts a new one.
 - **It needs `python3`** on the machine fxbot reaches herdr on, for the terminal.
 
 herdr's screen can open a pane, a shell as herdr's user, so a release's door opens it whenever the door is open. `--read-only` keeps it shut, with the rest of what types.

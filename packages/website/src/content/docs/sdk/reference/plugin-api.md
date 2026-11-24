@@ -185,6 +185,7 @@ fx.socket("/desktop/:bot", (socket, request, { bot }) => {
 - `socket` has `send(data)`, `close(code?, reason?)`, `bufferedAmount`, and two handlers to set: `onmessage`, which gets a binary message as a `Buffer` and text as a string, and `onclose`.
 - fxbot's server checks first: a socket opened from another site's page gets 403, since a WebSocket opens with a GET, which the write check doesn't cover. A path no socket has gets 404.
 - A handler that throws closes its socket with code 1011, and the error goes in the log. Turning the plugin off, removing it, or stopping fxbot closes its open sockets.
+- fxbot pings each socket every 30 seconds, and closes one that didn't answer the last ping, so `onclose` runs within a minute for a device that went away without closing it, as a phone that sleeps can. Browsers answer pings by themselves. Since 0.11.1.
 
 ## Data
 
