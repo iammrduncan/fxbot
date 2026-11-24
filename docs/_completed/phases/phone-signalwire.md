@@ -604,3 +604,11 @@ On 2026-11-18 the owner asked to split the plugin in two, [Phone](phone.md): "Ph
 - **phone** took `call.ts`, the tools, now `phone_call` and `phone_hang_up`, the rules, the owner's number, the page, the skill, and the `to`, `minutes`, `quiet`, and `perDay` settings.
 - **phone-signalwire** kept `relay.ts` and SignalWire's settings, and offers phone a line with `fx.provide`. Its one table, `kept`, is what ends a call after a restart, which phone's `calls` row used to hold. Its `0001_phone.sql` became `0001_kept.sql`, since it hadn't shipped.
 - **The owner's number** is phone's, so it's typed and confirmed once more.
+
+### From the owner's test call (0.1.1, for 0.11.1)
+
+The owner, after a call on 2026-11-24: "after I hung up the last message resent to the agent." Their last words, "what toll calls did you do", reached the bot at 17:19:23, and again at 17:19:36.9, 0.2 seconds before SignalWire said the call ended.
+
+- **A collect's end gives its last result again.** SignalWire's own SDK (`voiceCallCollectWorker`) reads a continuous collect's results this way: each thing said comes as a final while its `state` is `collecting`, and a speech result with any other `state` is the collect ending, carrying its last result. The line took that as new words. Now a result that ends the collect, with the words it last gave, isn't sent again, and the log says so. Different words still go, and the same words said twice, each while collecting, both go.
+- **A collect that ended with a result didn't listen again.** The speech branch returned before the check that starts a new collect, so a call whose collect ended mid-call that way stopped hearing the owner. It listens again now.
+- **Checked** against the fake RELAY, which now sends `state: "collecting"` on each result and the collect's end before a hang-up: before the fix, the hang-up sent the last words again, the chat showed them twice, and a mid-call collect end sent them again and didn't listen again. After it, none of those, and the confirm, talk, rules, restart, reload, asked, deaf, and providers checks still pass. The talk check's id pattern was stale since the ids carry when a call began, and was fixed. Not checked: a real call, which shows whether SignalWire's end event is the shape its SDK reads.

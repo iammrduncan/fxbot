@@ -1,6 +1,6 @@
 {
   "name": "phone",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Press Call me and a bot rings your phone, and you talk with it, hands-free. Its own model, memory, and tools answer. A provider plugin, such as phone-signalwire, carries the call.",
   "license": "Apache-2.0",
   "extensions": {

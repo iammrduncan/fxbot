@@ -43,7 +43,7 @@ const floorWords = /^(?:wait|hold on|hang on|one (?:sec|second|moment)|sorry)[.!
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const note = (greeting: string) =>
   `You're on a live phone call with the owner, who may be driving. You called them and said: "${greeting}" What they say comes to you as text, and what you write is read out to them. ` +
-  "Answer in one to three short spoken sentences, with no lists, tables, links, code, or markdown. Before work that takes more than a few seconds, say in a few words what you'll do, and hand long work to a subagent if you have one. " +
+  "Answer in one to three short spoken sentences, with no lists, tables, links, code, or markdown. Your tools work as in the chat: to say how something stands now, check with them first, since what's earlier in the chat may be old. Before work that takes more than a few seconds, say in a few words what you'll do, and hand long work to a subagent if you have one. " +
   "Anything that needs their OK shows on their screen, which they can't look at while driving. When they're done, say goodbye and use phone_hang_up.";
 
 // NDJSON lines from a stream of bytes, until it ends or is cancelled.

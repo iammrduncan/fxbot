@@ -156,6 +156,8 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
   let detected: ((found: string) => void) | null = null;
   let detecting = "";
   let collect = "";
+  // The words the collect running now last gave as said.
+  let lastHeard = "";
   let listens: number[] = [];
   const ids = () => ({ node_id: call!.node, call_id: call!.id });
   const conn = connection(relay, event, () => end("The connection to SignalWire was lost."));
@@ -209,6 +211,7 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
     listens = [...listens.filter((at) => now - at < 60_000), now];
     if (listens.length > 5) return deaf("SignalWire kept ending its listening.");
     collect = randomUUID();
+    lastHeard = "";
     const control = collect;
     conn
       .request("calling.collect", {
@@ -288,17 +291,23 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
       if (playing && !playing.cut) relay.log(`The owner began to speak ${Date.now() - playing.at} ms into a line.`);
       return;
     }
+    const ending = ["finished", "error"].includes(params.state);
     if (result.type === "speech") {
       const text = String(result.params?.text ?? "").trim();
       const final = params.final === true || (params.final === undefined && params.state !== "collecting");
-      if (!text || (playing && !playing.cut && echo(text, playing.text))) return;
-      // Two words while the bot speaks cut in. One may be a cough, or the bot's own voice; a final says what it was.
-      if (playing && wordsOf(text).length >= 2 && cut()) on.interrupted();
-      if (final) on.heard(text);
-      return;
+      // A continuous collect gives each thing said as a final while it's collecting, then its last result again as it
+      // ends, as SignalWire's own SDK reads it: when the owner hung up, their last words went to the bot a second time.
+      if (ending && text && text === lastHeard) relay.log("SignalWire gave the last words again as its listening ended; they weren't sent again.");
+      else if (text && !(playing && !playing.cut && echo(text, playing.text))) {
+        // Two words while the bot speaks cut in. One may be a cough, or the bot's own voice; a final says what it was.
+        if (playing && wordsOf(text).length >= 2 && cut()) on.interrupted();
+        if (final) on.heard((lastHeard = text));
+      }
+      // A collect that ends with a result starts again too, below.
+      if (!ending) return;
     }
     // A collect that ended, on an error or after its longest wait, starts again while the call lasts.
-    if (["finished", "error"].includes(result.type) || ["finished", "error"].includes(params.state)) if (!over) listen();
+    if (ending || ["finished", "error"].includes(result.type)) if (!over) listen();
   }
 
   async function begin() {
