@@ -37,6 +37,11 @@ export const idleAsk =
   "Write a summary of this conversation so far, for yourself, to carry on after a break. Keep the user's requests and instructions in their own words, " +
   "then what was decided and why, facts about the user and their work, and each open task and where it stands, with when each was said or done, from the messages' times. At most 1,500 words.";
 
+// /compact: the owner's message starts the bot's own chat over from a summary of all of it, as idle compaction does,
+// and nothing goes to the new chat. Words after it say what the summary keeps above all.
+export const compactCommand = /^\s*\/compact(?=\s|$)/;
+export const compactAsk = (keep: string) => (keep ? `${idleAsk}\n\nThe owner asked that it keep, above all:\n<keep>\n${keep}\n</keep>` : idleAsk);
+
 // Search words for a bot's tools: runs of letters and digits, at most 8, each matching as a prefix. Any of them
 // matches, and more of them rank higher, since a bot guesses at words. They need no escaping.
 export const anyWords = (q: string) =>

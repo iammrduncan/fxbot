@@ -1,7 +1,7 @@
 import type { FxAgentTool, FxResumeTurn, FxSessionPromptInput, FxTurn } from "libfx";
 import { createArchives } from "./archive.ts";
 import { createEmbeddings, type EmbeddingSettings } from "./embeddings.ts";
-import { createHistory, freshAsk, freshCommand, idleAsk, sentLine, summarize, switchAsk, unstamped, when } from "./history.ts";
+import { compactAsk, compactCommand, createHistory, freshAsk, freshCommand, idleAsk, sentLine, summarize, switchAsk, unstamped, when } from "./history.ts";
 import { createLibrary, pdf } from "./library.ts";
 import { createMcp } from "./mcp.ts";
 import { createMemories } from "./memories.ts";
@@ -304,7 +304,10 @@ export async function createFxbot(options: FxbotOptions) {
   ready = true;
 
   // The commands every bot's chat has, in the composer's / list, with the plugins'.
-  const coreCommands = [{ name: "fresh", description: "Start the chat over toward what you write next" }];
+  const coreCommands = [
+    { name: "fresh", description: "Start the chat over toward what you write next" },
+    { name: "compact", description: "Shorten the chat to a summary and carry on from it; words after it say what to keep" },
+  ];
   // A start-over's summary, a switch's, idle compaction's, or /fresh's, follows the bot's own instructions in the chat it
   // began, the bot's own: not in a room's session, a subagent's, or another plugin's, which never had that chat.
   const instructionsFor = (profile: StoredProfile, sessionId = profile.sessionId) =>
@@ -635,8 +638,8 @@ export async function createFxbot(options: FxbotOptions) {
   // The provider that ran the chat summarizes its session from its checkpoint, or else `provider` summarizes the stored
   // messages, after the earlier handoff. A turn still running in the old session is cancelled first, and each open
   // stream of the chat ends with a moved line. A provider switch is one: it moves the bot to `provider`.
-  async function startOver(profile: StoredProfile, options: { ask: string; heading: (from: string, to: string) => string; provider?: string; model?: string }) {
-    const { ask, heading, provider = profile.provider, model = profile.model } = options;
+  async function startOver(profile: StoredProfile, options: { ask: string; heading: (from: string, to: string) => string; provider?: string; model?: string; tail?: boolean }) {
+    const { ask, heading, provider = profile.provider, model = profile.model, tail = false } = options;
     const [from, to] = [await providers.get(profile.provider).catch(() => null), await providers.get(provider)];
     const previous = profile.handoff ? [profile.handoff] : [];
     if (from) await (await open(profile, profile.sessionId!)).cancel().catch(() => {});
@@ -659,7 +662,10 @@ export async function createFxbot(options: FxbotOptions) {
       summary = await summarize(await providers.options(to), newModel, [profile.instructions].filter(Boolean), ask, undefined, [...previous, transcript].join("\n\n"))
         .catch((error: Error) => fail(502, `The chat could not be summarized: ${error.message}`));
     }
-    return restart(profile, provider, model, `${heading(from?.name ?? "a removed provider", to.name)}${await covering(profile.id, profile.sessionId!)}:\n\n${summary}`);
+    // With `tail`, as /compact asks, the last messages word for word, as idle compaction's summary has them.
+    const words = tail ? await history.lastWords(profile.id, profile.sessionId!, 6000) : "";
+    const rest = tail ? [...(words ? [`The last messages, word for word:\n${words}`] : []), "This summary is for reference. Don't act on it by itself: answer the next message."] : [];
+    return restart(profile, provider, model, [`${heading(from?.name ?? "a removed provider", to.name)}${await covering(profile.id, profile.sessionId!)}:`, summary, ...rest].join("\n\n"));
   }
   // What a summary covers, and when it was written, for its heading: a bot reads it as old as it is.
   async function covering(id: string, sessionId: string) {
@@ -848,9 +854,15 @@ export async function createFxbot(options: FxbotOptions) {
     let done: (() => void) | undefined;
     // /fresh at the start of the owner's message to the bot's own chat starts the chat over, aimed at the rest of it.
     let startOverAsk: string | undefined;
+    let compact = false;
     if (!session && !from && freshCommand.test(text)) {
       text = text.replace(freshCommand, "").trim();
       startOverAsk = freshAsk(text.slice(0, 4000));
+    } else if (!session && !from && compactCommand.test(text)) {
+      // /compact: the same, from a summary of the whole chat, and nothing goes to the new one.
+      startOverAsk = compactAsk(text.replace(compactCommand, "").trim().slice(0, 4000));
+      text = "";
+      compact = true;
     }
     // Plugins may change the message, or handle it themselves, and then no turn runs. A plugin may start the bot's own
     // chat over too, when /fresh didn't.
@@ -871,7 +883,9 @@ export async function createFxbot(options: FxbotOptions) {
         const [{ any, seen }] = await store.sql<{ any: boolean; seen: boolean }[]>`select
           exists (select 1 from messages where profile_id = ${id} and session_id = ${profile.sessionId}) as any,
           exists (select 1 from messages where profile_id = ${id} and message_id = ${messageId} and role = 'user') as seen`;
-        if (any && !seen) profile = await startOver(profile, { ask: startOverAsk, heading: () => "Earlier conversation, summarized when the chat started over" });
+        if (compact && !any) fail(400, "There's nothing to compact yet.");
+        if (any && !seen)
+          profile = await startOver(profile, { ask: startOverAsk, tail: compact, heading: () => (compact ? "Earlier conversation, compacted when the owner asked" : "Earlier conversation, summarized when the chat started over") });
         sessionId = profile.sessionId!;
       } catch (error) {
         done();

@@ -23,10 +23,21 @@ The chat then shows a **Started over** card, which opens to the summary, then yo
 
 It leaves out the threads that don't bear on your words, in at most 600 words. `/fresh` alone starts over with what still matters, and sends nothing. The whole request is `freshAsk` in fxbot's [source](https://github.com/iammrduncan/fxbot/blob/main/packages/sdk/src/history.ts).
 
+## Compact the chat instead, with /compact
+
+`/compact` shortens the chat to a summary and carries on from it, with nothing sent: use it when a long chat has grown slow or costly, and you aren't changing topic. It's idle compaction, now, since fxbot 0.11.1.
+
+1. Type `/compact`, alone, or with what the summary must keep, such as `/compact keep the budget numbers`. What follows it isn't sent to the bot.
+2. Send it. The bot's model writes the summary, as for `/fresh`.
+
+The chat shows a **Compacted** card, which opens to the summary and the last messages word for word, as idle compaction keeps them, each with its time. Your next message starts from there. A chat with no messages yet answers "There's nothing to compact yet."
+
+The summary keeps your requests and instructions in your words, what was decided and why, facts about you and your work, and each open task and where it stands, with when each was said or done, in at most 1,500 words. The request is `idleAsk` in fxbot's [source](https://github.com/iammrduncan/fxbot/blob/main/packages/sdk/src/history.ts), with your words after `/compact` added.
+
 ## When it doesn't start over
 
 - **A chat with no messages yet:** your words go to it as they are.
-- **A plugin's chat,** such as a routine's run: `/fresh` is ordinary text there. A chat room starts over as a whole, with chat rooms 0.5.0: see [Start a room over](/docs/how-to/talk-in-a-room/#start-a-room-over).
+- **A plugin's chat,** such as a routine's run: `/fresh` and `/compact` are ordinary text there. A chat room starts over as a whole, with chat rooms 0.5.0: see [Start a room over](/docs/how-to/talk-in-a-room/#start-a-room-over).
 
 ## When you still have the fresh plugin
 

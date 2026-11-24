@@ -1158,15 +1158,18 @@ function Files({ files, remove, className = "" }: { files: Upload[]; remove?: (i
 // The summary a provider switch carried over, folded at the top of the chat it started.
 function Handoff({ text }: { text: string }) {
   const [first, ...summary] = text.split("\n\n");
-  const from = /moved from (.+) to .+:$/.exec(first)?.[1];
-  const startedOver = /started over:$/.test(first);
-  const idle = /summarized after \d+ minutes idle:$/.test(first);
+  // Since 0.11.1 the heading ends with when the chat it sums up ran, and when it was written.
+  const head = first.replace(/ \((?:from .+; )?written [^()]+\):$/, ":");
+  const from = /moved from (.+) to .+:$/.exec(head)?.[1];
+  const startedOver = /started over:$/.test(head);
+  const idle = /summarized after \d+ minutes idle:$/.test(head);
+  const compacted = /compacted when the owner asked:$/.test(head);
   return (
     <Collapsible className="mx-auto w-full max-w-3xl rounded-xl border px-3 py-2 text-sm">
       <div className="flex items-center gap-2">
         <CollapsibleTrigger className="group flex flex-1 items-center gap-2 text-left font-medium">
           <ChevronRightIcon className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-          {idle ? "Compacted while idle" : startedOver ? "Started over" : `Continued from ${from ?? "an earlier chat"}`}
+          {idle ? "Compacted while idle" : compacted ? "Compacted" : startedOver ? "Started over" : `Continued from ${from ?? "an earlier chat"}`}
         </CollapsibleTrigger>
         {idle && (
           <span className="shrink-0 text-xs text-muted-foreground">
