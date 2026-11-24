@@ -116,9 +116,9 @@ export class Relay {
     const kind = new URL(request.url).pathname.split("/")[2];
     const [client, server] = Object.values(new WebSocketPair());
     if (kind === "listen") {
-      // One listener for each fxbot; a newer one replaces it.
+      // One listener for each fxbot; a newer one replaces it. Its tag says when it came, for listener().
       for (const old of this.state.getWebSockets("listener")) old.close(4000, "Replaced by a newer listener.");
-      this.state.acceptWebSocket(server, ["listener"]);
+      this.state.acceptWebSocket(server, ["listener", `since:${Date.now()}`]);
     } else {
       const now = Date.now();
       this.recent = this.recent.filter((at) => now - at < 60_000);
@@ -126,7 +126,7 @@ export class Relay {
       this.recent.push(now);
       const id = crypto.randomUUID();
       this.state.acceptWebSocket(server, ["call", `call:${id}`]);
-      if (!this.state.getWebSockets("listener").length) server.send(JSON.stringify({ k: "err", e: "offline" }));
+      if (!this.listener()) server.send(JSON.stringify({ k: "err", e: "offline" }));
     }
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -150,7 +150,7 @@ export class Relay {
     const count = (this.calls.get(id) ?? 0) + 1;
     this.calls.set(id, count);
     if (count > MAX_CALL_MESSAGES) return ws.close(1008, "Too many messages for one call.");
-    const listener = this.state.getWebSockets("listener")[0];
+    const listener = this.listener();
     if (!listener) return ws.send(JSON.stringify({ k: "err", e: "offline" }));
     let d: unknown;
     try {
@@ -165,11 +165,23 @@ export class Relay {
     const id = tags.find((t) => t.startsWith("call:"))?.slice(5);
     if (id) {
       this.calls.delete(id);
-      this.state.getWebSockets("listener")[0]?.send(JSON.stringify({ call: id, closed: true }));
+      this.listener()?.send(JSON.stringify({ call: id, closed: true }));
     }
   }
   async webSocketError(ws: WebSocket) {
     await this.webSocketClose(ws);
+  }
+  // The newest listener. One a newer one replaced stays in the list until its connection ends, which takes many
+  // minutes when its path died without a word, and the first in the list got every call: they went nowhere, and the
+  // fxbot looked offline to every device until then.
+  private listener() {
+    let newest: WebSocket | undefined;
+    let at = -1;
+    for (const ws of this.state.getWebSockets("listener")) {
+      const since = Number(this.state.getTags(ws).find((t) => t.startsWith("since:"))?.slice(6) ?? 0);
+      if (since > at) (newest = ws), (at = since);
+    }
+    return newest;
   }
 }
 

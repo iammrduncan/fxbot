@@ -162,9 +162,11 @@ export default async function webPairing(fx: PluginApi) {
     };
     l.ws.onclose = (e) => closed(e.code);
     l.ws.onerror = () => (l.ws.readyState === WebSocket.OPEN ? undefined : closed(1006));
-    // A small ping every 30 s, which the relay answers without waking; silence for 75 s means the line is dead.
+    // A small ping every 30 s, which the relay answers without waking; silence for 75 s means the line is dead. A line
+    // whose path died without a word never finishes closing, so it ends here, and a new one opens: waiting for its close
+    // kept this fxbot off the relay until the connection timed out, many minutes later.
     const timer = setInterval(() => {
-      if (Date.now() - heard > 75_000) return l.ws.close();
+      if (Date.now() - heard > 75_000) return void (l.ws.close(), closed(1006));
       if (l.ws.readyState === WebSocket.OPEN) l.ws.send("ping");
     }, 30_000);
     return l;

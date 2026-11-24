@@ -929,3 +929,14 @@ What changed:
 - **Not in this:** compressing what crosses the connection, which both ends of the bridge need; a device's own report of its events, such as going to the background; and caching the frame's own files. They're later work.
 
 The app's changes reach devices when web.fxbot.sh is deployed again: `npm run deploy` in `packages/web-app`, the owner's step.
+
+### A line that dies without a word (0.12.0, web pairing 0.1.2)
+
+On 2026-11-24 the owner's new iPad paired, then looped on "Connecting", the app's "didn't answer", and "Not connected", for minutes: dev logged no attempt at all, and its iPad had no last seen. A call through the real relay to a throwaway fxbot was answered in 351 ms; one to dev got nothing in 15 seconds, though dev said it was listening. Dev's log had shown its line to the relay closing with 1006 every 6 to 49 minutes.
+
+- **What happened, reproduced** with the relay under `wrangler dev` and a TCP proxy between it and a throwaway fxbot that could freeze its connections, so nothing passed and neither end was told:
+  - **fxbot:** 75 seconds of silence called `ws.close()`, and Node's WebSocket waits for the closing handshake, which a dead path never completes, so `onclose` never came and no new line opened: after 150 seconds it was still off the relay, `listening` false.
+  - **The relay:** a new listener closes the old ones, but a closed one stays in `getWebSockets("listener")` until its connection ends, and calls went to the first in that list. With a new live line beside a dead one, a call got no answer.
+  - On dev, the dead line ended at the relay 14 minutes later, and the iPad connected one second after, directly, through the owner's iPhone's hotspot.
+- **The fixes:** the plugin ends a silent line itself, `closed(1006)` after `ws.close()`, so a new one opens at once; the relay tags each listener with when it came and sends calls, and a call's end, to the newest. Checked in the same setup: a frozen line was replaced 83 seconds later, and a call then reached the new one in 16 ms with the dead one still on the relay. The protocol vectors and both typechecks pass, and `server.js` is rebuilt by the README's command, which reproduced the old one byte for byte first.
+- **What reaches whom:** the relay's fix needs web.fxbot.sh deployed; the plugin's, an update of Web pairing. Either alone helps: without the relay's, a new line waits for the dead one to time out; without the plugin's, fxbot waits for its own.
