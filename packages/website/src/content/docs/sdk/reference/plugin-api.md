@@ -170,6 +170,7 @@ fx.route("GET", "/rooms/:id", async (request, { id }) => Response.json({ id }));
 - A `Response` with a stream for its body streams to the caller. The request's `signal` aborts when the caller goes.
 - fxbot's server checks first: a write from another site's page gets 403, and a body over 12 MiB 413.
 - A handler that throws answers 500, `{ "error": "<message>" }`, and the error goes in the log.
+- A JSON answer, `application/json`, goes as fxbot's own do, since 0.11.1: gzipped over 1 KB, and for a `GET`, with an `ETag` that makes an unchanged answer a 304. Set `Cache-Control` or `ETag` yourself to keep your own caching, or `Content-Encoding` to encode it yourself. fxbot reads the whole answer first, so stream with another type.
 - `/api/plugins/<name>/files/` serves its page code and CSS, and no route there is reached.
 
 ## Sockets

@@ -145,6 +145,10 @@ export function App() {
   useEffect(() => {
     if (whole) setShown(true);
   }, [whole]);
+  // The first screen, kept out of React's way (main.tsx), goes once the app shows.
+  useEffect(() => {
+    if (shown || whole) document.querySelector("body > .splash")?.remove();
+  }, [shown, whole]);
   // A screen that never says it's whole still shows.
   useEffect(() => {
     const late = setTimeout(() => setShown(true), 3000);
@@ -695,18 +699,26 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   useEffect(() => {
     if (ready && from === null) setFrom(first);
   }, [ready]); // Once, when the chat so far has arrived.
+  // Earlier chats, above the handoff once the chat's own turns all show, the same way: their newest, then more. All of
+  // them at once was up to 200 turns to draw before the chat showed.
+  const [earlierFrom, setEarlierFrom] = useState<number | null>(null);
+  const more = () => {
+    if (first > 0) setFrom(Math.max(0, first - turnsAtOnce));
+    else if (earlierFirst > 0) setEarlierFrom(Math.max(0, earlierFirst - turnsAtOnce));
+  };
   const showEarlier = () => {
     const view = viewport.current;
-    if (view && first > 0 && view.scrollTop < view.clientHeight / 2) setFrom(Math.max(0, first - turnsAtOnce));
+    if (view && view.scrollTop < view.clientHeight / 2) more();
   };
   useEffect(() => {
     const view = viewport.current;
-    if (view && first > 0 && view.scrollHeight <= view.clientHeight) setFrom(Math.max(0, first - turnsAtOnce));
+    if (view && view.scrollHeight <= view.clientHeight) more();
   });
   const panel = usePanel();
   // A provider switch starts a new chat. The earlier ones stay readable above the handoff, though the bot now sees only
   // their summary and its chat_history search.
   const [earlier, setEarlier] = useState<Turn[]>([]);
+  const earlierFirst = earlierFrom ?? Math.max(0, earlier.length - turnsAtOnce);
   const switched = Boolean(profile?.handoff);
   const [earlierRead, setEarlierRead] = useState(false);
   useEffect(() => {
@@ -825,8 +837,16 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   const offline = error || (!connected && (lost || unreachable));
   // The chat paints once it's whole: its lines, the turns from before a provider switch, and the code, diagrams, and
   // images that finish after the first render. Until then it's hidden. A chat that can't load shows what there is, with the problem.
-  const whole = Boolean(error) || (profile !== null && (!profile.sessionId || ready || !connected) && (!profile.handoff || earlierRead));
+  // Earlier chats are waited for only when they show at once, above a chat short enough to show whole.
+  const whole = Boolean(error) || (profile !== null && (!profile.sessionId || ready || !connected) && (!profile.handoff || earlierRead || first > 0));
   const settled = useSettled(viewport, whole);
+  // While the chat loads, its bot bounces where the chat will be, after a moment, so a slow link isn't a blank page.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (settled) return;
+    const later = setTimeout(() => setSlow(true), 400);
+    return () => clearTimeout(later);
+  }, [settled]);
   useEffect(() => {
     if (settled) onShown();
   }, [settled]); // Once; onShown is a new function on every render.
@@ -834,7 +854,12 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   const empty = turns.length === 0 && earlier.length === 0 && (ready || !profile?.sessionId);
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        {!settled && slow && profile && (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center" aria-hidden="true">
+            <Blob {...profile} size={72} busy />
+          </div>
+        )}
         {/* The sidebar already shows which bot this is, and whether it is busy, so the name stays only for screen readers. */}
         <Header title={<span className="sr-only">{profile?.name ?? "Chat"}</span>}>
           <Tooltip>
@@ -893,7 +918,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
               <MessageScroller className="flex-1">
                 <MessageScrollerViewport ref={viewport} onScroll={showEarlier}>
                   <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 py-4">
-                    {first === 0 && <Thread turns={earlier} color={profile?.color} skills={skillNames} />}
+                    {first === 0 && <Thread turns={earlier.slice(earlierFirst)} color={profile?.color} skills={skillNames} />}
                     {first === 0 && profile?.handoff && <Handoff text={profile.handoff} />}
                     <Thread turns={turns.slice(first)} color={profile?.color} skills={skillNames} retry={(turn) => send(turn.text, turn.messageId, turn.files ?? [])} anchored={(messageId) => ready && !replayed.current?.has(messageId)} />
                   </MessageScrollerContent>

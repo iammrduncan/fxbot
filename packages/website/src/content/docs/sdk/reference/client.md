@@ -45,7 +45,7 @@ Each call is one route of the [HTTP API](/sdk/reference/http-api/). They mirror 
 
 | Call | Route | Returns |
 | --- | --- | --- |
-| `profiles.list()` | `GET /api/profiles` | `Profile[]` |
+| `profiles.list()` | `GET /api/profiles` | `Profile[]`, without `handoff`, which `profiles.get(id)` has, since 0.11.1 |
 | `profiles.get(id)` | `GET /api/profiles/<id>` | `Profile` |
 | `profiles.create(fields)` | `POST /api/profiles` | `Profile` |
 | `profiles.stop(id)` | `POST /api/profiles/<id>/stop` | `{ ok: true }` |

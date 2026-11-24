@@ -33,9 +33,9 @@ export type Tint = (typeof tints)[number];
 // `provider` is a provider id, or empty for none. An empty model follows the provider's default model.
 // `effort` is how hard the bot's model thinks: '' for the model's own default, else a level, such as 'high'.
 export type Fields = { name: string; instructions: string; model: string; provider: string; effort: string; shape: Shape; color: Color; mood: Mood; head: Head; face: Face; outfit: Outfit; tint: Tint };
-// `preview` is the start of the latest reply, for a list of bots. `handoff` is the summary a provider switch carried
-// over, which the current chat starts from. `busy` is true while a turn runs, and `waiting` while a plugin holds one of its calls. Pinned bots head the list.
-export type Profile = Fields & { id: string; sessionId: string | null; preview: string | null; handoff: string | null; busy: boolean; waiting: boolean; pinned: boolean; isDefault: boolean };
+// `preview` is the start of the latest reply, for a list of bots. `handoff` is the summary a start-over carried over,
+// which the current chat starts from: one bot read alone has it, and since 0.11.1 a list of bots over HTTP leaves it out. `busy` is true while a turn runs, and `waiting` while a plugin holds one of its calls. Pinned bots head the list.
+export type Profile = Fields & { id: string; sessionId: string | null; preview: string | null; handoff?: string | null; busy: boolean; waiting: boolean; pinned: boolean; isDefault: boolean };
 // An update takes any field, and `pinned`. The first bot starts pinned, and at most `maxPinned` are.
 export type ProfileUpdate = Partial<Fields> & { pinned?: boolean };
 export const maxPinned = 3;

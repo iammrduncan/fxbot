@@ -1,4 +1,4 @@
-import { Component, StrictMode, type ReactNode } from "react";
+import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app.tsx";
 import "./index.css";
@@ -9,6 +9,10 @@ class Crash extends Component<{ children: ReactNode }, { error?: Error }> {
   state: { error?: Error } = {};
   static getDerivedStateFromError(error: Error) {
     return { error };
+  }
+  // The first screen, if it's still up, would cover what broke.
+  componentDidCatch() {
+    document.querySelector("body > .splash")?.remove();
   }
   render() {
     if (!this.state.error) return this.props.children;
@@ -24,10 +28,15 @@ class Crash extends Component<{ children: ReactNode }, { error?: Error }> {
   }
 }
 
+// The first screen, a bot bouncing (index.html), stays until the app shows: React's first render replaced it with a page
+// still hidden while its lists load, which on a slow link was a blank screen for seconds. App takes it away.
+const splash = document.querySelector("#root > .splash");
+if (splash) document.body.append(splash);
+
+// No StrictMode: in development it runs each effect twice, so every request went twice, and the owner's installed app
+// is the development server.
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <Crash>
-      <App />
-    </Crash>
-  </StrictMode>,
+  <Crash>
+    <App />
+  </Crash>,
 );

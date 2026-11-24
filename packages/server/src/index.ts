@@ -1,4 +1,5 @@
 import { createFxbot, releasesUrlFor, type PluginRef, type PluginSocket, type ItemKind, type LocalEmbedder, type Settings, type UpdateStatus } from "@fxbot/sdk";
+import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { delimiter, extname, join, normalize } from "node:path";
@@ -79,8 +80,23 @@ function sendFile(req: IncomingMessage, res: ServerResponse, type: string, data:
 const fail = (status: number, message: string): never => {
   throw Object.assign(new Error(message), { status });
 };
-const json = (res: ServerResponse, status: number, body: unknown) =>
-  res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
+const json = (res: ServerResponse, status: number, body: unknown) => sendJson(res.req, res, status, Buffer.from(JSON.stringify(body)));
+// A JSON answer, the app's or a plugin's. Over 1 KB it's gzipped for a client that takes it, and a GET's carries an
+// ETag, so one that hasn't changed costs a 304 and no body, unless the plugin set its own caching: a phone on a slow link
+// waited seconds at every launch for the same lists, sent whole. `headers` are the plugin's.
+function sendJson(req: IncomingMessage, res: ServerResponse, status: number, data: Buffer, headers: Record<string, string> = {}) {
+  const out: Record<string, string> = { "content-type": "application/json", ...headers };
+  delete out["content-length"];
+  if (status === 200 && (req.method === "GET" || req.method === "HEAD") && !out.etag && !out["cache-control"]) {
+    const tag = `W/"${createHash("sha1").update(data).digest("base64url")}"`;
+    Object.assign(out, { etag: tag, "cache-control": "no-cache" });
+    if (String(req.headers["if-none-match"] ?? "").split(",").some((one) => one.trim() === tag)) return void res.writeHead(304, { etag: tag, "cache-control": "no-cache" }).end();
+  }
+  const gzip = data.length > 1024 && /\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""));
+  if (data.length > 1024) out.vary = "accept-encoding";
+  if (gzip) out["content-encoding"] = "gzip";
+  res.writeHead(status, out).end(gzip ? gzipSync(data, { level: 6 }) : data);
+}
 
 // A library file goes out as data: an image under its checked type, every document as plain text, with no sniffing and
 // a sandbox that runs nothing, even opened in its own tab. `no-cache` asks again each time, so a deleted item stops
@@ -154,6 +170,9 @@ async function pluginRoute(req: IncomingMessage, res: ServerResponse, url: URL, 
     ...(method === "GET" || method === "HEAD" ? {} : { body: Readable.toWeb(req) as unknown as BodyInit, duplex: "half" }),
   } as RequestInit);
   const response = await fxbot.plugins.handle(name, request, url.pathname.split("/").slice(4).join("/"));
+  // A plugin's JSON goes as the app's does, unless the plugin encoded it itself.
+  if (/^application\/json\b/i.test(response.headers.get("content-type") ?? "") && !response.headers.has("content-encoding") && response.body && method !== "HEAD")
+    return sendJson(req, res, response.status, Buffer.from(await response.arrayBuffer()), Object.fromEntries(response.headers));
   res.writeHead(response.status, Object.fromEntries(response.headers));
   if (!response.body || method === "HEAD") return void res.end();
   return pipeline(Readable.fromWeb(response.body as ReadableStream<Uint8Array>), res).catch(() => {});
@@ -297,7 +316,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   if (resource !== "profiles" || extra !== undefined) return fail(404, "not found");
 
   if (!id) {
-    if (method === "GET") return json(res, 200, await fxbot.profiles.list());
+    // Without each bot's handoff, which only its own chat reads: a list read at every launch and after every reply carried
+    // each bot's whole summary.
+    if (method === "GET") return json(res, 200, (await fxbot.profiles.list()).map(({ handoff: _, ...bot }) => bot));
     if (method === "POST") return json(res, 201, await fxbot.profiles.create(await body(req)));
     return fail(405, "method not allowed");
   }

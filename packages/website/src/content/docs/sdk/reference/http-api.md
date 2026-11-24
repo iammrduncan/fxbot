@@ -15,6 +15,7 @@ For typed calls from a page or a script, use [the client](/sdk/reference/client/
 - A route that reads a body takes a JSON object. Anything else gets 400, "body must be a JSON object". A body is at most 1 MiB, and a message's at most 12 MiB. A larger one gets 413.
 - An error comes back as JSON, `{ "error": "<message>" }`, with the SDK's `status`, or 500 for an unexpected one, which the server logs. An error after an answer has started, as in a stream, closes the connection.
 - A path or method the server doesn't serve gets 404, `not found`, or 405, `method not allowed`.
+- A JSON answer over 1 KB is gzipped when the request accepts gzip. A `GET`'s answer has a weak `ETag` and `Cache-Control: no-cache`, so a request with a matching `If-None-Match` gets 304 and no body, as a browser's cache asks. A plugin's JSON gets the same, unless it set its own `Cache-Control` or `ETag`. Since 0.11.1.
 - A bot id is 12 hex characters. Most routes under `/api/profiles/<id>` get 400 for another shape, and 404 for an unknown bot.
 
 ## Status codes
@@ -24,7 +25,7 @@ For typed calls from a page or a script, use [the client](/sdk/reference/client/
 | 200 | Done |
 | 201 | Made: a bot, a memory, a provider, a sign-in, a plugin, or an OAuth sign-in |
 | 202 | An update was asked for |
-| 304 | A library file whose ETag matches `If-None-Match` |
+| 304 | A library file, or since 0.11.1 a `GET`'s JSON answer, whose ETag matches `If-None-Match` |
 | 400 | Bad input, or a request fxbot refuses |
 | 403 | A write from another site |
 | 404 | No such route, or a missing bot, provider, memory, library item, plugin, or sign-in |
@@ -144,7 +145,7 @@ A file's answer has these headers:
 
 | Method | Path | Body or query | Answer |
 | --- | --- | --- | --- |
-| `GET` | `/api/profiles` | | `Profile[]` |
+| `GET` | `/api/profiles` | | `Profile[]`, without each bot's `handoff` since 0.11.1: read one bot for it |
 | `POST` | `/api/profiles` | `name`, and any of `instructions`, `model`, `provider`, `shape`, `color`, `mood`, `head`, `face`, `outfit`, `tint` | 201 and `Profile` |
 | `GET` | `/api/profiles/<id>` | | `Profile` |
 | `PATCH` | `/api/profiles/<id>` | Any of the fields, and `pinned` | `Profile` |
