@@ -71,7 +71,8 @@ export function App() {
 
   // The sidebar's list. Forms bump `version` after a change; a failed load retries.
   const [profiles, setProfiles] = useState<Profile[] | null>(null);
-  const [offline, setOffline] = useState(false);
+  // Why the list can't be read, or "" while it can.
+  const [offline, setOffline] = useState("");
   const [version, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
   // A launch at / opens the default bot's chat: a fresh load only, not a reload or Back, and only until the first list
@@ -88,13 +89,13 @@ export function App() {
           // Replaced, so Back leaves the app, and set with the list, so Home never paints.
           if (start) (history.replaceState(null, "", `/profiles/${start.id}`), setPath(location.pathname));
           setProfiles(list);
-          setOffline(false);
+          setOffline("");
           // The next launch's first screen shows one of them (splash.ts).
           keepForSplash(list);
         },
-        () => {
+        (error: Error) => {
           if (stopped) return;
-          setOffline(true);
+          setOffline(error.message);
           setTimeout(load, 3000);
         },
       );
@@ -139,7 +140,7 @@ export function App() {
   const [firstRun, setFirstRun] = useState<string | null>();
   const [chatShown, setChatShown] = useState(false);
   const onChat = top === "profiles" && Boolean(id) && sub === undefined;
-  const whole = (profiles !== null || offline) && (firstRun !== undefined || offline) && (!onChat || chatShown);
+  const whole = (profiles !== null || Boolean(offline)) && (firstRun !== undefined || Boolean(offline)) && (!onChat || chatShown);
   const [shown, setShown] = useState(false);
   useEffect(() => {
     if (whole) setShown(true);
@@ -211,7 +212,7 @@ function NewBot({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange
   );
 }
 
-function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: Profile[] | null; offline: boolean; active?: string; onNew: () => void; onChange: () => void }) {
+function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: Profile[] | null; offline: string; active?: string; onNew: () => void; onChange: () => void }) {
   const { setOpenMobile } = useSidebar();
   // The open bot's eyes follow the pointer, and so do the eyes of the bot under it.
   const [hovered, setHovered] = useState<string | null>(null);
@@ -292,7 +293,7 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
         </Tooltip>
       </SidebarHeader>
       <SidebarContent>
-        {offline && <p className="px-4 text-sm text-destructive">{unreachable}</p>}
+        {offline && <p className="px-4 text-sm text-destructive">{offline}</p>}
         {pinned.length > 0 && (
           <SidebarGroup aria-label="Pinned">
             <div ref={pins.list} className="flex justify-center gap-1">
@@ -477,14 +478,14 @@ const Problem = ({ children }: { children: ReactNode }) => (
   </p>
 );
 
-function Home({ profiles, offline, onNew }: { profiles: Profile[] | null; offline: boolean; onNew: () => void }) {
+function Home({ profiles, offline, onNew }: { profiles: Profile[] | null; offline: string; onNew: () => void }) {
   const some = Boolean(profiles?.length);
   return (
     <>
       <Header title="fxbot" />
       {offline && (
         <div className="px-4">
-          <Problem>{unreachable} Retrying…</Problem>
+          <Problem>{offline} Retrying…</Problem>
         </div>
       )}
       <Empty className="flex-1">
@@ -680,7 +681,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   const skillNames = new Set(skills.skills.filter((s) => !s.command).map((s) => s.name));
   // A chat that started over, here or on another page, is read again: its new session, and its handoff.
   const reread = () => void client.profiles.get(id).then(setProfile, () => {});
-  const { turns, setTurns, connected, ready } = useTurnStream(id, profile?.sessionId ?? null, reread);
+  const { turns, setTurns, connected, lost, ready } = useTurnStream(id, profile?.sessionId ?? null, reread);
   // The turns there when the chat caught up, which aren't scroll anchors: see Thread.
   const replayed = useRef<Set<string> | null>(null);
   if (ready && !replayed.current) replayed.current = new Set(turns.map((turn) => turn.messageId));
@@ -806,7 +807,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
     setNotice(problems.join(" "));
   }
 
-  const offline = error || (!connected && unreachable);
+  const offline = error || (!connected && (lost || unreachable));
   // The chat paints once it's whole: its lines, the turns from before a provider switch, and the code, diagrams, and
   // images that finish after the first render. Until then it's hidden. A chat that can't load shows what there is, with the problem.
   const whole = Boolean(error) || (profile !== null && (!profile.sessionId || ready || !connected) && (!profile.handoff || earlierRead));

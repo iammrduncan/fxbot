@@ -25,7 +25,7 @@ It imports nothing from `@fxbot/sdk`'s main entry, so a browser bundle can take 
 | `onVersion` | `(version: string) => void` | None | Hears the version in each answer's `x-fxbot-version` header, so a page can notice a new release |
 
 - Each call asks `<baseUrl>/api/...` with `fetch`, sends JSON, and resolves to the JSON answer.
-- A call that fails throws an `Error` with the server's message. When the server can't be reached, or answers with something that isn't JSON, such as a proxy's page, the message is `unreachable`: "Cannot reach the server." The `Error` carries no status.
+- A call that fails throws an `Error` with the server's message. When the server can't be reached, the message is `unreachable`: "Cannot reach the server." An answer that isn't fxbot's JSON, such as a proxy's error page or web pairing's "Not connected to your fxbot.", gives its words and HTTP status when they're one short line of text, else `unreachable` and the status (since 0.11.1). The `Error` carries no status of its own.
 - The client holds no keys or tokens. A key goes to the server once, in `providers.add` or `providers.update`, and comes back only as `hasKey`. Header values and OAuth clients go up once, in `plugins.setSecrets`.
 - The server refuses a write with 403 when the request's `Origin` header names another host than its `Host`. A browser sends `Origin`, so a page on another origin gets 403 for every write. Node's `fetch` sends no `Origin`, so a script's writes pass. The server sends no CORS headers.
 
@@ -143,7 +143,7 @@ After `plugins.signIn`, open the attempt's `url`, then call `oauth.get` until th
 ## stream
 
 ```ts
-stream(id: string, options?: { cursor?: number; session?: string; signal?: AbortSignal; onConnection?: (connected: boolean) => void; onCaughtUp?: () => void }): AsyncGenerator<StreamLine>
+stream(id: string, options?: { cursor?: number; session?: string; signal?: AbortSignal; onConnection?: (connected: boolean, why?: string) => void; onCaughtUp?: () => void }): AsyncGenerator<StreamLine>
 ```
 
 | Option | Default | What it does |
@@ -151,10 +151,11 @@ stream(id: string, options?: { cursor?: number; session?: string; signal?: Abort
 | `cursor` | `0` | Where to start. 0 replays the whole chat. |
 | `session` | None | The session `cursor` is in. When the chat has moved from it since, the stream is the `moved` line alone. Since 0.5.0. |
 | `signal` | None | Stops the stream. The generator then returns. |
-| `onConnection` | None | Hears `true` on each connection, and `false` when one drops |
+| `onConnection` | None | Hears `true` on each connection, and `false` when one drops, with why: the server's error, the words or HTTP status of what answered in its place, or `unreachable` when nothing did. `why` since 0.11.1. |
 | `onCaughtUp` | None | Hears each connection catch up: every line the chat had when it opened has been yielded, so the lines before were the replay |
 
 - It yields every line of the bot's chat from `cursor` on, then each new line, until `signal` aborts.
+- It skips blank lines, which the server sends to keep a quiet stream open.
 - It keeps the `cursor` of the last line it read. When the connection drops, the server answers with an error, or the stream ends, it waits 2 seconds and asks again from that cursor. The server ends the stream at once for a bot with no chat yet, so the client asks again every 2 seconds until the chat starts.
 - It hides a line whose `epoch` is lower than one it has already seen, as libfx's rule says.
 - A `moved` line, when the chat starts over, is the last it yields: a cursor of the old session means nothing in the new one. Read the bot again, and stream its new `sessionId` from 0.

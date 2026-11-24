@@ -2,7 +2,7 @@ import { createFxbot, releasesUrlFor, type PluginRef, type PluginSocket, type It
 import { readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { delimiter, extname, join, normalize } from "node:path";
-import { Readable, type Duplex } from "node:stream";
+import { PassThrough, Readable, type Duplex } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
 import { constants, createGzip, gzipSync } from "node:zlib";
@@ -337,7 +337,12 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
       ...(gzip ? { "content-encoding": "gzip", vary: "accept-encoding" } : {}),
     }).flushHeaders();
     // Replays from the cursor up to x-fxbot-end, then stays open for new lines. A closed response cancels the stream.
-    return (gzip ? pipeline(lines, createGzip({ flush: constants.Z_SYNC_FLUSH }), res) : pipeline(lines, res)).catch(() => {});
+    // Every 25 seconds a blank line, which clients skip, crosses it too. A device that went away without closing its
+    // connection, as a phone that sleeps or loses its network can, is found when a write to it fails, so its reader
+    // goes, where a quiet chat kept it until fxbot restarted. And a proxy that cuts a quiet connection keeps this one.
+    const beat = new PassThrough();
+    const timer = setInterval(() => beat.writable && beat.write("\n"), 25_000);
+    return (gzip ? pipeline(lines, beat, createGzip({ flush: constants.Z_SYNC_FLUSH }), res) : pipeline(lines, beat, res)).catch(() => {}).finally(() => clearInterval(timer));
   }
   return fail(action ? 404 : 405, action ? "not found" : "method not allowed");
 }
@@ -375,6 +380,9 @@ const server = createServer(async (req, res) => {
     else json(res, 405, { error: "method not allowed" });
   } catch (error) {
     const status = (error as { status?: number }).status ?? 500;
+    // A request whose connection closed before fxbot had read it, as when a page reloads or its network drops, is no
+    // fault of fxbot's, and nobody is left to answer.
+    if (req.destroyed && (error as { code?: string }).code === "ECONNRESET") return;
     if (status === 500) console.error(error);
     if (!res.headersSent) json(res, status, { error: error instanceof Error ? error.message : String(error) });
     else res.destroy();

@@ -2,6 +2,14 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
+## Unreleased
+
+- **Fixes, from [issue #21](https://github.com/iammrduncan/fxbot/issues/21):**
+  - "Cannot reach the server" says what went wrong when something did answer. A chat shows fxbot's own error, and the bots list and the Plugins page show what answered in fxbot's place, such as a proxy's HTTP status or web pairing's "Not connected to your fxbot." The words stay only when nothing answered at all.
+  - A chat's connection from a device that went away without closing it, as a phone that sleeps or loses its network can, now ends once fxbot's next write to it fails, where a quiet chat kept it until fxbot restarted. A blank line crosses each chat's stream every 25 seconds, so a proxy that cuts quiet connections keeps it too.
+  - A request the browser gave up on, as when a page reloads, no longer shows in fxbot's log as `Error: aborted`.
+- **For the SDK:** `client.stream`'s `onConnection` hears why a connection dropped, and a call's `Error` gives what answered in fxbot's place. The chat stream's blank lines are skipped by the client; a reader of `GET /api/profiles/<id>/stream` of its own should skip them too.
+
 ## 0.11.0 (2026-11-23)
 
 **Before upgrading.** Migration `0019_idle_compact_tokens` adds `idle_compact_tokens` to `settings`, how long a chat must be before it's compacted while idle: 30,000 tokens, as before. Then update from **Plugins**: Chat rooms to 0.5.1, so rooms follow it too, Messages to 0.2.1, Permissions to 0.1.2, Computer to 0.5.1, and Web pairing to 0.1.1. On a release install with herdr's door open, run `sudo fxbot herdr on` again after the update: the door now runs herdr's own screen for fxbot's page, which can open a shell as herdr's user, needs `python3` on the machine, and lets a connection last a day. `--read-only` keeps the screen and keys shut.

@@ -21,6 +21,8 @@ export function useVisible() {
 export function useTurnStream(profileId: string, session: string | null, onMoved: () => void) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [connected, setConnected] = useState(true);
+  // Why the last connection dropped: the server's error, what answered in its place, or that nothing did.
+  const [lost, setLost] = useState("");
   const [ready, setReady] = useState(false);
   const visible = useVisible();
   const cursor = useRef(0);
@@ -50,8 +52,9 @@ export function useTurnStream(profileId: string, session: string | null, onMoved
       held = [];
       setReady(true);
     };
-    const connection = (on: boolean) => {
+    const connection = (on: boolean, why = "") => {
       setConnected(on);
+      setLost(why);
       if (on) holding = true;
     };
     (async () => {
@@ -64,5 +67,5 @@ export function useTurnStream(profileId: string, session: string | null, onMoved
     return () => abort.abort();
   }, [profileId, session, visible]);
 
-  return { turns, setTurns, connected, ready };
+  return { turns, setTurns, connected, lost, ready };
 }

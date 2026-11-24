@@ -175,6 +175,7 @@ The stream:
 - answers 200 with `content-type: application/x-ndjson` and `cache-control: no-store`, the `x-fxbot-version` header, and `x-fxbot-end`, the cursor of the chat's newest line when the stream opened. The lines up to it are the replay.
 - is gzipped, flushed after each line, when the request accepts gzip
 - replays the chat's lines from `cursor`, then stays open for new ones. 0 replays the whole chat. Each line's `cursor` is where to ask again to get the lines after it.
+- sends a blank line every 25 seconds, which a client skips. A connection whose device went away without closing it ends once a write to it fails, and a proxy that cuts quiet connections keeps it open. Since 0.11.1.
 - ends at once for a bot with no chat yet, or whose provider is gone
 - stops when the client closes the connection
 - gets 400 for a `cursor` that isn't a whole number

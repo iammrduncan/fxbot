@@ -46,6 +46,19 @@ export { iconSeed, pluginIcon, type PluginIcon, type Tones } from "./plugin-icon
 
 export const unreachable = "Cannot reach the server.";
 
+// What an answer that isn't fxbot's says: fxbot's own error, else the words of what answered in its place, such as web
+// pairing's "Not connected to your fxbot.", when they're one short line, else its status. A proxy's error page is HTML.
+function answered(status: number, text: string) {
+  let error: unknown;
+  try {
+    error = JSON.parse(text)?.error;
+  } catch {}
+  if (typeof error === "string" && error) return error;
+  const words = text.trim();
+  if (words && words.length <= 200 && !/[\n<]/.test(words)) return `${words} (HTTP ${status})`;
+  return `${unreachable} Something in front of it answered HTTP ${status}.`;
+}
+
 export type ClientOptions = {
   /** The server's origin. Default: the page's own. */
   baseUrl?: string;
@@ -60,8 +73,9 @@ export type StreamOptions = {
   session?: string;
   /** Stops the stream. */
   signal?: AbortSignal;
-  /** Hears the connection drop and come back. */
-  onConnection?: (connected: boolean) => void;
+  /** Hears the connection drop and come back. A drop says why: the server's error, or what answered in its place, or
+   * `unreachable` when nothing did. */
+  onConnection?: (connected: boolean, why?: string) => void;
   /** Hears each connection catch up: every line the chat had when it opened has been yielded. */
   onCaughtUp?: () => void;
 };
@@ -82,9 +96,13 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
     }
     const version = res.headers.get("x-fxbot-version");
     if (version) onVersion?.(version);
-    // A body that is not JSON comes from a proxy in front of a stopped server.
-    const data = await res.json().catch(() => null);
-    if (!res.ok || data === null) throw new Error(data?.error ?? unreachable);
+    // A body that is not JSON comes from something in front of fxbot, such as a proxy in front of a stopped server.
+    const text = await res.text().catch(() => "");
+    let data: T | null = null;
+    try {
+      data = JSON.parse(text);
+    } catch {}
+    if (!res.ok || data === null) throw new Error(answered(res.status, text));
     return data;
   }
 
@@ -97,9 +115,13 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
       // Only a stream that couldn't open, or broke, is a lost connection. One the server closed, such as while a bot's
       // provider restarts, is opened again without saying so.
       let failed = false;
+      let why = unreachable;
       try {
         const res = await fetch(`${baseUrl}/api/profiles/${id}/stream?${new URLSearchParams({ cursor: String(cursor), ...(session ? { session } : {}) })}`, { signal });
-        if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok || !res.body) {
+          why = answered(res.status, await res.text().catch(() => ""));
+          throw new Error(why);
+        }
         const version = res.headers.get("x-fxbot-version");
         if (version) onVersion?.(version);
         onConnection?.(true);
@@ -137,7 +159,7 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
         failed = true;
       }
       if (signal?.aborted) return;
-      if (failed) onConnection?.(false);
+      if (failed) onConnection?.(false, why);
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
