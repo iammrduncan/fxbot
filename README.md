@@ -32,7 +32,7 @@ Records live in Postgres, and so do libfx's sessions, each chat's. No Next.js, a
 
 ## Phases
 
-In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Distribution, Mac support, hc, and Embedded links are.
+In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Claude's own API, Distribution, Mac support, hc, and Embedded links are.
 
 - [x] [v1](docs/_completed/v1-plan.md) (core): bot profiles and a streaming chat
 - [x] [Provider logins](docs/_completed/phases/provider-logins.md) (core): ChatGPT, Grok, and Vercel accounts, API keys, and local model servers
@@ -49,8 +49,16 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Agent computer](docs/_completed/phases/computer.md) (plugin, one others build on): a Linux computer for each bot, in the machine's own podman or docker, run rootless; the [computer](plugins/computer/README.md) is in `plugins/`
 - [x] [Streams](docs/_completed/phases/streams.md) (core): chats in the Postgres fxbot already runs, so an open chat costs nothing while idle and a long one is as quick to send to as a new one
 - [x] [Computer v2](docs/_completed/phases/computer-v2.md) (plugin, with one core hook): a whole computer in one plugin: a desktop the owner watches and takes over, a shared terminal, a browser on the desktop, and the tools to drive them by pixels, accessibility trees, and text
+- [x] [The computer on Add](docs/_completed/phases/computer-on-add.md) (plugin, with a core hook for jobs the machine runs as root; 0.4.0): adding the computer sets the machine up for it by itself, its rootless engine and firewall, and Settings says how that goes
 - [x] [Permissions](docs/_completed/phases/permissions.md) (plugin, on a core hook; 0.6.0): ask, auto, and yolo modes for tool calls, with a reviewer model and an approval card
 - [x] [Chat rooms](docs/_completed/phases/chat-rooms.md) (plugin, with two core hooks; 0.4.1): rooms of the owner and several bots, with `@` chips, bots tagging each other within limits, a Stop, and skills for working in a room
+- [x] [Settings in tabs](docs/_completed/phases/settings-tabs.md) (core; 0.5.0): General, Providers, Memory, Plugins, and About, and a tab of its own for each plugin that draws in Settings
+- [x] [A default bot](docs/_completed/phases/default-bot.md) (core; 0.5.0): launching fxbot opens the chat of the bot picked in Settings › General, where it left off
+- [x] [Plugin icons](docs/_completed/phases/plugin-icons.md) (core; 0.5.0): each plugin's own icon, a soft shape on a tinted tile drawn from its creator and name, the same everywhere it shows
+- [x] [The plugin directory](docs/_completed/phases/plugin-directory.md) (the website; 0.5.0): a Plugins page on fxbot.sh that searches fxbot's vetted plugins, with a page for each that says what it carries and how to add it
+- [x] [/fresh](docs/_completed/phases/fresh.md) (plugin, on a core start-over; 0.5.0, built into core in 0.10.0): a bot's chat changes subject, starting over from a summary aimed at what the owner writes next
+- [x] [A computer for each room](docs/_completed/phases/chat-rooms-computer.md) (plugin; 0.5.0, retired in 0.10.0 for a room's computer in the computer plugin): a room's bots share one computer, taking turns, with each bot's cursor drawn for the owner
+- [x] [Dreams](docs/_completed/phases/dreams.md) (plugin; 0.5.0): each bot's nightly pass over its day, saving memories and at most one skill a night, in a journal the owner reads and can undo
 - [x] [Cross-bot messaging](docs/_completed/phases/cross-bot-messaging.md) (plugin, with core steering and Stop; 0.6.0): bots message each other in their own chats, where the owner watches them work together, and a message to a working bot joins what it's doing
 - [x] [Routines](docs/_completed/phases/routines.md) (plugin, with a core time zone; 0.6.0): saved tasks a bot runs on a schedule, with everything it has, telling the owner in its chat
 - [x] [Plugin compatibility](docs/_completed/phases/plugin-compatibility.md) (core; 0.7.0): a minimum fxbot for each plugin, a list of what each release broke, and **Unsupported** where a plugin can't run
@@ -77,16 +85,18 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [herdr screen](docs/_completed/phases/herdr-screen.md) (plugin, with its door; 0.11.0): herdr itself in the app, a real terminal running herdr's own client, the whole screen or one agent attached
 - [x] [Phone](docs/_completed/phases/phone.md) (plugin; 0.11.0): the call in one plugin, `phone`, with what each bot gets, and providers as plugins that need it, phone-signalwire first
 - [x] [Phone: SignalWire](docs/_completed/phases/phone-signalwire.md) (plugin; 0.11.0): press Call me and the bot rings your phone through SignalWire, greets you, and talks with you, hands-free, with its own model, memory, and tools, and nothing reaching fxbot
+- [x] [/compact](docs/_completed/phases/room-context.md#compact-0111) (core; 0.11.1): a bot's chat shortened to a summary that it carries on from, with nothing sent, as idle compaction does, now
+- [x] [Times on messages](docs/_completed/phases/room-context.md#times-on-messages-and-summaries-0111) (core; 0.11.1): each message a bot reads starts with when it was sent, in the owner's time zone, and each start-over's summary says what it covers and when it was written
 - [ ] [Claude's own API](docs/phases/claude-messages.md) (core; on hold until libfx is checked again): Claude by key over Anthropic's Messages API, with prompt caching, thinking at a bot's effort, cache counts in a turn's usage, and cache keys for the providers that want one ([#18](https://github.com/iammrduncan/fxbot/issues/18)). Meanwhile, Claude by key caches through AI Gateway
 - [ ] [Gateways](docs/phases/gateways.md) (plugins, with a small core hook): talk to bots from the chat apps you already use, as the owner, in the same conversation the app shows
 - [ ] [Telegram and Discord](docs/phases/telegram-and-discord.md) (plugins): the first two gateways
-- [ ] [Distribution](docs/phases/distribution.md) (core; after 0.8.0): the main install, one download for Linux, macOS, and Windows that brings its own Postgres and embedder and a Linux machine for the computer, and later the desktop app; the container release is for hosting
-- [ ] [Mac support](docs/phases/mac-support.md) (core; after 0.8.0): one line installs fxbot on a Mac, as Distribution's macOS download built first, with only the computer in a Lima VM, and a handoff to check it on a real Mac
+- [ ] [Distribution](docs/phases/distribution.md) (core; planned, not scheduled): the main install, one download for Linux, macOS, and Windows that brings its own Postgres and embedder and a Linux machine for the computer, and later the desktop app; the container release is for hosting
+- [ ] [Mac support](docs/phases/mac-support.md) (core; planned, not scheduled): one line installs fxbot on a Mac, as Distribution's macOS download built first, with only the computer in a Lima VM, and a handoff to check it on a real Mac
 - [ ] [Triggers](docs/phases/triggers.md) (plugins): webhooks and new email start a bot's turn
 - [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window, past the compaction libfx does
 - [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
 - [ ] [Knowledge base](docs/phases/knowledge-base.md) (plugin): knowledge the bots draw on
-- [ ] [hc](docs/phases/hc.md) (plugin, with a second door on the machine; deferred until after 0.11.0): bots run coding agents of their own, such as Claude Code, in terminals that stay alive on any of the owner's machines, through herdr-core, hear back when one's turn ends, and the owner watches them live in fxbot
+- [ ] [hc](docs/phases/hc.md) (plugin, with a second door on the machine; deferred until the owner approves installing herdr-core): bots run coding agents of their own, such as Claude Code, in terminals that stay alive on any of the owner's machines, through herdr-core, hear back when one's turn ends, and the owner watches them live in fxbot
 - [ ] [Web search](docs/phases/web-search.md) (plugin): bots search and read the web, and cite it
 - [ ] [X feed](docs/phases/plugin-x-feed.md) (plugins): bots read X (Twitter) for free with tools of their own, posts, search, mentions, followers, and lists, from X's public pages, its embeds, and FxTwitter, or through a signed-in tab on the bot's computer, and watches start a turn when someone posts or the owner is mentioned
 - [ ] [Embedded links](docs/phases/embedded-links.md) (plugin, with a small core hook): a link on its own line, pasted or in a bot's reply, shows as a preview card, an X post as the post, and a YouTube video as its player, and stays a link to right-click and copy
@@ -97,7 +107,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Voice memos](docs/phases/voice-memos.md) (plugin): send a bot a recorded voice memo
 - [ ] [Phone: Telnyx](docs/phases/phone-telnyx.md) (plugin): a provider for phone, the same call for about a third of the price, with fxbot as a softphone and speech providers of the owner's own
 - [ ] [Phone in the app](docs/phases/phone-in-app.md) (plugin): a call in fxbot's own page, with speech providers such as phone-elevenlabs
-- [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): talk with a bot by voice, in the app or over a phone line
+- [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): call a bot from your phone. A bot calling you is built in Phone, and talking in the app is Phone in the app
 
 The previous design and spike are in [archive/](archive/README.md). The git host may still use the old repository name until the owner renames it.
 
