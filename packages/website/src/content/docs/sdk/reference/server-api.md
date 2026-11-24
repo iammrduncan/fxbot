@@ -287,7 +287,7 @@ type Profile = Fields & {
   id: string;
   sessionId: string | null; // the current chat, from the first message
   preview: string | null; // the start of the latest reply
-  handoff: string | null; // the summary a provider switch carried over
+  handoff?: string | null; // the summary a start-over carried over; GET /api/profiles leaves it out since 0.11.1
   busy: boolean; // a turn runs in this process
   waiting: boolean; // a plugin's `wait` holds one of its calls
   pinned: boolean;
