@@ -32,7 +32,7 @@ Records live in Postgres, and so do libfx's sessions, each chat's. No Next.js, a
 
 ## Phases
 
-In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Coding, Claude's own API, Distribution, Mac support, hc, and Embedded links are.
+In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Built phases link to their phase docs in `docs/_completed/phases/`. The rest are one-page stubs in `docs/phases/` until they're planned, as Coding, Phone v2, Claude's own API, Distribution, Mac support, hc, and Embedded links are.
 
 - [x] [v1](docs/_completed/v1-plan.md) (core): bot profiles and a streaming chat
 - [x] [Provider logins](docs/_completed/phases/provider-logins.md) (core): ChatGPT, Grok, and Vercel accounts, API keys, and local model servers
@@ -88,6 +88,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [/compact](docs/_completed/phases/room-context.md#compact-0111) (core; 0.11.1): a bot's chat shortened to a summary that it carries on from, with nothing sent, as idle compaction does, now
 - [x] [Times on messages](docs/_completed/phases/room-context.md#times-on-messages-and-summaries-0111) (core; 0.11.1): each message a bot reads starts with when it was sent, in the owner's time zone, and each start-over's summary says what it covers and when it was written
 - [ ] [Coding](docs/phases/coding.md) (plugin, with a door on the machine; planned): bots take coding projects, each task on a branch of its own, held to the project's checks, which the plugin runs itself, with a diff the user reads and lands with a click. Where the code is worked on is the user's choice: the bot's own computer, the machine fxbot runs on, another machine over SSH, or one of the user's own agents through herdr
+- [ ] [Phone v2](docs/phases/phone-v2.md) (plugin, with two small hooks; planned): phone carries the voice itself, so you can cut a bot off mid-sentence. Talk in the app, with voice providers as logins on the providers page: one you have that speaks, such as Mistral, Groq, or Cloudflare, Deepgram and ElevenLabs added by phone, a speech server on your machine, or the browser's own speech. A carrier plugin only places the call, over phone's SIP user agent, SignalWire first once a real call proves the audio comes back
 - [ ] [Claude's own API](docs/phases/claude-messages.md) (core; on hold until libfx is checked again): Claude by key over Anthropic's Messages API, with prompt caching, thinking at a bot's effort, cache counts in a turn's usage, and cache keys for the providers that want one ([#18](https://github.com/iammrduncan/fxbot/issues/18)). Meanwhile, Claude by key caches through AI Gateway
 - [ ] [Gateways](docs/phases/gateways.md) (plugins, with a small core hook): talk to bots from the chat apps you already use, as the owner, in the same conversation the app shows
 - [ ] [Telegram and Discord](docs/phases/telegram-and-discord.md) (plugins): the first two gateways
@@ -106,8 +107,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Local access](docs/phases/plugin-local-access.md) (plugin): bots reach folders the owner picks on the machine itself, off until the owner turns it on
 - [ ] [Image and video generation](docs/phases/media-generation.md) (plugin): bots create images and video
 - [ ] [Voice memos](docs/phases/voice-memos.md) (plugin): send a bot a recorded voice memo
-- [ ] [Phone: Telnyx](docs/phases/phone-telnyx.md) (plugin): a provider for phone, the same call for about a third of the price, with fxbot as a softphone and speech providers of the owner's own
-- [ ] [Phone in the app](docs/phases/phone-in-app.md) (plugin): a call in fxbot's own page, with speech providers such as phone-elevenlabs
+- [ ] [Phone: Telnyx](docs/phases/phone-telnyx.md) (plugin): a carrier for phone, the same call for about a third of the price, on Phone v2's SIP user agent
 - [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): call a bot from your phone. A bot calling you is built in Phone, and talking in the app is Phone in the app
 
 The previous design and spike are in [archive/](archive/README.md). The git host may still use the old repository name until the owner renames it.
