@@ -45,7 +45,7 @@ All the bot can do, but for what its chat decides. A subagent can't:
 
 It says in its report what it would do, and the bot decides, in its chat with you. With [Permissions](/docs/how-to/choose-what-a-bot-can-do-alone/), a subagent's call that needs your OK waits at a card in the bot's chat, as other background work does.
 
-Subagents start only in a bot's own chat with you, not in a room or a routine's run.
+Subagents start in a bot's own chat with you, and, since subagents 0.3.0 with chat rooms 0.6.0, in a room. One started in a room reports there, as a message from **Subagents**, and the bot that started it answers in the room. They don't start in a routine's run.
 
 ## On the computer
 
