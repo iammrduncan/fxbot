@@ -868,6 +868,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
         )}
         {/* The sidebar already shows which bot this is, and whether it is busy, so the name stays only for screen readers. */}
         <Header title={<span className="sr-only">{profile?.name ?? "Chat"}</span>}>
+          {profile && <Place pick={(places) => places.header} props={{ bot: profile }} />}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Bot panel" aria-expanded={panel.open && !beside.path} onClick={() => (beside.path ? (beside.close(), panel.setOpen(true)) : panel.setOpen(!panel.open))}>

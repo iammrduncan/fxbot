@@ -14,6 +14,7 @@ import * as input from "@/components/ui/input";
 import { InputGroupTextarea } from "@/components/ui/input-group";
 import * as message from "@/components/ui/message";
 import * as nativeSelect from "@/components/ui/native-select";
+import * as popover from "@/components/ui/popover";
 import * as scroller from "@/components/ui/message-scroller";
 import * as sidebar from "@/components/ui/sidebar";
 import * as switches from "@/components/ui/switch";
@@ -62,6 +63,8 @@ type Places = {
   botPanel: ComponentType<{ bot: Profile }>[];
   libraryItem: ComponentType<{ item: LibraryItem }>[];
   chat: ComponentType<{ bot: Profile; reload: () => void }>[];
+  // In a bot chat's header, left of the bot panel's button, such as phone's calls.
+  header: ComponentType<{ bot: Profile }>[];
   box: ComponentType<any>[];
   fold: Fold[];
   said: { pattern: RegExp; Component: ComponentType<{ match: RegExpMatchArray }> }[];
@@ -73,7 +76,7 @@ type Places = {
 // `key` is the URLs it loaded from, which change with its files.
 type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places; pageError?: string };
 
-const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], libraryItem: [], chat: [], box: [], fold: [], said: [], mentions: [], codeBlocks: [], slots: new Map() });
+const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], libraryItem: [], chat: [], header: [], box: [], fold: [], said: [], mentions: [], codeBlocks: [], slots: new Map() });
 
 // The loaded plugins, by name. A change makes a new array, which the places read through usePlugins.
 let loaded: Loaded[] = [];
@@ -99,6 +102,7 @@ const ui = () => ({
   ...input,
   ...message,
   ...nativeSelect,
+  ...popover,
   ...scroller,
   ...sidebar,
   ...switches,
@@ -163,6 +167,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     botPanel: (Component: ComponentType<{ bot: Profile }>) => places.botPanel.push(Component),
     libraryItem: (Component: ComponentType<{ item: LibraryItem }>) => places.libraryItem.push(Component),
     chat: (Component: ComponentType<{ bot: Profile; reload: () => void }>) => places.chat.push(Component),
+    header: (Component: ComponentType<{ bot: Profile }>) => places.header.push(Component),
     box: (Component: ComponentType<any>) => places.box.push(Component),
     fold: (fold: Fold) => places.fold.push(fold),
     said: (pattern: RegExp, Component: ComponentType<{ match: RegExpMatchArray }>) => places.said.push({ pattern, Component }),
