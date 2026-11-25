@@ -16,6 +16,7 @@ type Row = {
   ask: string;
   session: string | null;
   room_session: string | null;
+  call_session: string | null;
   title: string;
   task: string;
   state: "working" | "done" | "failed" | "stopped";
@@ -132,8 +133,15 @@ export default async function setup(fx: PluginApi) {
   type Rooms = { roomOf(session: string): Promise<unknown | null>; wake?(session: string, message: { text: string; label?: string }): Promise<unknown> };
   const rooms = () => fx.need<Rooms>("chat-rooms");
   const inRoom = async (session: string) => Boolean(rooms()?.wake && (await rooms()!.roomOf(session).catch(() => null)));
-  // What a subagent sends back: to the room it was started from, or else the bot's own chat.
+  // Phone, when it's added: a call is a session of its own, and a subagent started on one reports into the call while it's
+  // on, and to the bot's own chat after (phone 0.2.0).
+  type Calls = { callOf(session: string): Promise<unknown | null>; wake?(session: string, message: { text: string; label?: string; shown?: string; messageId?: string }): Promise<unknown> };
+  const calls = () => fx.need<Calls>("phone");
+  const onCall = async (session: string) => Boolean(calls()?.wake && (await calls()!.callOf(session).catch(() => null)));
+  // What a subagent sends back: to the room or the call it was started from, or else the bot's own chat.
   async function back(r: Row, message: { messageId: string; label: string; shown: string; text: string }) {
+    const call = r.call_session ? calls() : null;
+    if (r.call_session && call?.wake) return void (await call.wake(r.call_session, message));
     const room = r.room_session ? rooms() : null;
     if (r.room_session && room?.wake) return void (await room.wake(r.room_session, { text: message.text, label: message.label }));
     await fx.chats.send(r.bot, { ...message, steer: true });
@@ -285,7 +293,7 @@ export default async function setup(fx: PluginApi) {
       "computer, skills, and memories, but hasn't seen this chat: put everything it needs in task, such as names, dates, ids, files in your " +
       "library, and what to hand back. It can't ask you or the owner anything. Its report reaches you on its own, with those of the others this " +
       "turn starts, once they've all ended: don't wait or check for it. Start several for parallel work, each with its own part. Only in your " +
-      "chat with the owner. The skill subagents says how to split work and write a task.",
+      "chat with the owner, a chat room, or a call with them. The skill subagents says how to split work and write a task.",
     inputSchema: {
       type: "object",
       properties: {
@@ -298,7 +306,8 @@ export default async function setup(fx: PluginApi) {
     async execute(input: Input, call) {
       if (sessions.has(call.session)) return "You're a subagent: do this part yourself.";
       const room = await inRoom(call.session);
-      if (!room && !(await ownChat(call))) return "Subagents start only in your chat with the owner, or in a chat room.";
+      const phoned = !room && (await onCall(call.session));
+      if (!room && !phoned && !(await ownChat(call))) return "Subagents start only in your chat with the owner, in a chat room, or on a call.";
       const title = text(input.title).replace(/\s+/g, " ");
       const task = text(input.task);
       if (!title || title.length > most.title) return "Give a title of up to 80 characters.";
@@ -310,8 +319,8 @@ export default async function setup(fx: PluginApi) {
       // Counted under a lock on the bot before anything waits, so calls arriving together can't all pass.
       const [made] = await fx.sql.begin(async (sql) => {
         await sql`select pg_advisory_xact_lock(hashtext(${`subagents:${call.bot}`}))`;
-        const [row] = await sql<Row[]>`insert into subagents (bot, key, turn, ask, title, task, room_session)
-          select ${call.bot}, ${key}, ${call.messageId}, ${ask}, ${title}, ${task}, ${room ? call.session : null}
+        const [row] = await sql<Row[]>`insert into subagents (bot, key, turn, ask, title, task, room_session, call_session)
+          select ${call.bot}, ${key}, ${call.messageId}, ${ask}, ${title}, ${task}, ${room ? call.session : null}, ${phoned ? call.session : null}
           where (select count(*) from subagents where bot = ${call.bot} and state = 'working') < ${atOnce}
             and (select count(*) from subagents where ask = ${ask}) < ${perAsk}
           on conflict (key) do nothing returning *`;

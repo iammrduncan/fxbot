@@ -15,7 +15,7 @@ Add it from **Plugins**, or with **Essentials**, which has it. It runs inside fx
 
 ## The tools
 
-- **`subagents_start({ title, task })`:** starts one, in the bot's own chat with you, or, since 0.3.0 with [chat rooms](../chat-rooms/) 0.6.0, in a room, whose tells and report come back into the room and wake that bot there. Not in a routine's run. The same call twice in one turn, as libfx runs a call a restart cut off, finds the subagent the first one started.
+- **`subagents_start({ title, task })`:** starts one, in the bot's own chat with you, or, since 0.3.0 with [chat rooms](../chat-rooms/) 0.6.0, in a room, whose tells and report come back into the room and wake that bot there, or, with [phone](../phone/) 0.2.0, on a call, whose tells and report come back into the call while it's on, and to the bot's chat with you after. Not in a routine's run. The same call twice in one turn, as libfx runs a call a restart cut off, finds the subagent the first one started.
 - **`subagents_list()`:** the bot's subagents working now, and those that ended in the last day, for when you ask how they're going. A second call in the same turn answers that their reports come on their own, so a bot doesn't wait by polling.
 - **`subagents_stop({ id })`:** stops one, by name or id. A batch the bot stopped entirely sends no report.
 - **`subagents_message({ to, text })`:** from the bot's chat, sends a working subagent an answer or a change, which reaches it at its next step, while it works.

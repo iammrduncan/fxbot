@@ -6,7 +6,7 @@
   "extensions": {
     "sh.fxbot": {
       "minFxbot": "0.10.0",
-      "needs": { "chat-rooms": { "optional": true } },
+      "needs": { "chat-rooms": { "optional": true }, "phone": { "optional": true } },
       "server": "./fxbot/server.ts",
       "page": "./fxbot/page.js",
       "css": "./fxbot/page.css",
