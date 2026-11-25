@@ -262,7 +262,7 @@ The computer and chat rooms provide objects of their own: see [the computer's](/
 
 | Call | Where it shows |
 | --- | --- |
-| `app.route(path, Component)` | The screen at `/<plugin><path>`. `path` may have `:name` parts, which `Component` gets as `params`. |
+| `app.route(path, Component, options?)` | The screen at `/<plugin><path>`. `path` may have `:name` parts, which `Component` gets as `params`. With `{ beside: true }`, since 0.12.0, it shows other plugins' screens beside it, as a bot's chat does, such as a page a link opens; use it for a screen with a conversation, such as a room. Such a screen never opens beside another. An older fxbot ignores the option. |
 | `app.sidebar(Component)` | A group in the sidebar, after the bots |
 | `app.nav({ label, path, icon? })` | A button in the sidebar's footer row, to `/<plugin><path>`. `icon` is a component; without one, the button shows the plugin's icon. |
 | `app.chat(Component)` | Above the message box in a bot's chat. It gets `bot`, and `reload()`, which reads the bot again, so the chat follows a session the plugin started, such as with `fx.chats.send` to a bot that had no chat. Since 0.6.0; `reload` since 0.10.0. |
@@ -289,7 +289,7 @@ Each part sits in its own error boundary: one that throws shows a short card in 
 | `client` | The app's client, as [The client](/sdk/reference/client/) describes |
 | `applyLine` | Folds a stream line into turns |
 | `go(path)` | Opens a path in the app |
-| `openBeside(path)` | Opens one of a plugin's screens beside the chat, when a chat is showing, so it stays: a panel on a computer, over the chat on a phone, and in the address as `?beside=<path>`. Anywhere else, or for a path that isn't a plugin's screen, it's `go`. The screen's `Header` then has **Open full screen** and **Close** in place of the sidebar's button. A link in Markdown to a plugin's screen opens this way too. Since 0.12.0. |
+| `openBeside(path)` | Opens one of a plugin's screens beside the chat, when a bot's chat or a screen with `beside` is showing, so it stays: a panel on a computer, over the chat on a phone, and in the address as `?beside=<path>`. Anywhere else, or for a path that isn't a plugin's screen, it's `go`. The screen's `Header` then has **Open full screen** and **Close** in place of the sidebar's button. A link in Markdown to a plugin's screen opens this way too. Since 0.12.0. |
 | `useBots()` | The app's list of bots, or `null` while it loads |
 | `useMentions()` | Every plugin's `app.mention` sources, each with its `plugin` and `iconKey`, for a box with an `@` list. Since 0.11.0. |
 | `createPortal(children, node)` | React's, from `react-dom`, for drawing a component into DOM the plugin doesn't render with React, such as an editor's node. Since 0.4.1. |

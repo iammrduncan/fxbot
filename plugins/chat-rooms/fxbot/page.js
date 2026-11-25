@@ -10644,6 +10644,6 @@ function RoomScreen({ params }) {
 }
 function setup(app) {
 	app.sidebar(RoomsGroup);
-	app.route("/rooms/:id", RoomScreen);
+	app.route("/rooms/:id", RoomScreen, { beside: true });
 }
 module.exports = setup;

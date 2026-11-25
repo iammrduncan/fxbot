@@ -534,5 +534,6 @@ function RoomScreen({ params }) {
 
 export default function setup(app) {
   app.sidebar(RoomsGroup);
-  app.route("/rooms/:id", RoomScreen);
+  // A page a bot links in the room opens beside it, as beside a bot's chat. An older fxbot ignores the option.
+  app.route("/rooms/:id", RoomScreen, { beside: true });
 }

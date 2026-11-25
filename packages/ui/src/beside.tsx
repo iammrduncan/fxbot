@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { BesideFrame } from "./header.tsx";
 import { besideWith, go } from "./nav.ts";
-import { pluginScreen, usePluginScreen, usePlugins } from "./plugins.tsx";
+import { pluginRoute, usePluginRoute, usePlugins } from "./plugins.tsx";
 
-// A plugin's screen beside the chat, such as a page a bot linked, so the chat stays where it was. Its path is in the
-// chat's address, as ?beside=/pages/<id>, so a reload keeps it and Back closes it.
+// A plugin's screen beside the chat, such as a page a bot linked, so the chat stays where it was: a bot's chat, or a
+// plugin's screen that asks for it, such as a room. Its path is in the chat's address, as ?beside=/pages/<id>, so a
+// reload keeps it and Back closes it.
 const read = () => new URLSearchParams(location.search).get("beside");
 const moved = () => dispatchEvent(new PopStateEvent("popstate"));
 
@@ -18,12 +19,13 @@ export function useBeside() {
     return () => removeEventListener("popstate", update);
   }, []);
   const plugins = usePlugins();
-  // Only a plugin's screen opens here; the app's own, such as Settings, replace the chat as before. A second one takes
-  // the first one's place, in history too.
+  // Only a plugin's screen opens here, and not another chat, such as a room; the app's own, such as Settings, replace
+  // the chat as before. A second one takes the first one's place, in history too.
   useEffect(
     () =>
       besideWith((next) => {
-        if (!pluginScreen(plugins, next)) return false;
+        const route = pluginRoute(plugins, next);
+        if (!route || route.beside) return false;
         const url = `${location.pathname}?beside=${encodeURIComponent(next)}`;
         if (read()) history.replaceState(history.state, "", url);
         else history.pushState({ beside: true }, "", url);
@@ -44,8 +46,9 @@ export function useBeside() {
 // phone, over the chat, which stays as it was underneath.
 export function BesidePanel({ path, close }: { path: string; close: () => void }) {
   const mobile = useIsMobile();
-  const screen = usePluginScreen(path);
-  if (!screen) return null;
+  const route = usePluginRoute(path);
+  if (!route || route.beside) return null;
+  const screen = route.screen;
   const body = (
     <BesideFrame.Provider value={{ full: () => go(path), close }}>
       <div data-beside className="flex min-h-0 flex-1 flex-col">
@@ -67,5 +70,19 @@ export function BesidePanel({ path, close }: { path: string; close: () => void }
     <aside aria-label="Beside the chat" className="flex w-[clamp(22rem,50%,50rem)] shrink-0 flex-col border-l print:w-full print:border-0">
       {body}
     </aside>
+  );
+}
+
+// A plugin's screen that shows others beside it, as a bot's chat does. It's always wrapped, so opening one doesn't
+// remount the screen.
+export function BesideHost({ children }: { children: ReactNode }) {
+  const beside = useBeside();
+  return (
+    <div className="flex min-h-0 flex-1">
+      <div data-chat className="flex min-w-0 flex-1 flex-col">
+        {children}
+      </div>
+      {beside.path && <BesidePanel path={beside.path} close={beside.close} />}
+    </div>
   );
 }

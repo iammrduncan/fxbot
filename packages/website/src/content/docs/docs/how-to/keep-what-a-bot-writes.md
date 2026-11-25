@@ -16,7 +16,7 @@ A bot also writes a page without being asked when its answer would be long, such
 
 ## Read it
 
-**Open** shows the page beside the chat, so the chat stays where it was and you can keep talking to the bot while you read. On a phone it covers the chat, and closing it goes back. A link to the page in a reply opens it the same way. Its top bar has **Open full screen**, for the page alone at an address of its own, and **Close**. A page can have headings, tables, code, and images from the library.
+**Open** shows the page beside the chat, or beside the room, so the chat stays where it was and you can keep talking while you read. On a phone it covers the chat, and closing it goes back. A link to the page in a reply opens it the same way. Its top bar has **Open full screen**, for the page alone at an address of its own, and **Close**. A page can have headings, tables, code, and images from the library.
 
 - **Copy** copies its Markdown.
 - **Print** prints it, or saves it as a PDF, which is how a page goes to someone who can't reach your fxbot.

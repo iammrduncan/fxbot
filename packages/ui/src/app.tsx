@@ -44,7 +44,7 @@ import { BotForm } from "./bot-form.tsx";
 import { LookDialog, type BotLook } from "./look-picker.tsx";
 import { Fold, type Folded } from "./fold.tsx";
 import { Onboarding } from "./onboarding.tsx";
-import { BesidePanel, useBeside } from "./beside.tsx";
+import { BesideHost, BesidePanel, useBeside } from "./beside.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
 import { BotMemories } from "./memories.tsx";
 import { PluginsPage, BotPlugins } from "./plugins-page.tsx";
@@ -52,7 +52,7 @@ import { LibraryPage } from "./library.tsx";
 import { Reply } from "./steps.tsx";
 import { follow, go } from "./nav.ts";
 import { Header } from "./header.tsx";
-import { BotsProvider, loadPlugins, MessageBox, Place, SaidText, useFold, usePluginNav, usePluginScreen } from "./plugins.tsx";
+import { BotsProvider, loadPlugins, MessageBox, Place, SaidText, useFold, usePluginNav, usePluginRoute } from "./plugins.tsx";
 import { ModelField } from "./providers.tsx";
 import { draftOf, keepDraft } from "./drafts.ts";
 import { reload, useNewVersion } from "./pwa.ts";
@@ -125,7 +125,7 @@ export function App() {
       () => setFirstRun(null),
     );
   }, []);
-  const pluginScreen = usePluginScreen(path);
+  const pluginRoute = usePluginRoute(path);
 
   const [creating, setCreating] = useState(false);
   const created = (profile: Profile) => {
@@ -167,7 +167,7 @@ export function App() {
   else if (path === "/plugins" || path === "/addons") screen = <PluginsPage profiles={profiles} />;
   else if (top === "profiles" && id && sub === "edit") screen = <ProfileForm key={id} id={id} onSaved={refresh} />;
   else if (top === "profiles" && id && sub === undefined) screen = <Chat key={id} id={id} profiles={profiles} onChange={refresh} onShown={() => setChatShown(true)} />;
-  else if (pluginScreen) screen = pluginScreen;
+  else if (pluginRoute) screen = pluginRoute.beside ? <BesideHost>{pluginRoute.screen}</BesideHost> : pluginRoute.screen;
   else screen = <Header title="Not found" />;
 
   return (

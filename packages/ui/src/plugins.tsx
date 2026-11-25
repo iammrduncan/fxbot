@@ -51,7 +51,8 @@ type Nav = { label: string; path: string; icon?: ComponentType<{ className?: str
 export type MentionChoice = { key: string; name: string; link: string; title?: string; detail?: string };
 export type Mention = { search: (query: string, bot?: Profile) => MentionChoice[] | Promise<MentionChoice[]> };
 type Places = {
-  routes: { path: string; parts: string[]; Component: ComponentType<{ params: Record<string, string> }> }[];
+  // `beside`: a screen, such as a room, that shows other plugins' screens beside it, as a bot's chat does (beside.tsx).
+  routes: { path: string; parts: string[]; Component: ComponentType<{ params: Record<string, string> }>; beside: boolean }[];
   sidebar: ComponentType[];
   nav: Nav[];
   composer: ComponentType<ComposerProps>[];
@@ -151,7 +152,8 @@ async function run(name: string, version: string, url: string): Promise<Places> 
   setup({
     name,
     version,
-    route: (path: string, Component: Places["routes"][number]["Component"]) => places.routes.push({ path, parts: path.split("/").filter(Boolean), Component }),
+    route: (path: string, Component: Places["routes"][number]["Component"], options?: { beside?: boolean }) =>
+      places.routes.push({ path, parts: path.split("/").filter(Boolean), Component, beside: options?.beside === true }),
     sidebar: (Component: ComponentType) => places.sidebar.push(Component),
     nav: (nav: Nav) => places.nav.push(nav),
     composer: (Component: ComponentType<ComposerProps>) => places.composer.push(Component),
@@ -346,9 +348,10 @@ export function usePluginSettings() {
 
 // The plugin screen for a path, `/<plugin>/…`, checked after the app's own.
 export function usePluginScreen(path: string): ReactNode | undefined {
-  return pluginScreen(usePlugins(), path);
+  return pluginRoute(usePlugins(), path)?.screen;
 }
-export function pluginScreen(plugins: Loaded[], path: string): ReactNode | undefined {
+export const usePluginRoute = (path: string) => pluginRoute(usePlugins(), path);
+export function pluginRoute(plugins: Loaded[], path: string): { screen: ReactNode; beside: boolean } | undefined {
   const [, top, ...rest] = path.split("/");
   const plugin = plugins.find((p) => p.name === top);
   if (!plugin) return undefined;
@@ -356,11 +359,14 @@ export function pluginScreen(plugins: Loaded[], path: string): ReactNode | undef
     if (route.parts.length !== rest.filter(Boolean).length) continue;
     const params: Record<string, string> = {};
     if (route.parts.every((part, i) => (part.startsWith(":") ? ((params[part.slice(1)] = decodeURIComponent(rest[i])), true) : part === rest[i])))
-      return (
-        <PluginPart key={path} plugin={plugin.name}>
-          <route.Component params={params} />
-        </PluginPart>
-      );
+      return {
+        beside: route.beside,
+        screen: (
+          <PluginPart key={path} plugin={plugin.name}>
+            <route.Component params={params} />
+          </PluginPart>
+        ),
+      };
   }
   return undefined;
 }
