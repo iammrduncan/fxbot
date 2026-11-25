@@ -1,9 +1,9 @@
 # phone
 
-A plugin for [fxbot](https://fxbot.sh): talk with a bot by voice. **Talk** starts a call in the app, and **Call me** rings your phone, greets you, and you talk with it, hands-free. What you say goes to the bot's own chat, and its own model, memory, and tools answer, read out as it writes them.
+A plugin for [fxbot](https://fxbot.sh): talk with a bot by voice. **In-app call** starts a call in the app, and **Call me** rings your phone, greets you, and you talk with it, hands-free. What you say goes to the bot's own chat, and its own model, memory, and tools answer, read out as it writes them.
 
-- **Talk** is in the message box, and at the top of a [chat room](../chat-rooms/), for a call with all its bots. See Talk in the app, below.
-- **Call me** is in the message box. The bar above it shows the call ringing, then how long it's been on, with **End call**.
+- **The phone** at the top of a bot's chat offers both. **Call me** shows while a phone-line plugin, such as phone-signalwire, is added and on. A [chat room](../chat-rooms/) has the phone too, with **In-app call** for all its bots. See In-app calls, below.
+- **The bar** above the message box shows a call ringing, then how long it's been on, with **End call**.
 - `phone_call` rings you when you ask the bot to, now, or later with `later: true`: "call me when the build is done." The call opens with why it rang.
 - `phone_hang_up` ends the call after the bot's goodbye.
 - The `phone` skill tells bots how to talk on a call: short, plain, and nothing they can't say aloud.
@@ -14,13 +14,13 @@ Only your phone: you set your number once and confirm it, and no tool takes a nu
 
 Add it from **Plugins**. It needs fxbot 0.12.0 or newer. It runs inside fxbot: read its code there before you add it. See [Talk with a bot on the phone](https://fxbot.sh/docs/how-to/talk-with-a-bot-on-the-phone/).
 
-## Talk in the app
+## In-app calls
 
 phone carries the call's audio itself, over the page's own socket: the microphone, echo-cancelled by the browser, as 16 kHz PCM, and the bot's voice, played as it comes and dropped at once when you cut in. The call is the same conversation as on a phone line, below, and opens with "Hey, what's up?"
 
 - **Cutting in:** with a listener that hears as you speak, two words over the bot stop it mid-sentence. With one that hears one stretch at a time, a voice detector in phone cuts the stretch, and most of a second of your voice over the bot stops it.
 - **A sidekick:** the call's note tells the bot to answer in a sentence or two, do quick looks itself, and hand anything longer to a subagent or a herdr agent, then come straight back to you. A call's turns think at `callThinking`; its subagents keep the bot's own level. A subagent's report waits for your pause, and is never said over you.
-- **In a room:** Talk at the top of a room, with chat rooms 0.6.0, calls its bots. Your words go to the room as from **your call**, with a bot named at their start or end tagged, and the room decides who answers, as in text. Each bot speaks in its own voice, one at a time, and its tags are said as names. Cutting in drops every reply waiting, and the next message says who you cut off.
+- **In a room:** the phone at the top of a room, with chat rooms 0.6.0, calls its bots. Your words go to the room as from **your call**, with a bot named at their start or end tagged, and the room decides who answers, as in text. Each bot speaks in its own voice, one at a time, and its tags are said as names. Cutting in drops every reply waiting, and the next message says who you cut off.
 - **The bar** shows the call, who's speaking, the subagents working, Mute, and End. The call ends when the app goes to the background.
 
 ## Voice
@@ -50,7 +50,7 @@ Requests go through `fx.providers`, so keys stay with fxbot. With nothing picked
 ## What each bot gets
 
 A bot's settings have a **Phone** section:
-- **Call me:** the button in the message box. On by default.
+- **Call me:** in the phone at the top of its chat. On by default.
 - **Calls when you ask:** calls you ask for, now or later. On by default.
 - **Calls on its own:** calls the bot decides to make, a few times a day at most, and never in your quiet hours. Off by default.
 - **Calls go through:** with two or more providers, the bot's own, or the default.
@@ -121,7 +121,7 @@ The text goes both ways: the provider does the speech. phone-signalwire's `fxbot
 | `fxbot/talk.ts` | The page's socket: the microphone in, the voice out, and the marks that say what played |
 | `fxbot/room.ts` | A call in a room: names as tags, tags said as names, and each bot's voice |
 | `fxbot/audio.ts`, `fxbot/speech.ts`, `fxbot/speech/` | The adapters, and what they share |
-| `fxbot/page.jsx`, `fxbot/talk.jsx` | Talk, Call me, the calls' bars, a call's card, the plugin's tab with Voice, and a bot's section |
+| `fxbot/page.jsx`, `fxbot/talk.jsx` | The phone at the top of a chat, the calls' bars, a call's card, the plugin's tab with Voice, and a bot's section |
 | `fxbot/page.js` | `page.jsx`, built |
 | `fxbot/migrations/` | Its five tables |
 | `skills/phone/SKILL.md` | How bots call, and talk on a call |

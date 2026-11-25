@@ -1,8 +1,8 @@
-// phone in the app: Call me in the message box, the call's bar above it, a call's card in the chat, the plugin's tab,
-// and a section in each bot's settings. Built into page.js; see the README.
+// phone in the app: the phone at the top of a chat, with its calls, the call's bar above the message box, a call's card
+// in the chat, the plugin's tab, and a section in each bot's settings. Built into page.js; see the README.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { api, go, ui } from "@fxbot/app";
-import { RoomTalk, RoomTalkBar, TalkBar, TalkButton } from "./talk.jsx";
+import { Mic, RoomTalkBar, TalkBar, talk, useTalk } from "./talk.jsx";
 
 async function call(path, method = "GET", body) {
   const res = await api(path, { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
@@ -21,7 +21,7 @@ async function read(bot) {
   clearTimeout(timers.get(bot));
   if (document.visibilityState === "visible") {
     const next = await call(`calls/live?bot=${bot}`).then(
-      (answer) => ({ call: answer.call, button: answer.button !== false }),
+      (answer) => ({ call: answer.call, button: answer.button !== false, lines: answer.lines === true }),
       () => live.get(bot) ?? null,
     );
     live.set(bot, next);
@@ -58,34 +58,66 @@ const Phone = () => (
   </svg>
 );
 
-// Call me, beside the message box, unless it's off for the bot. Until phone and its provider are set up and the number
-// confirmed, it opens phone's tab.
-function CallButton({ bot }) {
+// The phone at the top of a bot's chat, or a room's: a choice of calls, so a tap never starts one by itself. An in-app
+// call is phone's own. Call me shows when a plugin that carries phone lines, such as phone-signalwire, is added, and Call
+// me is on for the bot. Until phone and that plugin are set up and the number confirmed, Call me opens phone's tab.
+function CallChoices({ label, busy, choices, error, open, setOpen, size = "icon" }) {
+  return (
+    <ui.Popover open={open} onOpenChange={setOpen}>
+      <ui.PopoverTrigger asChild>
+        <ui.Button type="button" variant="ghost" size={size} aria-label={busy ? "A call is on" : label} title={busy ? "A call is on" : label} disabled={busy}>
+          <Phone />
+        </ui.Button>
+      </ui.PopoverTrigger>
+      <ui.PopoverContent align="end" className="w-72 gap-1 p-1" aria-label={label}>
+        {error && <p className="px-2 py-1.5 text-xs text-destructive">{error}</p>}
+        {choices.map((choice) => (
+          <ui.Button
+            key={choice.key}
+            type="button"
+            variant="ghost"
+            className="h-auto w-full items-start justify-start gap-3 px-2 py-1.5 text-left whitespace-normal"
+            onClick={() => (setOpen(false), choice.run())}
+          >
+            <span className="mt-0.5 shrink-0 text-muted-foreground">{choice.icon}</span>
+            <span className="grid gap-0.5">
+              <span className="font-medium">{choice.label}</span>
+              <span className="text-xs font-normal text-muted-foreground">{choice.hint}</span>
+            </span>
+          </ui.Button>
+        ))}
+      </ui.PopoverContent>
+    </ui.Popover>
+  );
+}
+
+function CallMenu({ bot }) {
   const state = useLive(bot.id);
-  const now = state?.call ?? null;
+  const app = useTalk();
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const ring = () => {
     setError("");
     call("calls", "POST", { bot: bot.id }).then(
       () => void read(bot.id),
-      (e) => (e.answer?.missing || /confirm/i.test(e.message) ? go(settingsTab) : setError(e.message)),
+      (e) => (e.answer?.missing || /confirm/i.test(e.message) ? go(settingsTab) : (setError(e.message), setOpen(true))),
     );
   };
-  if (state && !state.button) return null;
-  return (
-    <ui.Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      className="rounded-full"
-      aria-label={error || `Call me: ${bot.name} rings your phone`}
-      title={error || `Call me: ${bot.name} rings your phone`}
-      disabled={Boolean(now)}
-      onClick={ring}
-    >
-      <Phone />
-    </ui.Button>
-  );
+  const choices = [
+    { key: "app", label: "In-app call", hint: "Talk here, in this browser", icon: <Mic />, run: () => (setError(""), void talk({ bot: bot.id }, bot.name)) },
+    ...(state?.lines && state.button ? [{ key: "line", label: "Call me", hint: `${bot.name} rings your phone`, icon: <Phone />, run: ring }] : []),
+  ];
+  const busy = Boolean(state?.call) || Boolean(app && app.status !== "ended");
+  return <CallChoices label={`Call ${bot.name}`} busy={busy} choices={choices} error={error} open={open} setOpen={setOpen} />;
+}
+
+// The same in a room's header, for a call with all its bots in the app. A room has no phone line yet.
+function RoomCall({ room }) {
+  const app = useTalk();
+  const [open, setOpen] = useState(false);
+  if (!room?.members?.length) return null;
+  const choices = [{ key: "app", label: "In-app call", hint: "Talk with all its bots, in this browser", icon: <Mic />, run: () => void talk({ room: room.id }, room.name) }];
+  return <CallChoices label={`Call ${room.name}`} busy={Boolean(app && app.status !== "ended")} choices={choices} open={open} setOpen={setOpen} size="icon-sm" />;
 }
 
 const clock = (from) => {
@@ -311,7 +343,7 @@ function VoiceSection() {
     <section className="grid gap-3" aria-label="Voice">
       <h2 className="font-medium">Voice</h2>
       <p className="text-muted-foreground">
-        How bots hear you and speak on a call in the app: Talk, beside the message box. Add voice providers in Settings › Providers: ElevenLabs and Deepgram, under For phone, or a
+        How bots hear you and speak on an in-app call, from the phone at the top of a chat. Add voice providers in Settings › Providers: ElevenLabs and Deepgram, under For phone, or a
         speech server on your machine. A Mistral, Groq, OpenAI, or Cloudflare login listens too.
       </p>
       <label className="grid gap-1">
@@ -411,7 +443,7 @@ function BotSection({ bot }) {
   return (
     <section className="grid gap-3 text-sm" aria-label="Phone">
       <h2 className="font-medium">Phone</h2>
-      <Toggle checked={state.button} label="Call me" hint="The button beside the message box rings your phone." onChange={(button) => save({ button })} />
+      <Toggle checked={state.button} label="Call me" hint="In the phone at the top of the bot's chat: the bot rings your phone." onChange={(button) => save({ button })} />
       <Toggle checked={state.asked} label="Calls when you ask" hint={`${bot.name} calls when you ask it to, now or when something is done.`} onChange={(asked) => save({ asked })} />
       <Toggle
         checked={state.own}
@@ -474,11 +506,11 @@ function BotSection({ bot }) {
 }
 
 export default function setup(app) {
-  app.composer(TalkButton);
-  app.composer(CallButton);
+  // The phone at the top of a chat, on fxbot 0.12.0 or newer.
+  app.header?.(CallMenu);
   app.chat(TalkBar);
   app.chat(CallBar);
-  app.slot?.("chat-rooms.room-header", RoomTalk);
+  app.slot?.("chat-rooms.room-header", RoomCall);
   app.slot?.("chat-rooms.room-box", RoomTalkBar);
   app.toolView("call", CallCard, { open: true });
   app.settings(Tab);

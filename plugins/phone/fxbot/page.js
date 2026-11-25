@@ -219,21 +219,6 @@ const clock$1 = (from) => {
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 const mine = (now, target) => now && (target.room !== void 0 ? now.target.room === target.room : now.target.bot === target.bot);
-function TalkButton({ bot }) {
-	const now = useTalk();
-	const busy = now && now.status !== "ended";
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
-		type: "button",
-		variant: "ghost",
-		size: "icon-sm",
-		className: "rounded-full",
-		"aria-label": `Talk with ${bot.name} by voice, here`,
-		title: busy ? "A call is on" : `Talk with ${bot.name} by voice, here`,
-		disabled: Boolean(busy),
-		onClick: () => void talk({ bot: bot.id }, bot.name),
-		children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Mic, {})
-	});
-}
 function useWorking(bots) {
 	const [names, setNames] = (0, react.useState)([]);
 	const key = bots.join(",");
@@ -316,19 +301,6 @@ function TalkBar({ bot }) {
 		bots: [bot.id]
 	});
 }
-function RoomTalk({ room }) {
-	const now = useTalk();
-	if (!room?.members?.length || mine(now, { room: room.id }) && now.status !== "ended") return null;
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.Button, {
-		type: "button",
-		size: "sm",
-		variant: "ghost",
-		disabled: Boolean(on()),
-		title: on() ? "A call is on" : `Talk with ${room.name}'s bots by voice`,
-		onClick: () => void talk({ room: room.id }, room.name),
-		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Mic, {}), " Talk"]
-	});
-}
 function RoomTalkBar({ room }) {
 	const now = useTalk();
 	const bots = (0, _fxbot_app.useBots)() ?? [];
@@ -380,7 +352,8 @@ async function read(bot) {
 	if (document.visibilityState === "visible") {
 		const next = await call(`calls/live?bot=${bot}`).then((answer) => ({
 			call: answer.call,
-			button: answer.button !== false
+			button: answer.button !== false,
+			lines: answer.lines === true
 		}), () => live.get(bot) ?? null);
 		live.set(bot, next);
 		listeners.get(bot)?.forEach((listen) => listen());
@@ -408,25 +381,100 @@ const Phone = () => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
 	"aria-hidden": "true",
 	children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" })
 });
-function CallButton({ bot }) {
+function CallChoices({ label, busy, choices, error, open, setOpen, size = "icon" }) {
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.Popover, {
+		open,
+		onOpenChange: setOpen,
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.PopoverTrigger, {
+			asChild: true,
+			children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+				type: "button",
+				variant: "ghost",
+				size,
+				"aria-label": busy ? "A call is on" : label,
+				title: busy ? "A call is on" : label,
+				disabled: busy,
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Phone, {})
+			})
+		}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.PopoverContent, {
+			align: "end",
+			className: "w-72 gap-1 p-1",
+			"aria-label": label,
+			children: [error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: "px-2 py-1.5 text-xs text-destructive",
+				children: error
+			}), choices.map((choice) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.Button, {
+				type: "button",
+				variant: "ghost",
+				className: "h-auto w-full items-start justify-start gap-3 px-2 py-1.5 text-left whitespace-normal",
+				onClick: () => (setOpen(false), choice.run()),
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "mt-0.5 shrink-0 text-muted-foreground",
+					children: choice.icon
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+					className: "grid gap-0.5",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "font-medium",
+						children: choice.label
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "text-xs font-normal text-muted-foreground",
+						children: choice.hint
+					})]
+				})]
+			}, choice.key))]
+		})]
+	});
+}
+function CallMenu({ bot }) {
 	const state = useLive(bot.id);
-	const now = state?.call ?? null;
+	const app = useTalk();
+	const [open, setOpen] = (0, react.useState)(false);
 	const [error, setError] = (0, react.useState)("");
 	const ring = () => {
 		setError("");
-		call("calls", "POST", { bot: bot.id }).then(() => void read(bot.id), (e) => e.answer?.missing || /confirm/i.test(e.message) ? (0, _fxbot_app.go)(settingsTab) : setError(e.message));
+		call("calls", "POST", { bot: bot.id }).then(() => void read(bot.id), (e) => e.answer?.missing || /confirm/i.test(e.message) ? (0, _fxbot_app.go)(settingsTab) : (setError(e.message), setOpen(true)));
 	};
-	if (state && !state.button) return null;
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
-		type: "button",
-		variant: "ghost",
-		size: "icon-sm",
-		className: "rounded-full",
-		"aria-label": error || `Call me: ${bot.name} rings your phone`,
-		title: error || `Call me: ${bot.name} rings your phone`,
-		disabled: Boolean(now),
-		onClick: ring,
-		children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Phone, {})
+	const choices = [{
+		key: "app",
+		label: "In-app call",
+		hint: "Talk here, in this browser",
+		icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Mic, {}),
+		run: () => (setError(""), void talk({ bot: bot.id }, bot.name))
+	}, ...state?.lines && state.button ? [{
+		key: "line",
+		label: "Call me",
+		hint: `${bot.name} rings your phone`,
+		icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Phone, {}),
+		run: ring
+	}] : []];
+	const busy = Boolean(state?.call) || Boolean(app && app.status !== "ended");
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(CallChoices, {
+		label: `Call ${bot.name}`,
+		busy,
+		choices,
+		error,
+		open,
+		setOpen
+	});
+}
+function RoomCall({ room }) {
+	const app = useTalk();
+	const [open, setOpen] = (0, react.useState)(false);
+	if (!room?.members?.length) return null;
+	const choices = [{
+		key: "app",
+		label: "In-app call",
+		hint: "Talk with all its bots, in this browser",
+		icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Mic, {}),
+		run: () => void talk({ room: room.id }, room.name)
+	}];
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(CallChoices, {
+		label: `Call ${room.name}`,
+		busy: Boolean(app && app.status !== "ended"),
+		choices,
+		open,
+		setOpen,
+		size: "icon-sm"
 	});
 }
 const clock = (from) => {
@@ -746,7 +794,7 @@ function VoiceSection() {
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "text-muted-foreground",
-				children: "How bots hear you and speak on a call in the app: Talk, beside the message box. Add voice providers in Settings › Providers: ElevenLabs and Deepgram, under For phone, or a speech server on your machine. A Mistral, Groq, OpenAI, or Cloudflare login listens too."
+				children: "How bots hear you and speak on an in-app call, from the phone at the top of a chat. Add voice providers in Settings › Providers: ElevenLabs and Deepgram, under For phone, or a speech server on your machine. A Mistral, Groq, OpenAI, or Cloudflare login listens too."
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
 				className: "grid gap-1",
@@ -865,7 +913,7 @@ function BotSection({ bot }) {
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Toggle, {
 				checked: state.button,
 				label: "Call me",
-				hint: "The button beside the message box rings your phone.",
+				hint: "In the phone at the top of the bot's chat: the bot rings your phone.",
 				onChange: (button) => save({ button })
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Toggle, {
@@ -951,11 +999,10 @@ function BotSection({ bot }) {
 	});
 }
 function setup(app) {
-	app.composer(TalkButton);
-	app.composer(CallButton);
+	app.header?.(CallMenu);
 	app.chat(TalkBar);
 	app.chat(CallBar);
-	app.slot?.("chat-rooms.room-header", RoomTalk);
+	app.slot?.("chat-rooms.room-header", RoomCall);
 	app.slot?.("chat-rooms.room-box", RoomTalkBar);
 	app.toolView("call", CallCard, { open: true });
 	app.settings(Tab);

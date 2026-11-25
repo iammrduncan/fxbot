@@ -3,7 +3,7 @@ title: "Add a voice provider"
 description: "Pick how bots hear you and speak on a call in the app: ElevenLabs or Deepgram with a key, a login you already have, a speech server on your machine, or the browser's own speech."
 ---
 
-A call in the app, **Talk** in a bot's message box, needs something to hear you and something to speak. The phone plugin picks one of each in its tab, under **Voice**. Each can be:
+An in-app call, from the phone at the top of a bot's chat, needs something to hear you and something to speak. The phone plugin picks one of each in its tab, under **Voice**. Each can be:
 
 - **A voice service with a key:** ElevenLabs or Deepgram, added from **Settings** › **Providers**.
 - **A login you already have** for a bot's model: Mistral, Groq, OpenAI, Cloudflare, and other providers that serve OpenAI's audio endpoints.

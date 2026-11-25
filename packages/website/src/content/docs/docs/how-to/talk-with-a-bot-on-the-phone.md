@@ -3,15 +3,15 @@ title: "Talk with a bot on the phone"
 description: "Talk with a bot by voice in the app, or press Call me and it rings your phone. Its own model, memory, and tools answer, and it hands long work to the background while you talk."
 ---
 
-With the phone plugin, you talk with a bot by voice. **Talk** in its message box starts a call in the app, below. **Call me** rings your phone: answer and the bot says "Hey, this is your fxbot Bob. How can I help today?" Either way, you talk as you'd chat by text: what you say goes to the bot's own chat, and its own model, memory, and tools answer, read out to you. The chat keeps the whole conversation.
+With the phone plugin, you talk with a bot by voice. The phone at the top of its chat offers two calls: **In-app call**, below, and **Call me**, which rings your phone. Answer, and the bot says "Hey, this is your fxbot Bob. How can I help today?" Either way, you talk as you'd chat by text: what you say goes to the bot's own chat, and its own model, memory, and tools answer, read out to you. The chat keeps the whole conversation.
 
 ## In the app
 
-**Talk**, the microphone in a bot's message box, starts a call right there, in the browser. On a phone it's with the box's other buttons. The bot says "Hey, what's up?", and you talk.
+**In-app call**, from the phone at the top of a bot's chat, starts a call right there, in the browser. The bot says "Hey, what's up?", and you talk.
 
-1. Add **phone** from **Plugins**, on **Browse**. Talk needs Phone 0.2.0 and fxbot 0.12.0 or newer.
+1. Add **phone** from **Plugins**, on **Browse**. It needs Phone 0.2.0 and fxbot 0.12.0 or newer.
 2. Pick what hears you and what speaks, in phone's tab under **Voice**: ElevenLabs or Deepgram with a key, a login you have, a speech server on your machine, or **This device**, the browser's own. See [Add a voice provider](/docs/how-to/add-a-voice-provider/).
-3. Press **Talk**, and allow the microphone.
+3. Press the phone at the top of the chat, choose **In-app call**, and allow the microphone.
 
 The bar above the message box shows the call: how long, whether the bot is listening or speaking, which of its subagents are working, **Mute**, and **End**.
 
@@ -21,7 +21,7 @@ The bar above the message box shows the call: how long, whether the bot is liste
 - **What you say and what it answers** are in its chat, as text, with your words marked **From your call**.
 - **The call ends** when you press **End**, say goodbye, or put the app in the background, since a phone takes the microphone from it then.
 
-Talk works over [web pairing](/docs/how-to/pair-another-device/) too. In a room, **Talk** calls all its bots: see [Talk with several bots in a room](/docs/how-to/talk-in-a-room/#by-voice).
+It works over [web pairing](/docs/how-to/pair-another-device/) too. In a room, the phone at the top calls all its bots: see [Talk with several bots in a room](/docs/how-to/talk-in-a-room/#by-voice).
 
 ## On a phone line
 
@@ -30,7 +30,7 @@ A provider plugin carries the call. The one today is **phone-signalwire**: fxbot
 1. Set up SignalWire, below.
 2. Add **phone**, then **phone-signalwire**, from **Plugins**, on **Browse**. They aren't in **Essentials**. They need fxbot 0.9.0 or newer.
 3. Fill in phone-signalwire's settings, then phone's, and confirm your number in phone's tab.
-4. Press **Call me** in a bot's message box.
+4. Press the phone at the top of a bot's chat, and choose **Call me**. It's there while a phone-line plugin, such as phone-signalwire, is added and on.
 
 ## Set up SignalWire
 
@@ -76,7 +76,7 @@ The bar above the message box shows the call, ringing and then on, with **End ca
 Ask it: "Call me." Or "Call me when the build is done": the bot keeps one call-back, for 12 hours, and rings you when it's done, with why it called.
 
 Each bot's settings have a **Phone** section with what it gets:
-- **Call me**, the button in its message box, on by default.
+- **Call me**, in the phone at the top of its chat, on by default.
 - **Calls when you ask**, now or later, on by default.
 - **Calls on its own**, when the bot decides to, off by default. It calls at most `perDay` times a day, 3 by default, and never in your quiet hours, 22:00 to 07:00 by default. A call it makes listens for voicemail first, and leaves a short message there.
 

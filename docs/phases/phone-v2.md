@@ -697,6 +697,7 @@ Built on 2026-11-25 in a worktree of `release/0.12.0`, and landed there. Part 2 
 - **A room's call shows above its message box,** in a new place, `chat-rooms.room-box`. In the room's header, where the plan put it, the bar pushed the room's name and End off a phone's screen. The header keeps **Talk**.
 - **This device listening is offered only where the browser has speech recognition,** or when it's already picked, as "This device: not in this browser". Firefox has none.
 - **The call's bar names the subagents working,** from the subagents plugin's list, every 3 seconds.
+- **One phone at the top of a chat,** at the owner's word once part 1 was in dev: "make one phone icon at top to the left of [the bot panel's button]. When you click it it brings up confirmation of 'call me' or 'in app call'." It takes the place of Talk and Call me in the message box. **Call me** shows only while a phone-line plugin, such as phone-signalwire, is added and running, and Call me is on for the bot. A room's header has the same phone, with **In-app call** for all its bots, until part 2 gives rooms a phone line. Core gained `app.header(Component)`, a place in a bot chat's header, and the Popover in the page's `ui`, about 10 lines.
 - **Found by the checks, and fixed:**
   - The page lost what phone sent while the microphone opened: the call's start and the greeting. It's held now, in order.
   - A call the page ended, such as for Chrome's Google toggle, came back on with the server's next message. Once over, a call stays over.

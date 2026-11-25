@@ -476,7 +476,8 @@ export default async function setup(fx: PluginApi) {
     const bot = new URL(request.url).searchParams.get("bot") ?? "";
     // A call in the app is the page's own, which shows it from its socket.
     const [row] = await fx.sql<Row[]>`select * from calls where bot = ${bot} and why not in ('confirm', 'talk') and status in ('ringing', 'on') order by id desc limit 1`;
-    return json({ call: row ? { id: row.id, status: row.status, at: row.at, answeredAt: row.answered_at } : null, button: (await features(bot)).button });
+    // lines: whether a plugin that carries phone lines is added and running, for Call me in the chat's phone.
+    return json({ call: row ? { id: row.id, status: row.status, at: row.at, answeredAt: row.answered_at } : null, button: (await features(bot)).button, lines: added().some((d) => d.api !== null) });
   });
 
   fx.route("POST", "/calls/:id/end", async (_request, { id }) => {

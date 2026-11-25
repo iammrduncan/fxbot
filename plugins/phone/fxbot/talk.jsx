@@ -6,7 +6,7 @@ import { ui, useBots } from "@fxbot/app";
 
 const store = { now: null, listeners: new Set() };
 const set = (next) => ((store.now = next && { ...(store.now ?? {}), ...next }), store.listeners.forEach((listen) => listen()));
-const useTalk = () =>
+export const useTalk = () =>
   useSyncExternalStore(
     (listen) => (store.listeners.add(listen), () => store.listeners.delete(listen)),
     () => store.now,
@@ -184,7 +184,7 @@ export async function talk(target, label) {
   ready = true;
 }
 
-const Mic = () => (
+export const Mic = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
     <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
@@ -196,26 +196,6 @@ const clock = (from) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 const mine = (now, target) => now && (target.room !== undefined ? now.target.room === target.room : now.target.bot === target.bot);
-
-// Talk, beside Call me: a call with the bot in the app.
-export function TalkButton({ bot }) {
-  const now = useTalk();
-  const busy = now && now.status !== "ended";
-  return (
-    <ui.Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      className="rounded-full"
-      aria-label={`Talk with ${bot.name} by voice, here`}
-      title={busy ? "A call is on" : `Talk with ${bot.name} by voice, here`}
-      disabled={Boolean(busy)}
-      onClick={() => void talk({ bot: bot.id }, bot.name)}
-    >
-      <Mic />
-    </ui.Button>
-  );
-}
 
 // The subagents working for the call's bots, by name, from the subagents plugin's list, if it's added: what's under way.
 function useWorking(bots) {
@@ -268,17 +248,6 @@ export function TalkBar({ bot }) {
   if (!mine(now, { bot: bot.id })) return null;
   if (now.status === "ended") return now.error ? <p className="rounded-lg border p-2 text-sm text-destructive">The call ended: {now.error}</p> : null;
   return <Bar now={now} title={`Talking with ${bot.name}`} bots={[bot.id]} />;
-}
-
-// In a room's header: Talk with the room's bots, hidden while their call is on.
-export function RoomTalk({ room }) {
-  const now = useTalk();
-  if (!room?.members?.length || (mine(now, { room: room.id }) && now.status !== "ended")) return null;
-  return (
-    <ui.Button type="button" size="sm" variant="ghost" disabled={Boolean(on())} title={on() ? "A call is on" : `Talk with ${room.name}'s bots by voice`} onClick={() => void talk({ room: room.id }, room.name)}>
-      <Mic /> Talk
-    </ui.Button>
-  );
 }
 
 // Above a room's message box while its call is on: who's speaking, with the call's bar, or why the last one ended.
