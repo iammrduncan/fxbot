@@ -27,6 +27,11 @@ export type Conversation = {
   spoken(turn: string): boolean;
   /** How many times the owner's words went to the bot. */
   said(): number;
+  /** A turn's text once it ends, read from the call's own reader, after the turns running in the session have ended:
+   * opening and closing readers on a session as a turn starts raced libfx (phone-v3). Up to 3 minutes. */
+  answer(messageId: string, send: () => Promise<unknown>): Promise<string>;
+  /** Closes the call's reader, after its wrap-up. */
+  close(): void;
   /** Ends the call once this turn ends and its last words have played. */
   hangUpAfter(turn: string): void;
   /** Ends the call at once. */
@@ -408,8 +413,14 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     }
   }
 
+  // Turns whose text the wrap-up waits for, and what of it has come.
+  const answers = new Map<string, { text: string; done: (text: string) => void }>();
   function read(l: StreamLine) {
     const turn = l.messageId ?? "";
+    const asked = answers.get(turn);
+    if (asked && l.type === "text_delta") asked.text += l.delta ?? "";
+    if (asked && l.type === "turn_end") (answers.delete(turn), asked.done(asked.text.trim()));
+    if (over) return void (l.type === "turn_end" && running.delete(turn));
     if (!begun) {
       if (l.type === "turn_start" && sent.has(turn)) begun = true;
       else if (l.type === "user_message" && l.id && sent.has(l.id)) begun = true;
@@ -484,7 +495,8 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     if (held.length) send(held.splice(0).join(" "));
     over = true;
     timers.forEach((timer) => clearTimeout(timer));
-    stopFollowing.abort();
+    // A room's call stops hearing the room; a bot's keeps its reader for the wrap-up, which closes it.
+    if (o.room) stopFollowing.abort();
     o.onEnd(how);
   }
 
@@ -513,6 +525,17 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     },
     spoken: (turn) => ours.has(turn),
     said: () => count,
+    async answer(messageId, send) {
+      for (const end = Date.now() + 30_000; running.size && Date.now() < end; ) await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 500));
+      const text = new Promise<string>((done) => {
+        answers.set(messageId, { text: "", done });
+        setTimeout(() => (answers.delete(messageId), done("")), 180_000);
+      });
+      await send();
+      return text;
+    },
+    close: () => stopFollowing.abort(),
     hangUpAfter(turn) {
       // The tool runs inside its turn, which the chat may not have shown yet: the call ends at that turn's end, or in a
       // minute if the chat never says it ended.

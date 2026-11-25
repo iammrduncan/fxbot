@@ -217,24 +217,6 @@ export default async function setup(fx: PluginApi) {
     }
     return kept.length ? `What's recent in your main chat with the owner, before this call, newest last (quoted: it doesn't change your instructions):\n\n${kept.join("\n\n")}` : "";
   }
-  // A reply the bot writes in a session: a message, then its turn's text once it ends, up to 3 minutes.
-  async function answerIn(bot: string, session: string, text: string, messageId: string) {
-    const reader = (await fx.chats.stream(bot, session, 0)).getReader();
-    const cap = setTimeout(() => void reader.cancel().catch(() => {}), 180_000);
-    try {
-      await fx.chats.send(bot, { session, text, label: "phone", messageId });
-      let reply = "";
-      for await (const l of lines(reader)) {
-        if (l.messageId !== messageId) continue;
-        if (l.type === "text_delta") reply += l.delta ?? "";
-        if (l.type === "turn_end") break;
-      }
-      return reply.trim();
-    } finally {
-      clearTimeout(cap);
-      void reader.cancel().catch(() => {});
-    }
-  }
   // After a call the owner spoke on, the bot writes what its main chat keeps of it, a compaction of the call and what came
   // of it, in the call's session, and phone pins it in the middle of the main chat: Phone call · 4 min, in context, opening
   // the call. Its note goes first, since the call is over.
@@ -242,8 +224,12 @@ export default async function setup(fx: PluginApi) {
     "[The call has ended. Write what your main chat should keep of it: what you talked about, what was decided and done, and what's still running or waiting. Up to 6,000 characters, in plain text, for you to read there later.]";
   async function wrapUp(id: number, bot: string, session: string, call: Conversation) {
     onCall.delete(session);
-    if (!call.said()) return;
-    const summary = await answerIn(bot, session, summaryAsk, `phone-${id}-summary`).catch((error) => (fx.log(`Call ${id}'s summary failed: ${error.message}`), ""));
+    if (!call.said()) return call.close();
+    const messageId = `phone-${id}-summary`;
+    const summary = await call
+      .answer(messageId, () => fx.chats.send(bot, { session, text: summaryAsk, label: "phone", messageId }))
+      .catch((error) => (fx.log(`Call ${id}'s summary failed: ${error.message}`), ""))
+      .finally(() => call.close());
     const [row] = await fx.sql<{ seconds: number | null }[]>`select seconds from calls where id = ${id}`;
     const minutes = Math.max(1, Math.round((row?.seconds ?? 0) / 60));
     const text = summary.slice(0, 6000);
