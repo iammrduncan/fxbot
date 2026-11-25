@@ -18,7 +18,7 @@ An in-app call, from the phone at the top of a bot's chat, needs something to he
 
 | Service | What it does on a call | The key |
 | --- | --- | --- |
-| **ElevenLabs** | Listens with Scribe, as you speak, and speaks with Flash v2, in English, in any of your voices, cloned ones too. For another language, pick Multilingual v2 or Flash v2.5 | **Create API key**, with Text to Speech, Speech to Text, and Voices read access |
+| **ElevenLabs** | Listens with Scribe, as you speak, and speaks with Flash v2, in English, in any of your voices, cloned ones too. For another language, pick Multilingual v2 or Flash v2.5. v4 Turbo, v3 Conversational, v4, and v3 speak too, over ElevenLabs' dialogue connection: they cost more for each character, and each call takes one of the account's dialogue sessions | **Create API key**, with Text to Speech, Speech to Text, and Voices read access |
 | **Deepgram** | Listens with Flux, which hears when you've finished, and speaks with Aura | **API Keys** › **Create a New API Key** |
 
 A voice provider serves no chat model, so no bot or default offers it. **Settings** › **Providers** lists it with "For phone".

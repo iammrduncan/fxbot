@@ -28,7 +28,9 @@ While bots answer, the room shows who's writing and who's next. **Stop** ends th
 
 ## By voice
 
-With the phone plugin, the phone at the top of a room, then **In-app call**, starts a call with its bots. Each bot speaks in its own voice, one at a time, and the room shows it all, with what you said marked **From your call**. It needs Phone 0.2.0 and chat rooms 0.6.0. To set up the voice, see [Talk with a bot on the phone](/docs/how-to/talk-with-a-bot-on-the-phone/#in-the-app).
+With the phone plugin, the phone at the top of a room, then **In-app call**, starts a call with its bots. Each bot speaks in its own voice, one at a time. It needs Phone 0.2.0 and chat rooms 0.6.0.
+
+The call is a conversation of its own, in a call room beside the room, with what you said marked **From your call**. The bots start it knowing what the room said before the call. When it ends, the lead writes what the room should keep of it into a pill in the middle of the room, **Phone call · 4 min**, which every bot reads. Click the pill to read the whole call, on the right. The call room isn't listed with your rooms. To set up the voice, see [Talk with a bot on the phone](/docs/how-to/talk-with-a-bot-on-the-phone/#in-the-app).
 
 - **Name a bot** at the start or end of what you say, "Mr Robot, what's the GPU box doing?" or "…, Bob?", and it answers, as a tag would. "Everyone" asks them all. A name in the middle is left for the lead.
 - **Say no name,** and the room answers as it does in text: the lead, or everyone, by its setting.
