@@ -732,6 +732,8 @@ function VoiceSection() {
 	const [voice, setVoice] = (0, react.useState)(null);
 	const [voices, setVoices] = (0, react.useState)([]);
 	const [error, setError] = (0, react.useState)("");
+	const [typing, setTyping] = (0, react.useState)({});
+	const [hearing, setHearing] = (0, react.useState)(false);
 	const load = () => call("voice").then((v) => (setVoice(v), v.speak.provider !== "device" ? call("voice/voices").then(setVoices, () => setVoices([])) : setVoices([])), (e) => setError(e.message));
 	(0, react.useEffect)(() => void load(), []);
 	if (!voice) return error ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
@@ -752,23 +754,67 @@ function VoiceSection() {
 	};
 	const listener = voice.listeners.find((p) => p.id === voice.listen.provider);
 	const speaker = voice.speakers.find((p) => p.id === voice.speak.provider);
-	const models = (p, model, onPick, label) => p && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
-		className: "grid gap-1",
-		children: [
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: label }),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Input, {
-				list: `models-${label}`,
-				value: model,
-				placeholder: p.models[0] ?? "A model",
-				onChange: (e) => onPick(e.target.value),
-				onBlur: (e) => onPick(e.target.value, true)
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("datalist", {
-				id: `models-${label}`,
-				children: p.models.map((m) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", { value: m }, m))
-			})
-		]
-	});
+	const models = (p, model, onPick, label) => {
+		if (!p) return null;
+		const own = typing[label] || model && !p.models.includes(model) || !p.models.length;
+		const box = /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Input, {
+			"aria-label": `${label}, typed`,
+			value: model,
+			placeholder: "A model's id",
+			onChange: (e) => onPick(e.target.value),
+			onBlur: (e) => onPick(e.target.value, true)
+		});
+		if (!p.models.length) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+			className: "grid gap-1",
+			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: label }), box]
+		});
+		return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+			className: "grid gap-1",
+			children: [
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: label }),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.NativeSelect, {
+					"aria-label": label,
+					className: "w-full",
+					value: own ? "" : model || p.models[0],
+					onChange: (e) => e.target.value ? (setTyping({
+						...typing,
+						[label]: false
+					}), onPick(e.target.value, true)) : setTyping({
+						...typing,
+						[label]: true
+					}),
+					children: [p.models.map((m) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+						value: m,
+						children: m
+					}, m)), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+						value: "",
+						children: "Another model…"
+					})]
+				}),
+				own && box
+			]
+		});
+	};
+	const hear = async () => {
+		setHearing(true);
+		setError("");
+		try {
+			const res = await (0, _fxbot_app.api)(`voice/sample?${new URLSearchParams({
+				model: voice.speak.model ?? "",
+				voice: voice.speak.voice ?? ""
+			})}`);
+			if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+			const context = new AudioContext();
+			const source = context.createBufferSource();
+			source.buffer = await context.decodeAudioData(await res.arrayBuffer());
+			source.connect(context.destination);
+			source.onended = () => (setHearing(false), void context.close().catch(() => {}));
+			source.start();
+		} catch (e) {
+			setHearing(false);
+			setError(`The sample didn't play: ${e.message}`);
+		}
+	};
 	const [listenModel, setListenModel] = [voice.listen.model, (model, done) => (setVoice({
 		...voice,
 		listen: {
@@ -866,6 +912,13 @@ function VoiceSection() {
 					})
 				]
 			}),
+			speaker && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+				variant: "outline",
+				size: "sm",
+				disabled: hearing,
+				onClick: () => void hear(),
+				children: hearing ? "Playing…" : "Hear it"
+			}) }),
 			error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "text-destructive",
 				children: error

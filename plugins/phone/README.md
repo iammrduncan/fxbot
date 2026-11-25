@@ -25,13 +25,13 @@ phone carries the call's audio itself, over the page's own socket: the microphon
 
 ## Voice
 
-phone's tab has **Voice**: what listens, what speaks, and the voice, with a model for each. Each is a provider the owner added, or **This device**, the browser's own speech.
+phone's tab has **Voice**: what listens, what speaks, and the voice, with a model for each, and **Hear it**, a line in that voice from `GET /voice/sample`. Each is a provider the owner added, or **This device**, the browser's own speech.
 
 phone brings three entries to **Add provider**, under **For phone**: ElevenLabs and Deepgram, with a key, and **Speech server**, an address on your machine. A provider added for a bot's model serves too, when phone has an adapter for its kind:
 
 | Adapter | Listens | Speaks |
 | --- | --- | --- |
-| `speech/elevenlabs.ts` | Scribe realtime, as you speak | Flash, multi-context, in any of your voices |
+| `speech/elevenlabs.ts` | Scribe realtime, as you speak | Flash v2, Multilingual v2, or Flash v2.5, multi-context, in any of your voices |
 | `speech/deepgram.ts` | Flux, which ends your turns, from Deepgram or Cloudflare | Aura, Deepgram's only |
 | `speech/mistral.ts` | Voxtral realtime, as you speak | |
 | `speech/openai.ts` | OpenAI's `/audio/transcriptions`, one stretch at a time: OpenAI, Azure, Groq, Together, DeepInfra, OpenRouter, LiteLLM, vLLM, a custom server, and the speech server | OpenAI's `/audio/speech`, a sentence at a time: the same, but vLLM |

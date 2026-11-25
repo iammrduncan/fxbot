@@ -3,6 +3,7 @@ import type { PluginApi } from "@fxbot/sdk";
 import { conversation, type Conversation } from "./call.ts";
 import type { Outcome, Provider } from "./line.ts";
 import { voicesFor, type Rooms } from "./room.ts";
+import { wav } from "./audio.ts";
 import { adapters, listenerFor, speakerFor, type Added, type Voice as Spoken } from "./speech.ts";
 import { listen as fromPage, transport } from "./talk.ts";
 import { voiceLine, type Ear, type Input, type Mouth } from "./voice.ts";
@@ -294,6 +295,41 @@ export default async function setup(fx: PluginApi) {
     });
   });
   fx.route("GET", "/voice/voices", async () => json(await voicesOf(await voiceConfig())));
+  // A line in the voice picked, or in a model or voice being tried (?model=&voice=), as a WAV of what a call would play,
+  // for Hear it.
+  fx.route("GET", "/voice/sample", async (request) => {
+    const cfg = await voiceConfig();
+    if (cfg.speak === "device") return json({ error: "This device speaks in the browser, with no sample to fetch." }, 400);
+    const p = cfg.speak;
+    const q = new URL(request.url).searchParams;
+    const voice = q.get("voice")?.trim().slice(0, 100) || (await voiceFor(cfg));
+    const chunks: Int16Array[] = [];
+    let speaking: { close(): void } | null = null;
+    let over = false;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`${p.name} didn't finish the line in 15 seconds.`)), 15_000);
+        const settle = (error?: Error) => (clearTimeout(timer), error ? reject(error) : resolve());
+        speakerFor(p.kind)!
+          .speak!.open(fx, p, {
+            model: q.get("model")?.trim().slice(0, 100) || cfg.speakModel,
+            voice,
+            audio: (pcm) => void chunks.push(pcm),
+            mark: () => settle(),
+            failed: (why) => settle(new Error(why)),
+          })
+          .then((s) => (over ? s.close() : ((speaking = s), s.say("Hey, what's up? This is how I sound on a call.", 1))), settle);
+      });
+    } catch (error) {
+      return json({ error: (error as Error).message }, 502);
+    } finally {
+      over = true;
+      (speaking as { close(): void } | null)?.close();
+    }
+    const all = new Int16Array(chunks.reduce((n, c) => n + c.length, 0));
+    chunks.reduce((at, c) => (all.set(c, at), at + c.length), 0);
+    return new Response(wav(all), { headers: { "content-type": "audio/wav", "cache-control": "no-store" } });
+  });
   fx.route("PUT", "/voice", async (request) => {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const { listeners, speakers } = await usable();

@@ -303,6 +303,9 @@ function VoiceSection() {
   const [voice, setVoice] = useState(null);
   const [voices, setVoices] = useState([]);
   const [error, setError] = useState("");
+  // The model boxes open for typing a model the provider doesn't suggest, and whether Hear it is playing.
+  const [typing, setTyping] = useState({});
+  const [hearing, setHearing] = useState(false);
   const load = () =>
     call("voice").then(
       (v) => (setVoice(v), v.speak.provider !== "device" ? call("voice/voices").then(setVoices, () => setVoices([])) : setVoices([])),
@@ -324,18 +327,57 @@ function VoiceSection() {
   };
   const listener = voice.listeners.find((p) => p.id === voice.listen.provider);
   const speaker = voice.speakers.find((p) => p.id === voice.speak.provider);
-  const models = (p, model, onPick, label) =>
-    p && (
+  // A provider's models, each listed, and Another model to type one it doesn't suggest. A box with suggestions in a
+  // datalist showed only the one already in it.
+  const models = (p, model, onPick, label) => {
+    if (!p) return null;
+    const own = typing[label] || (model && !p.models.includes(model)) || !p.models.length;
+    const box = <ui.Input aria-label={`${label}, typed`} value={model} placeholder="A model's id" onChange={(e) => onPick(e.target.value)} onBlur={(e) => onPick(e.target.value, true)} />;
+    if (!p.models.length)
+      return (
+        <label className="grid gap-1">
+          <span>{label}</span>
+          {box}
+        </label>
+      );
+    return (
       <label className="grid gap-1">
         <span>{label}</span>
-        <ui.Input list={`models-${label}`} value={model} placeholder={p.models[0] ?? "A model"} onChange={(e) => onPick(e.target.value)} onBlur={(e) => onPick(e.target.value, true)} />
-        <datalist id={`models-${label}`}>
+        <ui.NativeSelect
+          aria-label={label}
+          className="w-full"
+          value={own ? "" : model || p.models[0]}
+          onChange={(e) => (e.target.value ? (setTyping({ ...typing, [label]: false }), onPick(e.target.value, true)) : setTyping({ ...typing, [label]: true }))}
+        >
           {p.models.map((m) => (
-            <option key={m} value={m} />
+            <ui.NativeSelectOption key={m} value={m}>
+              {m}
+            </ui.NativeSelectOption>
           ))}
-        </datalist>
+          <ui.NativeSelectOption value="">Another model…</ui.NativeSelectOption>
+        </ui.NativeSelect>
+        {own && box}
       </label>
     );
+  };
+  // A line in the voice and model picked, from phone, played here: what a call sounds like, without one.
+  const hear = async () => {
+    setHearing(true);
+    setError("");
+    try {
+      const res = await api(`voice/sample?${new URLSearchParams({ model: voice.speak.model ?? "", voice: voice.speak.voice ?? "" })}`);
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+      const context = new AudioContext();
+      const source = context.createBufferSource();
+      source.buffer = await context.decodeAudioData(await res.arrayBuffer());
+      source.connect(context.destination);
+      source.onended = () => (setHearing(false), void context.close().catch(() => {}));
+      source.start();
+    } catch (e) {
+      setHearing(false);
+      setError(`The sample didn't play: ${e.message}`);
+    }
+  };
   const [listenModel, setListenModel] = [voice.listen.model, (model, done) => (setVoice({ ...voice, listen: { ...voice.listen, model } }), done && save({ listenModel: model }))];
   const [speakModel, setSpeakModel] = [voice.speak.model, (model, done) => (setVoice({ ...voice, speak: { ...voice.speak, model } }), done && save({ speakModel: model }))];
   const hears = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -399,6 +441,13 @@ function VoiceSection() {
           </ui.NativeSelect>
           <span className="text-xs text-muted-foreground">Each bot can have its own, in its Phone section. In a room, a bot with none gets one no other bot there has.</span>
         </label>
+      )}
+      {speaker && (
+        <div>
+          <ui.Button variant="outline" size="sm" disabled={hearing} onClick={() => void hear()}>
+            {hearing ? "Playing…" : "Hear it"}
+          </ui.Button>
+        </div>
       )}
       {error && <p className="text-destructive">{error}</p>}
     </section>

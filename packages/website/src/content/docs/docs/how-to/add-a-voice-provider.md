@@ -18,7 +18,7 @@ An in-app call, from the phone at the top of a bot's chat, needs something to he
 
 | Service | What it does on a call | The key |
 | --- | --- | --- |
-| **ElevenLabs** | Listens with Scribe, as you speak, and speaks with Flash in any of your voices, cloned ones too | **Create API key**, with Text to Speech, Speech to Text, and Voices read access |
+| **ElevenLabs** | Listens with Scribe, as you speak, and speaks with Flash v2, in English, in any of your voices, cloned ones too. For another language, pick Multilingual v2 or Flash v2.5 | **Create API key**, with Text to Speech, Speech to Text, and Voices read access |
 | **Deepgram** | Listens with Flux, which hears when you've finished, and speaks with Aura | **API Keys** › **Create a New API Key** |
 
 A voice provider serves no chat model, so no bot or default offers it. **Settings** › **Providers** lists it with "For phone".
@@ -44,7 +44,9 @@ In **Settings** › **Plugins** › **phone**, under **Voice**:
 2. **Speaking:** what speaks. ElevenLabs, then Deepgram, then the others.
 3. **Voice:** the speaker's voice for every bot. To give one bot a voice of its own, pick it under **Voice** in that bot's **Phone** section. In a room, a bot with none gets one no other bot there has.
 
-The model boxes under each say which model it uses. Leave them as they are unless you know you want another.
+The model lists under each say which model it uses. Leave them as they are unless you know you want another. **Another model…** takes one the list doesn't have.
+
+**Hear it** plays a line in the voice and model picked, as a call would.
 
 ## This device
 

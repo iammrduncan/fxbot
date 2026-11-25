@@ -3,7 +3,9 @@ import { json, pcmOf, toBase64, type Adapter, type Added, type ListenOptions, ty
 
 // ElevenLabs, the owner's favorite: Scribe realtime to listen, committing a stretch after the owner's pause, and Flash
 // over the multi-context WebSocket to speak, one context a reply, so its voice carries from sentence to sentence
-// (elevenlabs.io/docs, read 2026-11-25). A sentence's mark comes once its last characters have been voiced, counted from
+// (elevenlabs.io/docs, read 2026-11-25). Flash v2, for English, is the default: on the owner's account, Flash and Turbo
+// v2.5 said the greeting, "Hey, what's up?", as 3 to 12 seconds of babble, told its language or not, where Flash v2 and
+// Multilingual v2 said it in a second. v3 and v4 don't open this WebSocket. A sentence's mark comes once its last characters have been voiced, counted from
 // the timing ElevenLabs sends with its audio.
 
 // ElevenLabs' addresses, at the origin the provider was added with.
@@ -34,7 +36,7 @@ async function listen(fx: PluginApi, p: Added, o: ListenOptions) {
 const letters = (text: string) => text.replace(/\s+/g, "").length;
 
 async function speak(fx: PluginApi, p: Added, o: SpeakOptions) {
-  const query = `model_id=${encodeURIComponent(o.model || "eleven_flash_v2_5")}&output_format=pcm_16000&sync_alignment=true&inactivity_timeout=180`;
+  const query = `model_id=${encodeURIComponent(o.model || "eleven_flash_v2")}&output_format=pcm_16000&sync_alignment=true&inactivity_timeout=180`;
   const ws = await fx.providers.socket(p.id, `${socketOrigin(p)}/v1/text-to-speech/${encodeURIComponent(o.voice)}/multi-stream-input?${query}`);
   const send = (msg: object) => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(msg));
   // The context of the reply being said, and its sentences' marks, each with the letters voiced once it's done.
@@ -88,7 +90,7 @@ export const elevenlabs: Adapter = {
   listen: { kinds: ["elevenlabs"], turns: true, models: () => ["scribe_v2_realtime"], open: listen },
   speak: {
     kinds: ["elevenlabs"],
-    models: () => ["eleven_flash_v2_5", "eleven_turbo_v2_5", "eleven_multilingual_v2"],
+    models: () => ["eleven_flash_v2", "eleven_multilingual_v2", "eleven_flash_v2_5"],
     async voices(fx, p) {
       const body = await json(await fx.providers.fetch(p.id, `${origin(p)}/v1/voices`), "ElevenLabs' voices");
       return (Array.isArray(body?.voices) ? body.voices : []).map((v: { voice_id: string; name: string; category?: string }) => ({
