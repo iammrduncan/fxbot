@@ -20,7 +20,7 @@
           "connect": "key",
           "baseUrl": "https://api.elevenlabs.io/v1",
           "headers": { "xi-api-key": "{apiKey}" },
-          "keyCheck": "https://api.elevenlabs.io/v1/user",
+          "keyCheck": "https://api.elevenlabs.io/v1/voices",
           "keyPage": "https://elevenlabs.io/app/settings/api-keys",
           "steps": ["Choose Create API key, and give it Text to Speech, Speech to Text, and Voices read access."],
           "models": "none",

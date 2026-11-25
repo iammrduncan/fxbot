@@ -327,14 +327,16 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
       await sql`delete from model_lists where provider_id = ${id}`;
     },
     // A key is checked where its entry says a bad one is refused, `keyCheck`, or at `/models`, where a 404 passes, since
-    // some servers serve no list there. AI Gateway and the local servers are checked by listing.
+    // some servers serve no list there. AI Gateway and the local servers are checked by listing. A key that goes in the
+    // entry's own headers goes only there: ElevenLabs refuses a request with a bearer too.
     async check(record: ProviderRecord, access: Access) {
       const entry = entryOf(record);
       // A plugin's server with no key check, such as a speech server on this machine, has no list to try.
       if (entry.models === "none" && !entry.keyCheck) return;
+      const own = Object.values(entry.headers ?? {}).some((value) => value.includes("{apiKey}"));
       try {
         if (["gateway", "ollama", "lmstudio"].includes(record.kind)) await fetchList(record, access);
-        else await getJson(access.fetch ?? fetch, entry.keyCheck ? fill(entry.keyCheck, entry, record.fields ?? {}) : `${record.baseUrl}/models`, { headers: bearer(access.apiKey) }, "The key check");
+        else await getJson(access.fetch ?? fetch, entry.keyCheck ? fill(entry.keyCheck, entry, record.fields ?? {}) : `${record.baseUrl}/models`, { headers: own ? {} : bearer(access.apiKey) }, "The key check");
       } catch (error) {
         const upstream = (error as { upstream?: number }).upstream;
         if (upstream === 404) return;
