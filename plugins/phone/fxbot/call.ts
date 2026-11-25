@@ -2,11 +2,11 @@ import type { PluginApi } from "@fxbot/sdk";
 import type { Line, LineEvents, Outcome, Place } from "./line.ts";
 import { roomNote, spoken, tagged, type Rooms, type RoomEvent } from "./room.ts";
 
-// A call's conversation (docs/_completed/phases/phone-signalwire.md, On the call). It names no phone service: it holds
-// the call through a provider's line. What the owner says goes to the bot's own chat as a message, joining a turn that's
-// running, and every reply in that chat is spoken while the call lasts, sentence by sentence, made fit to hear.
-// fx.chats.stream reads only a plugin's own sessions, so the call follows the bot's own chat through fxbot's own API, at
-// fx.localUrl, as the page does.
+// A call's conversation (docs/phases/phone-v3.md). It names no phone service: it holds the call through a provider's
+// line. A call is a side conversation: what the owner says goes to the call's own session, a session of phone's for the
+// bot, joining a turn that's running, and every reply there is spoken while the call lasts, sentence by sentence, made
+// fit to hear. The bot's instructions there say how to talk on a call (server.ts adds them, only while it's on), and
+// what's recent in its main chat. A room's call speaks in its call room.
 
 type StreamLine = {
   type: string;
@@ -14,12 +14,19 @@ type StreamLine = {
   id?: string;
   delta?: string;
   sessionId?: string;
+  input?: unknown;
+  text?: string;
+  from?: string;
+  cursor?: number;
+  pill?: { label: string; text?: string; from: string; inContext?: boolean };
 };
 export type Conversation = {
   /** Rings the owner, and answers once they answer or don't. */
   place(call: Place): Promise<{ outcome: Outcome; error?: string }>;
   /** Whether this turn is one the owner's words on this call started or joined. */
   spoken(turn: string): boolean;
+  /** How many times the owner's words went to the bot. */
+  said(): number;
   /** Ends the call once this turn ends and its last words have played. */
   hangUpAfter(turn: string): void;
   /** Ends the call at once. */
@@ -33,6 +40,8 @@ type Options = {
   minutes: number;
   /** The plugin's id for the call, which names the messages it sends. */
   id: number;
+  /** The call's own session for the bot, where what the owner says goes. A room's call has its call room instead. */
+  session: string;
   open: (events: LineEvents) => Line;
   /** A line 2: the call decides what cuts the bot off, from the words as they come. */
   turns: boolean;
@@ -46,13 +55,25 @@ type Options = {
   /** How hard a call's turns think, as fx.chats.send's effort, or none for the bot's own. */
   effort?: string;
   /** A call in a chat room: the room's bots answer, each in its own voice, one at a time. */
-  room?: { id: number; rooms: Rooms; names: Map<string, string>; voices: Map<string, string>; lead: string };
+  /** A room's call: its call room, `id`, and the room it's for, `parent`. */
+  room?: { id: number; rooms: Rooms; names: Map<string, string>; voices: Map<string, string>; lead: string; parent?: number };
 };
 
 const label = "your call";
 const floorWords = /^(?:wait|hold on|hang on|one (?:sec|second|moment)|sorry)[.!,]*$/i;
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const wordsOf = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [];
+// A heard word is a said one when they're equal, or both have 4 letters or more and are one edit apart, two letters
+// swapped counting as one: the recognizer hears the bot's own voice back a little wrong, as "quite" for "quiet" on
+// 2026-11-25, which cut it off after one word.
+export function alike(a: string, b: string) {
+  if (a === b) return true;
+  if (a.length < 4 || b.length < 4 || Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && a[i] === b[i]) i++;
+  const [x, y] = [a.slice(i), b.slice(i)];
+  return x.slice(1) === y.slice(1) || x.slice(1) === y || x === y.slice(1) || (x[0] === y[1] && x[1] === y[0] && x.slice(2) === y.slice(2));
+}
 // How many of these words come in that order in what was said. An echo is the bot's words as it said them; the owner
 // answering may use the same words in another order, as "hold on so you can't hear me" did on 2026-11-25, after the bot
 // said "it can't hear you while it's talking, so you have to wait... when you say hold on".
@@ -60,25 +81,29 @@ function inOrder(words: string[], said: string[]) {
   let row: number[] = new Array(said.length + 1).fill(0);
   for (const word of words) {
     const next = [0];
-    for (let j = 1; j <= said.length; j++) next[j] = word === said[j - 1] ? row[j - 1] + 1 : Math.max(row[j], next[j - 1]);
+    for (let j = 1; j <= said.length; j++) next[j] = alike(word, said[j - 1]) ? row[j - 1] + 1 : Math.max(row[j], next[j - 1]);
     row = next;
   }
   return row[said.length];
 }
-// How the bot works on a call (docs/phases/phone-v2.md, a sidekick on a call): quick looks in the conversation, and
-// anything longer in the background, so the conversation goes on.
+// How the bot talks on a call (docs/phases/phone-v3.md, the sidekick): in its own words at once, and longer work in the
+// background, so the conversation never waits. It's in the bot's instructions for the call's session while the call is
+// on, and never a message.
 const sidekick =
-  "Answer in one to three short spoken sentences, with no lists, tables, links, code, or markdown, and say in a few words what you'll do. " +
-  "A quick look, such as a status, a read, or a list, you do yourself: check with your tools, since what's earlier in the chat may be old. " +
-  "Anything longer, such as work on your computer, a herdr agent's task, digging, or more than a couple of tool calls, goes to the background: start a subagent with the task, or prompt a herdr agent, say what's under way, and come straight back to the owner. Never wait on it in the call. " +
-  "When a subagent tells you something or reports, say what matters, briefly. When the owner asks how it's going, check, with subagents_list or herdr's agents, and don't guess. Without subagents, keep each turn short, and say so if a task will take a while.";
-const note = (greeting: string, app = false) =>
+  "Talk like a person on a call: short spoken sentences, with no lists, tables, links, code, or markdown. " +
+  'Before you use a tool, first say in a few natural words what you\'re doing, such as "Oh, let me check that.", so the owner hears you at once. ' +
+  "Anything that takes more than a moment, such as digging, work on your computer, a herdr agent's task, or more than one or two tool calls, hand to a subagent with subagents_start, then come straight back to the owner and keep talking about anything they like. Never make them wait on it. " +
+  "When a subagent tells you something or reports, say what matters, briefly. When the owner asks how it's going, check with subagents_list or herdr's agents, and don't guess. Without subagents, keep each turn short, and say so if a task will take a while.";
+/** A room call's instructions, for each bot's session in the call room, while it's on. */
+export const roomCallNote = `${roomNote} ${sidekick}`;
+/** The bot's instructions for a call's session, while it's on. */
+export const callNote = (greeting: string, app = false) =>
   app
     ? `You're in a voice chat with the owner in the app: they opened it, and you said "${greeting}" What they say comes to you as text, and what you write is read out to them. ${sidekick} Anything that needs their OK shows on their screen. When they're done, say goodbye and use phone_hang_up.`
     : `You're on a live phone call with the owner, who may be driving. You called them and said: "${greeting}" What they say comes to you as text, and what you write is read out to them. ${sidekick} Anything that needs their OK shows on their screen, which they can't look at while driving. When they're done, say goodbye and use phone_hang_up.`;
 
 // NDJSON lines from a stream of bytes, until it ends or is cancelled.
-async function* lines(reader: ReadableStreamDefaultReader<Uint8Array>) {
+export async function* lines(reader: ReadableStreamDefaultReader<Uint8Array>) {
   const decoder = new TextDecoder();
   let rest = "";
   for (;;) {
@@ -211,7 +236,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     },
     ended: (how) => finish(how),
     // A listener with no words as they come: 700 ms of the owner's voice over the bot cuts it off, after the greeting.
-    voice: (ms) => void (o.turns && ms >= 700 && line.speaking && !greeting && (stop(), interrupted())),
+    voice: (ms) => void (o.turns && ms >= 700 && line.speaking && !greeting && (logCut(`${ms} ms of voice`), stop(), interrupted())),
   });
 
   // The owner is speaking: words as they come, a final within the last moment, or words held for the pause.
@@ -274,8 +299,10 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   }
   // On a line 2, two words of the owner's while the bot speaks cut it off, after the greeting. One may be a cough.
   function cutIn(text: string) {
-    if (o.turns && line.speaking && !greeting && wordsOf(text).length >= 2) (stop(), interrupted());
+    if (o.turns && line.speaking && !greeting && wordsOf(text).length >= 2) (logCut(text), stop(), interrupted());
   }
+  // Each cut says what cut the bot off and what it was saying, to tell a misheard echo from the owner on real calls.
+  const logCut = (heard: string) => fx.log(`Call ${o.id}: cut ${o.name} off on hearing "${heard.slice(0, 80)}", while saying "${(airing[0] ?? "").slice(0, 80)}"`);
   // Words as they come, on a line 2.
   function hearing(text: string) {
     if (!began) began = Date.now();
@@ -325,7 +352,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
       stop();
       if (o.room) return void (await o.room.rooms.stop?.(o.room.id), say("Okay, stopped.", "", o.room.voices.get(o.room.lead)));
       const mine = [...running].some((turn) => started.has(turn));
-      if (mine) await fx.chats.cancel(o.bot);
+      if (mine) await fx.chats.cancel(o.bot, o.session);
       return say(mine ? "Okay, stopped." : running.size ? "That one isn't mine to stop from here." : "Okay.");
     }
     if (o.room) return toRoom(words);
@@ -334,9 +361,9 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     const cut =
       cutAfter === null ? "" : cutAfter ? `(They cut you off after: "${cutAfter.slice(-300)}")\n` : "(They cut you off before you'd said anything.)\n";
     cutAfter = null;
-    const body = `${count === 1 ? note(o.greeting, o.app) : "[On the phone]"}\n\n${cut}${words}`;
     const result = await fx.chats.send(o.bot, {
-      text: body,
+      session: o.session,
+      text: `${cut}${words}`,
       shown: words,
       label,
       steer: true,
@@ -351,7 +378,8 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     if (muted === turn) muted = "";
     const asked = heardAt;
     // Unless the owner has talked again since.
-    timers.push(setTimeout(() => !over && saidAt < asked && talked <= asked && say("One moment."), 1500));
+    // A net for a slow start, not the call's voice: the bot's own words come first.
+    timers.push(setTimeout(() => !over && saidAt < asked && talked <= asked && say("One moment."), 3000));
     void follow();
   }
 
@@ -366,19 +394,9 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
       return;
     }
     try {
-      for (;;) {
-        const res = await fetch(`${fx.localUrl}/api/profiles/${o.bot}/stream?cursor=0`, { signal: stopFollowing.signal });
-        if (!res.ok || !res.body) throw new Error(`fxbot answered ${res.status}`);
-        let moved = false;
-        for await (const l of lines(res.body.getReader())) {
-          if (l.type === "moved") {
-            moved = true;
-            break;
-          }
-          read(l);
-        }
-        if (!moved || over) return;
-      }
+      const reader = (await fx.chats.stream(o.bot, o.session, 0)).getReader();
+      stopFollowing.signal.addEventListener("abort", () => void reader.cancel().catch(() => {}));
+      for await (const l of lines(reader)) read(l);
     } catch (error) {
       if (!over) fx.log(`The call stopped following ${o.name}'s chat: ${error instanceof Error ? error.message : error}`);
     }
@@ -426,8 +444,9 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
       cutAfter === null ? "" : !cutOff ? "(They cut in before anything was said.)" : cutAfter ? `(They cut off ${cutOff} after: "${cutAfter.slice(-300)}". The rest wasn't heard${nor}.)` : `(They cut off ${cutOff} before anything was heard${nor}.)`;
     cutAfter = null;
     const asked = heardAt;
-    await room.rooms.post!(room.id, { text: tagged(words, members), label, note: [++count === 1 ? roomNote : "", cut].filter(Boolean).join("\n") || undefined, effort: o.effort });
-    timers.push(setTimeout(() => !over && saidAt < asked && talked <= asked && say("One moment.", "", room.voices.get(room.lead)), 1500));
+    ++count;
+    await room.rooms.post!(room.id, { text: tagged(words, members), label, note: cut || undefined, effort: o.effort });
+    timers.push(setTimeout(() => !over && saidAt < asked && talked <= asked && say("One moment.", "", room.voices.get(room.lead)), 3000));
     void follow();
   }
   // The room's replies, said as they're written, each in its bot's voice, with tags said as names.
@@ -487,6 +506,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
       return result;
     },
     spoken: (turn) => ours.has(turn),
+    said: () => count,
     hangUpAfter(turn) {
       // The tool runs inside its turn, which the chat may not have shown yet: the call ends at that turn's end, or in a
       // minute if the chat never says it ended.

@@ -3,7 +3,7 @@
 // and tags: a bot named at the start or end of what the owner says is tagged, as `@` does in the room's box.
 
 /** What chat rooms 0.6.0 offers phone with fx.provide. */
-export type Room = { id: number; name: string; members: string[]; untagged: "lead" | "everyone"; replies: number };
+export type Room = { id: number; name: string; members: string[]; untagged: "lead" | "everyone"; replies: number; call_of?: number | null };
 export type RoomEvent =
   | { type: "reply"; bot: string; text: string }
   | { type: "message"; message: { id: number; author: string; text: string } }
@@ -15,6 +15,11 @@ export type Rooms = {
   post?(room: number, message: { text: string; label?: string; note?: string; effort?: string }): Promise<unknown>;
   stop?(room: number): Promise<void>;
   on?(room: number, listener: (event: RoomEvent) => void): () => void;
+  /** A session's room, for the call's instructions (phone-v3). */
+  roomOf?(session: string): Promise<Room | null>;
+  /** A call room for a room's call, left out of the list, and a pill in the middle of a room (phone-v3). */
+  callRoom?(room: number): Promise<Room | null>;
+  pill?(room: number, pill: { label: string; text?: string; open?: string; inContext?: boolean }): Promise<unknown>;
 };
 
 // Words said before a name that address someone: "Hey Bob", "Okay, Mr Robot".
@@ -68,9 +73,10 @@ export const spoken = (text: string, names: Map<string, string>) =>
     .replace(/(^|[\s(])@(?=\p{L})/gu, "$1");
 
 /** What the room's bots are told with the call's first words, and only them. */
+// The start of a room call's instructions, in each of its bots' sessions in the call room while the call is on; call.ts
+// adds how to talk on a call.
 export const roomNote =
-  "(The owner is on a voice call with this room. Each reply is read out to them in its bot's own voice, one bot at a time, so answer in one to three short spoken sentences, with no lists, tables, links, code, or markdown. " +
-  "Hand on to another bot by tagging it, as in text, and it's said as its name. Quick looks you do yourself; anything longer goes to a subagent, if you have one, and say it's under way.)";
+  "The owner is on a voice call with this room, in its call room. Each reply is read out to them in its bot's own voice, one bot at a time. Hand on to another bot by tagging it, as in text, and it's said as its name.";
 
 /** Each bot's voice in a room: its own, or one of the speaker's that no other bot in the room has, in the room's order. */
 export function voicesFor(members: string[], own: Map<string, string | null>, offered: string[], fallback: string) {

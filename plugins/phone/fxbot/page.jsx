@@ -1,7 +1,7 @@
 // phone in the app: the phone at the top of a chat, with its calls, the call's bar above the message box, a call's card
 // in the chat, the plugin's tab, and a section in each bot's settings. Built into page.js; see the README.
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { api, go, ui } from "@fxbot/app";
+import { api, applyLine, go, openBeside, ui, useBots } from "@fxbot/app";
 import { Mic, RoomTalkBar, TalkBar, talk, useTalk } from "./talk.jsx";
 
 async function call(path, method = "GET", body) {
@@ -289,6 +289,11 @@ function Tab() {
               <span>{outcome[c.status] ?? c.status}</span>
               <span className="text-muted-foreground">{length(c.seconds)}</span>
               {c.error && <span className="text-destructive">{c.error}</span>}
+              {(c.chat || c.call_room) && (
+                <button type="button" className="text-primary underline" onClick={() => openBeside(`/phone/calls/${c.id}`)}>
+                  Open
+                </button>
+              )}
             </p>
           ))}
         </div>
@@ -554,6 +559,158 @@ function BotSection({ bot }) {
   );
 }
 
+// A call's own chat, live: its session's lines, folded as the chat folds its own, read again after a drop while it's on.
+function useCallTurns(id, chat) {
+  const [turns, setTurns] = useState([]);
+  useEffect(() => {
+    if (!chat) return;
+    const stop = new AbortController();
+    (async () => {
+      while (!stop.signal.aborted) {
+        try {
+          const res = await api(`calls/${id}/stream`, { signal: stop.signal });
+          if (!res.ok) return;
+          let next = [];
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let rest = "";
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const parts = (rest + decoder.decode(value, { stream: true })).split("\n");
+            rest = parts.pop();
+            for (const part of parts.filter(Boolean)) next = applyLine(next, JSON.parse(part));
+            setTurns(next);
+          }
+        } catch {
+          if (stop.signal.aborted) return;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    })();
+    return () => stop.abort();
+  }, [id, chat]);
+  return turns;
+}
+
+// A room's call: its call room's messages, live, from chat rooms' stream, as the room's page reads them.
+function useCallRoom(id) {
+  const [messages, setMessages] = useState([]);
+  useEffect(() => {
+    if (!id) return;
+    const stop = new AbortController();
+    (async () => {
+      while (!stop.signal.aborted) {
+        try {
+          const res = await fetch(`/api/plugins/chat-rooms/rooms/${id}/stream`, { signal: stop.signal });
+          if (!res.ok) return;
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let rest = "";
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const parts = (rest + decoder.decode(value, { stream: true })).split("\n");
+            rest = parts.pop();
+            for (const part of parts.filter(Boolean)) {
+              const event = JSON.parse(part);
+              if (event.type === "room") setMessages(event.messages);
+              else if (event.type === "message") setMessages((all) => (all.some((m) => m.id === event.message.id) ? all : [...all, event.message]));
+            }
+          }
+        } catch {
+          if (stop.signal.aborted) return;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    })();
+    return () => stop.abort();
+  }, [id]);
+  return messages;
+}
+
+// A call's chat, read only, beside the main chat from its pill or Last calls (docs/phases/phone-v3.md): when, how long,
+// and who, the summary the bot wrote for its main chat, and the call as it went. The turn that asked for the summary
+// isn't shown: its answer is the summary.
+function CallChat({ params }) {
+  const { Header, Message, MessageContent, Bubble, BubbleContent, Reply, MessageScroller, MessageScrollerProvider, MessageScrollerViewport, MessageScrollerContent, MessageScrollerButton } = ui;
+  const [found, setFound] = useState(undefined);
+  useEffect(() => {
+    setFound(undefined);
+    call(`calls/${params.id}`).then(setFound, () => setFound(null));
+  }, [params.id]);
+  const turns = useCallTurns(params.id, Boolean(found?.chat));
+  const roomMessages = useCallRoom(found?.call_room);
+  const bots = useBots() ?? [];
+  if (found === null) return <Header title="Phone call" />;
+  if (!found) return <Header title="Phone call" />;
+  const minutes = Math.max(1, Math.round((found.seconds ?? 0) / 60));
+  const shown = turns.filter((turn) => !turn.messageId.endsWith("-summary"));
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <Header title={`Phone call · ${minutes} min`} />
+      <p className="px-4 text-xs text-muted-foreground">
+        {found.name} · {new Date(found.at).toLocaleString()} · {length(found.seconds)}
+      </p>
+      <MessageScrollerProvider autoScroll>
+        <MessageScroller className="flex-1">
+          <MessageScrollerViewport>
+            <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 py-4">
+              {found.summary && (
+                <section aria-label="Summary" className="grid gap-1 rounded-lg border bg-muted p-3 text-sm">
+                  <h3 className="font-medium">Summary</h3>
+                  <p className="whitespace-pre-wrap">{found.summary}</p>
+                </section>
+              )}
+              {!found.chat && !found.call_room && <p className="text-sm text-muted-foreground">This call was before calls had chats of their own: it's in the bot's main chat.</p>}
+              {/* A room's call: its call room, as said, but the ask for the summary and its answer, shown above. */}
+              {roomMessages
+                .filter((m) => m.author !== "note" && !/\[The call has ended/.test(m.text) && m.text !== found.summary)
+                .map((m) =>
+                  m.author === "owner" ? (
+                    <Message key={m.id} align="end">
+                      <MessageContent>
+                        <Bubble align="end" variant="muted">
+                          <BubbleContent className="whitespace-pre-wrap">{m.text.replace(/<@bot:([0-9a-f]{12})>/g, (_, id) => `@${bots.find((b) => b.id === id)?.name ?? "a bot"}`).replace(/<@all>/g, "@all")}</BubbleContent>
+                        </Bubble>
+                      </MessageContent>
+                    </Message>
+                  ) : (
+                    <Message key={m.id}>
+                      <MessageContent>
+                        <p className="text-sm font-medium">{m.author === "plugin" ? (m.label ?? "A plugin") : (bots.find((b) => b.id === m.author)?.name ?? "A bot that's gone")}</p>
+                        <p className="text-sm whitespace-pre-wrap">{m.text}</p>
+                      </MessageContent>
+                    </Message>
+                  ),
+                )}
+              {shown.map((turn) => (
+                <div key={turn.messageId} className="grid gap-6">
+                  {turn.text && (
+                    <Message align="end">
+                      <MessageContent>
+                        <Bubble align="end" variant="muted">
+                          <BubbleContent className="whitespace-pre-wrap">{turn.text}</BubbleContent>
+                        </Bubble>
+                      </MessageContent>
+                    </Message>
+                  )}
+                  <Message>
+                    <MessageContent>
+                      <Reply turn={turn} />
+                    </MessageContent>
+                  </Message>
+                </div>
+              ))}
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <MessageScrollerButton />
+        </MessageScroller>
+      </MessageScrollerProvider>
+    </div>
+  );
+}
+
 export default function setup(app) {
   // The phone at the top of a chat, on fxbot 0.12.0 or newer.
   app.header?.(CallMenu);
@@ -562,6 +719,7 @@ export default function setup(app) {
   app.slot?.("chat-rooms.room-header", RoomCall);
   app.slot?.("chat-rooms.room-box", RoomTalkBar);
   app.toolView("call", CallCard, { open: true });
+  app.route("/calls/:id", CallChat);
   app.settings(Tab);
   app.botSettings(BotSection);
 }

@@ -173,6 +173,7 @@ async function talk(target, label) {
 		if (typeof message !== "string") return ears?.hush(), sound.play(message);
 		const m = JSON.parse(message);
 		if (m.state === "starting") {
+			if (typeof m.open === "string") set({ open: m.open });
 			if (m.speak === "device") mouth = deviceMouth(socket, () => ears?.resume());
 			if (m.listen === "device") {
 				const got = await deviceEars(socket, sound.track, m.google, () => store.now?.speaking);
@@ -269,6 +270,33 @@ function Bar({ now, title, bots = [] }) {
 						]
 					})
 				]
+			}),
+			now.open && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+				type: "button",
+				size: "icon-sm",
+				variant: "ghost",
+				"aria-label": "Open the call's chat",
+				title: "Open the call's chat",
+				onClick: () => (0, _fxbot_app.openBeside)(now.open),
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
+					xmlns: "http://www.w3.org/2000/svg",
+					width: "16",
+					height: "16",
+					viewBox: "0 0 24 24",
+					fill: "none",
+					stroke: "currentColor",
+					strokeWidth: "2",
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					"aria-hidden": "true",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
+						width: "18",
+						height: "18",
+						x: "3",
+						y: "3",
+						rx: "2"
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M15 3v18" })]
+				})
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
 				type: "button",
@@ -721,6 +749,12 @@ function Tab() {
 						c.error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 							className: "text-destructive",
 							children: c.error
+						}),
+						(c.chat || c.call_room) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "text-primary underline",
+							onClick: () => (0, _fxbot_app.openBeside)(`/phone/calls/${c.id}`),
+							children: "Open"
 						})
 					]
 				}, c.id))]
@@ -1051,6 +1085,160 @@ function BotSection({ bot }) {
 		]
 	});
 }
+function useCallTurns(id, chat) {
+	const [turns, setTurns] = (0, react.useState)([]);
+	(0, react.useEffect)(() => {
+		if (!chat) return;
+		const stop = new AbortController();
+		(async () => {
+			while (!stop.signal.aborted) {
+				try {
+					const res = await (0, _fxbot_app.api)(`calls/${id}/stream`, { signal: stop.signal });
+					if (!res.ok) return;
+					let next = [];
+					const reader = res.body.getReader();
+					const decoder = new TextDecoder();
+					let rest = "";
+					for (;;) {
+						const { value, done } = await reader.read();
+						if (done) break;
+						const parts = (rest + decoder.decode(value, { stream: true })).split("\n");
+						rest = parts.pop();
+						for (const part of parts.filter(Boolean)) next = (0, _fxbot_app.applyLine)(next, JSON.parse(part));
+						setTurns(next);
+					}
+				} catch {
+					if (stop.signal.aborted) return;
+				}
+				await new Promise((r) => setTimeout(r, 2e3));
+			}
+		})();
+		return () => stop.abort();
+	}, [id, chat]);
+	return turns;
+}
+function useCallRoom(id) {
+	const [messages, setMessages] = (0, react.useState)([]);
+	(0, react.useEffect)(() => {
+		if (!id) return;
+		const stop = new AbortController();
+		(async () => {
+			while (!stop.signal.aborted) {
+				try {
+					const res = await fetch(`/api/plugins/chat-rooms/rooms/${id}/stream`, { signal: stop.signal });
+					if (!res.ok) return;
+					const reader = res.body.getReader();
+					const decoder = new TextDecoder();
+					let rest = "";
+					for (;;) {
+						const { value, done } = await reader.read();
+						if (done) break;
+						const parts = (rest + decoder.decode(value, { stream: true })).split("\n");
+						rest = parts.pop();
+						for (const part of parts.filter(Boolean)) {
+							const event = JSON.parse(part);
+							if (event.type === "room") setMessages(event.messages);
+							else if (event.type === "message") setMessages((all) => all.some((m) => m.id === event.message.id) ? all : [...all, event.message]);
+						}
+					}
+				} catch {
+					if (stop.signal.aborted) return;
+				}
+				await new Promise((r) => setTimeout(r, 2e3));
+			}
+		})();
+		return () => stop.abort();
+	}, [id]);
+	return messages;
+}
+function CallChat({ params }) {
+	const { Header, Message, MessageContent, Bubble, BubbleContent, Reply, MessageScroller, MessageScrollerProvider, MessageScrollerViewport, MessageScrollerContent, MessageScrollerButton } = _fxbot_app.ui;
+	const [found, setFound] = (0, react.useState)(void 0);
+	(0, react.useEffect)(() => {
+		setFound(void 0);
+		call(`calls/${params.id}`).then(setFound, () => setFound(null));
+	}, [params.id]);
+	const turns = useCallTurns(params.id, Boolean(found?.chat));
+	const roomMessages = useCallRoom(found?.call_room);
+	const bots = (0, _fxbot_app.useBots)() ?? [];
+	if (found === null) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Header, { title: "Phone call" });
+	if (!found) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Header, { title: "Phone call" });
+	const minutes = Math.max(1, Math.round((found.seconds ?? 0) / 60));
+	const shown = turns.filter((turn) => !turn.messageId.endsWith("-summary"));
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "flex min-h-0 flex-1 flex-col",
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Header, { title: `Phone call · ${minutes} min` }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+				className: "px-4 text-xs text-muted-foreground",
+				children: [
+					found.name,
+					" · ",
+					new Date(found.at).toLocaleString(),
+					" · ",
+					length(found.seconds)
+				]
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageScrollerProvider, {
+				autoScroll: true,
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(MessageScroller, {
+					className: "flex-1",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageScrollerViewport, { children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(MessageScrollerContent, {
+						className: "mx-auto w-full max-w-3xl gap-6 px-4 py-4",
+						children: [
+							found.summary && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+								"aria-label": "Summary",
+								className: "grid gap-1 rounded-lg border bg-muted p-3 text-sm",
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", {
+									className: "font-medium",
+									children: "Summary"
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+									className: "whitespace-pre-wrap",
+									children: found.summary
+								})]
+							}),
+							!found.chat && !found.call_room && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+								className: "text-sm text-muted-foreground",
+								children: "This call was before calls had chats of their own: it's in the bot's main chat."
+							}),
+							roomMessages.filter((m) => m.author !== "note" && !/\[The call has ended/.test(m.text) && m.text !== found.summary).map((m) => m.author === "owner" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Message, {
+								align: "end",
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageContent, { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Bubble, {
+									align: "end",
+									variant: "muted",
+									children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BubbleContent, {
+										className: "whitespace-pre-wrap",
+										children: m.text.replace(/<@bot:([0-9a-f]{12})>/g, (_, id) => `@${bots.find((b) => b.id === id)?.name ?? "a bot"}`).replace(/<@all>/g, "@all")
+									})
+								}) })
+							}, m.id) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Message, { children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(MessageContent, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+								className: "text-sm font-medium",
+								children: m.author === "plugin" ? m.label ?? "A plugin" : bots.find((b) => b.id === m.author)?.name ?? "A bot that's gone"
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+								className: "text-sm whitespace-pre-wrap",
+								children: m.text
+							})] }) }, m.id)),
+							shown.map((turn) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: "grid gap-6",
+								children: [turn.text && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Message, {
+									align: "end",
+									children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageContent, { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Bubble, {
+										align: "end",
+										variant: "muted",
+										children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BubbleContent, {
+											className: "whitespace-pre-wrap",
+											children: turn.text
+										})
+									}) })
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Message, { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageContent, { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Reply, { turn }) }) })]
+							}, turn.messageId))
+						]
+					}) }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageScrollerButton, {})]
+				})
+			})
+		]
+	});
+}
 function setup(app) {
 	app.header?.(CallMenu);
 	app.chat(TalkBar);
@@ -1058,6 +1246,7 @@ function setup(app) {
 	app.slot?.("chat-rooms.room-header", RoomCall);
 	app.slot?.("chat-rooms.room-box", RoomTalkBar);
 	app.toolView("call", CallCard, { open: true });
+	app.route("/calls/:id", CallChat);
 	app.settings(Tab);
 	app.botSettings(BotSection);
 }

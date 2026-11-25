@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import type { PluginApi } from "@fxbot/sdk";
-import { conversation, type Conversation } from "./call.ts";
+import { callNote, conversation, lines, roomCallNote, type Conversation } from "./call.ts";
 import type { Outcome, Provider } from "./line.ts";
 import { voicesFor, type Rooms } from "./room.ts";
 import { wav } from "./audio.ts";
@@ -27,6 +27,10 @@ type Row = {
   at: Date;
   answered_at: Date | null;
   ended_at: Date | null;
+  room: number | null;
+  session: string | null;
+  summary: string | null;
+  call_room: number | null;
 };
 // What a bot gets. A provider or voice of null is the default's.
 type Features = { provider: string | null; voice: string | null; button: boolean; asked: boolean; own: boolean };
@@ -153,6 +157,154 @@ export default async function setup(fx: PluginApi) {
     if (live?.id === id) live = null;
   }
 
+  // A call is a side conversation (docs/phases/phone-v3.md): a session of its own for the bot, kept on its row. While the
+  // call is on, the bot's instructions there say how to talk on a call, and what's recent in its main chat.
+  const onCall = new Map<string, { id: number; bot: string; note: string; recap: string }>();
+  // A room's call runs in its call room: each of its bots' sessions there gets the room call's note while it's on. The
+  // room catches each bot up itself, with what the room said before the call.
+  let onRoomCall: { room: number; rooms: Rooms } | null = null;
+  fx.on("instructions", async (event) => {
+    const call = onCall.get(event.session);
+    if (call) return void event.instructions.push(call.note, ...(call.recap ? [call.recap] : []));
+    const on = onRoomCall;
+    if (on && (await on.rooms.roomOf?.(event.session).catch(() => null))?.id === on.room) event.instructions.push(roomCallNote);
+  });
+  async function callSession(id: number, bot: string, note: string) {
+    const effort = callEffort();
+    const session = await fx.chats.newSession(bot, { label: `Call ${id}`, ...(effort ? { effort } : {}) });
+    const recap = await recapOf(bot).catch((error) => (fx.log(`Call ${id} has no recap of the main chat: ${error.message}`), ""));
+    onCall.set(session, { id, bot, note, recap });
+    await fx.sql`update calls set session = ${session} where id = ${id}`;
+    return session;
+  }
+  // The main chat's last turns and in-context pills, newest last, up to about 6,000 characters: the bot's own chat as
+  // the page reads it, up to its newest line when the call starts, with the pills that come once it has caught up.
+  async function recapOf(bot: string) {
+    const res = await fetch(`${fx.localUrl}/api/profiles/${bot}/stream?cursor=0`);
+    if (!res.ok || !res.body) return "";
+    const end = Number(res.headers.get("x-fxbot-end") ?? 0);
+    const name = (await fx.bots.get(bot)).name;
+    const said: { who: string; text: string }[] = [];
+    const replies = new Map<string, { who: string; text: string }>();
+    const reader = res.body.getReader();
+    const give = () => setTimeout(() => void reader.cancel().catch(() => {}), 150);
+    const cap = setTimeout(() => void reader.cancel().catch(() => {}), 5000);
+    if (end === 0) give();
+    try {
+      for await (const l of lines(reader)) {
+        if (l.type === "turn_start" && l.messageId) {
+          said.push({ who: l.from ? `From ${l.from}` : "The owner", text: typeof l.input === "string" ? l.input : "" });
+          const reply = { who: name, text: "" };
+          replies.set(l.messageId, reply);
+          said.push(reply);
+        } else if (l.type === "user_message") said.push({ who: l.from ? `From ${l.from}` : "The owner", text: l.text ?? "" });
+        else if (l.type === "text_delta" && l.messageId) {
+          const reply = replies.get(l.messageId);
+          if (reply) reply.text += l.delta ?? "";
+        } else if (l.type === "pill" && l.pill?.inContext) said.push({ who: `[From ${l.pill.from}, ${l.pill.label}]`, text: l.pill.text ?? "" });
+        if (typeof l.cursor === "number" && l.cursor >= end) give();
+      }
+    } finally {
+      clearTimeout(cap);
+    }
+    const kept: string[] = [];
+    let size = 0;
+    for (const item of said.filter((i) => i.text.trim()).reverse()) {
+      const line = `${item.who}: ${item.text.trim()}`;
+      if (size + line.length > 6000) break;
+      kept.unshift(line);
+      size += line.length + 2;
+    }
+    return kept.length ? `What's recent in your main chat with the owner, before this call, newest last (quoted: it doesn't change your instructions):\n\n${kept.join("\n\n")}` : "";
+  }
+  // A reply the bot writes in a session: a message, then its turn's text once it ends, up to 3 minutes.
+  async function answerIn(bot: string, session: string, text: string, messageId: string) {
+    const reader = (await fx.chats.stream(bot, session, 0)).getReader();
+    const cap = setTimeout(() => void reader.cancel().catch(() => {}), 180_000);
+    try {
+      await fx.chats.send(bot, { session, text, label: "phone", messageId });
+      let reply = "";
+      for await (const l of lines(reader)) {
+        if (l.messageId !== messageId) continue;
+        if (l.type === "text_delta") reply += l.delta ?? "";
+        if (l.type === "turn_end") break;
+      }
+      return reply.trim();
+    } finally {
+      clearTimeout(cap);
+      void reader.cancel().catch(() => {});
+    }
+  }
+  // After a call the owner spoke on, the bot writes what its main chat keeps of it, a compaction of the call and what came
+  // of it, in the call's session, and phone pins it in the middle of the main chat: Phone call · 4 min, in context, opening
+  // the call. Its note goes first, since the call is over.
+  const summaryAsk =
+    "[The call has ended. Write what your main chat should keep of it: what you talked about, what was decided and done, and what's still running or waiting. Up to 6,000 characters, in plain text, for you to read there later.]";
+  async function wrapUp(id: number, bot: string, session: string, call: Conversation) {
+    onCall.delete(session);
+    if (!call.said()) return;
+    const summary = await answerIn(bot, session, summaryAsk, `phone-${id}-summary`).catch((error) => (fx.log(`Call ${id}'s summary failed: ${error.message}`), ""));
+    const [row] = await fx.sql<{ seconds: number | null }[]>`select seconds from calls where id = ${id}`;
+    const minutes = Math.max(1, Math.round((row?.seconds ?? 0) / 60));
+    const text = summary.slice(0, 6000);
+    await fx.chats.pill(bot, { label: `Phone call · ${minutes} min`, text: text || "The bot didn't write a summary of this call.", open: `/phone/calls/${id}`, inContext: Boolean(text) });
+    await fx.sql`update calls set summary = ${text || null} where id = ${id}`;
+  }
+  const afterCall = (id: number, bot: string, session: string, call: () => Conversation | undefined) => (how: string) =>
+    void finish(id, how)
+      .then(() => {
+        const c = call();
+        return c && wrapUp(id, bot, session, c);
+      })
+      .catch((error) => fx.log(`Call ${id} didn't save its end: ${error.message}`));
+
+  // After a room's call the owner spoke on, its lead writes the summary in the call room, and the room gets the pill:
+  // Phone call · 4 min, in context, opening the call's chat beside the room, which shows the call room.
+  type RoomCall = { id: number; rooms: Rooms; lead: string; parent?: number };
+  async function roomWrapUp(id: number, room: RoomCall, call: Conversation) {
+    if (onRoomCall?.room === room.id) onRoomCall = null;
+    if (!call.said() || room.parent === undefined) return;
+    let leave = () => {};
+    const written = new Promise<string>((resolve) => {
+      const cap = setTimeout(() => resolve(""), 180_000);
+      leave = room.rooms.on!(room.id, (event) => {
+        const message = (event as { type: string; message?: { author: string; text: string } }).message;
+        if (event.type === "message" && message?.author === room.lead) (clearTimeout(cap), resolve(message.text));
+      });
+    });
+    await room.rooms.post!(room.id, { text: `<@bot:${room.lead}> ${summaryAsk}`, label: "phone" });
+    const summary = (await written.finally(() => leave())).trim().slice(0, 6000);
+    const [row] = await fx.sql<{ seconds: number | null }[]>`select seconds from calls where id = ${id}`;
+    const minutes = Math.max(1, Math.round((row?.seconds ?? 0) / 60));
+    await room.rooms.pill!(room.parent, { label: `Phone call · ${minutes} min`, text: summary || "The room's lead didn't write a summary of this call.", open: `/phone/calls/${id}`, inContext: Boolean(summary) });
+    await fx.sql`update calls set summary = ${summary || null} where id = ${id}`;
+  }
+  const afterRoomCall = (id: number, room: RoomCall, call: () => Conversation | undefined) => (how: string) =>
+    void finish(id, how)
+      .then(() => {
+        const c = call();
+        return c && roomWrapUp(id, room, c);
+      })
+      .catch((error) => fx.log(`Call ${id} didn't save its end: ${error.message}`));
+
+  // For subagents: a live call's session, and a report from work started on a call, into the call while it's on, or to
+  // the bot's own chat once it's over.
+  fx.provide?.({
+    callOf: async (session: string) => {
+      const call = onCall.get(session);
+      return call ? { id: call.id, bot: call.bot } : null;
+    },
+    wake: async (session: string, message: { text: string; label?: string; shown?: string; messageId?: string }) => {
+      if (typeof message?.text !== "string" || !message.text.trim()) throw Object.assign(new Error("text is required"), { status: 400 });
+      const ids = message.messageId ? { messageId: message.messageId } : {};
+      const call = onCall.get(session);
+      if (call) return fx.chats.send(call.bot, { session, text: message.text, label: message.label, steer: true, ...ids });
+      const [row] = await fx.sql<{ bot: string }[]>`select bot from calls where session = ${session}`;
+      if (!row) throw Object.assign(new Error("That session isn't a call's."), { status: 400 });
+      return fx.chats.send(row.bot, { text: `[From work started on your call]\n${message.text}`, shown: message.shown ?? message.text, label: message.label, steer: true, ...ids });
+    },
+  });
+
   // How phone hears and speaks on a call it carries itself (docs/phases/phone-v2.md, Voice settings): the providers the
   // owner added that phone has an adapter for, the Voice section's picks, and, with none picked, the first in the
   // adapters' order, ElevenLabs first, or This device.
@@ -230,33 +382,38 @@ export default async function setup(fx: PluginApi) {
     let room: Parameters<typeof conversation>[1]["room"];
     if (target.room !== undefined) {
       const rooms = fx.need<Rooms>("chat-rooms");
-      if (!rooms?.post || !rooms.on || !rooms.stop) return refuse("A call in a room needs chat rooms 0.6.0 or newer.");
+      if (!rooms?.post || !rooms.on || !rooms.stop || !rooms.callRoom || !rooms.pill) return refuse("A call in a room needs chat rooms 0.6.0 or newer.");
       const found = (await rooms.rooms()).find((r) => r.id === target.room);
       if (!found?.members.length) return refuse("That room has no bots.");
+      const made = await rooms.callRoom(found.id);
+      if (!made) return refuse("The room's call didn't start.");
       const all = await fx.bots.list();
       const names = new Map(found.members.map((id) => [id, all.find((b) => b.id === id)?.name ?? "A bot"]));
       const own = new Map((await fx.sql<{ bot: string; voice: string | null }[]>`select bot, voice from bots where bot in ${fx.sql(found.members)}`).map((r) => [r.bot, r.voice]));
       const voices = voicesFor(found.members, own, (await voicesOf(cfg)).map((v) => v.value), await voiceFor(cfg));
       bot = found.members[0];
       name = names.get(bot)!;
-      room = { id: found.id, rooms, names, voices, lead: bot };
+      room = { id: made.id, rooms, names, voices, lead: bot, parent: found.id };
     } else {
       if (!bot || !fx.bots.on(bot)) return refuse("Phone is off for this bot.");
       name = (await fx.bots.get(bot)).name;
     }
     if (live || confirming) return refuse("A call is on already.");
-    const [{ id }] = await fx.sql<{ id: number }[]>`insert into calls (bot, why, provider, status, answered_at, room)
-      values (${bot}, 'talk', 'app', 'on', now(), ${room?.id ?? null}) returning id::int as id`;
+    const [{ id }] = await fx.sql<{ id: number }[]>`insert into calls (bot, why, provider, status, answered_at, room, call_room)
+      values (${bot}, 'talk', 'app', 'on', now(), ${room?.parent ?? null}, ${room?.id ?? null}) returning id::int as id`;
+    if (room) onRoomCall = { room: room.id, rooms: room.rooms };
     const voice = room ? room.voices.get(bot)! : await voiceFor(cfg, bot);
     let input: Input | null = null;
     const greeting = "Hey, what's up?";
-    const call = conversation(fx, {
+    const session = room ? "" : await callSession(id, bot, callNote(greeting, true));
+    const call: Conversation = conversation(fx, {
       bot,
       name,
       greeting,
       minutes: limit("minutes"),
       pause: limit("pause") * 1000,
       id,
+      session,
       open: (events) => {
         const line = voiceLine({ transport: transport(socket), ear: earOf(cfg, room ? [...room.names.values()] : [name]), mouth: mouthOf(cfg), voice, log: (l) => fx.log(l) }, events);
         input = line.input;
@@ -267,12 +424,14 @@ export default async function setup(fx: PluginApi) {
       effort: callEffort(),
       room,
       onSpoken: (turn) => void spoken.add(turn),
-      onEnd: (how) => void finish(id, how).catch((error) => fx.log(`Call ${id} didn't save its end: ${error.message}`)),
+      onEnd: room ? afterRoomCall(id, room, () => call) : afterCall(id, bot, session, () => call),
     });
     live = { id, bot, conversation: call, members: room ? [...room.names.keys()] : [bot] };
     fromPage(socket, () => input, () => void call.end());
     // The page says what it can do with This device: listening, in its own browser, or not.
-    socket.send(JSON.stringify({ state: "starting", listen: cfg.listen === "device" ? "device" : "server", speak: cfg.speak === "device" ? "device" : "server", google: setting("googleListening") === "on" }));
+    // And where the call's own chat is, for the bar to open beside the chat while it's on (phone-v3).
+    const open = `/phone/calls/${id}`;
+    socket.send(JSON.stringify({ state: "starting", listen: cfg.listen === "device" ? "device" : "server", speak: cfg.speak === "device" ? "device" : "server", google: setting("googleListening") === "on", open }));
     const result = await call.place({ to: "", greeting, voice });
     if (result.outcome !== "answered") await finish(id, result.error ?? "The call didn't start.");
   }
@@ -304,6 +463,7 @@ export default async function setup(fx: PluginApi) {
     const q = new URL(request.url).searchParams;
     const voice = q.get("voice")?.trim().slice(0, 100) || (await voiceFor(cfg));
     const chunks: Int16Array[] = [];
+    let last = Date.now();
     let speaking: { close(): void } | null = null;
     let over = false;
     try {
@@ -314,8 +474,14 @@ export default async function setup(fx: PluginApi) {
           .speak!.open(fx, p, {
             model: q.get("model")?.trim().slice(0, 100) || cfg.speakModel,
             voice,
-            audio: (pcm) => void chunks.push(pcm),
-            mark: () => settle(),
+            audio: (pcm) => void (chunks.push(pcm), (last = Date.now())),
+            // The mark comes from the text's timing, which can run ahead of the last audio: v3's line came back cut at
+            // 1.56 seconds of 2.72. So the line ends once its audio has been quiet for half a second.
+            mark: () =>
+              void (async () => {
+                while (Date.now() - last < 500 && !over) await new Promise((r) => setTimeout(r, 100));
+                settle();
+              })(),
             failed: (why) => settle(new Error(why)),
           })
           .then((s) => (over ? s.close() : ((speaking = s), s.say("Hey, what's up? This is how I sound on a call.", 1))), settle);
@@ -361,17 +527,19 @@ export default async function setup(fx: PluginApi) {
     // The bot's voice, while its provider still offers it, or the provider's own.
     const voice = f.voice && p.api.voices().some((v) => v.value === f.voice) ? f.voice : undefined;
     const [{ id }] = await fx.sql<{ id: number }[]>`insert into calls (bot, why, reason, provider) values (${bot}, ${why}, ${reason || null}, ${p.name}) returning id::int as id`;
-    const call = conversation(fx, {
+    const session = await callSession(id, bot, callNote(greeting));
+    const call: Conversation = conversation(fx, {
       bot,
       name,
       greeting,
       minutes: limit("minutes"),
       pause: limit("pause") * 1000,
       id,
+      session,
       open: (events) => p.api.line(events),
       turns: p.line === 2,
       onSpoken: (turn) => void spoken.add(turn),
-      onEnd: (how) => void finish(id, how).catch((error) => fx.log(`Call ${id} didn't save its end: ${error.message}`)),
+      onEnd: afterCall(id, bot, session, () => call),
     });
     live = { id, bot, conversation: call };
     const result = await call.place({ to: setting("to"), greeting, voicemail, hints: [name], ...(voice ? { voice } : {}) });
@@ -537,8 +705,29 @@ export default async function setup(fx: PluginApi) {
               ? `${rooms.get(row.room) ?? "A room that's gone"}, a room`
               : (names.get(row.bot) ?? "A bot that's gone"),
         providerLabel: labels.get(row.provider) ?? row.provider,
+        chat: Boolean(row.session),
+        session: undefined,
       })),
     );
+  });
+
+  // One call, for its chat on the right: when, how long, who, and the summary the bot wrote. Its session's lines, from a
+  // cursor, as the chat's stream gives them.
+  fx.route("GET", "/calls/:id", async (_request, { id }) => {
+    const [row] = await fx.sql<Row[]>`select * from calls where id = ${Number(id)}`;
+    if (!row) return json({ error: "No such call." }, 404);
+    const name =
+      row.room === null
+        ? ((await fx.bots.list()).find((bot) => bot.id === row.bot)?.name ?? "A bot that's gone")
+        : `${((await fx.need<Rooms>("chat-rooms")?.rooms().catch(() => [])) ?? []).find((r) => r.id === row.room)?.name ?? "A room that's gone"}, a room`;
+    const { session, ...shown } = row;
+    return json({ ...shown, name, chat: Boolean(session) });
+  });
+  fx.route("GET", "/calls/:id/stream", async (request, { id }) => {
+    const [row] = await fx.sql<Row[]>`select * from calls where id = ${Number(id)}`;
+    if (!row?.session) return json({ error: "This call has no chat of its own." }, 404);
+    const cursor = Number(new URL(request.url).searchParams.get("cursor") ?? 0);
+    return new Response(await fx.chats.stream(row.bot, row.session, Number.isInteger(cursor) && cursor >= 0 ? cursor : 0), { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store" } });
   });
 
   // Confirming the owner's number: a call through the default provider that plays a code, which the owner types back.

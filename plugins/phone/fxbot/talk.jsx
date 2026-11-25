@@ -2,7 +2,7 @@
 // carries the audio: the microphone, echo-cancelled by the browser, as 16 kHz PCM16, and the bot's voice, played as it
 // comes and dropped at once when the owner cuts in. Or the browser's own speech, This device. One call at a time.
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ui, useBots } from "@fxbot/app";
+import { openBeside, ui, useBots } from "@fxbot/app";
 
 const store = { now: null, listeners: new Set() };
 const set = (next) => ((store.now = next && { ...(store.now ?? {}), ...next }), store.listeners.forEach((listen) => listen()));
@@ -167,6 +167,7 @@ export async function talk(target, label) {
     if (typeof message !== "string") return (ears?.hush(), sound.play(message));
     const m = JSON.parse(message);
     if (m.state === "starting") {
+      if (typeof m.open === "string") set({ open: m.open });
       if (m.speak === "device") mouth = deviceMouth(socket, () => ears?.resume());
       if (m.listen === "device") {
         const got = await deviceEars(socket, sound.track, m.google, () => store.now?.speaking);
@@ -232,6 +233,15 @@ function Bar({ now, title, bots = [] }) {
         {title} · {clock(now.at)} · <span className="text-muted-foreground">{doing}</span>
         {working.length > 0 && <span className="text-muted-foreground"> · {working.join(", ")} {working.length === 1 ? "is" : "are"} working</span>}
       </span>
+      {/* The call's own chat, as it goes, beside the chat (phone-v3): the main chat doesn't hold the call. */}
+      {now.open && (
+        <ui.Button type="button" size="icon-sm" variant="ghost" aria-label="Open the call's chat" title="Open the call's chat" onClick={() => openBeside(now.open)}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect width="18" height="18" x="3" y="3" rx="2" />
+            <path d="M15 3v18" />
+          </svg>
+        </ui.Button>
+      )}
       <ui.Button type="button" size="sm" variant="outline" aria-pressed={now.muted} onClick={() => now.mute(!now.muted)}>
         {now.muted ? "Unmute" : "Mute"}
       </ui.Button>
