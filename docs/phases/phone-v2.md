@@ -24,7 +24,7 @@ Their answers to the first version's questions:
 
 Then, on a first revision that had a live voice model front the bot: "live voice is the bot, and I meant options... i know gpt live replaces the agent loop I think etc... so we need to figure that out... but I want bots own words, handoff as in it can do tool calls, ask herdr to do stuff, fire off subagents, work on computer etc. it can talk to me and delegate behin tthe scenes and keep our conversation interactive. A true sidekick..."
 
-"Get rid of signalwire" is read as its RELAY way, the speech SignalWire does today. SignalWire stays the first SIP carrier, since the owner's account and number are there ([open question 1](#5-open-questions)).
+"Get rid of signalwire" meant its RELAY way, the speech SignalWire does today: "yes keep signalwire as first sip carrier." On how hard a call thinks: "yes call low, subagents full unless toggled to be different (default low)." On the GPT-Live test: "yes its worth after we get other stuff working."
 
 ## 0. Core or plugin
 
@@ -383,7 +383,7 @@ The bot is the voice, in its own chat, with everything it has: its tools, memory
   - When a subagent tells you something or reports, say what matters, briefly.
   - When the owner asks how it's going, check (`subagents_list`, herdr's agents), and don't guess.
   - Without the subagents plugin, keep each turn short, and say so if a task will take a while.
-- **A call's turns think less:** phone sends what the owner says with `effort`: a new setting, `callThinking`, `low` by default, or the bot's own. Subagents keep theirs.
+- **A call's turns think less:** phone sends what the owner says with `effort`: a new setting, `callThinking`, `low` by default, or the bot's own. Subagents think at the bot's own level, as the subagents plugin's `thinking` setting says by default (`same`), unless the owner changes it there.
 - **The bot never talks over the owner.** A reply that isn't to what the owner just said waits while the owner is speaking, and plays at their next pause. That covers a subagent's report, what it tells the chat, and "Still working on it."
 - **What's under way shows,** in the call's bar: the subagents working, by name, from the bot's panel as it lists them.
 - **The owner's words always reach the bot.** They join a running turn, as now. With long work in the background, the call's turn is short, so they rarely wait.
@@ -564,7 +564,7 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
 - [ ] A call in Chrome on a computer, and on the iPhone app over web pairing, on speaker: cutting in mid-sentence, no echo heard as them, and pacing that sounds right.
 - [ ] One call with This device in Chrome, and one in Firefox.
 - [ ] A sidekick call: they ask for work on the computer, a herdr agent's task, and a subagent's digging, then keep talking. They hear each result at a pause, and cut in mid-sentence.
-- [ ] Optional, with the owner's go-ahead, since it spends credit: GPT-Live as the bot's ears and mouth only. Every word it says comes from `session.commentary.append`, with the bot's reply, and instructions to say exactly that and nothing of its own. If it adds, drops, or rewords, it's out, and that goes here.
+- [ ] After everything above works, with the owner's go-ahead, since it spends credit: GPT-Live as the bot's ears and mouth only. Every word it says comes from `session.commentary.append`, with the bot's reply, and instructions to say exactly that and nothing of its own. If it adds, drops, or rewords, it's out, and that goes here.
 - [ ] One with a Mistral or Groq login reused.
 - [ ] One with Speaches on their machine.
 - [ ] On Android, whether echo cancellation holds.
@@ -590,16 +590,12 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
 
 ## 5. Open questions
 
-Answered on 2026-11-25:
+None left. Answered on 2026-11-25:
 - ElevenLabs first.
 - Google's servers are a toggle, and This device works across browsers.
-- RELAY goes, and this release waits for SIP.
+- RELAY goes, and this release waits for SIP. SignalWire stays the first SIP carrier, and Twilio's trunking is next if its audio doesn't come back.
 - "Hey, what's up?" opens an app call.
 - Phone v2 comes before Coding.
-- Twilio's trunking is next if SignalWire's audio doesn't come back.
-- The voice is the bot, in its own words. Handoffs are its own background work, and a live voice model is only an option to test.
-
-Still open:
-1. **"Get rid of signalwire":** is that its RELAY way only, with SignalWire kept as the first SIP carrier on the owner's account and number? Recommended: yes. If it means SignalWire altogether, Twilio's Elastic SIP Trunking becomes the first carrier, and the proof runs there.
-2. **How hard a call's turns think:** `low` by default, while subagents think at the bot's level? Recommended: yes. A thinking model's first words can take seconds at a high level.
-3. **The GPT-Live test:** worth its credit once the rest works? Recommended: yes, after part 1. If it passes, it's the most natural turn-taking with every word still the bot's.
+- The voice is the bot, in its own words. Handoffs are its own background work.
+- A call's turns think at `low` (`callThinking`), and subagents at the bot's own level unless the owner changes the subagents plugin's `thinking`.
+- The GPT-Live test runs once the rest works.
