@@ -221,7 +221,7 @@ export default async function setup(fx: PluginApi) {
   // of it, in the call's session, and phone pins it in the middle of the main chat: Phone call · 4 min, in context, opening
   // the call. Its note goes first, since the call is over.
   const summaryAsk =
-    "[The call has ended. Write what your main chat should keep of it: what you talked about, what was decided and done, and what's still running or waiting. Up to 6,000 characters, in plain text, for you to read there later.]";
+    "[The call has ended. Write what your main chat should keep of it: only what was said and done on this call, not what was already in your main chat before it. What you talked about, what was decided and done, and what's still running or waiting. Up to 6,000 characters, in plain text, for you to read there later.]";
   async function wrapUp(id: number, bot: string, session: string, call: Conversation) {
     onCall.delete(session);
     if (!call.said()) return call.close();
