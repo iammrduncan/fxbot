@@ -121,7 +121,7 @@ The likeliest cause is his own voice coming back through the desktop's speakers,
 - **A call is a side conversation.** It has a session of its own, with everything the main chat can do, and starts with a recap of the main chat.
 - **The pill is the call, in context.** The bot writes its compaction, up to 6,000 characters, and the pill carries it into the main chat's history and into later calls.
 - **Pills are a core part any plugin can use.** Rooms get pills of their own the same way.
-- **Nothing is refused on a call.** The sidekick is the bot's manner: it speaks first, in its own words, and hands longer work to subagents. Phone's own lines are a net for silence.
+- **Nothing is refused on a call.** The sidekick is the bot's manner, in its instructions only while a call is on: it speaks first, in its own words, and hands longer work to subagents. Phone's own lines are a net for silence.
 - **Done means measured on real calls against the owner's bar, then the owner's own calls.** A mock proves the wiring, and is reported as only that.
 
 ## 3. Implementation
@@ -165,7 +165,7 @@ The likeliest cause is his own voice coming back through the desktop's speakers,
 
 - **A session for each call.** At the start, phone opens one with `fx.chats.newSession(bot, { label: "Call <id>", effort })`, and keeps it on the call's row. That needs migration `0003_call_session.sql`, adding `calls.session`.
 - **The owner's words go there.** They're sent with `fx.chats.send(bot, { session, steer: true, … })`. Phone follows the session with `fx.chats.stream(bot, session)`, where it streamed the main chat from its start. What lands in the main chat during a call, such as herdr's watch reports, isn't spoken.
-- **The call's instructions,** added by the `instructions` hook for that session only:
+- **The call's instructions,** added by the `instructions` hook to that session only, and only while the call is on:
   - The call note, below.
   - A recap of the main chat: its last turns and pills, the owner's words and the bot's replies, newest last, up to about 6,000 characters. Its pills include the summaries of earlier calls, so later calls know them.
   - For a call the bot placed, its reason.
@@ -174,6 +174,10 @@ The likeliest cause is his own voice coming back through the desktop's speakers,
 
 ### Phone: the sidekick (`call.ts`, `server.ts`)
 
+- **Only during the call.** The sidekick note is part of the bot's instructions for the call's session, and only while the call is on.
+  - It's never a message, so it isn't in the call's chat, its summary, the main chat, or a subagent's task.
+  - A call session opened after the call ended gets none, such as for the summary or a late report.
+  - Phone-v2 sent the note as the call's first message into the main chat, where it stayed in the bot's history. That goes.
 - **The call note** replaces phone-v2's "quick looks yourself":
   - Talk like a person on a call.
   - Before you use a tool, first say in a few natural words what you're doing ("Oh, let me check that."), so the owner hears you at once.
@@ -296,7 +300,7 @@ The likeliest cause is his own voice coming back through the desktop's speakers,
   - [ ] What lands in the main chat during a call isn't spoken.
   - [ ] Nothing is refused.
 - [ ] Phone, the sidekick:
-  - [ ] The note.
+  - [ ] The note is in the call session's instructions only while the call is on: never a message, never in the main chat, and gone from a call session opened after the call.
   - [ ] "One moment." waits 3 seconds.
   - [ ] Phone provides `callOf` and `wake`. Subagents starts in a call's session, a report during the call is spoken at the owner's pause, and one after it goes to the main chat.
 - [ ] Phone, the pill:
