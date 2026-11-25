@@ -586,7 +586,7 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
   - They refuse a URL off the provider's hosts, a plan sign-in, and a provider with no key.
 - [x] `effort` on `fx.chats.send`: the turn a message starts thinks at that level, seen in the mock model's request, and a turn it joins keeps its own.
 - [x] Docs: the plugin API reference, and CHANGELOG's For plugins line.
-- [ ] `npm run typecheck`, `npm run build-site`, and `git diff --check` pass.
+- [x] `npm run typecheck`, `npm run build-site`, and `git diff --check` pass.
 
 **Part 1, phone 0.2.0:**
 - [x] `0002_voice.sql`, and the Voice section:
@@ -633,10 +633,10 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
 - [x] Over web pairing locally: `npm run dev --prefix packages/web-app` with the new policy. The frame gets the microphone, and a call works through the bridge.
 - [x] A local Speaches container, run disposably under podman, if its image and a small model fit on this machine. It hears a WAV and speaks a sentence through the speech server entry. If it doesn't fit, it's said here, and the fake stands in.
 - [x] phone's README (Voice, the app's call, and line 3), the how-tos, CHANGELOG, and the README's Phases line.
-- [ ] Dev: phone 0.2.0 landed in one write a file, and the API restarted. Its log shows the providers phone found.
+- [x] Dev: phone 0.2.0 landed, by a fast-forward with no call on, and the API restarted. Its log shows the migrations, and Voice falls back to This device, since dev has no provider phone can listen with yet.
 
 **Part 1, web.fxbot.sh:**
-- [ ] The relay's `permissions-policy` changed and checked locally, then deployed with the owner's approval.
+- [ ] The relay's `permissions-policy` changed and checked locally, then deployed with the owner's approval. Changed and checked locally (b54b4ac); the deploy waits.
 - [ ] The live `shell.js` hash matches a local build.
 
 **The owner's own** (only a person can):
