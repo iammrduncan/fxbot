@@ -46,6 +46,18 @@ const label = "your call";
 const floorWords = /^(?:wait|hold on|hang on|one (?:sec|second|moment)|sorry)[.!,]*$/i;
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const wordsOf = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [];
+// How many of these words come in that order in what was said. An echo is the bot's words as it said them; the owner
+// answering may use the same words in another order, as "hold on so you can't hear me" did on 2026-11-25, after the bot
+// said "it can't hear you while it's talking, so you have to wait... when you say hold on".
+function inOrder(words: string[], said: string[]) {
+  let row: number[] = new Array(said.length + 1).fill(0);
+  for (const word of words) {
+    const next = [0];
+    for (let j = 1; j <= said.length; j++) next[j] = word === said[j - 1] ? row[j - 1] + 1 : Math.max(row[j], next[j - 1]);
+    row = next;
+  }
+  return row[said.length];
+}
 const note = (greeting: string) =>
   `You're on a live phone call with the owner, who may be driving. You called them and said: "${greeting}" What they say comes to you as text, and what you write is read out to them. ` +
   "Answer in one to three short spoken sentences, with no lists, tables, links, code, or markdown. Your tools work as in the chat: to say how something stands now, check with them first, since what's earlier in the chat may be old. Before work that takes more than a few seconds, say in a few words what you'll do, and hand long work to a subagent if you have one. " +
@@ -203,15 +215,15 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     greeting = false;
   }
 
-  // Whether words heard are the bot's own voice coming back, as from a phone on speaker or a watch: most of them are in
-  // what was playing as they began, or had stopped up to 1.5 seconds before, the echo's way back. The recognizer gives
+  // Whether words heard are the bot's own voice coming back, as from a phone on speaker or a watch: most of them are, in
+  // order, what was playing as they began, or had stopped up to 1.5 seconds before, the echo's way back. The recognizer gives
   // words a second or more after their sound, so an echo comes after its line ended, or while the next one plays: on
   // 2026-11-24 the greeting's echo, "hey this is", reached the bot as the owner's words.
   function echoed(text: string, at: number) {
     if (!line.speaking && airing.length) offAir();
-    const said = new Set([...airing, ...aired.filter((a) => a.end + 1500 > at).map((a) => a.text)].flatMap(wordsOf));
+    const said = [...aired.filter((a) => a.end + 1500 > at).map((a) => a.text), ...airing].flatMap(wordsOf);
     const words = wordsOf(text);
-    return words.length > 0 && words.filter((word) => said.has(word)).length / words.length >= 0.6;
+    return words.length > 0 && inOrder(words, said) / words.length >= 0.6;
   }
   // On a line 2, two words of the owner's while the bot speaks cut it off, after the greeting. One may be a cough.
   function cutIn(text: string) {

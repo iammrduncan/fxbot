@@ -175,7 +175,7 @@ The owner, on 2026-11-24, after a call to their Apple Watch on speaker: "the pho
   - A provider needs phone with `{ "line": 2 }`. Its line gives the words as they come, `hearing(text)`, as well as `heard(text)` once they're finished, and never cuts the bot off itself: phone calls `stop()`.
   - phone still takes a line 1 provider, which cuts the bot off itself and says `interrupted()`. phone drops the echo in its finished words too, so phone 0.1.2 helps with phone-signalwire 0.1.1. But an old provider still cuts the greeting and the next line, so update both.
 - **What `call.ts` does now:**
-  - It keeps what the bot said that's playing or waiting, and what stopped playing in the last minute, with when. Words heard are the bot's own when most of them are in what was playing as they began, or had stopped up to 1.5 seconds before, the echo's way back from the phone.
+  - It keeps what the bot said that's playing or waiting, and what stopped playing in the last minute, with when. Words heard are the bot's own when most of them are, in order, what was playing as they began, or had stopped up to 1.5 seconds before, the echo's way back from the phone. In order since the first call on dev, below: at first any order counted.
   - When the words began is their first `hearing`. With only `heard`, it's about a second of silence and half a second a word before it.
   - Such words neither cut in nor reach the bot. The log says each one it drops, and how long after its line, to tune the 1.5 seconds on real calls.
   - On a line 2, two words of the owner's while the bot speaks cut it off, as before, except during the greeting, which plays to the end. "Stop" and "hold on" still stop it. Words said over the greeting that aren't its echo still reach the bot.
@@ -208,3 +208,14 @@ The owner, the same day: "it needs a bit of pause after I speak cause I may stut
   - No "One moment." while the owner talked again, and words held at a hang-up reached the bot once.
   - The confirm, talk, echo, repeat, deaf, and rules checks pass. The talk check's "One moment." now comes at 3.5 seconds, and its steps that speak again wait for the pause first.
   - **Not checked:** a real call, and whether 2 seconds suits the owner. A "stop" said just as held words go may find the bot's turn not started yet, and say "Okay." without stopping it, as before.
+
+### The first call on dev (2026-11-25)
+
+The owner, after a call from their watch with dev's phone 0.1.2: "I wasn't able to intterject/interrupt it at all." Bob read out a long status, about 25 seconds as one play. The owner talked over it, "so i'm talking to you on the phone and you're still talking...", and those words reached Bob, but nothing cut him off, and the log had no line stopped.
+
+- **SignalWire seems to give nothing it hears while a play runs.** The owner's words over the long play came clean, with no echo in them, so SignalWire heard them, but the call got them only after the play ended. No call yet has logged `start_of_input` during a line. And the owner's next words, said as Bob finished, began 0.0 seconds after his line ended, too soon for anyone to answer. FreeSWITCH, which SignalWire runs on, queues a call's speech events while a playback runs. SignalWire's docs don't say either way.
+- **So each sentence is its own play,** in phone-signalwire, where the line used to join what waited into one. The owner can cut in at the end of the sentence they talk over, not only at the end of a reply. The cost is a round trip between sentences.
+- **Echo is matched in order.** The owner's "hold on so you can't hear me", said as Bob ended "...it can't hear you while it's talking, so you have to wait... when you say hold on... stops me", was dropped as the bot's own voice: every word of it was in his reply, in another order. An echo is the bot's words as it said them, so most of the words heard must now come in that order.
+- **The provider's log says when SignalWire gives what it heard:** each time words start, and each final, against the line playing or the last one's end. The next call shows whether SignalWire holds words while a play runs.
+- **Checked** against the fake RELAY: all seven checks pass, and the echo check now has the owner's words in the bot's words, in another order, right as it ends, reaching the bot. The fake gives words during a play, so it can't show what SignalWire does.
+- **If SignalWire does hold words,** cutting in mid-sentence needs the call's audio itself, as [Phone: Telnyx](../../phases/phone-telnyx.md) and [Phone in the app](../../phases/phone-in-app.md) plan, with a `cascade.ts` in phone: a voice detector, noise removal, and a turn detector, as realtime voice products have. `calling.play_and_collect` may stop a prompt on speech, untested.

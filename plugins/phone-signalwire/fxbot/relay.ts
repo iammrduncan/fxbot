@@ -151,6 +151,9 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
   // The words the collect running now last gave as said.
   let lastHeard = "";
   let listens: number[] = [];
+  // When the last line ended, and whether the next words heard start something new: for the log below.
+  let lastEnd = 0;
+  let fresh = true;
   const ids = () => ({ node_id: call!.node, call_id: call!.id });
   const conn = connection(relay, event, () => end("The connection to SignalWire was lost."));
 
@@ -177,8 +180,9 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
       for (const done of drained) done();
       return drained.clear();
     }
-    // What waited while the last line played goes as one, so sentences don't each wait on a round trip.
-    const text = queue.splice(0).join(" ");
+    // One sentence a play. On a real call (2026-11-25), SignalWire gave nothing it heard until the play it was talking
+    // over had ended, so a whole reply as one play couldn't be cut off; each sentence's end is now a chance to.
+    const text = queue.shift()!;
     const control = randomUUID();
     playing = { control, text, cut: false, at: Date.now() };
     conn.request("calling.play", { ...ids(), control_id: control, play: [{ type: "tts", params: { text, voice: asked?.voice || relay.voice } }] }).catch((error) => {
@@ -264,6 +268,7 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
     if (type === "calling.call.play" && playing && params.control_id === playing.control && ["finished", "error"].includes(params.state)) {
       const done = playing;
       playing = null;
+      lastEnd = Date.now();
       if (done.stopAt) relay.log(`A line stopped ${Date.now() - done.stopAt} ms after it was asked to.`);
       if (params.state === "error") relay.log("SignalWire couldn't play a line.");
       else if (!done.cut) on.played(done.text);
@@ -287,6 +292,13 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
     if (result.type === "speech") {
       const text = String(result.params?.text ?? "").trim();
       const final = params.final === true || (params.final === undefined && params.state !== "collecting");
+      // For the next real calls: when SignalWire gives what it heard, against the bot's lines, to see whether it holds
+      // words while a line plays. Words starting, and each final, with how many words.
+      if (text && (fresh || final)) {
+        const when = playing ? `${Date.now() - playing.at} ms into a line` : lastEnd ? `${Date.now() - lastEnd} ms after a line ended` : "before any line";
+        relay.log(`Heard ${final ? "a final" : "words start"} (${text.split(/\s+/).length} words) ${when}.`);
+      }
+      if (text) fresh = final;
       // A continuous collect gives each thing said as a final while it's collecting, then its last result again as it
       // ends, as SignalWire's own SDK reads it: when the owner hung up, their last words went to the bot a second time.
       if (ending && text && text === lastHeard) relay.log("SignalWire gave the last words again as its listening ended; they weren't sent again.");
