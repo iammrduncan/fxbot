@@ -2,6 +2,7 @@
 // and a section in each bot's settings. Built into page.js; see the README.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { api, go, ui } from "@fxbot/app";
+import { RoomTalk, RoomTalkBar, TalkBar, TalkButton } from "./talk.jsx";
 
 async function call(path, method = "GET", body) {
   const res = await api(path, { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
@@ -105,7 +106,7 @@ function CallBar({ bot }) {
   if (!now) return null;
   const end = () => (setEnding(true), call(`calls/${now.id}/end`, "POST").finally(() => void read(bot.id)));
   return (
-    <section className="flex items-center gap-2 rounded-lg border bg-background p-2 pl-3 text-sm" aria-label={`Your call with ${bot.name}`}>
+    <section className="flex min-w-0 items-center gap-2 rounded-lg border bg-background p-2 pl-3 text-sm" aria-label={`Your call with ${bot.name}`}>
       <span className="text-muted-foreground">
         <Phone />
       </span>
@@ -210,6 +211,7 @@ function Tab() {
   const ready = using && using.running && !using.missing.length;
   return (
     <section className="grid gap-3 text-sm" aria-label="Your phone">
+      <VoiceSection />
       <h2 className="font-medium">Your phone</h2>
       <Providers status={status} onPick={pick} />
       {status.missing.length ? (
@@ -259,6 +261,114 @@ function Tab() {
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+// How phone hears and speaks on a call it carries itself, in the app: a provider the owner added for each, with its model,
+// and a voice, or This device, the browser's own speech.
+function VoiceSection() {
+  const [voice, setVoice] = useState(null);
+  const [voices, setVoices] = useState([]);
+  const [error, setError] = useState("");
+  const load = () =>
+    call("voice").then(
+      (v) => (setVoice(v), v.speak.provider !== "device" ? call("voice/voices").then(setVoices, () => setVoices([])) : setVoices([])),
+      (e) => setError(e.message),
+    );
+  useEffect(() => void load(), []);
+  if (!voice) return error ? <p className="text-destructive">{error}</p> : null;
+  const save = (patch) => {
+    const next = {
+      listenProvider: voice.listen.provider,
+      listenModel: voice.listen.model,
+      speakProvider: voice.speak.provider,
+      speakModel: voice.speak.model,
+      speakVoice: voice.speak.voice,
+      ...patch,
+    };
+    setError("");
+    call("voice", "PUT", next).then(load, (e) => setError(e.message));
+  };
+  const listener = voice.listeners.find((p) => p.id === voice.listen.provider);
+  const speaker = voice.speakers.find((p) => p.id === voice.speak.provider);
+  const models = (p, model, onPick, label) =>
+    p && (
+      <label className="grid gap-1">
+        <span>{label}</span>
+        <ui.Input list={`models-${label}`} value={model} placeholder={p.models[0] ?? "A model"} onChange={(e) => onPick(e.target.value)} onBlur={(e) => onPick(e.target.value, true)} />
+        <datalist id={`models-${label}`}>
+          {p.models.map((m) => (
+            <option key={m} value={m} />
+          ))}
+        </datalist>
+      </label>
+    );
+  const [listenModel, setListenModel] = [voice.listen.model, (model, done) => (setVoice({ ...voice, listen: { ...voice.listen, model } }), done && save({ listenModel: model }))];
+  const [speakModel, setSpeakModel] = [voice.speak.model, (model, done) => (setVoice({ ...voice, speak: { ...voice.speak, model } }), done && save({ speakModel: model }))];
+  const hears = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  return (
+    <section className="grid gap-3" aria-label="Voice">
+      <h2 className="font-medium">Voice</h2>
+      <p className="text-muted-foreground">
+        How bots hear you and speak on a call in the app: Talk, beside the message box. Add voice providers in Settings › Providers: ElevenLabs and Deepgram, under For phone, or a
+        speech server on your machine. A Mistral, Groq, OpenAI, or Cloudflare login listens too.
+      </p>
+      <label className="grid gap-1">
+        <span>Listening</span>
+        <ui.NativeSelect aria-label="Listening" className="w-full" value={voice.listen.provider} onChange={(e) => save({ listenProvider: e.target.value, listenModel: "" })}>
+          {voice.listeners.map((p) => (
+            <ui.NativeSelectOption key={p.id} value={p.id}>
+              {p.name}
+              {p.streams ? "" : ", one stretch at a time"}
+            </ui.NativeSelectOption>
+          ))}
+          {/* Listening on the device needs the browser's speech recognition, which Firefox and an installed iPhone app lack. */}
+          {(hears || voice.listen.provider === "device") && (
+            <ui.NativeSelectOption value="device">{hears ? "This device: the browser's own" : "This device: not in this browser"}</ui.NativeSelectOption>
+          )}
+        </ui.NativeSelect>
+      </label>
+      {models(listener, listenModel, setListenModel, "Listening model")}
+      <label className="grid gap-1">
+        <span>Speaking</span>
+        <ui.NativeSelect aria-label="Speaking" className="w-full" value={voice.speak.provider} onChange={(e) => save({ speakProvider: e.target.value, speakModel: "", speakVoice: "" })}>
+          {voice.speakers.map((p) => (
+            <ui.NativeSelectOption key={p.id} value={p.id}>
+              {p.name}
+            </ui.NativeSelectOption>
+          ))}
+          <ui.NativeSelectOption value="device">This device: the browser's own</ui.NativeSelectOption>
+        </ui.NativeSelect>
+      </label>
+      {models(speaker, speakModel, setSpeakModel, "Speaking model")}
+      {speaker && voices.length > 0 && (
+        <label className="grid gap-1">
+          <span>Voice</span>
+          <ui.NativeSelect aria-label="Voice" className="w-full" value={voice.speak.voice} onChange={(e) => save({ speakVoice: e.target.value })}>
+            <ui.NativeSelectOption value="">{voices[0].label}, the first</ui.NativeSelectOption>
+            {grouped(voices).map(([group, list]) =>
+              group ? (
+                <ui.NativeSelectOptGroup key={group} label={group}>
+                  {list.map((v) => (
+                    <ui.NativeSelectOption key={v.value} value={v.value}>
+                      {v.label}
+                    </ui.NativeSelectOption>
+                  ))}
+                </ui.NativeSelectOptGroup>
+              ) : (
+                list.map((v) => (
+                  <ui.NativeSelectOption key={v.value} value={v.value}>
+                    {v.label}
+                  </ui.NativeSelectOption>
+                ))
+              ),
+            )}
+          </ui.NativeSelect>
+          <span className="text-xs text-muted-foreground">Each bot can have its own, in its Phone section. In a room, a bot with none gets one no other bot there has.</span>
+        </label>
+      )}
+      {error && <p className="text-destructive">{error}</p>}
     </section>
   );
 }
@@ -326,7 +436,7 @@ function BotSection({ bot }) {
         <label className="grid gap-1">
           <span>Voice</span>
           <ui.NativeSelect aria-label="Its voice" className="w-full" value={state.voice ?? ""} onChange={(e) => save({ voice: e.target.value || null })}>
-            <ui.NativeSelectOption value="">The voice in {state.using.label}'s settings</ui.NativeSelectOption>
+            <ui.NativeSelectOption value="">The voice in phone's Voice section</ui.NativeSelectOption>
             {grouped(state.voices).map(([group, voices]) =>
               group ? (
                 <ui.NativeSelectOptGroup key={group} label={group}>
@@ -364,8 +474,12 @@ function BotSection({ bot }) {
 }
 
 export default function setup(app) {
+  app.composer(TalkButton);
   app.composer(CallButton);
+  app.chat(TalkBar);
   app.chat(CallBar);
+  app.slot?.("chat-rooms.room-header", RoomTalk);
+  app.slot?.("chat-rooms.room-box", RoomTalkBar);
   app.toolView("call", CallCard, { open: true });
   app.settings(Tab);
   app.botSettings(BotSection);

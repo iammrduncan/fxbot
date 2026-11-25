@@ -18,6 +18,9 @@ export type LineEvents = {
   played: (text: string) => void;
   /** The call is over, and why: "hung up" when the owner or the bot hung up, or else what ended it. */
   ended: (how: string) => void;
+  /** Phone's own voice loop: the owner's voice has sounded this long, in ms, with no words yet, from a listener that
+   * gives none as they come. */
+  voice?: (ms: number) => void;
 };
 export type Place = {
   /** The owner's confirmed number. */
@@ -36,14 +39,16 @@ export type Place = {
 export type Line = {
   /** Rings the owner. Resolves once they answer, or don't. */
   place(call: Place): Promise<{ outcome: Outcome; error?: string }>;
-  /** Speaks this after whatever is playing or waiting. */
-  say(text: string): void;
+  /** Speaks this after whatever is playing or waiting, in a voice of its own on phone's voice loop, as a room's bots do. */
+  say(text: string, voice?: string, who?: string): void;
   /** Stops what's playing, and drops what's waiting. */
   stop(): void;
   /** Ends the call once what's waiting has played, or at once with `now`. */
   hangUp(now?: boolean): Promise<void>;
   /** Whether something is playing or waiting to. */
   readonly speaking: boolean;
+  /** Phone's voice loop with a listener that ends the owner's turns itself: the call holds nothing more. */
+  readonly ends?: boolean;
 };
 /** A voice a bot may pick, shown under its group. */
 export type Voice = { value: string; label: string; group?: string };
