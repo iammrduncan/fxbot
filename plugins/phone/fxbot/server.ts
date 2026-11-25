@@ -225,10 +225,11 @@ export default async function setup(fx: PluginApi) {
   async function wrapUp(id: number, bot: string, session: string, call: Conversation) {
     onCall.delete(session);
     if (!call.said()) return call.close();
-    const messageId = `phone-${id}-summary`;
-    const summary = await call
-      .answer(messageId, () => fx.chats.send(bot, { session, text: summaryAsk, label: "phone", messageId }))
-      .catch((error) => (fx.log(`Call ${id}'s summary failed: ${error.message}`), ""))
+    // Asked once more if the first answer doesn't come, so a call isn't left with no summary by one failed turn.
+    const ask = (messageId: string) =>
+      call.answer(messageId, () => fx.chats.send(bot, { session, text: summaryAsk, label: "phone", messageId })).catch((error) => (fx.log(`Call ${id}'s summary failed: ${error.message}`), ""));
+    const summary = await ask(`phone-${id}-summary`)
+      .then((first) => first || ask(`phone-${id}-summary-2`))
       .finally(() => call.close());
     const [row] = await fx.sql<{ seconds: number | null }[]>`select seconds from calls where id = ${id}`;
     const minutes = Math.max(1, Math.round((row?.seconds ?? 0) / 60));

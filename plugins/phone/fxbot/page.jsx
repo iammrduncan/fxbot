@@ -645,7 +645,7 @@ function CallChat({ params }) {
   if (found === null) return <Header title="Phone call" />;
   if (!found) return <Header title="Phone call" />;
   const minutes = Math.max(1, Math.round((found.seconds ?? 0) / 60));
-  const shown = turns.filter((turn) => !turn.messageId.endsWith("-summary"));
+  const shown = turns.filter((turn) => !/-summary(-2)?$/.test(turn.messageId));
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Header title={`Phone call · ${minutes} min`} />

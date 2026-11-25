@@ -1164,7 +1164,7 @@ function CallChat({ params }) {
 	if (found === null) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Header, { title: "Phone call" });
 	if (!found) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Header, { title: "Phone call" });
 	const minutes = Math.max(1, Math.round((found.seconds ?? 0) / 60));
-	const shown = turns.filter((turn) => !turn.messageId.endsWith("-summary"));
+	const shown = turns.filter((turn) => !/-summary(-2)?$/.test(turn.messageId));
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		className: "flex min-h-0 flex-1 flex-col",
 		children: [
