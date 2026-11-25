@@ -12,6 +12,7 @@ Our reference implementations we glean inspiration from are the following:
 - https://github.com/CopilotKit/OpenDuet
 - https://github.com/CopilotKit/openmuse
 - https://github.com/CopilotKit/OpenDots
+- https://github.com/milind-soni/OpenMausBot
 - https://github.com/vercel-labs/agent-desktop
 - https://github.com/vercel-labs/fx0
 - https://github.com/vercel-labs/durable-harness
