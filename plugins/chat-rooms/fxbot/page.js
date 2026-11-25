@@ -10463,16 +10463,26 @@ function Said({ message, bot }) {
 		children: message.text
 	});
 	if (message.author === "summary") return (0, react_jsx_runtime.jsx)(Summary, { text: message.text });
-	if (message.author === "owner") return (0, react_jsx_runtime.jsx)("div", {
-		className: "flex justify-end",
-		children: (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Bubble, {
+	if (message.author === "owner") return (0, react_jsx_runtime.jsxs)("div", {
+		className: "grid justify-items-end gap-1",
+		children: [message.label && (0, react_jsx_runtime.jsxs)("span", {
+			className: "text-xs text-muted-foreground",
+			children: ["From ", message.label]
+		}), (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Bubble, {
 			align: "end",
 			variant: "muted",
 			children: (0, react_jsx_runtime.jsx)(_fxbot_app.ui.BubbleContent, {
 				className: "whitespace-pre-wrap",
 				children: (0, react_jsx_runtime.jsx)(Owned, { text: message.text })
 			})
-		})
+		})]
+	});
+	if (message.author === "plugin") return (0, react_jsx_runtime.jsxs)("div", {
+		className: "grid min-w-0 grid-cols-1 gap-1 rounded-xl border p-3 wrap-break-word",
+		children: [(0, react_jsx_runtime.jsx)("span", {
+			className: "text-sm font-medium",
+			children: message.label ?? "A plugin"
+		}), (0, react_jsx_runtime.jsx)(Markdown, { text: message.text })]
 	});
 	return (0, react_jsx_runtime.jsxs)("div", {
 		className: "flex items-start gap-3",
@@ -10596,6 +10606,13 @@ function RoomScreen({ params }) {
 			(0, react_jsx_runtime.jsxs)("div", {
 				className: "mx-auto w-full max-w-3xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))]",
 				children: [
+					_fxbot_app.Slot && room && (0, react_jsx_runtime.jsx)("div", {
+						className: "grid gap-2 pb-2 empty:hidden",
+						children: (0, react_jsx_runtime.jsx)(_fxbot_app.Slot, {
+							name: "chat-rooms.room-box",
+							props: { room }
+						})
+					}),
 					busy && (0, react_jsx_runtime.jsxs)("div", {
 						className: "flex items-center justify-between gap-2 pb-2 text-xs text-muted-foreground",
 						children: [(0, react_jsx_runtime.jsx)("span", {

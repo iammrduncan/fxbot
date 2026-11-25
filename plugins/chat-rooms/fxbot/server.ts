@@ -11,10 +11,13 @@ import { mentioned, toNames, toTokens } from "./mentions.ts";
 // and the room's sessions are dropped, so each bot's next turn makes a new one, with the summary in its instructions.
 
 type Room = { id: number; name: string; members: string[]; untagged: "lead" | "everyone"; replies: number };
-type Message = { id: number; author: string; text: string; at: string; chain: number | null };
+// `label` is shown with a message, such as "your call", or names the plugin a message of author 'plugin' came from.
+// `note` is for the bots only, and never reaches the page.
+type Message = { id: number; author: string; text: string; at: string; chain: number | null; label?: string | null; note?: string | null };
 // A turn in a room's queue: the bot, the owner's message whose chain it's in, and what woke it: the owner tagging it,
 // tagging everyone, an untagged message for the lead or for everyone, or another bot, by its id.
-type Step = { bot: string; chain: number; by: "owner" | "all" | "lead" | "everyone" | string };
+// A plugin's message, such as a subagent's report, wakes the bot it came for, `from` naming the plugin.
+type Step = { bot: string; chain: number; by: "owner" | "all" | "lead" | "everyone" | "plugin" | string; from?: string };
 // What the room's page hears: the room and its messages, then each new message, the reply being written, and who's next.
 type Event =
   | { type: "room"; room: Room; messages: Message[]; replying: { bot: string; text: string } | null; queue: string[]; starting: boolean }
@@ -98,6 +101,9 @@ export default async function setup(fx: PluginApi) {
   // Which room each session is for, for the instructions hook, and the sessions that hook reached: a bot the plugin
   // is off for gets no hook, and so no room instructions.
   const roomOf = new Map<string, number>();
+  // And the bot each session is for, kept when a room starts over and drops its sessions, so a plugin's message for an
+  // old session, such as a subagent's report, still finds its bot.
+  const botOf = new Map<string, string>();
   const reached = new Set<string>();
   // Sessions the lead's skill went with, since this start: it goes with the lead's first untagged turn.
   const led = new Set<string>();
@@ -106,7 +112,8 @@ export default async function setup(fx: PluginApi) {
   // again when the owner lowers the size.
   const pending = new Map<number, Promise<void>>();
   const tried = new Map<number, string>();
-  for (const { room, session } of await fx.sql<{ room: number; session: string }[]>`select room, session from sessions`) roomOf.set(session, room);
+  for (const { room, session, bot } of await fx.sql<{ room: number; session: string; bot: string }[]>`select room, session, bot from sessions`)
+    (roomOf.set(session, room), botOf.set(session, bot));
 
   async function room(id: number): Promise<Room | null> {
     const [found] = await fx.sql<Omit<Room, "members">[]>`select id, name, untagged, replies from rooms where id = ${id}`;
@@ -114,16 +121,57 @@ export default async function setup(fx: PluginApi) {
     const members = await fx.sql<{ bot: string }[]>`select bot from members where room = ${id} order by position`;
     return { ...found, members: members.map((m) => m.bot) };
   }
-  // For plugins that need chat rooms, such as the computer: the room a session of ours is for, and every room.
-  // fxbot 0.4 has no provide, and then the room works as before.
+  // For plugins that need chat rooms, such as the computer: the room a session of ours is for, and every room. Since
+  // 0.6.0, for phone's calls and subagents: the owner's message from a call, Stop, the room's events, and a plugin's
+  // message that wakes the bot whose session it is. fxbot 0.4 has no provide, and then the room works as before.
   fx.provide?.({
     roomOf: async (session: string) => (roomOf.has(session) ? await room(roomOf.get(session)!) : null),
     rooms: async () => (await Promise.all((await fx.sql<{ id: number }[]>`select id from rooms order by position nulls last, id`).map((r) => room(r.id)))).filter(Boolean),
+    post: async (id: number, message: { text: string; label?: string; note?: string; effort?: string }) => {
+      const found = (await room(Number(id))) ?? fail("No such room.");
+      if (typeof message?.text !== "string" || !message.text.trim()) fail("text is required");
+      await pending.get(found.id);
+      const short = (value: unknown, max: number) => (typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined);
+      return post((await room(found.id)) ?? found, message.text.trim(), { label: short(message.label, 80), note: short(message.note, 2000), effort: short(message.effort, 64) });
+    },
+    stop: async (id: number) => {
+      const found = (await room(Number(id))) ?? fail("No such room.");
+      const { turn, waiting } = await halt(found);
+      if (!turn && waiting) await say(found.id, "note", "Stopped.");
+    },
+    on: (id: number, listener: (event: Event) => void) => {
+      if (!listeners.has(id)) listeners.set(id, new Set());
+      listeners.get(id)!.add(listener);
+      return () => void listeners.get(id)?.delete(listener);
+    },
+    wake: async (session: string, message: { text: string; label?: string }) => {
+      const id = roomOf.get(session) ?? fail("That session isn't a room's.");
+      const found = (await room(id)) ?? fail("No such room.");
+      const [kept] = await fx.sql<{ bot: string }[]>`select bot from sessions where session = ${session}`;
+      const bot = kept?.bot ?? botOf.get(session);
+      if (!bot || !found.members.includes(bot)) fail("That bot isn't in the room any more.");
+      if (typeof message?.text !== "string" || !message.text.trim()) fail("text is required");
+      const label = typeof message.label === "string" && message.label.trim() ? message.label.trim().slice(0, 80) : "A plugin";
+      const said = await say(found.id, "plugin", message.text.trim(), null, { label });
+      queues.set(found.id, [...(queues.get(found.id) ?? []), { bot: bot!, chain: said.id, by: "plugin", from: label }]);
+      emit(found.id, { type: "queue", bots: queued(found.id) });
+      void drain(found.id).catch((error) => fx.log(`Room ${found.id}: ${error instanceof Error ? error.message : error}`));
+      return said;
+    },
   });
-  const messages = (id: number) => fx.sql<Message[]>`select id, author, text, at, chain from messages where room = ${id} order by id`;
-  async function say(id: number, author: string, text: string, chain: number | null = null) {
-    const [message] = await fx.sql<Message[]>`insert into messages (room, author, text, chain) values (${id}, ${author}, ${text}, ${chain})
-      returning id, author, text, at, chain`;
+  function fail(message: string): never {
+    throw Object.assign(new Error(message), { status: 400 });
+  }
+  // The thinking level of each round a call started, by its message, for its turns: the last 50.
+  const efforts = new Map<number, string>();
+  function keepEffort(chain: number, effort: string) {
+    efforts.set(chain, effort);
+    for (const old of [...efforts.keys()].slice(0, Math.max(0, efforts.size - 50))) efforts.delete(old);
+  }
+  const messages = (id: number) => fx.sql<Message[]>`select id, author, text, at, chain, label from messages where room = ${id} order by id`;
+  async function say(id: number, author: string, text: string, chain: number | null = null, { label = null, note = null }: { label?: string | null; note?: string | null } = {}) {
+    const [message] = await fx.sql<Message[]>`insert into messages (room, author, text, chain, label, note) values (${id}, ${author}, ${text}, ${chain}, ${label}, ${note})
+      returning id, author, text, at, chain, label`;
     emit(id, { type: "message", message });
     return message;
   }
@@ -252,7 +300,7 @@ export default async function setup(fx: PluginApi) {
   // The room so far for one bot: what was said since its last turn, or, for a session that's new, the room's recent
   // history with its own lines too, since the room's last summary. The newest come first, until the limits.
   async function since(found: Room, bot: string, seen: number, fresh: boolean, named: Map<string, string>) {
-    const rows = await fx.sql<Message[]>`select id, author, text, at, chain from messages
+    const rows = await fx.sql<Message[]>`select id, author, text, at, chain, label, note from messages
       where room = ${found.id} and author not in ('note', 'summary') and (${fresh} or id > ${seen})
         and id > (select coalesce(max(id), 0) from messages where room = ${found.id} and author = 'summary')
       order by id desc limit ${recent.messages + 1}`;
@@ -261,8 +309,15 @@ export default async function setup(fx: PluginApi) {
     let left = recent.characters;
     let cut = shown.length > recent.messages;
     for (const m of shown.slice(0, recent.messages)) {
-      const who = m.author === "owner" ? "Owner" : m.author === bot ? `${named.get(bot) ?? "You"} (you)` : (named.get(m.author) ?? "A bot that's gone");
-      const line = `${who}: ${toNames(m.text, named)}`;
+      const who =
+        m.author === "owner"
+          ? `Owner${m.label ? ` (${m.label})` : ""}`
+          : m.author === "plugin"
+            ? (m.label ?? "A plugin")
+            : m.author === bot
+              ? `${named.get(bot) ?? "You"} (you)`
+              : (named.get(m.author) ?? "A bot that's gone");
+      const line = `${who}: ${m.note ? `${m.note}\n` : ""}${toNames(m.text, named)}`;
       if (line.length > left) {
         cut = true;
         break;
@@ -286,6 +341,7 @@ export default async function setup(fx: PluginApi) {
       await fx.sql`insert into sessions (room, bot, session) values (${found.id}, ${bot}, ${session})
         on conflict (room, bot) do update set session = excluded.session, cursor = 0`;
       roomOf.set(session, found.id);
+      botOf.set(session, bot);
       kept = { session, cursor: 0, seen: kept?.seen ?? 0 };
       fresh = true;
     };
@@ -303,7 +359,9 @@ export default async function setup(fx: PluginApi) {
               ? "No one was tagged, so you answer as the room's lead."
               : step.by === "everyone"
                 ? "No one was tagged, so every bot answers, in turn."
-                : `${named.get(step.by) ?? "A bot"} tagged you.`;
+                : step.by === "plugin"
+                  ? `That message from ${step.from ?? "a plugin"} came for you.`
+                  : `${named.get(step.by) ?? "A bot"} tagged you.`;
       const skills = [fresh && "$chat-room", step.by === "lead" && !led.has(kept!.session) && "$room-lead"].filter(Boolean).join(" ");
       if (step.by === "lead") led.add(kept!.session);
       const framing = fresh
@@ -314,17 +372,19 @@ export default async function setup(fx: PluginApi) {
       return { text, last: heard.last };
     };
     const messageId = crypto.randomUUID();
+    // A round a call started thinks at the call's level.
+    const effort = efforts.get(chain);
     let sent = await prompt();
     // Each turn's own check: the plugin may have been switched off for this bot since its last one.
     reached.delete(kept!.session);
     try {
-      await fx.chats.send(bot, { text: sent.text, session: kept!.session, messageId });
+      await fx.chats.send(bot, { text: sent.text, session: kept!.session, messageId, ...(effort ? { effort } : {}) });
     } catch (error) {
       if ((error as { status?: number }).status !== 409) throw error;
       await make();
       sent = await prompt();
       reached.delete(kept!.session);
-      await fx.chats.send(bot, { text: sent.text, session: kept!.session, messageId });
+      await fx.chats.send(bot, { text: sent.text, session: kept!.session, messageId, ...(effort ? { effort } : {}) });
     }
     const turn = { bot, session: kept!.session, stopped: false };
     running.set(found.id, turn);
@@ -478,9 +538,11 @@ export default async function setup(fx: PluginApi) {
     }
     return { turn: Boolean(turn), waiting };
   }
-  // The owner's message, saved, then the bots it wakes, in the background. Turns still waiting give way to it.
-  async function post(found: Room, text: string) {
-    const message = await say(found.id, "owner", text);
+  // The owner's message, saved, then the bots it wakes, in the background. Turns still waiting give way to it. From a
+  // call, it carries a label the room shows, a note only the bots read, and the thinking level of the round it starts.
+  async function post(found: Room, text: string, { label, note, effort }: { label?: string; note?: string; effort?: string } = {}) {
+    const message = await say(found.id, "owner", text, null, { label: label ?? null, note: note ?? null });
+    if (effort) keepEffort(message.id, effort);
     const tags = mentioned(message.text);
     const steps: Step[] = tags.includes("all")
       ? found.members.map((bot) => ({ bot, chain: message.id, by: "all" }))
