@@ -51,6 +51,8 @@ export type Manifest = {
   needs: Record<string, Record<string, unknown>>;
   /** Commands for the `/` list, which its message hook carries out. */
   commands?: { name: string; description: string }[];
+  /** Catalog entries it brings to the Add provider page, each serving no chat model. Since 0.12.0. */
+  providers?: Record<string, unknown>[];
 };
 // A plugin from GitHub keeps its files' list, for what an update changes, and the MCP servers it added.
 type Config = Manifest & { files?: SkillFile[]; servers?: string[] };
@@ -149,6 +151,9 @@ export function parseManifest(text: string): Manifest {
   if (Buffer.byteLength(JSON.stringify(needs)) > 16 * 1024) fail(400, "plugin.json's needs must be at most 16 KiB.");
   if (Object.values(needs as Record<string, Record<string, unknown>>).some((block) => block.optional !== undefined && typeof block.optional !== "boolean"))
     fail(400, "A need's optional must be true or false.");
+  const providers = (own.providers ?? []) as unknown[];
+  if (!Array.isArray(providers) || providers.length > 20 || providers.some((p) => !isObject(p)) || Buffer.byteLength(JSON.stringify(providers)) > 32 * 1024)
+    fail(400, "plugin.json's providers must be a list of up to 20 catalog entries, at most 32 KiB.");
   const commands = (own.commands ?? []) as { name: string; description: string }[];
   if (!Array.isArray(commands) || commands.some((c) => typeof c?.name !== "string" || !pluginName.test(c.name) || c.name.length > 40 || typeof c.description !== "string" || c.description.length > 200))
     fail(400, "plugin.json's commands must each have a name of up to 40 lowercase letters, digits, and dashes, and a description of up to 200 characters.");
@@ -174,6 +179,7 @@ export function parseManifest(text: string): Manifest {
     })),
     needs: needs as Manifest["needs"],
     ...(commands.length ? { commands: commands.map(({ name, description }) => ({ name, description })) } : {}),
+    ...(providers.length ? { providers: providers as Record<string, unknown>[] } : {}),
   };
 }
 
@@ -189,6 +195,11 @@ type Wait = (call: { input: unknown }) => Promise<{ block: string } | void>;
 // What fxbot's core gives plugins: its bots, and turns marked as the plugin's.
 export type PluginHost = {
   bots: Omit<PluginApi["bots"], "on">;
+  providers: PluginApi["providers"] & {
+    /** A plugin's catalog entries, in place of those it brought before: answers the ids left out. */
+    bring(plugin: string, entries: unknown[]): string[];
+    drop(plugin: string): void;
+  };
   timeZone: PluginApi["timeZone"];
   compaction: PluginApi["compaction"];
   library: PluginApi["library"];
@@ -623,6 +634,7 @@ export async function createPlugins(options: {
         },
       },
       localUrl: host.localUrl,
+      providers: { list: host.providers.list, fetch: host.providers.fetch, socket: host.providers.socket },
       chats: {
         newSession: (bot, options) => host.chats.newSession(record.name, bot, options),
         send: (bot, message) => host.chats.send(record.name, bot, message),
@@ -653,9 +665,13 @@ export async function createPlugins(options: {
       }
       plugin.loaded = loaded;
       plugin.error = undefined;
+      // The providers it brings show on the Add provider page while it's loaded.
+      const left = host.providers.bring(record.name, record.config.providers ?? []);
+      if (left.length) write(plugin, `Its providers ${left.join(", ")} were left out: each must be a catalog entry fxbot can run, with models "none", and an id no other provider has.`);
       write(plugin, `loaded ${record.config.version}`);
     } catch (error) {
       loaded.controller.abort();
+      host.providers.drop(record.name);
       await loaded.sql?.end({ timeout: 5 });
       plugin.loaded = undefined;
       plugin.error = said(error);
@@ -669,6 +685,7 @@ export async function createPlugins(options: {
     plugin.loaded = undefined;
     plugin.skills = [];
     plugin.given.clear();
+    host.providers.drop(plugin.record.name);
     loaded.controller.abort();
     for (const socket of loaded.open) socket.close(1001, "The plugin stopped.");
     await within(() => loaded.cleanup?.(), limit, "Its cleanup").catch((error) => report(plugin, "Cleanup", error));

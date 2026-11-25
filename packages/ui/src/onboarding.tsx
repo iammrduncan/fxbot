@@ -9,8 +9,9 @@ import { AddProvider, ModelStep } from "./add-provider.tsx";
 
 const list = "grid gap-3 rounded-xl border p-3";
 const readyProvider = async () => {
-  const [settings, providers] = await Promise.all([client.settings.get(), client.providers.list()]);
-  // One added before its model was picked, as before a restart, isn't the default yet.
+  const [settings, all] = await Promise.all([client.settings.get(), client.providers.list()]);
+  // One added before its model was picked, as before a restart, isn't the default yet. A voice service isn't for chats.
+  const providers = all.filter((p) => p.chat !== false);
   return providers.find((provider) => provider.id === settings.defaultProvider) ?? (providers.length === 1 ? providers[0] : undefined);
 };
 const later = "text-sm text-muted-foreground underline underline-offset-4";

@@ -188,6 +188,8 @@ export async function createFxbot(options: FxbotOptions) {
   // A plugin that starts turns from its setup is told to wait: the agents come after it.
   let ready = false;
   const started = () => ready || fail(400, "fxbot is still starting. Start turns after setup.");
+  // Before the plugins, which bring entries of their own to it as they load.
+  const catalog = createCatalog({ url: `${lists}/providers-registry.json`, fetch, sync: options.syncRegistry !== false });
   const packages = await createPlugins({
     store,
     hold: holding,
@@ -204,6 +206,14 @@ export async function createFxbot(options: FxbotOptions) {
     onChange: () => void retool(),
     host: {
       bots: { list: async () => (await store.profiles.list()).map(withBusy), get: async (id) => withBusy(await get(id)) },
+      // The providers come after the plugins, so these answer once fxbot has started.
+      providers: {
+        list: async () => (started(), providers.forPlugins()),
+        fetch: async (id, url, init) => (started(), providers.request(id, url, init)),
+        socket: async (id, url, protocols) => (started(), providers.socket(id, url, protocols)),
+        bring: (plugin, entries) => catalog.bring(plugin, entries),
+        drop: (plugin) => catalog.drop(plugin),
+      },
       library: {
         read: (bot, id) => library.readFor(bot, id),
         save: ({ bot, session, name, type, bytes }) => library.save({ profileId: bot, sessionId: session, origin: "generated", name, type, bytes }),
@@ -247,8 +257,8 @@ export async function createFxbot(options: FxbotOptions) {
           return id;
         },
         ownerSaid: async (bot, limit) => (await get(bot), history.ownerSaid(bot, limit)),
-        send: async (plugin, bot, { text, shown, label, steer, files, session, messageId = crypto.randomUUID(), asked }) =>
-          (started(), deliver(bot, { text, files, messageId }, { session, from: plugin, shown, label, steer, asked })),
+        send: async (plugin, bot, { text, shown, label, steer, files, session, messageId = crypto.randomUUID(), asked, effort }) =>
+          (started(), deliver(bot, { text, files, messageId }, { session, from: plugin, shown, label, steer, asked, effort })),
         async stream(plugin, bot, session, cursor = 0) {
           started();
           const profile = await get(bot);
@@ -299,7 +309,6 @@ export async function createFxbot(options: FxbotOptions) {
   // its own word, and a read can carry data out in its query.
   const toolsNow = async () =>
     [...[history.tool, ...memories.tools, ...library.tools, ...(skills.any() ? [skills.tool] : [])].map((tool) => packages.wrap(tool, true)), ...(await mcp.tools()).map((tool) => packages.wrap(tool)), ...packages.tools()].map(keepAnswer);
-  const catalog = createCatalog({ url: `${lists}/providers-registry.json`, fetch, sync: options.syncRegistry !== false });
   const providers = await createProviders({ store, secretKey: key, durability: sessions.durability, vercelClientId, hfClientId: options.hfClientId, catalog, fetch, tools: await toolsNow() });
   // Vectors that rows lack, from where Settings says, in the background.
   embeddings.nudge();
@@ -364,7 +373,7 @@ export async function createFxbot(options: FxbotOptions) {
     return runs;
   }
 
-  async function open(profile: StoredProfile, sessionId: string, messageId?: string) {
+  async function open(profile: StoredProfile, sessionId: string, messageId?: string, level?: string) {
     const model = await modelFor(profile);
     const agent = await providers.agentFor(profile.provider, model);
     const window = await providers.contextWindow(profile.provider, model).catch(() => undefined);
@@ -380,7 +389,7 @@ export async function createFxbot(options: FxbotOptions) {
       instructions = (Array.isArray(event.instructions) ? event.instructions : []).filter((entry) => typeof entry === "string" && entry);
     }
     const session = await sessionOf(sessionId);
-    const effort = await effortOf(profile, model, session.effort ?? profile.effort);
+    const effort = await effortOf(profile, model, level ?? session.effort ?? profile.effort);
     return agent.session(sessionId, { model: effort ? { id: model, effort } : model || undefined, instructions, context: { bot: profile.id, messageId, label: session.label } });
   }
 
@@ -389,8 +398,12 @@ export async function createFxbot(options: FxbotOptions) {
     return (await store.profiles.get(id)) ?? fail(404, "profile not found");
   }
 
+  // A provider for chats: one that serves chat models, not a voice service a plugin brought.
   async function provider(id: string) {
-    if (id) await providers.get(id);
+    if (id) {
+      const record = await providers.get(id);
+      if (!providers.servesChat(record)) fail(400, `${record.name} serves no chat model.`);
+    }
     return id;
   }
 
@@ -843,7 +856,7 @@ export async function createFxbot(options: FxbotOptions) {
   // A message to a bot's own chat, or to a plugin's session for it. Resolves once libfx has stored the prompt; the reply
   // arrives on the stream. libfx takes at most 8 images, 3.75 MiB each and 6 MiB together. A plugin's message names it,
   // and can show other words and another name in the chat than the model gets, and the owner's words it carries on.
-  async function deliver(id: string, { text, messageId, files = [] }: Message, { session, from, shown, label, steer, asked }: { session?: string; from?: string; shown?: string; label?: string; steer?: boolean; asked?: string } = {}) {
+  async function deliver(id: string, { text, messageId, files = [] }: Message, { session, from, shown, label, steer, asked, effort }: { session?: string; from?: string; shown?: string; label?: string; steer?: boolean; asked?: string; effort?: string } = {}) {
     // A message to the bot's own chat calls off an idle compaction, and waits for any other start-over of it.
     if (!session) {
       compacting.get(id)?.abort();
@@ -854,6 +867,7 @@ export async function createFxbot(options: FxbotOptions) {
     if (typeof text !== "string" || (!text.trim() && !files.length)) fail(400, "text is required");
     if (typeof messageId !== "string" || !/^[\w.-]{1,128}$/.test(messageId)) fail(400, "messageId must be 1 to 128 letters, digits, '.', '_', or '-'");
     if (asked !== undefined && (typeof asked !== "string" || asked.length > 8000)) fail(400, "asked must be text, up to 8,000 characters");
+    if (effort !== undefined && (typeof effort !== "string" || !/^[A-Za-z0-9._-]{1,64}$/.test(effort.trim()))) fail(400, "effort must be a level's name, such as low");
     if (!(await modelFor(profile))) fail(400, "No model. Pick a default model for this bot's provider in Settings, or give the bot one.");
     if (session) await pluginSession(from!, profile, session);
     // Saved before the prompt, so a restart still finds the session and every upload knows its chat. A concurrent
@@ -947,8 +961,9 @@ export async function createFxbot(options: FxbotOptions) {
       // A plugin's session is followed as the bot's own chat is when the plugin steers in it, so a later steer finds its turn.
       const own = session && !steer ? undefined : workingOn(id, messageId, sent);
       if (own && !working.get(sessionId)?.some((t) => t.messageId === messageId)) working.set(sessionId, [...(working.get(sessionId) ?? []), own]);
-      // A messageId the session already accepted runs nothing new and resolves to the same ids.
-      const chat = await open(profile, sessionId, messageId);
+      // A messageId the session already accepted runs nothing new and resolves to the same ids. A message's own thinking
+      // level is its turn's.
+      const chat = await open(profile, sessionId, messageId, effort?.trim());
       const turn = chat.prompt(read, { messageId });
       const accepted = await turn.accepted;
       await history.record(id, accepted.sessionId, messageId, "user", text + names);
@@ -1101,7 +1116,7 @@ export async function createFxbot(options: FxbotOptions) {
           if (input.compactProvider !== undefined && typeof input.compactProvider !== "string") fail(400, "compactProvider must be a string");
           if (input.compactModel !== undefined && typeof input.compactModel !== "string") fail(400, "compactModel must be a string");
           const chosen = input.compactProvider === undefined ? now.compactProvider : input.compactProvider.trim();
-          const record = chosen ? await providers.get(chosen) : null;
+          const record = chosen ? await providers.get(await provider(chosen)) : null;
           let model = input.compactModel?.trim() ?? (chosen === now.compactProvider ? now.compactModel : "");
           if (record && !model) model = record.model || fail(400, `Pick a model of ${record.name} to summarize with.`);
           if (model.length > 200) fail(400, "compactModel must be at most 200 characters");

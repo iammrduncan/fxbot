@@ -36,6 +36,7 @@ Only `plugin.json` is required, and only the paths it names count.
 | `extensions["sh.fxbot"].settings` | A list of settings, each with `name`, `description`, and optionally `default`, `isRequired`, `isSecret`, and `options`. `options` is a list for the owner to pick from, up to 500, each with `value`, and optionally `label`, the words shown, both up to 200 characters, and `group`, a heading to list it under, up to 100. The owner can still type a value that isn't listed. A secret offers no list. Since 0.11.0: an older fxbot shows a text box. |
 | `extensions["sh.fxbot"].commands` | Commands for the `/` list in a bot's message box, each with `name` (up to 40 lowercase letters, digits, and dashes) and `description` (up to 200 characters). Listing one runs nothing: the plugin's `message` hook sees `/name` as text. Since 0.5.0. |
 | `extensions["sh.fxbot"].needs` | The plugins it needs, each name mapped to an object for that plugin, up to 16 KiB in all. See [Plugins that need others](#plugins-that-need-others). |
+| `extensions["sh.fxbot"].providers` | Up to 20 services the plugin uses that serve no chat model, such as voices, up to 32 KiB in all. The owner adds them on **Add provider**, under "For <plugin>", while the plugin is added, and the plugin reaches them with `fx.providers`. See [Providers](#providers). Since 0.12.0. |
 
 ## Which fxbot it runs on
 
@@ -94,6 +95,7 @@ export default async function setup(fx: PluginApi) {
 | `fx.timeZone()` | The owner's time zone, such as `Europe/Berlin`: **Settings** › **General**'s, or the machine's. Read it at each use. Since 0.6.0. |
 | `fx.compaction()` | Idle compaction's setting, from **Settings** › **General**: `{ idleMinutes, minTokens, provider, model }`. `idleMinutes` is how long a chat sits idle before it's compacted, 0 when it's off, `minTokens` how long it must be, in tokens at 4 bytes of text each (since 0.11.0; undefined before), and `provider` and `model` the model that writes a summary, or `""` for each bot's own. Chat rooms compacts its rooms by it. Read it at each use. Since 0.10.0. |
 | `fx.chats` | Sessions and turns of its own. See [Turns](#turns). |
+| `fx.providers` | The providers the owner added, and requests to them with their keys, which stay on the server. See [Providers](#providers). Since 0.12.0. |
 | `fx.dependents()` | The added plugins that need this one: `{ name, version, needs, api }` each, where `needs` is its object for this plugin, and `api` what it provides, or null while it isn't running |
 | `fx.provide(api)` | Offers an object to the plugins that need this one, which get it with `fx.need`. Since 0.5.0. See [Plugins that need others](#plugins-that-need-others). |
 | `fx.need(name)` | What a plugin this one names under `needs` provides, or null while it isn't running. It throws for a plugin `needs` doesn't name. Since 0.5.0. |
@@ -208,7 +210,7 @@ A plugin's turns run as the owner's do, with the same hooks, history, library, a
 | Call | What it does |
 | --- | --- |
 | `fx.chats.newSession(bot, { label?, effort? })` | A session of the plugin's own for the bot, on the bot's provider now. Keep its id. `label`, since 0.9.0, names it, up to 80 characters, such as a subagent's name: each of its tool calls gets it, so a plugin such as the computer can tell the bot's sessions apart. `effort`, since 0.10.0, is the thinking level its turns ask for, such as `high`, in place of the bot's: the model's nearest lower level when it doesn't offer that one. |
-| `fx.chats.send(bot, { text, shown?, label?, steer?, files?, session?, messageId?, asked? })` | A message. `shown`, since 0.6.0, is what the chat shows of it, when that isn't `text`, which the model gets. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. `asked`, since 0.7.0, is the owner's own words the message carries on, up to 8,000 characters, which the plugin quotes from a chat of theirs, such as what they asked the bot it's from. Hooks get it with the message and its turn. Since 0.11.1, the model reads `text` after a line with the time it was sent, which hooks, history, and the chat leave off. |
+| `fx.chats.send(bot, { text, shown?, label?, steer?, files?, session?, messageId?, asked?, effort? })` | A message. `shown`, since 0.6.0, is what the chat shows of it, when that isn't `text`, which the model gets. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. `asked`, since 0.7.0, is the owner's own words the message carries on, up to 8,000 characters, which the plugin quotes from a chat of theirs, such as what they asked the bot it's from. Hooks get it with the message and its turn. Since 0.11.1, the model reads `text` after a line with the time it was sent, which hooks, history, and the chat leave off. `effort`, since 0.12.0, is the thinking level of the turn the message starts, such as `low`, in place of the chat's or the bot's, run as [Choose how hard a bot thinks](/docs/how-to/choose-how-hard-a-bot-thinks/) says; a turn it joins keeps its own. An older fxbot ignores it. |
 | `fx.chats.stream(bot, session, cursor?)` | That session's lines, as NDJSON, from `cursor` on, then each new one. The same lines as [`fxbot.stream`](/sdk/how-to/stream-replies/). |
 | `fx.chats.ownerSaid(bot, limit)` | The owner's newest messages in the bot's own chat, oldest first, with no plugin's or other bot's. Since 0.6.0. |
 | `fx.chats.cancel(bot, session?)` | Stops the turn running in one of the plugin's own sessions, if one runs. It ends `cancelled`, and the session's stream says so. Since 0.4.1. With no `session`, since 0.6.0, it stops the turn running in the bot's own chat, if this plugin started it. Any other turn there throws with `status` 409, and with nothing running it does nothing. |
@@ -222,6 +224,37 @@ In a bot's own chat, since 0.6.0, and in a session of the plugin's own, since 0.
 | `joined` | In the answer: the `messageId` of the turn the message joined, when it did. Its text reaches that turn, and the turn's hooks stay that turn's. A message that came just too late runs as a turn of its own, under its own `messageId`, with `turn.start` and `turn.end`. |
 
 A session belongs to the provider it started on. After the bot moves to another provider, `send` and `stream` for it fail with `status` 409: make a new one.
+
+## Providers
+
+A plugin that uses a service of its own, such as a voice, brings its entry to **Add provider** with `providers` in its `plugin.json`. The owner adds it there, as any provider, with its key sealed on the server. Phone brings ElevenLabs, Deepgram, and a speech server this way:
+
+```json
+"providers": [
+  {
+    "id": "deepgram",
+    "name": "Deepgram",
+    "about": "Listening with Flux, and Aura voices",
+    "group": "key",
+    "connect": "key",
+    "baseUrl": "https://api.deepgram.com/v1",
+    "headers": { "Authorization": "Token {apiKey}" },
+    "keyCheck": "https://api.deepgram.com/v1/projects",
+    "keyPage": "https://console.deepgram.com/",
+    "models": "none"
+  }
+]
+```
+
+- **An entry** has the fields of an entry in fxbot's own `providers-registry.json`, with `models` `"none"`: it serves no chat model, so no bot, default, or model picker offers it. `connect` can't be `device` or `service-account`. `hosts` lists the service's other origins, such as its WebSocket's on another host. Addresses are `https:` or `wss:`, or `http:` and `ws:` on `localhost`.
+- **While the plugin is added,** its entries show under "For <plugin>". One with the id of fxbot's own entry or another plugin's is left out, and the plugin's log says so. When the plugin is removed, **Settings** › **Providers** marks what was added from them.
+- **A provider the owner added** from any entry, the plugin's or fxbot's own, is the plugin's to use: Phone listens with a Groq or Mistral login too.
+
+| Member | What it is |
+| --- | --- |
+| `fx.providers.list()` | Each provider added: `{ id, kind, name, label, baseUrl }`, where `kind` is its entry's `id`, `label` the entry's name, and `baseUrl` the address it was added with, or null. No key. |
+| `fx.providers.fetch(id, url, init?)` | A request with the provider's key added as its entry's `headers` say, or `Authorization: Bearer <key>` without them. `url` must be on one of the provider's own origins: its base URL's, its key check's, or its entry's `hosts`. A provider with no key, such as a speech server, gets none. It throws for another address, and for a ChatGPT or Grok plan, which has no API for it. |
+| `fx.providers.socket(id, url, protocols?)` | A WebSocket to one of the same origins, as `ws:` or `wss:`, opened with the key in its headers. It answers once the socket is open, with `binaryType` `arraybuffer`. A Vercel sign-in opens none. |
 
 ## Plugins that need others
 

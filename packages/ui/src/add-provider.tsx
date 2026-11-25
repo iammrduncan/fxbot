@@ -60,7 +60,14 @@ export function AddProvider({ first, words, done = "Done", onDefault, onDone }: 
         catalog={catalog}
         found={found.find((server) => server.kind === picked.id)}
         onBack={() => setPicked(null)}
-        onConnected={(id) => void client.providers.list().then((list) => setConnected(list.find((p) => p.id === id) ?? null))}
+        onConnected={(id) =>
+          void client.providers.list().then((list) => {
+            const added = list.find((p) => p.id === id) ?? null;
+            // A provider that serves no chat model has no model to pick.
+            if (added && picked.models === "none") onDone(added);
+            else setConnected(added);
+          })
+        }
       />
     );
   if (!catalog)
@@ -79,7 +86,9 @@ export function AddProvider({ first, words, done = "Done", onDefault, onDone }: 
       </p>
     );
 
-  const shown = catalog.providers.filter((e) => e.order !== undefined);
+  const shown = catalog.providers.filter((e) => e.order !== undefined && !e.plugin);
+  // Each plugin's own entries, such as phone's voice services, under the plugin's name.
+  const brought = [...new Set(catalog.providers.flatMap((e) => (e.plugin ? [e.plugin] : [])))];
   const signIns = [...shown.filter((e) => e.group === "sign-in").sort(byOrder), ...shown.filter((e) => e.group !== "sign-in" && e.signIn).sort(byOrder)];
   const custom = catalog.providers.find((e) => e.group === "custom");
   const q = query.trim().toLowerCase();
@@ -108,6 +117,11 @@ export function AddProvider({ first, words, done = "Done", onDefault, onDone }: 
           {groups.map(([group, title, worded]) => (
             <Group key={group} title={title} about={worded ? words?.[worded] : undefined}>
               {shown.filter((e) => e.group === group).sort(byOrder).map(tile)}
+            </Group>
+          ))}
+          {brought.map((plugin) => (
+            <Group key={`plugin-${plugin}`} title={`For ${plugin}`} about={`What the ${plugin} plugin uses. They serve no chat model.`}>
+              {catalog.providers.filter((e) => e.plugin === plugin).sort(byOrder).map(tile)}
             </Group>
           ))}
         </>

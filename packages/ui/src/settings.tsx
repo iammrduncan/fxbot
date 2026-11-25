@@ -243,7 +243,7 @@ function About() {
 // writes the summary, each bot's own or one the owner picks. A time or size set some other way shows as itself.
 function IdleCompaction({ settings, save }: { settings: Settings; save: (fields: Partial<Settings>) => Promise<unknown> }) {
   const [providers, setProviders] = useState<Provider[]>([]);
-  useEffect(() => void client.providers.list().then(setProviders, () => {}), []);
+  useEffect(() => void client.providers.list().then((list) => setProviders(list.filter((p) => p.chat !== false)), () => {}), []);
   // A provider with no default model waits here for its model, and the two are saved together.
   const [picked, setPicked] = useState("");
   const shown = picked || settings.compactProvider;

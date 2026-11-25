@@ -215,6 +215,8 @@ function ProviderRow({ provider: p, isDefault, onDefault, onChange, onReconnect 
   const [teams, setTeams] = useState<Team[]>([]);
   const [status, setStatus] = useState("");
   const connect = p.connect;
+  // A provider a plugin brought, such as a voice service, serves no chat model: it has no model to pick, and isn't a default.
+  const chat = p.chat !== false;
   // A provider whose models are typed, as Azure's deployments, or a custom server, edits its ids here.
   const typed = p.modelIds.length > 0 || p.kind === "custom";
   useEffect(() => {
@@ -246,20 +248,23 @@ function ProviderRow({ provider: p, isDefault, onDefault, onChange, onReconnect 
         <span className="font-medium">{p.name}</span>
         {about && <span className="text-sm text-muted-foreground">{about}</span>}
         {isDefault && <span className="text-sm text-muted-foreground">· Default</span>}
+        {p.plugin && <span className="text-sm text-muted-foreground">· For {p.plugin}</span>}
         <span className={`ml-auto text-sm ${p.error ? "text-destructive" : "text-muted-foreground"}`}>{state}</span>
       </div>
       {p.baseUrl && <span className="truncate text-sm text-muted-foreground">{p.baseUrl}</span>}
-      <label className={label}>
-        Default model
-        <ModelField id={p.id} provider={p.id} version={`${p.teamId ?? ""}:${p.modelIds.join(",")}`} value={model} onChange={setModel} placeholder="A model this provider serves" />
-      </label>
-      {typed && (
+      {chat && (
+        <label className={label}>
+          Default model
+          <ModelField id={p.id} provider={p.id} version={`${p.teamId ?? ""}:${p.modelIds.join(",")}`} value={model} onChange={setModel} placeholder="A model this provider serves" />
+        </label>
+      )}
+      {chat && typed && (
         <label className={label}>
           {p.kind === "custom" ? "Model ids, if the server lists none" : "Deployments"}
           <Input value={modelIds} onChange={(e) => setModelIds(e.target.value)} placeholder="One or more, with commas between" />
         </label>
       )}
-      {connect === "url" && (
+      {chat && connect === "url" && (
         <label className={label}>
           Context window
           <Input inputMode="numeric" value={context} onChange={(e) => setContext(e.target.value.replace(/\D/g, ""))} placeholder="As the server reports" />
@@ -280,10 +285,12 @@ function ProviderRow({ provider: p, isDefault, onDefault, onChange, onReconnect 
         </label>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm">
-          Save
-        </Button>
-        {!isDefault && (
+        {chat && (
+          <Button type="submit" size="sm">
+            Save
+          </Button>
+        )}
+        {chat && !isDefault && (
           <Button type="button" size="sm" variant="outline" onClick={onDefault}>
             Make default
           </Button>

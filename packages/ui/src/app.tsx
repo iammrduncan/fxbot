@@ -522,7 +522,8 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
   // Where the bot's chat lives now, so a move to another provider can warn first.
   const [chat, setChat] = useState<{ provider: string; sessionId: string | null }>({ provider: "", sessionId: null });
   useEffect(() => {
-    client.providers.list().then(setProviders, () => {});
+    // A voice service a plugin brought serves no chat model, so it's no bot's provider.
+    client.providers.list().then((list) => setProviders(list.filter((p) => p.chat !== false)), () => {});
     client.profiles.get(id).then(
       (profile) => {
         const { name, instructions, model, provider, effort, shape, color, mood, head, face, outfit, tint, sessionId } = profile;
