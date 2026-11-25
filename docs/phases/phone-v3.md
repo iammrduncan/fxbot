@@ -17,11 +17,10 @@ A call with a bot is a conversation of its own, beside its main chat, as a chat 
 - **Newer voices.** ElevenLabs v3 and v4, over its Text to Dialogue WebSocket.
 - **Cut-ins you can trust.** Every cut-off is logged with what caused it, and a misheard echo of the bot's own words counts as an echo.
 
-Status: **planned on 2026-11-25**, after the owner's first ElevenLabs calls on dev, and revised the same day with their answers.
-- It builds on [phone-v2](phone-v2.md)'s part 1, on `release/0.12.0`. Phone 0.2.0, chat rooms 0.6.0, and subagents 0.3.0 aren't released yet, so they change in place.
-- Phone-v2's part 2, SIP, stays there.
-- The reference research was skipped at the owner's word.
-- The v3 and v4 voices are built (`8f43fc2`), and checked on the owner's account. The rest isn't started.
+Status: **built on 2026-11-25** on `release/0.12.0`, the day it was planned, and checked on real calls with Bob on the owner's dev. All but three checklist items are done ([What the build changed](#what-the-build-changed)):
+- Bob's first words come about 5 seconds after the owner's last, not 2.
+- Speakers, the watch, and Flash v2's line are the owner's to try.
+- Phone-v2's part 2, SIP, stays there. The reference research was skipped at the owner's word.
 
 ## What the owner asked
 
@@ -283,60 +282,60 @@ The likeliest cause is his own voice coming back through the desktop's speakers,
 ## 4. Checklist
 
 - [x] v3 and v4 over the Dialogue WebSocket, checked on the owner's account: v4 Turbo and v3 Conversational said the greeting cleanly, and a context held across a 25-second wait.
-- [ ] `eleven_v4` and `eleven_v3` with Hear it, with how long each takes to start.
-- [ ] Flash v2's Hear it line, played or transcribed whole.
-- [ ] Cut-ins:
-  - [ ] Each cut is logged.
-  - [ ] Near words match, and a node check shows "quite all five" counts as Bob's echo, while "hold on so you can't hear me" stays the owner's.
-- [ ] Core pills:
-  - [ ] The migration, and `fx.chats.pill`.
-  - [ ] The `pill` stream line, live and on replay, after the turn it followed.
-  - [ ] `applyLine` and `Thread` draw it in the middle, opening beside or unfolding.
-  - [ ] An in-context pill reaches the model once, with the next turn, while the chat shows only that turn's own message.
-  - [ ] A pill that isn't in context never reaches the model.
-  - [ ] The reference and the CHANGELOG.
-- [ ] Phone, a call's own session:
-  - [ ] `calls.session` and its migration.
-  - [ ] The recap, with its pills, and the call note in its instructions.
-  - [ ] The owner's words go there, and phone follows it.
-  - [ ] What lands in the main chat during a call isn't spoken.
-  - [ ] Nothing is refused.
-- [ ] Phone, the sidekick:
-  - [ ] The note is in the call session's instructions only while the call is on: never a message, never in the main chat, and gone from a call session opened after the call.
-  - [ ] "One moment." waits 3 seconds.
-  - [ ] Phone provides `callOf` and `wake`. Subagents starts in a call's session, a report during the call is spoken at the owner's pause, and one after it goes to the main chat.
-- [ ] Phone, the pill:
-  - [ ] At the end, the bot writes the summary in the call's session, up to 6,000 characters.
-  - [ ] Phone pins it as **Phone call · 4 min**, in context, opening the call.
-  - [ ] A call with no words gets none.
-  - [ ] The call's chat opens beside the main chat, from the pill and from Last calls.
-- [ ] Room calls:
-  - [ ] Chat rooms makes a call room, left out of the list, with the parent's recent history.
-  - [ ] The lead writes the summary.
-  - [ ] The room's pill, in its timeline and in each bot's catch-up.
-  - [ ] It opens the call room beside the room.
-- [ ] Checked in Chromium, on a desktop in light and a phone in dark: the pills, the call's chat, and a room's.
-- [ ] The wiring, on the disposable check fxbot with fake voices and the mock model, reported as wiring only:
-  - [ ] The session.
-  - [ ] The recap.
-  - [ ] The summary turn.
-  - [ ] The pill in the stream and in the model's next input.
-  - [ ] A subagent's report during and after a call.
-  - [ ] A room's call room and pill.
+- [x] `eleven_v4` and `eleven_v3` with Hear it, timed on the owner's account: v4 said the line in 3.08 seconds of audio, back in 1.4 seconds; v3 in 2.72, back in 1.1, once Hear it waited for its last audio. v4 Turbo took 0.95 seconds, and v3 Conversational 1.17.
+- [ ] Flash v2's Hear it line, played or transcribed whole. Its line is 1.74 seconds, with or without waiting for the last audio, so nothing is cut off at phone's end. Whether every word is in it is the owner's ear: installing a local transcriber here wasn't allowed.
+- [x] Cut-ins:
+  - [x] Each cut is logged. On the real calls: "Call 16: cut bob off on hearing "Also, tell me a quick joke while you wait.", while saying "One agent's busy and the rest are sitting still."".
+  - [x] Near words match, and a node check shows "quite all five" counts as Bob's echo (1.00), while "hold on so you can't hear me" stays the owner's (0.29).
+- [x] Core pills:
+  - [x] The migration, `0020_pills.sql`, and `fx.chats.pill`.
+  - [x] The `pill` stream line, live and on replay, after the turn it followed.
+  - [x] `applyLine` and `Thread` draw it in the middle, opening beside or unfolding.
+  - [x] An in-context pill reaches the model once, with the next turn, while the chat shows only that turn's own message, after a restart too.
+  - [x] A pill that isn't in context never reaches the model.
+  - [x] The reference and the CHANGELOG.
+- [x] Phone, a call's own session:
+  - [x] `calls.session` and its migration.
+  - [x] The recap, with its pills, and the call note in its instructions.
+  - [x] The owner's words go there, and phone follows it.
+  - [x] What lands in the main chat during a call isn't spoken.
+  - [x] Nothing is refused.
+- [x] Phone, the sidekick:
+  - [x] The note is in the call session's instructions only while the call is on: never a message, never in the main chat, and gone from the summary turn after the call.
+  - [x] "One moment." waits 3 seconds.
+  - [x] Phone provides `callOf` and `wake`. Subagents starts in a call's session, a report during the call is spoken at the owner's pause, and one after it goes to the main chat.
+- [x] Phone, the pill:
+  - [x] At the end, the bot writes the summary in the call's session, up to 6,000 characters.
+  - [x] Phone pins it as **Phone call · 4 min**, in context, opening the call.
+  - [x] A call with no words gets none.
+  - [x] The call's chat opens beside the main chat, from the pill and from Last calls.
+- [x] Room calls:
+  - [x] Chat rooms makes a call room, left out of the list, with the parent's recent history.
+  - [x] The lead writes the summary.
+  - [x] The room's pill, in its timeline and in each bot's catch-up.
+  - [x] It opens the call's chat beside the room, showing the call room.
+- [x] Checked in Chromium, on a desktop in light and a phone in dark: the pills, the call's chat, a room's, Last calls' Open, and the call bar's button.
+- [x] The wiring, on the disposable check fxbot with fake voices and the mock model, reported as wiring only:
+  - [x] The session.
+  - [x] The recap.
+  - [x] The summary turn.
+  - [x] The pill in the stream and in the model's next input.
+  - [x] A subagent's report during and after a call.
+  - [x] A room's call room and pill.
 - [ ] **The owner's bar, measured on real calls with Bob on dev,** automated from headless Chrome with a voice ElevenLabs makes, each number in the build notes:
-  - [ ] Bob's first words come within about 2 seconds of the owner's last, in his own words.
-  - [ ] Asked for something that takes a while, Bob says so and hands it off, and the conversation goes on.
-  - [ ] Asked something else while the work runs, Bob answers.
-  - [ ] The result comes at the owner's next pause, not over them.
-  - [ ] On speakers, nothing cuts Bob off falsely, and the log says what each cut was.
-  - [ ] After the call, the pill holds Bob's summary. Asked in the main chat about the call, Bob knows it, and on a second call, he does too.
+  - [ ] Bob's first words come within about 2 seconds of the owner's last, in his own words. Not met: 5.2 seconds after "What's going on in the lab?", and 3.6 after "Thanks, that's all for now. Bye.", in his own words. That's the owner's 2-second `pause`, then 1.6 to 3.2 seconds of the model.
+  - [x] Asked for something that takes a while, Bob says so and hands it off, and the conversation goes on: "Let me look.", one quick tool, a subagent for the rest, and "Anything else while we wait?"
+  - [x] Asked something else while the work runs, Bob answers: the joke, while the subagent read the pane.
+  - [x] The result comes at the owner's next pause, not over them: the first answer waited out the owner's next words, and the report came when they were quiet.
+  - [ ] On speakers, nothing cuts Bob off falsely, and the log says what each cut was. The log does. Headless Chrome has no speakers, so the false cuts are the owner's calls to find.
+  - [x] After the call, the pill holds Bob's summary. Asked in the main chat about the call, Bob knows it, and on a second call, he does too.
 - [ ] **The owner's own calls,** on desktop speakers and from the watch: it feels like a sidekick. This item is theirs to tick.
-- [ ] The docs listed above.
-- [ ] The repo checks:
-  - [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
-  - [ ] Phone's, chat rooms', and subagents' `page.js` rebuilt.
-  - [ ] Dev updated, with each plugin file landed in one write while no call is on, and its API restarted after core and non-entry files.
-  - [ ] Committed on `release/0.12.0`.
+- [x] The docs listed above.
+- [x] The repo checks:
+  - [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
+  - [x] Phone's and chat rooms' `page.js` rebuilt. Subagents' page didn't change.
+  - [x] Dev updated, with each plugin file landed while no call was on, and its API restarted after core and non-entry files.
+  - [x] Committed on `release/0.12.0`.
 
 ## 5. Open questions
 
@@ -353,3 +352,53 @@ Answered on 2026-11-25:
 - **The sidekick note is in the bot's instructions only during the call:** "sidekick should be part of bobs instructions only during the phone call..."
 
 Nothing is still open.
+
+## What the build changed
+
+Built on 2026-11-25 in a worktree of `release/0.12.0`, landed there by fast-forward with no call on, and checked on the owner's dev.
+
+**As planned:**
+- **Core pills,** about 120 lines: `0020_pills.sql`, `fx.chats.pill`, the `pill` stream line, `applyLine`, the pill in the middle of the chat, the next turn carrying an in-context pill, and a start-over's handoff taking any left.
+- **Phone:** a call's own session, its note and recap only while it's on, the summary and the pill, the call's chat on the right, `callOf` and `wake`, near words, and the cut log.
+- **Chat rooms:** call rooms and room pills, `0006_call_rooms.sql`.
+- **Subagents:** a call's session, `0004_calls.sql`.
+- **v3 and v4 voices.**
+
+**What changed from the plan, and why:**
+- **The first real call failed:** every turn in the call's session ended with libfx's `ConflictingIdentity`, before any model request.
+  - **Narrowed on dev** with a diagnostic session: the call's note, its recap, and its level weren't the cause. Core's new pill step was: it asked libfx's store for each stream's newest line, and asking a session that a turn was starting in raced libfx's own writing. With the lookup off, 5 of 5 tries that had failed 2 of 3 worked.
+  - **Now:** the pill step gives the rest of the pills once a replay has been quiet for 100 ms, and asks libfx nothing.
+- **Steered messages race in core, not fixed here.** A plugin session's messages sent with `steer` failed now and then the same way: 2 of 5, even with the pill step fixed. So phone sends into a call without `steer`, and words said while a turn runs are its next turn. Subagents still steer, which wasn't checked.
+- **Phone keeps one reader for a call's session,** through its wrap-up. Closing it and opening another for the summary, while the goodbye turn was ending, failed the summary. The summary is also asked once more if the first answer doesn't come, and the ask says to keep to what was said on the call.
+- **Nothing Bob says starts while the owner is mid-words.** On the first real call, Bob's answer to "What's going on in the lab?" began 2 seconds into the owner's next words, and was cut off. An answer to the owner's own words now waits for their pause, as a report already did, without the moment after their final words.
+- **One quick tool call, not two.** Bob ran `herdr_agents` and `herdr_read` himself, and the owner waited 14 seconds. The note now allows one quick tool call, and hands anything more to a subagent. On the next call, Bob looked once, started a subagent for the rest, and asked "Anything else while we wait?"
+- **Every call's chat opens through phone's view,** `/phone/calls/<id>`, a room's call showing its call room. A room can't open beside a room, so the call room itself didn't open beside its room.
+- **The call bar has a button for the call's chat,** since the main chat no longer shows the call as it goes.
+- **Hear it waits for half a second of quiet:** the mark comes from the text's timing, and v3's line came back cut at 1.56 seconds of 2.72.
+- **A call's level rides on each message,** as in phone-v2, not on its session. fxbot sends a level only to AI Gateway, Vercel, ChatGPT, and Grok, so it never reached the owner's OpenCode Go model either way.
+- **A bad `callThinking`** now stops the call as it starts, where it refused each message.
+
+**The real calls,** on dev, with Bob on OpenCode Go's `deepseek-v4.1-flash`, ElevenLabs Scribe and Flash v2. Headless Chrome's microphone played the owner's three lines in ElevenLabs' Sarah: at 6 seconds, at 21, and at 78.
+- **Call 20, after the fixes:**
+  - "Let me look." came 5.2 seconds after the owner's first line.
+  - One `herdr_agents` call, then a subagent, "Lab status detail", and the answer by 27.6 seconds, after the owner's second line had ended.
+  - The joke, while the subagent worked.
+  - The report, spoken until the owner's goodbye cut it off, which was logged.
+  - "Alright, labs quiet …" 3.6 seconds after the goodbye, then `phone_hang_up`.
+  - Its pill holds Bob's summary, in context.
+- **In the main chat, then on the next call:** asked "what did we talk about on the last phone call", Bob answered from the pills. On call 21, he recapped call 20.
+- **Call 21's summary** put the main chat's check question into the call. The ask now says to keep to the call.
+
+**Wiring checks,** on the disposable check fxbot with fake voices and the mock model, all passing:
+- core pills;
+- the call (22 checks), a room's call (11), the page in Chromium on a desktop in light and a phone in dark;
+- answers held while the owner is mid-words;
+- phone-v2's checks c1–c5, c7, c8, c10–c15.
+
+c9's four failures are its voice expectations from phone 0.1. A bot's voice is phone's speaker's since 0.2.0, and the committed phone before phone-v3 fails them the same way.
+
+**Not checked here:**
+- Speakers and the watch, for false cuts.
+- Flash v2's line, by ear.
+- Subagents' own steered messages.
+- A phone-line call carried by SignalWire with a session of its own, past phone-v2's line checks.
