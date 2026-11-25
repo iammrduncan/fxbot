@@ -92,7 +92,7 @@ function inOrder(words: string[], said: string[]) {
 const sidekick =
   "Talk like a person on a call: short spoken sentences, with no lists, tables, links, code, or markdown. " +
   'Before you use a tool, first say in a few natural words what you\'re doing, such as "Oh, let me check that.", so the owner hears you at once. ' +
-  "Anything that takes more than a moment, such as digging, work on your computer, a herdr agent's task, or more than one or two tool calls, hand to a subagent with subagents_start, then come straight back to the owner and keep talking about anything they like. Never make them wait on it. " +
+  "One quick look, a single tool call, you may do yourself. Anything more, such as reading what you found, digging, work on your computer, a herdr agent's task, or a second tool call, hand to a subagent with subagents_start, with all it needs, then come straight back to the owner and keep talking about anything they like. Never make them wait on it. " +
   "When a subagent tells you something or reports, say what matters, briefly. When the owner asks how it's going, check with subagents_list or herdr's agents, and don't guess. Without subagents, keep each turn short, and say so if a task will take a while.";
 /** A room call's instructions, for each bot's session in the call room, while it's on. */
 export const roomCallNote = `${roomNote} ${sidekick}`;
@@ -239,19 +239,23 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     voice: (ms) => void (o.turns && ms >= 700 && line.speaking && !greeting && (logCut(`${ms} ms of voice`), stop(), interrupted())),
   });
 
-  // The owner is speaking: words as they come, a final within the last moment, or words held for the pause.
+  // The owner is speaking: words as they come, a final within the last moment, or words held for the pause. Mid-words is
+  // the first and last of those, without the moment after a final, which an answer to their words doesn't wait out.
   const talking = () => began > 0 || Date.now() - talked < 1200 || held.length > 0;
-  // What isn't an answer to the owner's words, such as a subagent's report, waits while they speak, for their pause.
+  const midWords = () => began > 0 || held.length > 0;
+  // Nothing the bot says starts over the owner: what isn't an answer to their words, such as a subagent's report, and
+  // since phone-v3 an answer to their earlier words too, waits while they speak, for their pause. On the owner's first
+  // real call, the answer to "What's going on in the lab?" began 2 seconds into their next words, and was cut off.
   const later: [string, string, string | undefined][] = [];
   let waitingFor: NodeJS.Timeout | undefined;
   function hold() {
     clearTimeout(waitingFor);
     if (over || !later.length) return;
-    if (talking()) return void (waitingFor = setTimeout(hold, 300));
+    if (later.some(([, turn]) => !ours.has(turn)) ? talking() : midWords()) return void (waitingFor = setTimeout(hold, 300));
     for (const [text, turn, voice] of later.splice(0)) say(text, turn, voice);
   }
   function say(text: string, turn = "", voice?: string) {
-    if (turn && !o.room && !ours.has(turn) && (talking() || later.length)) return (later.push([text, turn, voice]), hold());
+    if (turn && !o.room && ((ours.has(turn) ? midWords() : talking()) || later.length)) return (later.push([text, turn, voice]), hold());
     if (turn && turn !== speaking) ((speaking = turn), heardOf.delete(turn));
     saidAt = Date.now();
     if (text.trim()) (airing.push(text.trim()), unplayed.push({ text: text.trim(), turn }));
