@@ -365,12 +365,14 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     const cut =
       cutAfter === null ? "" : cutAfter ? `(They cut you off after: "${cutAfter.slice(-300)}")\n` : "(They cut you off before you'd said anything.)\n";
     cutAfter = null;
+    // Without steer: in the call's own session, messages sent with it failed now and then with libfx's
+    // ConflictingIdentity on the owner's OpenCode Go model (3 of 6 tries on dev, 2026-11-25), and without it none did,
+    // a second one sent while the first turn ran included. Words said while a turn runs are the next turn.
     const result = await fx.chats.send(o.bot, {
       session: o.session,
       text: `${cut}${words}`,
       shown: words,
       label,
-      steer: true,
       asked: words,
       messageId: id,
       ...(o.effort ? { effort: o.effort } : {}),

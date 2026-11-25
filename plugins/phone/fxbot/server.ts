@@ -169,8 +169,7 @@ export default async function setup(fx: PluginApi) {
     const on = onRoomCall;
     if (on && (await on.rooms.roomOf?.(event.session).catch(() => null))?.id === on.room) event.instructions.push(roomCallNote);
   });
-  // Its thinking level goes with each message, not on the session: a session's own level failed every turn after a
-  // tool call with libfx's ConflictingIdentity on the owner's OpenCode Go model, where each message's level works.
+  // Its thinking level goes with each message, as phone-v2 sent it.
   async function callSession(id: number, bot: string, note: string) {
     const session = await fx.chats.newSession(bot, { label: `Call ${id}` });
     const recap = await recapOf(bot).catch((error) => (fx.log(`Call ${id} has no recap of the main chat: ${error.message}`), ""));
@@ -300,7 +299,8 @@ export default async function setup(fx: PluginApi) {
       const ids = message.messageId ? { messageId: message.messageId } : {};
       const call = onCall.get(session);
       const effort = callEffort();
-      if (call) return fx.chats.send(call.bot, { session, text: message.text, label: message.label, steer: true, ...ids, ...(effort ? { effort } : {}) });
+      // Without steer, as the call's own messages go: see call.ts.
+      if (call) return fx.chats.send(call.bot, { session, text: message.text, label: message.label, ...ids, ...(effort ? { effort } : {}) });
       const [row] = await fx.sql<{ bot: string }[]>`select bot from calls where session = ${session}`;
       if (!row) throw Object.assign(new Error("That session isn't a call's."), { status: 400 });
       return fx.chats.send(row.bot, { text: `[From work started on your call]\n${message.text}`, shown: message.shown ?? message.text, label: message.label, steer: true, ...ids });
