@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as jsxRuntime from "react/jsx-runtime";
 import { Component, createContext, useContext, useMemo, useSyncExternalStore, type ComponentProps, type ComponentType, type ReactNode } from "react";
-import { Streamdown } from "streamdown";
+import { defaultComponents, Streamdown, type Components, type ExtraProps } from "streamdown";
 import { createPortal } from "react-dom";
 import * as attachment from "@/components/ui/attachment";
 import * as badge from "@/components/ui/badge";
@@ -23,7 +23,7 @@ import { Blob } from "./blob.tsx";
 import { ModelField } from "./providers.tsx";
 import { client } from "./client.ts";
 import { Header } from "./header.tsx";
-import { go } from "./nav.ts";
+import { follow, go } from "./nav.ts";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { useReorder } from "./reorder.ts";
 import { Reply } from "./steps.tsx";
@@ -274,10 +274,19 @@ function useCodeBlocks() {
 
 // Markdown as the app draws it everywhere, and gives plugins as ui.Streamdown: Streamdown, with the code blocks plugins
 // draw. With none, it's Streamdown as it is.
-export function Markdown({ plugins, ...props }: ComponentProps<typeof Streamdown>) {
+export function Markdown({ plugins, components, ...props }: ComponentProps<typeof Streamdown>) {
   const blocks = useCodeBlocks();
   const merged = useMemo(() => (blocks.length ? { ...plugins, renderers: [...(plugins?.renderers ?? []), ...blocks] } : plugins), [plugins, blocks]);
-  return <Streamdown {...props} plugins={merged} />;
+  const links = useMemo<Components>(() => ({ a: AppLink, ...components }), [components]);
+  return <Streamdown {...props} components={links} plugins={merged} />;
+}
+
+// A link to a place in the app, such as a page's /pages/<id>, opens here, in place. Any other link is Streamdown's,
+// which asks before it opens another site in a new tab.
+function AppLink({ node, ...props }: ComponentProps<"a"> & ExtraProps) {
+  const href = props.href ?? "";
+  if (!/^\/(?!\/|api\/)/.test(href)) return <defaultComponents.a node={node} {...props} />;
+  return <a {...props} target={undefined} rel={undefined} className={`wrap-anywhere font-medium text-primary underline ${props.className ?? ""}`} data-streamdown="link" onClick={follow} />;
 }
 
 // What the owner or a plugin said, with each match of a plugin's `said` pattern drawn by its part.
