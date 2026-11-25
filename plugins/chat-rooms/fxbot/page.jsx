@@ -1,7 +1,7 @@
 // The rooms in the app: a Rooms group in the sidebar, each room with its bots' avatars, + to make one, and a screen for
 // each room, where the owner tags bots with @ and each reply shows as it's written. Built into page.js; see the README.
 import { useEffect, useRef, useState } from "react";
-import { api, client, go, ui, useBots, Slot } from "@fxbot/app";
+import { api, client, go, openBeside, ui, useBots, Slot } from "@fxbot/app";
 import { Composer } from "./composer.jsx";
 import { Chip, Stack } from "./faces.jsx";
 import { tokens } from "./mentions.ts";
@@ -408,8 +408,29 @@ function Summary({ text }) {
   );
 }
 
+// A pill in the middle of the room, such as a call's (phone-v3): its words, opening its place beside the room, or
+// unfolding to show what it holds.
+function Pill({ message }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="grid gap-3">
+      <button
+        type="button"
+        aria-expanded={message.open ? undefined : open}
+        onClick={() => (message.open ? openBeside(message.open) : setOpen(!open))}
+        className="mx-auto flex max-w-full items-center gap-1.5 rounded-full border bg-muted px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <span className="min-w-0 truncate">{message.label}</span>
+        <span aria-hidden="true">›</span>
+      </button>
+      {!message.open && open && message.text && <p className="mx-auto max-w-prose text-sm whitespace-pre-wrap text-muted-foreground">{message.text}</p>}
+    </div>
+  );
+}
+
 function Said({ message, bot }) {
   if (message.author === "note") return <p className="text-center text-xs text-muted-foreground">{message.text}</p>;
+  if (message.author === "pill") return <Pill message={message} />;
   if (message.author === "summary") return <Summary text={message.text} />;
   if (message.author === "owner")
     return (

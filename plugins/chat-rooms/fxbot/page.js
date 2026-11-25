@@ -10457,11 +10457,34 @@ function Summary({ text }) {
 		})]
 	});
 }
+function Pill({ message }) {
+	const [open, setOpen] = (0, react.useState)(false);
+	return (0, react_jsx_runtime.jsxs)("div", {
+		className: "grid gap-3",
+		children: [(0, react_jsx_runtime.jsxs)("button", {
+			type: "button",
+			"aria-expanded": message.open ? void 0 : open,
+			onClick: () => message.open ? (0, _fxbot_app.openBeside)(message.open) : setOpen(!open),
+			className: "mx-auto flex max-w-full items-center gap-1.5 rounded-full border bg-muted px-3 py-1 text-xs text-muted-foreground hover:text-foreground",
+			children: [(0, react_jsx_runtime.jsx)("span", {
+				className: "min-w-0 truncate",
+				children: message.label
+			}), (0, react_jsx_runtime.jsx)("span", {
+				"aria-hidden": "true",
+				children: "›"
+			})]
+		}), !message.open && open && message.text && (0, react_jsx_runtime.jsx)("p", {
+			className: "mx-auto max-w-prose text-sm whitespace-pre-wrap text-muted-foreground",
+			children: message.text
+		})]
+	});
+}
 function Said({ message, bot }) {
 	if (message.author === "note") return (0, react_jsx_runtime.jsx)("p", {
 		className: "text-center text-xs text-muted-foreground",
 		children: message.text
 	});
+	if (message.author === "pill") return (0, react_jsx_runtime.jsx)(Pill, { message });
 	if (message.author === "summary") return (0, react_jsx_runtime.jsx)(Summary, { text: message.text });
 	if (message.author === "owner") return (0, react_jsx_runtime.jsxs)("div", {
 		className: "grid justify-items-end gap-1",

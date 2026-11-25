@@ -45,6 +45,8 @@ Since 0.6.0, for phone's calls in a room and for subagents:
 - `post(room, { text, label, note, effort })`: the owner's message, as from a call. The room shows `label` with it, such as "your call". Its bots read `note` and the room doesn't show it. `effort` is how hard the round it starts thinks, on fxbot 0.12.0 or newer.
 - `stop(room)`: the room's **Stop**.
 - `on(room, listener)`: the room's events, as its page hears them, until the function it answers is called.
+- `callRoom(room)`: a call room for the room's call, for phone 0.2.0: a room of its own, with the room's bots and settings, left out of the rooms list. Each bot's first turn there starts with what the room said before the call. Deleting the room deletes its call rooms.
+- `pill(room, { label, text, open, inContext })`: a pill in the middle of the room, such as the call's **Phone call · 4 min**, opening `open` beside the room, or unfolding to show its text. In context, each bot's next turn reads it with what was said since.
 - `wake(session, { text, label })`: a message from another plugin, such as a subagent's report, into the room whose session that is, under `label`. It wakes the bot whose session it is.
 
 The room's header leaves a place, `chat-rooms.room-header`, which a plugin fills with `app.slot`; each part gets `room`. Since 0.6.0, so does the space above its message box, `chat-rooms.room-box`, where [phone](../phone/) shows a room's call. The [computer](../computer/) uses `roomOf` and the header, for a room's computer. On fxbot 0.4, which has neither, the room works as in 0.2.0.

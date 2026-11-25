@@ -10,10 +10,12 @@ import { mentioned, toNames, toTokens } from "./mentions.ts";
 // setting with enough said since its last summary, and when the owner sends /fresh. The summary is kept as a message,
 // and the room's sessions are dropped, so each bot's next turn makes a new one, with the summary in its instructions.
 
-type Room = { id: number; name: string; members: string[]; untagged: "lead" | "everyone"; replies: number };
+// `call_of` is the room a call room is for (phone-v3), or null.
+type Room = { id: number; name: string; members: string[]; untagged: "lead" | "everyone"; replies: number; call_of?: number | null };
 // `label` is shown with a message, such as "your call", or names the plugin a message of author 'plugin' came from.
 // `note` is for the bots only, and never reaches the page.
-type Message = { id: number; author: string; text: string; at: string; chain: number | null; label?: string | null; note?: string | null };
+// A pill, author 'pill', is shown in the middle, with `open` the place it opens.
+type Message = { id: number; author: string; text: string; at: string; chain: number | null; label?: string | null; note?: string | null; open?: string | null };
 // A turn in a room's queue: the bot, the owner's message whose chain it's in, and what woke it: the owner tagging it,
 // tagging everyone, an untagged message for the lead or for everyone, or another bot, by its id.
 // A plugin's message, such as a subagent's report, wakes the bot it came for, `from` naming the plugin.
@@ -116,7 +118,7 @@ export default async function setup(fx: PluginApi) {
     (roomOf.set(session, room), botOf.set(session, bot));
 
   async function room(id: number): Promise<Room | null> {
-    const [found] = await fx.sql<Omit<Room, "members">[]>`select id, name, untagged, replies from rooms where id = ${id}`;
+    const [found] = await fx.sql<Omit<Room, "members">[]>`select id, name, untagged, replies, call_of from rooms where id = ${id}`;
     if (!found) return null;
     const members = await fx.sql<{ bot: string }[]>`select bot from members where room = ${id} order by position`;
     return { ...found, members: members.map((m) => m.bot) };
@@ -126,7 +128,7 @@ export default async function setup(fx: PluginApi) {
   // message that wakes the bot whose session it is. fxbot 0.4 has no provide, and then the room works as before.
   fx.provide?.({
     roomOf: async (session: string) => (roomOf.has(session) ? await room(roomOf.get(session)!) : null),
-    rooms: async () => (await Promise.all((await fx.sql<{ id: number }[]>`select id from rooms order by position nulls last, id`).map((r) => room(r.id)))).filter(Boolean),
+    rooms: async () => (await Promise.all((await fx.sql<{ id: number }[]>`select id from rooms where call_of is null order by position nulls last, id`).map((r) => room(r.id)))).filter(Boolean),
     post: async (id: number, message: { text: string; label?: string; note?: string; effort?: string }) => {
       const found = (await room(Number(id))) ?? fail("No such room.");
       if (typeof message?.text !== "string" || !message.text.trim()) fail("text is required");
@@ -143,6 +145,26 @@ export default async function setup(fx: PluginApi) {
       if (!listeners.has(id)) listeners.set(id, new Set());
       listeners.get(id)!.add(listener);
       return () => void listeners.get(id)?.delete(listener);
+    },
+    // Since 0.6.0, for phone 0.2.0 (docs/phases/phone-v3.md): a room's call is a side conversation in a call room of its
+    // own, with the room's bots and settings, left out of the list. A pill in the middle of a room, such as the call's,
+    // which the bots read when it's in context.
+    callRoom: async (id: number) => {
+      const found = (await room(Number(id))) ?? fail("No such room.");
+      const [made] = await fx.sql<{ id: number }[]>`insert into rooms (name, untagged, replies, call_of)
+        values (${`${found.name}, a call`.slice(0, 80)}, ${found.untagged}, ${found.replies}, ${found.id}) returning id`;
+      for (const [position, bot] of found.members.entries()) await fx.sql`insert into members (room, bot, position) values (${made.id}, ${bot}, ${position})`;
+      return room(made.id);
+    },
+    pill: async (id: number, pill: { label: string; text?: string; open?: string; inContext?: boolean }) => {
+      const found = (await room(Number(id))) ?? fail("No such room.");
+      if (typeof pill?.label !== "string" || !pill.label.trim() || pill.label.length > 80) fail("label must be 1 to 80 characters");
+      const text = typeof pill.text === "string" ? pill.text.slice(0, 8000) : "";
+      const open = typeof pill.open === "string" && /^\/(?!\/|api\/)\S{0,299}$/.test(pill.open) ? pill.open : null;
+      const [message] = await fx.sql<Message[]>`insert into messages (room, author, text, label, open, in_context)
+        values (${found.id}, 'pill', ${text}, ${pill.label.trim()}, ${open}, ${pill.inContext === true}) returning id, author, text, at, chain, label, open`;
+      emit(found.id, { type: "message", message });
+      return message;
     },
     wake: async (session: string, message: { text: string; label?: string }) => {
       const id = roomOf.get(session) ?? fail("That session isn't a room's.");
@@ -168,7 +190,7 @@ export default async function setup(fx: PluginApi) {
     efforts.set(chain, effort);
     for (const old of [...efforts.keys()].slice(0, Math.max(0, efforts.size - 50))) efforts.delete(old);
   }
-  const messages = (id: number) => fx.sql<Message[]>`select id, author, text, at, chain, label from messages where room = ${id} order by id`;
+  const messages = (id: number) => fx.sql<Message[]>`select id, author, text, at, chain, label, open from messages where room = ${id} order by id`;
   async function say(id: number, author: string, text: string, chain: number | null = null, { label = null, note = null }: { label?: string | null; note?: string | null } = {}) {
     const [message] = await fx.sql<Message[]>`insert into messages (room, author, text, chain, label, note) values (${id}, ${author}, ${text}, ${chain}, ${label}, ${note})
       returning id, author, text, at, chain, label`;
@@ -301,7 +323,7 @@ export default async function setup(fx: PluginApi) {
   // history with its own lines too, since the room's last summary. The newest come first, until the limits.
   async function since(found: Room, bot: string, seen: number, fresh: boolean, named: Map<string, string>) {
     const rows = await fx.sql<Message[]>`select id, author, text, at, chain, label, note from messages
-      where room = ${found.id} and author not in ('note', 'summary') and (${fresh} or id > ${seen})
+      where room = ${found.id} and author not in ('note', 'summary') and (author <> 'pill' or in_context) and (${fresh} or id > ${seen})
         and id > (select coalesce(max(id), 0) from messages where room = ${found.id} and author = 'summary')
       order by id desc limit ${recent.messages + 1}`;
     const shown = rows.filter((m) => fresh || m.author !== bot);
@@ -312,7 +334,9 @@ export default async function setup(fx: PluginApi) {
       const who =
         m.author === "owner"
           ? `Owner${m.label ? ` (${m.label})` : ""}`
-          : m.author === "plugin"
+          : m.author === "pill"
+            ? `[${m.label ?? "A pill"}]`
+            : m.author === "plugin"
             ? (m.label ?? "A plugin")
             : m.author === bot
               ? `${named.get(bot) ?? "You"} (you)`
@@ -324,6 +348,12 @@ export default async function setup(fx: PluginApi) {
       }
       left -= line.length;
       lines.unshift(line);
+    }
+    // A call room's first turn for a bot starts with what the room said before the call.
+    const parent = fresh && found.call_of ? await room(found.call_of) : null;
+    if (parent) {
+      const before = await since(parent, bot, 0, true, named);
+      if (before.lines.length) lines.unshift(`(In ${parent.name}, before this call:)`, ...before.lines, "(On the call:)");
     }
     return { lines, last: rows[0]?.id ?? seen, cut };
   }
@@ -625,7 +655,7 @@ export default async function setup(fx: PluginApi) {
 
   // The rooms, in the owner's order, each with the bot writing in it now, if one is.
   fx.route("GET", "/rooms", async () => {
-    const rooms = await fx.sql<{ id: number }[]>`select id from rooms order by position nulls last, id`;
+    const rooms = await fx.sql<{ id: number }[]>`select id from rooms where call_of is null order by position nulls last, id`;
     return json(await Promise.all(rooms.map(async (r) => ({ ...(await room(r.id)), writing: replying.get(r.id)?.bot ?? null }))));
   });
   // The owner's order for rooms, which a drag in the sidebar sets. Rooms it doesn't name keep theirs.
