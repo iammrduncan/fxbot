@@ -8,7 +8,7 @@ Talk with a bot by voice, in the app or on a phone line, as naturally as realtim
 - **In-app calls:** a Talk button in a bot's chat, over the connection the app already has, web pairing included. The bot opens with "Hey, what's up?"
 - **A carrier plugin only places the call and carries its sound,** over a SIP user agent phone offers. `phone-signalwire` becomes SignalWire's SIP account, and its RELAY way goes. This release waits until SIP works well on the owner's network.
 
-Status: **part 1 built on 2026-11-25** on `release/0.12.0`: the core hooks, Phone 0.2.0's calls in the app and in rooms, Chat rooms 0.6.0, and Subagents 0.3.0, checked against fakes of each voice service, a real Speaches, a mock model, and Chromium ([What the build changed](#what-the-build-changed-part-1)). web.fxbot.sh's new policy waits for the owner's deploy. **Part 2, SIP, isn't started:** its proof needs the owner's go-ahead. It was planned on 2026-11-25. Researched the same day against the research directive's references, Pipecat and LiveKit Agents, about 40 voice providers, the browsers' own speech, local speech servers, and nine phone carriers. Revised twice the same night with the owner's answers: the bot speaks in its own words, as a sidekick that works in the background while it talks. Live voice models are an option to test, not the plan. Then the owner added calls in chat rooms, to the first version. Nothing here has run on a real account or network except the two calls on dev that showed why it's needed. What's unverified says so.
+Status: **part 1 built on 2026-11-25** on `release/0.12.0`: the core hooks, Phone 0.2.0's calls in the app and in rooms, Chat rooms 0.6.0, and Subagents 0.3.0, checked against fakes of each voice service, a real Speaches, a mock model, and Chromium ([What the build changed](#what-the-build-changed-part-1)). web.fxbot.sh's new policy is deployed. **Part 2, SIP, isn't started:** its proof needs the owner's go-ahead. It was planned on 2026-11-25. Researched the same day against the research directive's references, Pipecat and LiveKit Agents, about 40 voice providers, the browsers' own speech, local speech servers, and nine phone carriers. Revised twice the same night with the owner's answers: the bot speaks in its own words, as a sidekick that works in the background while it talks. Live voice models are an option to test, not the plan. Then the owner added calls in chat rooms, to the first version. Nothing here has run on a real account or network except the two calls on dev that showed why it's needed. What's unverified says so.
 
 ## What the owner asked
 
@@ -636,7 +636,7 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
 - [x] Dev: phone 0.2.0 landed, by a fast-forward with no call on, and the API restarted. Its log shows the migrations, and Voice falls back to This device, since dev has no provider phone can listen with yet.
 
 **Part 1, web.fxbot.sh:**
-- [ ] The relay's `permissions-policy` changed and checked locally, then deployed with the owner's approval. Changed and checked locally (b54b4ac); the deploy waits.
+- [x] The relay's `permissions-policy` changed and checked locally, then deployed with the owner's approval. Changed and checked locally (b54b4ac), and deployed on 2026-11-25.
 - [ ] The live `shell.js` hash matches a local build.
 
 **The owner's own** (only a person can):
@@ -724,4 +724,5 @@ Built on 2026-11-25 in a worktree of `release/0.12.0`, and landed there. Part 2 
 - **A thinking level reaching a model:** libfx sends one only to AI Gateway, Vercel, ChatGPT, and Grok, and no fake of those ran. fxbot checking the level showed phone sends it.
 - **Firefox's audio:** headless Firefox here has no sound output, so its call ends with the browser's reason. Its microphone, worklet, and wake lock worked, and it doesn't offer This device listening.
 - **Safari, an iPhone, and Android,** and how echo cancellation holds there.
-- **web.fxbot.sh's new policy,** until the owner deploys it.
+
+**web.fxbot.sh** was deployed on 2026-11-25, at the owner's word (Worker version `0904783f`). The live shell sends `microphone=(self "https://*.fxbot.sh")`, and its `shell.js` matches a local build.
