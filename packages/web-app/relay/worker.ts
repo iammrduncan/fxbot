@@ -48,7 +48,7 @@ async function provesKeys(rid: string, q: URLSearchParams) {
 const security = {
   "x-content-type-options": "nosniff",
   "referrer-policy": "no-referrer",
-  "permissions-policy": "camera=(self), microphone=(), geolocation=()",
+  "permissions-policy": "camera=(self), microphone=(self), geolocation=()",
 };
 
 export default {
@@ -75,6 +75,8 @@ export default {
       const ws = url.protocol === "http:" ? " ws:" : "";
       return withHeaders(res, {
         ...security,
+        // The microphone for phone's calls in the app, in a frame of fxbot's page, which asks for it with allow=.
+        "permissions-policy": `camera=(self), microphone=(self "${url.protocol}//*.${base}"), geolocation=()`,
         "content-security-policy": `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self' wss:${ws}; frame-src ${url.protocol}//*.${base}; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'`,
         ...(url.pathname === "/sw.js" ? { "cache-control": "no-cache" } : {}),
       });
