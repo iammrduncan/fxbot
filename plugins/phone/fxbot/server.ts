@@ -5,7 +5,7 @@ import type { Outcome, Provider } from "./line.ts";
 
 // phone: a bot rings the owner's own phone, and they talk, with the bot's own turn deciding everything
 // (docs/_completed/phases/phone.md). This holds the call: Call me, the tools, who may call and when, the owner's number, the conversation, and
-// the last calls. A provider plugin, such as phone-signalwire, carries it: it needs phone with { "line": 1 } and offers
+// the last calls. A provider plugin, such as phone-signalwire, carries it: it needs phone with { "line": 2 } and offers
 // a Provider (line.ts). The owner starts a call with Call me; a bot starts one when the owner asked, on a call-back they
 // gave, or on its own when the owner allowed that.
 
@@ -25,7 +25,8 @@ type Row = {
 };
 // What a bot gets. A provider or voice of null is the default's.
 type Features = { provider: string | null; voice: string | null; button: boolean; asked: boolean; own: boolean };
-type Found = { name: string; api: Provider };
+// line is the contract the provider speaks: 2, or the older 1, where the provider decides what cuts the bot off.
+type Found = { name: string; api: Provider; line: number };
 
 const limits = { minutes: [5, 120, 30], perDay: [1, 20, 3] } as const;
 const phone = /^\+[1-9]\d{6,14}$/;
@@ -58,12 +59,13 @@ export default async function setup(fx: PluginApi) {
   const setting = (name: string) => (fx.settings[name] ?? "").trim();
   const confirmed = async () => phone.test(setting("to")) && (await fx.secrets.get("confirmed")) === setting("to");
 
-  // The providers: the plugins that need phone with { "line": 1 }, added, and the ones of them running now, by name.
-  const added = () => fx.dependents().filter((d) => d.needs.line === 1);
+  // The providers: the plugins that need phone with { "line": 2 } or { "line": 1 }, added, and the ones of them running
+  // now, by name.
+  const added = () => fx.dependents().filter((d) => d.needs.line === 1 || d.needs.line === 2);
   const providers = (): Found[] =>
     added()
       .filter((d) => typeof (d.api as Partial<Provider> | null)?.line === "function")
-      .map((d) => ({ name: d.name, api: d.api as unknown as Provider }))
+      .map((d) => ({ name: d.name, api: d.api as unknown as Provider, line: Number(d.needs.line) }))
       .sort((a, b) => (a.name < b.name ? -1 : 1));
   // The default: the one picked, while it runs, or else the first running.
   async function chosen() {
@@ -128,6 +130,7 @@ export default async function setup(fx: PluginApi) {
       minutes: limit("minutes"),
       id,
       open: (events) => p.api.line(events),
+      turns: p.line === 2,
       onSpoken: (turn) => void spoken.add(turn),
       onEnd: (how) => void finish(id, how).catch((error) => fx.log(`Call ${id} didn't save its end: ${error.message}`)),
     });

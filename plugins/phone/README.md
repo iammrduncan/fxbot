@@ -17,7 +17,7 @@ Add it from **Plugins**. It needs fxbot 0.9.0 or newer. It runs inside fxbot: re
 
 - **What you say** goes to the bot's chat as a message, labeled **your call**, joining whatever it's working on. The first one tells the bot it's on a call. Every reply in that chat is read out while the call lasts, including one to a subagent's report. Markdown's marks go, a link is "a link in the chat," and a code block or table is "There's more in the chat."
 - **While it thinks,** you hear "One moment." once, and "Still working on it." every 20 seconds while a tool runs.
-- **Talking over it** stops it, and the bot learns where you cut in. Its work goes on.
+- **Talking over it** stops it, after the greeting, which plays to the end, and the bot learns where you cut in. Its work goes on. Its own voice coming back, as from a speakerphone or a watch, isn't taken as yours: words that are mostly what it was saying as they began, or had said up to 1.5 seconds before, aren't sent, and the log says so.
 - **"Stop"** stops the work the call started, and isn't sent to the bot. "Wait" and "hold on" only stop it talking.
 - **The call ends** when you hang up, when the bot hangs up, after a minute with nothing said, or at `minutes`.
 - **Anything that needs your OK** waits on your screen, as Permissions shows it.
@@ -54,11 +54,13 @@ The confirmed number and a code waiting to be typed are kept sealed. What was sa
 
 ## Writing a provider
 
-A provider is a plugin that needs phone with `{ "line": 1 }`:
+A provider is a plugin that needs phone with `{ "line": 2 }`:
 
 ```json
-"needs": { "phone": { "line": 1 } }
+"needs": { "phone": { "line": 2 } }
 ```
+
+phone still takes `{ "line": 1 }`, the contract before phone 0.1.2, where the provider decides what cuts the bot off, stops it, and says `interrupted()`.
 
 It offers phone one object with `fx.provide`, and phone finds it with `fx.dependents()`. `fxbot/line.ts` has the types:
 
@@ -72,7 +74,7 @@ type Provider = {
 ```
 
 - **`line(events)`** gives a `Line` for one call: `place(call)` rings `call.to` and resolves once the owner answers, or doesn't. `say(text)` speaks after whatever is playing or waiting, and `stop()` cuts it off. `hangUp(now)` ends the call, and `speaking` says whether something plays or waits.
-- **`events`** are what the provider says back: `heard(text)` when the owner finished something they said, `interrupted()` when they cut in and the provider stopped speaking, `played(text)` for words played to the end, and `ended(how)` once the call is over: `"hung up"`, or what ended it, which the call's row keeps.
+- **`events`** are what the provider says back: `hearing(text)` with the words of what the owner is saying so far, as they come, `heard(text)` when they finished something they said, `played(text)` for words played to the end, and `ended(how)` once the call is over: `"hung up"`, or what ended it, which the call's row keeps. phone decides from what it hears what's the bot's own voice coming back and what cuts the bot off, and calls `stop()`: a provider never cuts it off itself.
 - **`place` carries** the greeting to play on answer, a line for voicemail on a call the bot makes, words to expect such as the bot's name, `quiet` for a call that only speaks, and the bot's `voice`, one of `voices()`, or none for the provider's own.
 - **The provider ends its own calls** when it unloads, and after a restart, any its last process left up.
 

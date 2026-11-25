@@ -1,5 +1,5 @@
 // What a provider plugin offers phone (docs/_completed/phases/phone.md, The contract). A provider names phone under
-// needs, with { "line": 1 }, and offers a Provider with fx.provide. phone holds the call and its conversation; the
+// needs, with { "line": 2 }, or the older { "line": 1 }, and offers a Provider with fx.provide. phone holds the call and its conversation; the
 // provider holds the connection to its service, speaks the bot's words, and says what the owner said, as text both ways.
 
 export type Outcome = "answered" | "voicemail" | "missed" | "busy" | "declined" | "failed";
@@ -7,7 +7,11 @@ export type Outcome = "answered" | "voicemail" | "missed" | "busy" | "declined" 
 export type LineEvents = {
   /** The owner finished something they said. */
   heard: (text: string) => void;
-  /** The owner cut in while the bot spoke: what was playing stopped, and what was waiting was dropped. */
+  /** Line 2: the words of what the owner is saying so far, as they come. phone decides from them, and from heard, what
+   * cuts the bot off, and stops the line itself. */
+  hearing?: (text: string) => void;
+  /** Line 1 only: the provider cut the bot off when the owner spoke over it, so what was playing stopped, and what was
+   * waiting was dropped. A line 2 provider never cuts the bot off on its own. */
   interrupted: () => void;
   /** Those words were played to the end. */
   played: (text: string) => void;

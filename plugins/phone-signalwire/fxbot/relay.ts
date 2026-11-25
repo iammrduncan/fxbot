@@ -123,14 +123,6 @@ function connection(relay: Relay, onEvent: (type: string, params: any) => void, 
   };
 }
 
-// Words, for comparing what the recognizer heard with what's playing.
-const wordsOf = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [];
-// What the recognizer heard is the bot's own voice coming back when most of its words are in what the bot said.
-function echo(heard: string, spoken: string) {
-  const said = new Set(wordsOf(spoken));
-  const words = wordsOf(heard);
-  return words.length > 0 && words.filter((word) => said.has(word)).length / words.length >= 0.6;
-}
 const outcomes: Record<string, Outcome> = { busy: "busy", noAnswer: "missed", decline: "declined" };
 
 // `kept` gets what ends the call after a restart once SignalWire names it, and null once the call is over.
@@ -146,13 +138,7 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
   let lastDial: (() => void) | null = null;
   let asked: Place | null = null;
   const queue: string[] = [];
-  // A firm line is the greeting, which plays through: nothing the owner says cuts it, though "stop" still does.
-  let playing: { control: string; text: string; cut: boolean; at: number; firm: boolean; stopAt?: number } | null = null;
-  let greeted = false;
-  // The lines played in the last minute, and when each ended, for telling the bot's own voice from the owner's.
-  let said: { text: string; end: number }[] = [];
-  // When the words heard now began, as their first partial result came.
-  let began = 0;
+  let playing: { control: string; text: string; cut: boolean; at: number; stopAt?: number } | null = null;
   // What waits for the last line to play, a hang-up or a voicemail's end, and what waits for the call to end.
   const drained = new Set<() => void>();
   const closed = new Set<() => void>();
@@ -194,8 +180,7 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
     // What waited while the last line played goes as one, so sentences don't each wait on a round trip.
     const text = queue.splice(0).join(" ");
     const control = randomUUID();
-    playing = { control, text, cut: false, at: Date.now(), firm: !greeted };
-    greeted = true;
+    playing = { control, text, cut: false, at: Date.now() };
     conn.request("calling.play", { ...ids(), control_id: control, play: [{ type: "tts", params: { text, voice: asked?.voice || relay.voice } }] }).catch((error) => {
       relay.log(`SignalWire didn't play a line: ${error.message}`);
       if (playing?.control === control) ((playing = null), pump());
@@ -219,7 +204,6 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
     if (listens.length > 5) return deaf("SignalWire kept ending its listening.");
     collect = randomUUID();
     lastHeard = "";
-    began = 0;
     const control = collect;
     conn
       .request("calling.collect", {
@@ -280,7 +264,6 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
     if (type === "calling.call.play" && playing && params.control_id === playing.control && ["finished", "error"].includes(params.state)) {
       const done = playing;
       playing = null;
-      said = [...said.filter((l) => Date.now() - l.end < 60_000), { text: done.text, end: Date.now() }];
       if (done.stopAt) relay.log(`A line stopped ${Date.now() - done.stopAt} ms after it was asked to.`);
       if (params.state === "error") relay.log("SignalWire couldn't play a line.");
       else if (!done.cut) on.played(done.text);
@@ -291,18 +274,6 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
       const found = params.detect?.params?.event;
       if (typeof found === "string") detected?.(found);
     }
-  }
-
-  // When words heard began: their first partial result, or with only a final, about a second of silence and half a
-  // second a word before it.
-  const startOf = (text: string) => began || Date.now() - 1000 - 500 * wordsOf(text).length;
-  // Whether words heard are the bot's own voice coming back, as from a phone on speaker or a watch: most of them are in
-  // the lines that were playing as they began, or that had ended up to 1.5 seconds before, the echo's way back. The
-  // recognizer gives words a second or more after their sound, so an echo comes after its line ended, or while the next
-  // one plays: on 2026-11-24 the greeting's echo, "hey this is", reached the bot as the owner's words.
-  function echoed(text: string, at: number) {
-    const lines = [...said, ...(playing ? [{ text: playing.text, end: Infinity }] : [])].filter((l) => l.end + 1500 > at);
-    return lines.length > 0 && echo(text, lines.map((l) => l.text).join(" "));
   }
 
   function heard(params: any) {
@@ -316,23 +287,13 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
     if (result.type === "speech") {
       const text = String(result.params?.text ?? "").trim();
       const final = params.final === true || (params.final === undefined && params.state !== "collecting");
-      if (text && !final && !began) began = Date.now();
-      const at = startOf(text);
       // A continuous collect gives each thing said as a final while it's collecting, then its last result again as it
       // ends, as SignalWire's own SDK reads it: when the owner hung up, their last words went to the bot a second time.
       if (ending && text && text === lastHeard) relay.log("SignalWire gave the last words again as its listening ended; they weren't sent again.");
-      else if (text && echoed(text, at)) {
-        // Each echo dropped, and how long after its line ended it began, for tuning the 1.5 seconds on real calls.
-        const last = said.at(-1);
-        const after = last && at > last.end && !(playing && at >= playing.at) ? at - last.end : 0;
-        const when = after ? `${(after / 1000).toFixed(1)} s after a line ended` : "during a line";
-        if (final) relay.log(`The bot's own voice came back ${when}${began ? "" : " (its start estimated)"}, and wasn't sent: "${text.slice(0, 80)}"`);
-      } else if (text) {
-        // Two words while the bot speaks cut in, but not into the greeting. One may be a cough; a final says what it was.
-        if (playing && !playing.firm && wordsOf(text).length >= 2 && cut()) on.interrupted();
-        if (final) on.heard((lastHeard = text));
-      }
-      if (final || ending) began = 0;
+      // The words as they come, and once finished: phone decides what's the bot's own voice coming back, and what cuts
+      // it off (line 2).
+      else if (text && final) on.heard((lastHeard = text));
+      else if (text) on.hearing?.(text);
       // A collect that ends with a result starts again too, below.
       if (!ending) return;
     }

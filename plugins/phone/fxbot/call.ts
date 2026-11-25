@@ -33,6 +33,8 @@ type Options = {
   /** The plugin's id for the call, which names the messages it sends. */
   id: number;
   open: (events: LineEvents) => Line;
+  /** A line 2: the call decides what cuts the bot off, from the words as they come. */
+  turns: boolean;
   /** A turn the owner's words joined or started, for the plugin to count as theirs. */
   onSpoken: (turn: string) => void;
   onEnd: (how: string) => void;
@@ -41,6 +43,7 @@ type Options = {
 const label = "your call";
 const floorWords = /^(?:wait|hold on|hang on|one (?:sec|second|moment)|sorry)[.!,]*$/i;
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const wordsOf = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [];
 const note = (greeting: string) =>
   `You're on a live phone call with the owner, who may be driving. You called them and said: "${greeting}" What they say comes to you as text, and what you write is read out to them. ` +
   "Answer in one to three short spoken sentences, with no lists, tables, links, code, or markdown. Your tools work as in the chat: to say how something stands now, check with them first, since what's earlier in the chat may be old. Before work that takes more than a few seconds, say in a few words what you'll do, and hand long work to a subagent if you have one. " +
@@ -144,17 +147,22 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   let goodbyeAfter = "";
   let over = false;
   const timers: NodeJS.Timeout[] = [];
+  // What the bot said that's playing or waiting to, and what stopped playing, with when: for telling its own voice coming
+  // back from the owner's words (echoed). The greeting plays through: on a line 2, nothing said cuts it but "stop".
+  let airing: string[] = [];
+  let aired: { text: string; end: number }[] = [];
+  let greeting = true;
+  // When the words heard now began, as their first partial came, on a line 2.
+  let began = 0;
 
   const line = o.open({
-    heard: (text) => void hear(text).catch((error) => fx.log(`What the owner said didn't reach ${o.name}: ${error.message}`)),
-    interrupted: () => {
-      muted = speaking;
-      speeches.delete(muted);
-      cutAfter = played;
-    },
+    hearing: (text) => void (o.turns && hearing(text)),
+    heard: (text) => void (owners(text) && hear(text).catch((error) => fx.log(`What the owner said didn't reach ${o.name}: ${error.message}`))),
+    interrupted: () => interrupted(),
     played: (text) => {
       played = `${played} ${text}`.trim();
       saidAt = Date.now();
+      offAir(text);
     },
     ended: (how) => finish(how),
   });
@@ -162,15 +170,71 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   function say(text: string, turn = "") {
     if (turn && turn !== speaking) ((speaking = turn), (played = ""));
     saidAt = Date.now();
+    if (text.trim()) airing.push(text.trim());
     line.say(text);
+  }
+
+  // The bot cut off, by the call or by a line 1 provider: what was playing stopped, and what waited was dropped.
+  function interrupted() {
+    muted = speaking;
+    speeches.delete(muted);
+    cutAfter = played;
+    offAir();
+  }
+  function stop() {
+    line.stop();
+    offAir();
+  }
+  // What the bot said leaves the air as it plays to the end, or all at once when the line stops. The first to leave is
+  // the greeting.
+  function offAir(text?: string) {
+    const now = Date.now();
+    const gone = text === undefined ? airing : airing.filter((said) => text.includes(said));
+    airing = airing.filter((said) => !gone.includes(said));
+    aired = [...aired.filter((a) => now - a.end < 60_000), ...gone.map((said) => ({ text: said, end: now }))];
+    greeting = false;
+  }
+
+  // Whether words heard are the bot's own voice coming back, as from a phone on speaker or a watch: most of them are in
+  // what was playing as they began, or had stopped up to 1.5 seconds before, the echo's way back. The recognizer gives
+  // words a second or more after their sound, so an echo comes after its line ended, or while the next one plays: on
+  // 2026-11-24 the greeting's echo, "hey this is", reached the bot as the owner's words.
+  function echoed(text: string, at: number) {
+    if (!line.speaking && airing.length) offAir();
+    const said = new Set([...airing, ...aired.filter((a) => a.end + 1500 > at).map((a) => a.text)].flatMap(wordsOf));
+    const words = wordsOf(text);
+    return words.length > 0 && words.filter((word) => said.has(word)).length / words.length >= 0.6;
+  }
+  // On a line 2, two words of the owner's while the bot speaks cut it off, after the greeting. One may be a cough.
+  function cutIn(text: string) {
+    if (o.turns && line.speaking && !greeting && wordsOf(text).length >= 2) (stop(), interrupted());
+  }
+  // Words as they come, on a line 2.
+  function hearing(text: string) {
+    if (!began) began = Date.now();
+    if (!echoed(text, began)) cutIn(text);
+  }
+  // Words finished: whether they're the owner's, to send. They began at their first partial, or with only a final,
+  // about a second of silence and half a second a word before it. The log says each echo dropped, and how long after
+  // its line, for tuning the 1.5 seconds on real calls.
+  function owners(text: string) {
+    const dated = began > 0;
+    const at = dated ? began : Date.now() - 1000 - 500 * wordsOf(text).length;
+    began = 0;
+    if (!echoed(text, at)) return (cutIn(text), true);
+    const last = aired.at(-1);
+    const after = !airing.length && last && at > last.end ? at - last.end : 0;
+    const when = after ? `${(after / 1000).toFixed(1)} s after a line ended` : "during a line";
+    fx.log(`The bot's own voice came back ${when}${dated ? "" : " (its start estimated)"}, and wasn't sent: "${text.slice(0, 80)}"`);
+    return false;
   }
 
   async function hear(text: string) {
     heardAt = Date.now();
     const words = text.trim();
-    if (floorWords.test(words)) return line.stop();
+    if (floorWords.test(words)) return stop();
     if (stopWords.test(words)) {
-      line.stop();
+      stop();
       const mine = [...running].some((turn) => started.has(turn));
       if (mine) await fx.chats.cancel(o.bot);
       return say(mine ? "Okay, stopped." : running.size ? "That one isn't mine to stop from here." : "Okay.");
@@ -265,6 +329,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
 
   return {
     async place(call) {
+      airing = [call.greeting.trim()];
       const result = await line.place(call);
       if (result.outcome !== "answered" || over) return result;
       const ms = o.minutes * 60_000;

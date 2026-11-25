@@ -315,7 +315,7 @@ fx.chats.send(bot, { text, shown: words, label: "your call", steer: true, asked:
 - "Still working on it." every 20 seconds while a tool runs and nothing else is said.
 
 **Interruptions:**
-- **What counts:** while a sentence plays, a partial result of two or more words cuts in, unless its words are mostly the sentence playing, which is the bot's own voice coming back. Since 0.1.2, the lines that were playing as the words began, or had just ended, count too, and the greeting plays through ([The bot's own voice](#the-bots-own-voice-012-for-0120)). `start_of_input` alone doesn't, since road noise may set it off, until a real call shows it's clean.
+- **What counts:** while a sentence plays, a partial result of two or more words cuts in, unless its words are mostly the sentence playing, which is the bot's own voice coming back. Since 0.1.2, phone decides this, from the words as they come, and the greeting plays through ([The bot's own voice](phone.md#the-bots-own-voice-012-for-0120)). `start_of_input` alone doesn't, since road noise may set it off, until a real call shows it's clean.
 - **What happens:** the line stops the play and drops the sentences after it, and says `interrupted`. A final result of two or more words during a play cuts in the same way.
 - **What the bot learns:** the owner's next words go to the bot with "(They cut you off after: "…")", so it knows where they stopped listening. The turn itself keeps running.
 
@@ -489,7 +489,7 @@ The script wasn't run: there's no SignalWire account here, and the owner set the
 - [ ] A greeting plays on `answered`, and the time from answer to sound is noted.
 - [ ] A continuous `calling.collect` runs while a `calling.play` runs, and `start_of_input` and partials arrive during the play. `calling.play.stop` cuts the sound, in how many milliseconds.
 - [ ] A second `calling.play` sent during one: whether it queues, mixes, or replaces. The gap between back-to-back sentences.
-- [ ] On speaker and in a car, the bot's voice and road noise don't set off `start_of_input` or a partial of two words. On a watch's speaker, 2026-11-24, the greeting came back as words: see [The bot's own voice](#the-bots-own-voice-012-for-0120).
+- [ ] On speaker and in a car, the bot's voice and road noise don't set off `start_of_input` or a partial of two words. On a watch's speaker, 2026-11-24, the greeting came back as words: see [The bot's own voice](phone.md#the-bots-own-voice-012-for-0120).
 - [ ] From the owner's last word to the final result, on Deepgram and on Google, with SignalWire's own `end_silence_timeout`. It refused 0.8 on the first call with the bot; whether it takes whole seconds only, or nothing under 1, isn't known.
 - [ ] A dropped connection connecting again mid-call, `calling.end`, and the owner hanging up. `max_duration` isn't sent since the first real calls, so its unit no longer matters.
 - [ ] After the script quits mid-call, a new connection with the old `protocol` can end the call. If it can't, say how long the call stays up.
@@ -615,24 +615,4 @@ The owner, after a call on 2026-11-24: "after I hung up the last message resent 
 
 ### The bot's own voice (0.1.2, for 0.12.0)
 
-The owner, on 2026-11-24, after a call to their Apple Watch on speaker: "the phone heard itself talking and interrupted itself." The call lasted 9 seconds. Its first message to Bob was "hey this is": the greeting, "Hey, this is your fxbot Bob. How can I help today?", coming back down the line. Bob answered it ("It cut off, so say it again?"), and that answer, with "One moment.", talked over the owner, whose "take a look at" reached Bob cut short. The log showed a line stopped 158 ms after it was asked to, and Bob's last answer went to a call already over.
-
-- **Why the guard missed it:** the line compared words heard only with the line playing at that moment, and not with one that had been cut. The recognizer gives words a second or more after their sound, since a second of silence ends them, so an echo arrives after its line has ended, or while the next line plays, and it counted as the owner's. A watch's speaker and microphone sit close together, so its echo canceller lets more through than a phone held to the ear, and more in a call's first seconds.
-- **How others do it:**
-  - SignalWire's own AI agent doesn't answer what it hears while it talks, for up to 3 seconds (`transparent_barge`), and can make the greeting impossible to cut (`static_greeting_no_barge`). Its [parameters](https://signalwire.com/docs/swml/reference/ai/params.md) have nothing for echo, and RELAY has no echo canceller.
-  - Pipecat [mutes the owner](https://docs.pipecat.ai/server/utilities/user-mute-strategies) until the bot's first speech is done, then asks for some words before cutting in.
-  - LiveKit [asks for some words](https://docs.livekit.io/agents/logic/turns/tuning/), and resumes when a cut turns out to be nothing.
-  - OpenClaw had the same bug ([#159140](https://github.com/openclaw/openclaw/issues/159140)): it drops what's heard while the bot plays and about 400 ms after.
-- **What changed:**
-  - The line keeps the lines played in the last minute, with when each ended. Words heard are the bot's own when most of them are in the lines that were playing as they began, or had ended up to 1.5 seconds before, the echo's way back from the phone. When they began is their first partial result, or with only a final, about a second of silence and half a second a word before it. Such words neither cut in nor reach the bot, and the log says each one it drops, and how long after its line, to tune the 1.5 seconds on real calls.
-  - The greeting plays to the end: no words cut it, though "stop" and a voicemail's machine still do. Words said over it that aren't its echo still reach the bot.
-- **The trade-off:** the owner's own words, when most of them are the bot's last line and they start within 1.5 seconds of its end, such as "hey Bob" right after the greeting, are taken as its echo. Said later, they go.
-- **Checked** against the fake RELAY, with lines slowed to 40 ms a character:
-  - The greeting's echo, and three words of the owner's over it, don't cut it.
-  - The greeting's echo as a final, 0.5 seconds after it ended, doesn't reach the bot, and the log says so. Words said over the greeting do.
-  - A line's echo that began during it and finished while the next line played doesn't cut that line or reach the bot.
-  - Two words of the owner's still cut in on a later line, and words said after a line reach the bot, as does the bot's own last word said 3.5 seconds after its line.
-  - The talk, repeat, deaf, and rules checks still pass. The repeat check now waits 3 seconds before saying the bot's last line back, since the mock bot repeats what it's told.
-  - Not checked: a real call. The log's new lines say whether SignalWire sends partial results at all, and how late an echo comes. No call so far logged `start_of_input` during a line.
-- **If it isn't enough:** a partial could need three words to cut in, as Vapi suggests for noisy calls, and then a setting could make the call take turns. Separately, a pause of a second mid-sentence ends what the owner said, and "One moment." can play while they go on: the call's "take a look at" was likely that.
-- **For checks under dev:** fxbot reloads a local plugin's entry file when its files change, but its other files, such as `relay.ts`, stay as first imported until fxbot restarts. A plugin added from GitHub gets a folder for each commit, so an update isn't affected.
+On a call to the owner's watch on speaker, the greeting came back down the line, and "hey this is" reached the bot as the owner's words. The line compared what it heard only with the line playing then, but the recognizer gives words a second or more after their sound. What counts as the bot's own voice, and what cuts it off, are the same for any provider, so they moved to phone, with the fix: see [The bot's own voice](phone.md#the-bots-own-voice-012-for-0120) in phone's doc. The line now needs phone with `{ "line": 2 }`. It gives phone the words as they come (`hearing`) and once finished (`heard`), and never cuts the bot off itself: phone stops it. Its own echo check and its two-word rule are gone.

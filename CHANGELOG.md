@@ -4,9 +4,10 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
-**Before upgrading.** Nothing changes in the database. Then update phone-signalwire to 0.1.2 from **Plugins**.
+**Before upgrading.** Nothing changes in the database. Then update Phone and phone-signalwire to 0.1.2 from **Plugins**, both: phone-signalwire 0.1.2 needs Phone 0.1.2.
 
-- **A call no longer takes the bot's own voice for yours.** On a call to a watch on speaker, the greeting came back down the line, and "hey this is" reached the bot as the owner's words. The bot answered it, and talked over what the owner did say. The recognizer gives words a second or more after their sound, so an echo arrives after its line has ended, or while the next one plays, and phone-signalwire compared it only with the line playing then. Now words heard are the bot's own when most of them are in a line that was playing as they began, or had ended up to 1.5 seconds before: they don't cut in or reach the bot, and the log says each one dropped. The greeting plays to the end: words said over it reach the bot without cutting it, and "stop" still does. Update phone-signalwire to 0.1.2.
+- **A call no longer takes the bot's own voice for yours.** On a call to a watch on speaker, the greeting came back down the line, and "hey this is" reached the bot as the owner's words. The bot answered it, and talked over what the owner did say. The recognizer gives words a second or more after their sound, so an echo arrives after its line has ended, or while the next one plays, and phone-signalwire compared it only with the line playing then. Phone now decides, for any provider: words heard are the bot's own when most of them are in what it was saying as they began, or had said up to 1.5 seconds before. They don't cut in or reach the bot, and the log says each one dropped. The greeting plays to the end: words said over it reach the bot without cutting it, and "stop" still does. Update Phone and phone-signalwire to 0.1.2.
+- **For plugins:** Phone's provider contract is `{ "line": 2 }`. A provider's line says `hearing(text)` with the owner's words as they come, beside `heard(text)` once they're finished, and leaves cutting the bot off to Phone, which calls `stop()`. Phone still takes a `{ "line": 1 }` provider, which cuts the bot off itself.
 
 ## 0.11.2 (2026-11-24)
 
