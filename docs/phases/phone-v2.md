@@ -3,11 +3,12 @@
 Talk with a bot by voice, in the app or on a phone line, as naturally as realtime voice products do: cut in the moment you speak, take time to think, hear a voice you like, and keep everything the bot can do.
 - **The voice is the bot,** in its own words, from its own model, always. phone carries the voice for the app and every phone line: it hears the owner, stops the bot as they speak, and never takes the bot's own voice for theirs.
 - **A sidekick:** the bot talks with the owner and works behind the scenes at once. Quick looks it does in the conversation. Anything longer it hands to subagents with its tools, its computer, and herdr, or to a herdr agent, and comes straight back to the conversation. What they find comes back on its own, and the bot tells the owner at a pause.
+- **Rooms too, a conference call of bots:** talk with a chat room's bots at once, such as Bob and Mr Robot, each in a voice of its own. The bot you name answers, or the room's lead, who hands it to the one that fits better. The bots address each other as they do in text, one speaking at a time, and you cut in whenever you like.
 - **Voice providers are logins,** on Settings › Providers beside the bots' models. A login that also speaks, such as Mistral's or OpenAI's, serves as it is. phone adds the voice services people use, ElevenLabs (the owner's favorite) and Deepgram, to the same page. A speech server on the owner's own machine, or the browser's own speech in Chrome, Firefox, Safari, or Edge, works too.
 - **In-app calls:** a Talk button in a bot's chat, over the connection the app already has, web pairing included. The bot opens with "Hey, what's up?"
 - **A carrier plugin only places the call and carries its sound,** over a SIP user agent phone offers. `phone-signalwire` becomes SignalWire's SIP account, and its RELAY way goes. This release waits until SIP works well on the owner's network.
 
-Status: **planned on 2026-11-25, not built.** Researched the same day against the research directive's references, Pipecat and LiveKit Agents, about 40 voice providers, the browsers' own speech, local speech servers, and nine phone carriers. Revised twice the same night with the owner's answers: the bot speaks in its own words, as a sidekick that works in the background while it talks. Live voice models are an option to test, not the plan. Nothing here has run on a real account or network except the two calls on dev that showed why it's needed. What's unverified says so.
+Status: **planned on 2026-11-25, not built.** Researched the same day against the research directive's references, Pipecat and LiveKit Agents, about 40 voice providers, the browsers' own speech, local speech servers, and nine phone carriers. Revised twice the same night with the owner's answers: the bot speaks in its own words, as a sidekick that works in the background while it talks. Live voice models are an option to test, not the plan. Then the owner added calls in chat rooms, to the first version. Nothing here has run on a real account or network except the two calls on dev that showed why it's needed. What's unverified says so.
 
 ## What the owner asked
 
@@ -26,6 +27,8 @@ Then, on a first revision that had a live voice model front the bot: "live voice
 
 "Get rid of signalwire" meant its RELAY way, the speech SignalWire does today: "yes keep signalwire as first sip carrier." On how hard a call thinks: "yes call low, subagents full unless toggled to be different (default low)." On the GPT-Live test: "yes its worth after we get other stuff working."
 
+And one more, for the first version: "I want this to work in a chat room too with multiple bots. I don't think anyone does this yet... but I want to... I want to have conversations with bob and mr robot and the one that is more appropriate or I address directly responds or defaults to the default bot of the room and the bots can address the other bots on the call etc... just like in chatroom text, but over a "conference call" of bots."
+
 ## 0. Core or plugin
 
 **A plugin, `phone` 0.2.0, with three small hooks in the plugin API** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Talking by voice isn't what every bot needs. phone owns the voice loop, how a bot works on a call, the in-app call, the voice providers' adapters, and a phone line's audio. Carriers stay plugins that need phone.
@@ -36,7 +39,9 @@ Then, on a first revision that had a live voice model front the bot: "live voice
 
 3. **How hard a call's turn thinks:** `fx.chats.send` takes `effort`, such as `low`, for the turn its message starts in the bot's own chat. A turn it joins keeps its own level. Plugin sessions have had `effort` since 0.10.0, but a call has to be in the bot's own chat, where `subagents_start` works and the owner reads it.
 
-Any plugin can use the first two: an image plugin bringing fal.ai, a search plugin bringing a search API.
+Any plugin can use the first two: an image plugin bringing fal.ai, a search plugin bringing a search API. `effort` works for a plugin's own sessions too, so a room's bots think less on a call.
+
+**Rooms need no more core.** Chat rooms keeps who answers. It offers phone a little more with `fx.provide`, and phone names it under `needs` as optional, as the computer does. Subagents learn to start from a room, through what chat rooms offers.
 
 **Fewer ways for a carrier, not more.** `phone-signalwire` 0.2.0 is SignalWire's SIP account and nothing else. Its RELAY way, `relay.ts` with its 419 lines, goes. So do phone's text lines, `{ "line": 1 }` and `2`, which only RELAY used. This release waits until SIP works well, so no owner is left without a way to call.
 
@@ -57,6 +62,14 @@ Any plugin can use the first two: an image plugin bringing fal.ai, a search plug
   - `subagents_list` answers "how's it going?"
   - herdr's `herdr_prompt` sets an agent to work in its pane, and the computer's tools work for a subagent as for the bot.
   - phone already speaks the bot's reply to a report while a call lasts, and its note on a call says to hand long work to a subagent.
+- **Chat rooms already decide who answers** ([chat-rooms](../../plugins/chat-rooms/README.md), 0.5.2):
+  - A message wakes the bots it tags (`<@bot:id>`, or `<@all>`). One that tags no one wakes the lead, or every bot in order, by the room's setting.
+  - The lead's skill, `room-lead`, has it answer or tag "another bot in the room [that] fits it better".
+  - A reply that tags another bot wakes that bot next, up to 3 tags a reply and 10 replies a message. A new message from the owner replaces the queue. Stop ends the reply being written.
+  - Each bot answers in a session of its own for the room.
+  - The room's stream gives `reply` with the bot and its text so far, then each `message`, the `queue`, and `idle`.
+  - The room's header has a place, `chat-rooms.room-header`, for other plugins. It offers `roomOf(session)` and `rooms()`.
+  - `subagents_start` works "only in the bot's own chat with you, not in a room".
 - **What fxbot has for this:**
   - **Requests a plugin makes with a provider's login:** `fx.models.ask` (keys stay on the server), and the SDK's `embeddingsTarget` (an address and credentials for a provider kind that serves something).
   - **The catalog** (`packages/sdk/src/catalog.ts`): checked entries with `connect` key, url, or device; `headers` with `{apiKey}` (which fits `xi-api-key: {apiKey}` and `Authorization: Token {apiKey}`); `keyCheck`; and `models`. It arrives with fxbot's lists, hourly.
@@ -129,6 +142,16 @@ A live voice model hears and speaks in one model, so it backchannels, takes turn
   - A 2026 fix stopped the sound of a tool call being taken as the user's speech.
   - **Not verified:** making an agent through the API, the WebSocket's auth from a server, how progress is passed while a tool runs, and the price a minute.
 - **Others, later:** Gemini's Live API, xAI's `grok-voice-3.0` at $0.08 a minute, and Bedrock's Nova Sonic, each with function calls.
+
+### Several bots on one call
+
+Nothing found does what the owner asked: named bots with real tools on one call, which the owner addresses by name, and which hand the floor to each other. One search, so something may have been missed.
+- [AI Group Call](https://completeaitraining.com/ai-tools/ai-group-call/), a consumer app, puts up to six AI characters on a voice call, each with a name and role. They "go quiet the instant you start speaking".
+- [Telnyx's multi-participant calls](https://telnyx.com/resources/multi-participant-voice-ai-calls) are one assistant with several people. It tracks who's speaking and stays quiet when it isn't addressed.
+- A [Gemini multi-speaker demo](https://fishjam.swmansion.com/blog/voice-ai-how-we-built-a-multi-speaker-ai-agent-using-gemini) found an agent for each client "chaotic", with everyone speaking at once. It found "floor control", deciding who answers, the hard part.
+- Aircall's and LiveKit's multi-agent setups pass a caller from one agent to the next, one at a time.
+
+So the floor is the design: who answers is the room's, which it already decides in text, and only one bot speaks at a time.
 
 ### Voice providers: the logins fxbot already has
 
@@ -225,6 +248,7 @@ The owner's rule stands: nothing on the internet connects to fxbot. Every carrie
 - **The voice is the bot,** its own model and words. A live voice model replaces the bot's loop, so it's an option to test as ears and mouth only.
 - **A sidekick talks and works at once.** A call's turns stay short. Anything longer goes to the background, to subagents with the bot's tools, computer, and herdr, or to a herdr agent, and the bot comes straight back to the conversation. Findings and reports come back on their own, and the bot tells the owner at a pause, never over them.
 - **A fast talker and deep workers.** A call's turns think less, so the first words come quickly. Subagents think at the bot's own level, or the subagents plugin's `thinking`.
+- **A room is a conference call.** The room already decides who answers. phone adds three things: spoken names become tags, each bot gets a voice of its own, and only one speaks at a time.
 - **One reply, one voice context,** in the bot's own words. Its text streams into one speaker context as the model writes, so the pacing flows: ElevenLabs' stream-input, Cartesia's `continue`, or Deepgram's `Flush`. One request per sentence sounded wrong on dev.
 - **One voice loop, for the app and the line.** `voice.ts` makes a `Line` out of a transport, a listener, and a speaker. `call.ts` keeps the conversation and every rule it has: the pause, the echo window, cutting in, and "stop".
 - **Only words cut the bot off.** With a listener that gives words as they come, two words do, as now. With one that doesn't, 700 ms of the owner's voice does, since the browser's echo cancellation has already taken the bot out. phone's echo window stays as the second layer, as Pi has one.
@@ -261,11 +285,14 @@ plugins/phone/        0.2.0, minFxbot 0.12.0
   fxbot/speech.ts     the listener and speaker types, and which adapter serves which kind
   fxbot/speech/       openai.ts, deepgram.ts, elevenlabs.ts, mistral.ts
   fxbot/talk.ts       the app's call: its socket and what crosses it
+  fxbot/room.ts       a room's call: spoken names to tags, a voice for each bot, and the floor
   fxbot/call.ts       the sidekick on a call, the app's greeting, a voice event, and no more text lines
   fxbot/line.ts       one contract left, { "line": 3 }: audio
   fxbot/sip.ts        part 2: a SIP user agent, offered to carriers
   fxbot/migrations/   0002_voice.sql
   fxbot/page.jsx      Talk, the call's screen, the microphone and playback, this device's speech, Voice settings
+plugins/chat-rooms/  0.6.0: offers post, stop, on, and wake; a message's label and note
+plugins/subagents/   0.3.0: starts from a room, and reports there
 plugins/phone-signalwire/  part 2: 0.2.0, SignalWire's SIP account only; relay.ts goes
 packages/web-app/relay/worker.ts  the microphone allowed
 ```
@@ -389,7 +416,47 @@ The bot is the voice, in its own chat, with everything it has: its tools, memory
 - **The owner's words always reach the bot.** They join a running turn, as now. With long work in the background, the call's turn is short, so they rarely wait.
 - **On a phone line the same:** a phone call is this conversation too.
 
-### phone: Voice settings### phone: Voice settings
+### phone: a conference call in a room (`room.ts`)
+
+A call in a room is the room's conversation, said aloud. The room keeps who answers and its limits, exactly as in text. phone adds the voices and the floor:
+- **Where:**
+  - Talk, in the room's header, through `chat-rooms.room-header`.
+  - Call me there, for a phone line.
+  - One call at a time still holds. A call's row gets the room.
+- **The owner's words go to the room** as their message, labeled **your call**, through chat rooms' `post`.
+- **Names become tags:**
+  - A bot of the room named at the start ("Bob, …", "Hey Mr Robot, …") or at the end ("…, Bob?") is tagged with the room's token, so the room shows its chip and wakes it.
+  - "Everyone", "both of you", or "you all" tags `<@all>`.
+  - A name in the middle ("ask Bob about it") tags no one, and the lead decides, as in text.
+  - Names match loosely: case, "Mr" and "Mister", a missing space. They're the recognizer's hints, so they're heard as written.
+- **No name:** the room's own setting decides. The lead answers, and hands it to the bot that fits better, as its `room-lead` skill says. Or every bot answers in order.
+- **Bots address each other** as they do in text. A reply that tags another bot gives it the floor next, and the tag is said as its name: "Mr Robot, can you check the logs?"
+- **A voice for each bot:**
+  - A bot speaks in its own voice, from its Phone section.
+  - A bot with none, in a room, gets one of the speaker's voices that no other bot in the room has, in the room's order, so no two sound alike.
+  - The call's bar lights the face of whoever's speaking.
+- **One speaker at a time:** replies play in the order the room runs them, each in its bot's voice. A reply that streams in while another plays waits, with a breath, about 300 ms, between speakers.
+- **Cutting in:**
+  - It stops whoever's speaking, and drops the replies waiting to be said.
+  - The owner's next words replace the room's queue, as a typed message does. They carry a note for the bots that isn't shown: "(They cut off Bob after: "…". Mr Robot's reply wasn't heard.)"
+  - "Stop" is the room's Stop.
+- **The greeting:**
+  - In the app, the lead says "Hey, what's up?"
+  - On a phone line, the lead says "Hey, it's Bob and Mr Robot. What's up?"
+- **Thinking:** a room's turns on a call think at `callThinking`, through `post`'s `effort`.
+- **The sidekick in a room:**
+  - A bot in a room starts subagents as in its own chat: subagents 0.3.0 drops the "not in a room" rule.
+  - Their tells and reports come back into the room through chat rooms' `wake`, which wakes that bot there.
+  - Herdr and the room's computer already work in a room.
+- **Chat rooms 0.6.0 offers,** besides `roomOf` and `rooms`:
+  - `post(room, { text, label, note, effort })`, the owner's message from a call
+  - `stop(room)`
+  - `on(room, listener)`, the stream's events
+  - `wake(session, { text, label })`, a message from another plugin, such as a subagent's report, that wakes the bot whose session it is
+
+  A message keeps its `label`, shown with it, and its `note`, which the bots get and the room doesn't show.
+
+### phone: Voice settings
 
 - **phone's tab gains a Voice section:**
   - **Listening:** a provider and its model.
@@ -470,11 +537,12 @@ This release waits for it, since RELAY goes. The proof, the first item of its ch
 2. **Pick the voice:** phone's tab, Voice. ElevenLabs Scribe and Flash, with a voice they like, or This device.
 3. **Talk in the app:** a bot's chat, Talk. "Hey, what's up?" They talk as they would to a person, and the bot answers in its own words within a second or two.
 4. **Ask for real work:** "Have a look at why the build failed, and ask the herdr agent on fxbot to rebase." "On it. I've got Curie on the build, and I've asked the fxbot agent to rebase." They keep talking about something else. "Curie found it: a missing env var in CI. Want me to fix it?" It comes at a pause, not over them. They cut in whenever they like, and the chat shows it all.
-5. **On a phone line,** after part 2: Call me rings their phone, and the call behaves the same.
+5. **In a room:** Talk, in the room with Bob and Mr Robot. Bob, the lead, says "Hey, what's up?" They say "Mr Robot, what's the GPU box doing?", and Mr Robot answers in his own voice, then "Bob, you had the logs?", and Bob takes it. A question with no name goes to Bob, who hands it to Mr Robot when it's his. They cut in on either.
+6. **On a phone line,** after part 2: Call me rings their phone, in a bot's chat or a room, and the call behaves the same.
 
 ### Docs, when it's built
 
-- **How-tos:** Talk with a bot on the phone gets an In the app section, a page on adding a voice provider, and Run speech on your machine, with Speaches.
+- **How-tos:** Talk with several bots in a room gets a By voice section. Talk with a bot on the phone gets an In the app section, a page on adding a voice provider, and Run speech on your machine, with Speaches.
 - **References:** the plugin API's `fx.providers` and `providers` in `plugin.json`, and phone's README with its contract, line 3.
 - **The rest:** CHANGELOG, the README's Phases line, and this doc's What the build changed.
 
@@ -489,6 +557,7 @@ This release waits for it, since RELAY goes. The proof, the first item of its ch
   - the page: 300
   - settings and the migration: 50
 - **The sidekick:** about 80 lines in `call.ts`, the note, and the skill, and 20 for `effort` in core.
+- **Rooms:** about 150 lines in phone's `room.ts` and the page, 60 in chat rooms, and 60 in subagents.
 - **Part 2:** about 600 lines: `sip.ts` 500, and phone-signalwire 100.
 - **Removed:** `relay.ts` (419 lines), and phone's text-line paths, about 60.
 
@@ -549,7 +618,18 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
   - The subagent's `subagents_tell` and its report are spoken at the owner's next pause, never over their words, even when the owner is speaking as they arrive.
   - "How's it going?" is answered from `subagents_list`.
   - The call's bar shows the subagent by name.
-- [ ] This device in Chromium: speaking,- [ ] This device in Chromium: speaking, with `speechSynthesis` stubbed to count utterances, and a cut cancels it. Listening is stubbed the same way. It isn't offered where `SpeechRecognition` is missing. Chrome's Google toggle starts off, and with it off and no language on the device, it says why. In Firefox through Playwright, listening is offered where the browser has it.
+- [ ] A room's call, in Chromium, with two mock bots in a room, the fake speaker recording which voice each reply asked for:
+  - "Bob, …" wakes Bob, and "…, Bob?" does too. "Mister Robot, …" wakes Mr Robot, and "everyone" wakes both.
+  - A question with no name wakes the lead.
+  - A reply that tags the other bot is said next, in that bot's voice, with the tag said as its name.
+  - Two bots with no voice of their own get different voices.
+  - One speaks at a time.
+  - A cut stops the speaker and drops what waits, and the next message carries the note, which the room doesn't show.
+  - "Stop" stops the room.
+  - A room's call shows in Last calls with the room.
+- [ ] Chat rooms 0.6.0: `post`, `stop`, `on`, and `wake`, `label` shown and `note` not, and its README's For other plugins.
+- [ ] Subagents 0.3.0: a bot in a room starts one. Its `subagents_tell` and report wake that bot in the room, and on a call they're said at a pause. Its README, and the "not in a room" line, change.
+- [ ] This device in Chromium: speaking, with `speechSynthesis` stubbed to count utterances, and a cut cancels it. Listening is stubbed the same way. It isn't offered where `SpeechRecognition` is missing. Chrome's Google toggle starts off, and with it off and no language on the device, it says why. In Firefox through Playwright, listening is offered where the browser has it.
 - [ ] Over web pairing locally: `npm run dev --prefix packages/web-app` with the new policy. The frame gets the microphone, and a call works through the bridge.
 - [ ] A local Speaches container, run disposably under podman, if its image and a small model fit on this machine. It hears a WAV and speaks a sentence through the speech server entry. If it doesn't fit, it's said here, and the fake stands in.
 - [ ] phone's README (Voice, the app's call, and line 3), the how-tos, CHANGELOG, and the README's Phases line.
@@ -563,6 +643,7 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
 - [ ] A Deepgram key and an ElevenLabs key added from For Phone.
 - [ ] A call in Chrome on a computer, and on the iPhone app over web pairing, on speaker: cutting in mid-sentence, no echo heard as them, and pacing that sounds right.
 - [ ] One call with This device in Chrome, and one in Firefox.
+- [ ] A conference call with Bob and Mr Robot, in the app and on the phone: naming each, a question with no name, the bots handing it to each other, and cutting in.
 - [ ] A sidekick call: they ask for work on the computer, a herdr agent's task, and a subagent's digging, then keep talking. They hear each result at a pause, and cut in mid-sentence.
 - [ ] After everything above works, with the owner's go-ahead, since it spends credit: GPT-Live as the bot's ears and mouth only. Every word it says comes from `session.commentary.append`, with the bot's reply, and instructions to say exactly that and nothing of its own. If it adds, drops, or rewords, it's out, and that goes here.
 - [ ] One with a Mistral or Groq login reused.
@@ -599,3 +680,4 @@ None left. Answered on 2026-11-25:
 - The voice is the bot, in its own words. Handoffs are its own background work.
 - A call's turns think at `low` (`callThinking`), and subagents at the bot's own level unless the owner changes the subagents plugin's `thinking`.
 - The GPT-Live test runs once the rest works.
+- Calls in chat rooms, with several bots, are in the first version.
