@@ -2,6 +2,12 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
+## Unreleased
+
+**Before upgrading.** Nothing changes in the database. Then update phone-signalwire to 0.1.2 from **Plugins**.
+
+- **A call no longer takes the bot's own voice for yours.** On a call to a watch on speaker, the greeting came back down the line, and "hey this is" reached the bot as the owner's words. The bot answered it, and talked over what the owner did say. The recognizer gives words a second or more after their sound, so an echo arrives after its line has ended, or while the next one plays, and phone-signalwire compared it only with the line playing then. Now words heard are the bot's own when most of them are in a line that was playing as they began, or had ended up to 1.5 seconds before: they don't cut in or reach the bot, and the log says each one dropped. The greeting plays to the end: words said over it reach the bot without cutting it, and "stop" still does. Update phone-signalwire to 0.1.2.
+
 ## 0.11.2 (2026-11-24)
 
 **Before upgrading.** Nothing changes in the database. Then update Web pairing to 0.1.2 from **Plugins**.
