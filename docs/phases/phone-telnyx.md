@@ -32,6 +32,6 @@ Found on 2026-11-14, before planning:
   - Telnyx's WebRTC only if it doesn't
   - which way through the router a call takes, and whether Telnyx bills its $0.002 WebRTC fee
 
-**Since [Phone v2](phone-v2.md) was planned (2026-11-25):** phone carries the voice, with the owner's voice providers, and offers its carriers a SIP user agent. So this plugin would be only Telnyx's account and settings on that user agent. Telnyx refuses a private address in the SDP with 488, so the address STUN finds goes there. Telnyx is the next carrier if SignalWire's audio doesn't come back through the owner's router.
+**Since [Phone v2](phone-v2.md) was planned (2026-11-25):** phone carries the voice, with the owner's voice providers, and offers its carriers a SIP user agent. So this plugin would be only Telnyx's account and settings on that user agent. Telnyx refuses a private address in the SDP with 488, so the address STUN finds goes there. If SignalWire's audio doesn't come back through the owner's router, Twilio's Elastic SIP Trunking is next, with its documented latch, and then Telnyx.
 
 Not planned yet.

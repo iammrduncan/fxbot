@@ -1,12 +1,15 @@
 # Phone v2: the voice is phone's
 
-Talk with a bot by voice, in the app or on a phone line, the way realtime voice products do it: cut in the moment you speak, take time to think, and not have the bot's own voice heard as yours.
-- **phone carries the voice itself.** It hears the owner, decides when they've finished, stops the bot as they speak, and speaks the bot's words. The same voice loop serves the app and every phone line.
-- **Voice providers are logins,** on Settings › Providers beside the bots' models. A login that also speaks, such as Mistral's or OpenAI's, serves as it is. phone adds the voice services people use, Deepgram and ElevenLabs first, to the same page. A speech server on the owner's own machine, or the browser's own speech, works too.
-- **In-app calls come first:** a Talk button in a bot's chat, over the connection the app already has, web pairing included. No phone service, and nothing to pay by the minute but the voice provider's own price, or nothing at all.
-- **A carrier plugin only places the call and carries its sound.** phone offers it a SIP user agent. `phone-signalwire` gets a SIP way once a real call proves SignalWire sends the audio back through the owner's router.
+Talk with a bot by voice, in the app or on a phone line, as naturally as realtime voice products do: cut in the moment you speak, take time to think, hear a voice you like, and keep everything the bot can do.
+- **phone carries the voice itself,** for the app and every phone line. It hears the owner, stops the bot as they speak, and never takes the bot's own voice for theirs.
+- **Two ways to talk:**
+  - **Live:** a voice model holds the conversation, with the instant turn-taking of OpenAI's GPT-Live, and hands everything beyond small talk to the bot: its model, tools, memory, and subagents. GPT-Live and ElevenLabs' agent are the live voices.
+  - **The bot's own words:** the bot's model answers, and phone listens and speaks with the voice providers the owner picks, ElevenLabs first.
+- **Voice providers are logins,** on Settings › Providers beside the bots' models. A login that also speaks, such as Mistral's or OpenAI's, serves as it is. phone adds the voice services people use, ElevenLabs and Deepgram first, to the same page. A speech server on the owner's own machine, or the browser's own speech in Chrome, Firefox, Safari, or Edge, works too.
+- **In-app calls:** a Talk button in a bot's chat, over the connection the app already has, web pairing included. The bot opens with "Hey, what's up?"
+- **A carrier plugin only places the call and carries its sound,** over a SIP user agent phone offers. `phone-signalwire` becomes SignalWire's SIP account, and its RELAY way goes. This release waits until SIP works well on the owner's network.
 
-Status: **planned on 2026-11-25, not built.** Researched the same day against the research directive's references, Pipecat and LiveKit Agents, about 40 voice providers, the browsers' own speech, local speech servers, and nine phone carriers. Nothing here has run on a real account or network except the two calls on dev that showed why it's needed. What's unverified says so.
+Status: **planned on 2026-11-25, not built.** Researched the same day against the research directive's references, Pipecat and LiveKit Agents, about 40 voice providers, the browsers' own speech, local speech servers, and nine phone carriers. Revised the same night with the owner's answers, adding OpenAI's GPT-Live 1 and ElevenLabs' agents as live voices. Nothing here has run on a real account or network except the two calls on dev that showed why it's needed. What's unverified says so.
 
 ## What the owner asked
 
@@ -17,15 +20,23 @@ On 2026-11-25, after two test calls on dev from their Apple Watch on speaker:
 
 Earlier that night they asked for time to think, "I may stutter, stumble, or brain pause before finishing my statement", which phone 0.1.2's `pause` setting built.
 
+Their answers to the first version's questions:
+- "gpt live is openai... btw... elevenlabs is my favorite,. google servers is a toggle but no everyone uses chrome... some folks use firefox etc...... nah get rid of signalwire we won't release this update until SIP works well and we won't need that. We do want a small greeting like "Hey whats up?" or something. phone v2 before coding."
+- "I really want natural sounding conversation with deep functionality and handoffs."
+
+"Get rid of signalwire" is read as its RELAY way, the speech SignalWire does today. SignalWire stays the first SIP carrier, since the owner's account and number are there ([open question 1](#5-open-questions)).
+
 ## 0. Core or plugin
 
-**A plugin, `phone` 0.2.0, with two small hooks in the plugin API** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Talking by voice isn't what every bot needs. phone owns the voice loop, the in-app call, the voice providers' adapters, and a phone line's audio. Carriers stay plugins that need phone.
+**A plugin, `phone` 0.2.0, with two small hooks in the plugin API** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Talking by voice isn't what every bot needs. phone owns the voice loop, the live voices and their handoffs, the in-app call, the voice providers' adapters, and a phone line's audio. Carriers stay plugins that need phone.
 
 **Provider logins are core:** the Add provider page, keys sealed in Postgres, and the key check. The owner asked for voice providers on that page, and for logins already added to serve. A plugin can do neither today. `fx.models.ask` makes one chat request, and nothing lets a plugin add a kind of provider or reach an added one's API. So the plugin API widens, with nothing in it about voice:
 1. **Provider entries a plugin brings.** `plugin.json` may carry `providers`: catalog entries of the same shape as `providers-registry.json`'s, checked by the same rules, with a new `models: "none"`. While the plugin is added, the Add provider page lists them in a group under the plugin's name. They're added, sealed, and key-checked like any provider, and they're never a bot's model.
 2. **`fx.providers`:** `list()`, `fetch(id, url, init)`, and `socket(id, url, protocols)`. These are requests and WebSockets to an added provider's own hosts, with its key or sign-in added by fxbot, as libfx's requests get theirs. The plugin never holds a key, as with `fx.models.ask` ("Keys stay on the server").
 
 Any plugin can use both: an image plugin bringing fal.ai, a search plugin bringing a search API.
+
+**Fewer ways for a carrier, not more.** `phone-signalwire` 0.2.0 is SignalWire's SIP account and nothing else. Its RELAY way, `relay.ts` with its 419 lines, goes. So do phone's text lines, `{ "line": 1 }` and `2`, which only RELAY used. This release waits until SIP works well, so no owner is left without a way to call.
 
 **Not core, but needed:** web.fxbot.sh sends `permissions-policy: … microphone=()` on the shell and on every frame ([`relay/worker.ts`](../../packages/web-app/relay/worker.ts)). That blocks the microphone for fxbot's page over web pairing, though the shell's iframe asks for it with `allow="…microphone…"`. It changes, and web.fxbot.sh is deployed again.
 
@@ -88,6 +99,28 @@ Pi's p2 is the shape for fxbot: the page's own socket, the speech engines behind
   - LiveKit's speech to text is a stream that takes audio frames and gives `START_OF_SPEECH`, interim, final, and `END_OF_SPEECH` ([stt.ts](https://github.com/livekit/agents-js/blob/f170f632142cf71d7e17b99cefff9cac3135ffc7/agents/src/stt/stt.ts)).
   - Its text to speech takes text and gives audio frames, with flush and close ([tts.ts](https://github.com/livekit/agents-js/blob/f170f632142cf71d7e17b99cefff9cac3135ffc7/agents/src/tts/tts.ts)).
   - A batch model becomes a stream with a voice detector in front (`StreamAdapter`).
+
+### Live voice models, and handoffs
+
+A live voice model hears and speaks in one model, so it backchannels, takes turns, and lets the owner cut in as a person does. The bot stays the brain through handoffs.
+
+- **OpenAI's GPT-Live 1** ([model](https://developers.openai.com/api/docs/models/gpt-live-1), [launch, 2026-09-10](https://openai.com/index/introducing-gpt-live-1-in-the-api/)):
+  - It "listens and speaks at the same time" and "reasons over incoming and outgoing audio together", handling background noise and silence. OpenAI reports 30 points better on Full Duplex Bench than GPT-Realtime-2.1, and a customer reports interruptions cut by almost 80%.
+  - Only the Live endpoint, `v1/live/sessions`, serves it, over WebRTC, a WebSocket, or a sideband WebSocket. It takes function calls, and has "Telephony support".
+  - $0.05 a minute active and $0.02 on standby, billed by the second. Custom voices are by sales. GPT-Live 1.1 is listed on AI Gateway.
+  - **Delegation** ([guide](https://developers.openai.com/api/docs/guides/live-delegation)):
+    - In *client delegation*, "your application prepares the context, runs an agent or workflow, and sends results back to GPT-Live".
+    - `session.delegation.created` starts one, and carries only metadata.
+    - `session.thinking.append` is "quiet context the model can use later without speaking it". `session.commentary.append` holds "results GPT-Live should say aloud", up to 500 tokens each.
+    - "Live speech and delegated work continue independently", with an acknowledgement by default.
+  - **eve's voice template** is that, with eve as the agent: GPT-Live "does the listening, speaking, and turn-taking", hands off "anything beyond small talk", and is given "the agent's answer to say in its own words". Progress shows on screen, and approvals are answered on screen or by naming an option. Hanging up cancels eve's turn.
+  - **Not verified:** the Live endpoint's WebSocket address and its auth from a server with an API key, its audio formats, and the event that says the owner cut in.
+- **ElevenLabs' agents** ([client tools](https://elevenlabs.io/docs/agents-platform/customization/tools/client-tools), [events](https://elevenlabs.io/docs/eleven-agents/customization/events/client-events)):
+  - An agent is ElevenLabs' listening, a model of its own, and an ElevenLabs voice, with turn-taking. It's turn by turn, not full duplex.
+  - A conversation runs over a WebSocket (`wss://api.elevenlabs.io/v1/convai/conversation?agent_id=…`, from a third party). Client tools run in whatever holds the conversation: `client_tool_call` comes in, and `client_tool_result` goes back with its id. So fxbot holds the conversation and hands off through one tool.
+  - A 2026 fix stopped the sound of a tool call being taken as the user's speech.
+  - **Not verified:** making an agent through the API, the WebSocket's auth from a server, how progress is passed while a tool runs, and the price a minute.
+- **Others, later:** Gemini's Live API, xAI's `grok-voice-3.0` at $0.08 a minute, and Bedrock's Nova Sonic, each with function calls.
 
 ### Voice providers: the logins fxbot already has
 
@@ -181,6 +214,9 @@ The owner's rule stands: nothing on the internet connects to fxbot. Every carrie
 ## 2. Key takeaways
 
 - **Own the audio.** Speech done by the carrier, text in and text out, can't be cut off mid-sentence. Every product that feels instant carries the sound itself.
+- **Natural needs a live voice; depth needs the bot.** A live voice model answers small talk at once, backchannels, and takes turns as a person does. Handing everything else to the bot's own turn keeps its tools, memory, and subagents. That's eve's design, and GPT-Live's client delegation is made for it.
+- **A handoff says what it's doing, and the answer in the voice's own words.** Each of the bot's tool calls becomes quiet context, so the voice can say "checking herdr" if asked. The bot's answer becomes what the voice says aloud.
+- **One reply, one voice context,** in the bot's own words. Its text streams into one speaker context as the model writes, so the pacing flows: ElevenLabs' stream-input, Cartesia's `continue`, or Deepgram's `Flush`. One request per sentence sounded wrong on dev.
 - **One voice loop, for the app and the line.** `voice.ts` makes a `Line` out of a transport, a listener, and a speaker. `call.ts` keeps the conversation and every rule it has: the pause, the echo window, cutting in, and "stop".
 - **Only words cut the bot off.** With a listener that gives words as they come, two words do, as now. With one that doesn't, 700 ms of the owner's voice does, since the browser's echo cancellation has already taken the bot out. phone's echo window stays as the second layer, as Pi has one.
 - **Stopping is instant because phone owns playback.** On a cut, phone tells the page or line to drop what it holds, at once, and learns how much had played.
@@ -192,7 +228,8 @@ The owner's rule stands: nothing on the internet connects to fxbot. Every carrie
   - And the browser's own speech, in the page.
 - **End of turn from the provider when it has one,** such as Flux, Voxtral, Scribe, xAI, or Gemini Live, with the owner's `pause` as its wait. Otherwise phone's hold, after a simple voice detector. Smart Turn comes later, if it's needed.
 - **Keys stay on the server.** fxbot opens the provider's socket for phone, and the page only ever talks to fxbot.
-- **OpenAI's voice has six weeks left** on `/v1/audio/speech`, so it's never the default speaker.
+- **OpenAI's `/v1/audio/speech` has six weeks left,** so it's never the default speaker. GPT-Live is OpenAI's voice from now on.
+- **ElevenLabs first,** the owner's favorite: its agent as a live voice, and Scribe and Flash for the bot's own words.
 - **Phone lines are SIP, registered outward,** with STUN, SRTP, and RTP that never stops, and they're proven on a real network before they're built.
 
 ## 3. Implementation
@@ -213,12 +250,14 @@ plugins/phone/        0.2.0, minFxbot 0.12.0
   fxbot/voice.ts      the voice loop: a Line from a transport, a listener, and a speaker
   fxbot/speech.ts     the listener and speaker types, and which adapter serves which kind
   fxbot/speech/       openai.ts, deepgram.ts, elevenlabs.ts, mistral.ts
+  fxbot/live.ts       Live: GPT-Live's and ElevenLabs' agent's sessions, and handoffs to the bot
   fxbot/talk.ts       the app's call: its socket and what crosses it
-  fxbot/call.ts       a greeting that may be none, and a voice event
+  fxbot/call.ts       the app's greeting, a voice event, and no more text lines
+  fxbot/line.ts       one contract left, { "line": 3 }: audio
   fxbot/sip.ts        part 2: a SIP user agent, offered to carriers
   fxbot/migrations/   0002_voice.sql
   fxbot/page.jsx      Talk, the call's screen, the microphone and playback, this device's speech, Voice settings
-plugins/phone-signalwire/  part 2: 0.2.0, a SIP way
+plugins/phone-signalwire/  part 2: 0.2.0, SignalWire's SIP account only; relay.ts goes
 packages/web-app/relay/worker.ts  the microphone allowed
 ```
 
@@ -281,7 +320,7 @@ providers: {
   - A listener without turns gets phone's own: a voice detector, below, cuts the stretches it sends, and `call.ts`'s hold does the rest, as now.
 - **The voice detector:** energy against a noise floor that follows the room, about 40 lines. It cuts stretches for a batch listener, and gives `voice(ms)` while the owner speaks, for a listener that has no words as they come.
 - **Speaking:**
-  - `say(text)` queues a sentence, and the speaker streams its audio. Audio goes out a second ahead at most, so a cut drops little, with a mark after each sentence.
+  - `say(text)` adds a sentence to the reply's text, which streams into one speaker context a reply, so the voice's pacing carries across sentences. Audio goes out a second ahead at most, so a cut drops little, with a mark after each sentence.
   - The mark played becomes `played`.
   - `stop()` aborts the speaker, clears the transport, and drops what waits.
   - `speaking` is true while anything is queued or playing.
@@ -291,17 +330,19 @@ providers: {
 
 ### phone: `call.ts`
 
-- **The greeting may be none.** An app call has none: the owner pressed Talk. The first message tells the bot "You're in a voice chat with the owner in the app" in place of the call's note.
+- **The app's greeting is "Hey, what's up?"** A phone call keeps "Hey, this is your fxbot Bob…", since the owner may not know who's calling. In the app, the first message tells the bot "You're in a voice chat with the owner in the app" in place of the call's note.
 - **A `voice(ms)` event:** 700 ms of the owner's voice while the bot speaks cuts it off, after the greeting, for a listener with no words as they come. Words still decide with any other listener.
 - **Everything else stays:** the pause, the echo window, "stop", "hold on", "One moment.", and the call's limits.
+- **The text lines go.** `call.ts` gets its `Line` from `voice.ts` or `live.ts`, never from a carrier, so the `turns` flag and the line 1 paths go.
 
 ### phone: listeners, speakers, and adapters (`speech.ts`)
 
 ```ts
 export type Heard = { type: "partial"; text: string } | { type: "final"; text: string; turn: boolean };
 export type Listener = { write(pcm: Int16Array): void; close(): void; heard(on: (h: Heard) => void): void };
-/** Audio for one sentence, at the rate asked, ending early when signal aborts. */
-export type Speaker = { speak(text: string, signal: AbortSignal): AsyncIterable<Int16Array | Uint8Array> };
+/** Audio for one reply, whose text streams in as the model writes it, at the rate asked, ending early when signal
+ * aborts. Marks say which sentence plays from where. One context a reply keeps the voice's pacing. */
+export type Speaker = { speak(text: AsyncIterable<string>, signal: AbortSignal): AsyncIterable<{ audio: Int16Array | Uint8Array } | { mark: number }> };
 export type Adapter = {
   /** Which providers it serves, by catalog entry: "deepgram", "cloudflare". */
   kinds: string[];
@@ -314,25 +355,47 @@ export type Adapter = {
 
 | Adapter | Listens | Speaks | Serves |
 |---|---|---|---|
-| `openai.ts` | `/audio/transcriptions`, one stretch at a time, as the voice detector cuts them | `/audio/speech`, one sentence at a time, PCM | openai (until its shutdowns), azure, groq, mistral, together, deepinfra, openrouter, litellm, vllm, and phone's speech server |
+| `openai.ts` | `/audio/transcriptions`, one stretch at a time, as the voice detector cuts them | `/audio/speech`, one sentence at a time, PCM, since the shape has no context to stream into | openai (until its shutdowns), azure, groq, mistral, together, deepinfra, openrouter, litellm, vllm, and phone's speech server |
 | `deepgram.ts` | Flux over `/v2/listen`, with turns | Aura-2 over `/v1/speak`, with `Flush` and `Clear` | phone's deepgram, and cloudflare at `/ai/run/@cf/deepgram/…` |
-| `elevenlabs.ts` | Scribe realtime, committed by `turn_prediction` | Flash v2.5 over the multi-context WebSocket | phone's elevenlabs |
+| `elevenlabs.ts` | Scribe realtime, committed by `turn_prediction` | Flash v2.5 over the multi-context WebSocket, a context a reply | phone's elevenlabs |
 | `mistral.ts` | Voxtral realtime, with `turn.*` | (`openai.ts`'s `/audio/speech`) | mistral |
 | the page | `SpeechRecognition` | `speechSynthesis` | This device |
 
 - **Next, one file each:** xAI, Gemini (Live transcription and its voices), Cartesia, AssemblyAI, Soniox, Rime, and Inworld.
-- **The default listener and speaker** come from what's added: Deepgram, then ElevenLabs, then Mistral, then the OpenAI shape, then This device. OpenAI is never a default speaker.
+- **The default listener and speaker** come from what's added: ElevenLabs, then Deepgram, then Mistral, then the OpenAI shape, then This device. OpenAI is never a default speaker.
+
+### phone: Live, and handoffs (`live.ts`)
+
+A live voice is a `Line` too: `live.ts` makes one from a transport and a live session, so `call.ts` keeps the call's record, limits, and "stop". The live voice takes turns itself, so phone's pause, echo window, and cutting in don't apply. The browser's echo cancellation still does.
+
+- **The session:**
+  - **GPT-Live:** `fx.providers.socket` on an OpenAI login, at the Live endpoint, with client delegation.
+  - **ElevenLabs' agent:** an ElevenLabs login. phone makes the agent once through ElevenLabs' API, and again when the bot's name, instructions, or voice change. It has the bot's voice, the first message "Hey, what's up?", and one client tool, `ask_<bot>`.
+  - Audio crosses as it comes, resampled to what the session takes.
+- **What the voice is told:**
+  - It's the bot's voice: its name, and its instructions' first 1,000 characters, so it sounds like the bot.
+  - Small talk it answers itself. Anything that needs a fact, an action, memory, or a tool, it hands to the bot, and it never makes up an answer.
+  - Anything that needs the owner's OK waits on their screen, as now.
+- **A handoff:**
+  - GPT-Live's `session.delegation.created`, or the agent's `client_tool_call`, sends the owner's words since the last handoff to the bot's own chat, labeled **your call**, as `call.ts` sends them today. It joins a turn that's running.
+  - phone follows the turn. Each tool call goes in as quiet context, such as "Bob is reading herdr's agents" (`session.thinking.append`, or the agent's progress, which needs checking).
+  - The bot's answer goes back to be said in the voice's own words: `session.commentary.append` of up to 500 tokens, or `client_tool_result`. A longer answer goes as its first part and "There's more in the chat."
+  - Work the bot hands to a subagent is said to be under way, and its report is handed over when it's back, if the call is still on.
+- **Cutting in:** the live voice stops itself. phone empties the page's or line's playback on its signal (to be verified), and the next handoff tells the bot what was heard.
+- **The bot's chat** shows each handoff: the owner's words, the bot's tool calls, and its answer. The voice's own small talk isn't sent to the bot. The call's card in the chat holds the whole transcript at the end.
+- **Hanging up** cancels a turn the call started, as eve's does.
 
 ### phone: Voice settings
 
 - **phone's tab gains a Voice section:**
-  - **Listening:** a provider and its model.
-  - **Speaking:** a provider, its model, and a voice.
-  - **The pause,** which moves here from the settings list.
+  - **The way to talk:** Live, or the bot's own words.
+  - **For Live:** GPT-Live (an OpenAI login) or ElevenLabs' agent (an ElevenLabs login), and a voice.
+  - **For the bot's own words:** listening, a provider and its model; speaking, a provider, its model, and a voice; and the pause, which moves here from the settings list.
+  - **Defaults:** Live with ElevenLabs' agent when an ElevenLabs login is added, else Live with GPT-Live when an OpenAI login is, else the bot's own words with what's added ([open question 2](#5-open-questions)).
 
   Each list holds only the providers phone can use, plus **This device**, with a link to add one.
-- **A bot's voice,** its Phone section's, is a voice of the speaker chosen. phone-signalwire's RELAY keeps its own voices, as now.
-- **Storage:** `0002_voice.sql`, a `voice` table of one row: the listening provider and model, the speaking provider, model, and voice. The `pause` setting stays a setting.
+- **A bot's voice,** its Phone section's, is a voice of the live voice or the speaker chosen, so each bot can sound like itself.
+- **Storage:** `0002_voice.sql`, a `voice` table of one row: the way, the live voice's provider and voice, the listening provider and model, the speaking provider, model, and voice, and the agent ElevenLabs made for each bot. The `pause` setting stays a setting.
 
 ### phone: the app's call (`talk.ts` and the page)
 
@@ -359,7 +422,12 @@ export type Adapter = {
 - **This device, listening:**
   - `SpeechRecognition`, continuous, with interim results, started again when it ends.
   - It gets the echo-cancelled track with `start(track)` where the browser has that. Where it doesn't, it stops while the bot speaks, and says so: no cutting in.
-  - Chrome on a computer listens on the device when `install()` has its language. Otherwise the setting says the audio goes to Google.
+  - Each browser listens its own way:
+    - Firefox (161 and later) listens only on the device.
+    - Safari in a tab listens through Apple.
+    - Edge listens on the device in its newest builds.
+    - Chrome on a computer listens on the device when `install()` has its language.
+  - **Chrome's cloud is a toggle:** "Let Chrome send what you say to Google". It's off until the owner turns it on. With it off and no language on the device, This device doesn't listen in Chrome, and says why.
   - It isn't offered where there's no `SpeechRecognition`: an iPhone's home-screen app, and Firefox on Android.
 - **This device, speaking:**
   - `speechSynthesis`, local voices first.
@@ -372,31 +440,31 @@ export type Adapter = {
 
 ### Part 2: phone lines that carry audio
 
-Built only after the proof, the first item of its checklist, passes.
+This release waits for it, since RELAY goes. The proof, the first item of its checklist, comes before any of it is built.
 
 - **The contract is `{ "line": 3 }`.** A carrier's line places the call, and carries 8 kHz audio both ways:
   - `place(call)` and `hangUp()`
   - `send(frame)` and `clear()`
   - events `audio(frame)` and `ended(how)`
 
-  phone's voice loop does the rest. phone still takes lines 1 and 2.
+  phone's voice loop, or a live voice, does the rest. It's the only contract left: lines 1 and 2 go with RELAY.
 - **phone's `sip.ts`,** offered to its carriers with `fx.provide({ sip })`, about 500 lines with no dependency, shaped after ringcentral-softphone:
   - SIP over TLS on 5061, with digest auth, REGISTER, and INVITE.
   - SDP with the address STUN finds.
   - SDES-SRTP, AES_CM_128_HMAC_SHA1_80, on `node:crypto`.
   - PCMU in 20 ms frames on one UDP socket, sent without a gap, silence included.
   - CRLF keepalives, and a new REGISTER about every 60 s.
-- **phone-signalwire 0.2.0 gains a SIP way:**
+- **phone-signalwire 0.2.0 is SignalWire's SIP account:**
   - It makes its SIP endpoint itself through SignalWire's REST API, with the project and token it already holds, `call_handler: passthrough`, and `send_as` the owner's SignalWire number.
   - It places calls through phone's `sip`.
-  - RELAY stays a choice in its settings, as the way that needs nothing through the router.
-- **If SignalWire's audio doesn't come back** through the owner's router, Telnyx (with STUN in the SDP) or Twilio's Elastic SIP Trunking (a documented latch) is next: [open question 2](#5-open-questions), and [Phone: Telnyx](phone-telnyx.md).
+  - `relay.ts` and its voice list go. A bot's voice is phone's now.
+- **If SignalWire's audio doesn't come back** through the owner's router, Twilio's Elastic SIP Trunking is next, the one carrier with a documented latch, and then Telnyx, with STUN in the SDP ([Phone: Telnyx](phone-telnyx.md)).
 
 ### What the owner sees
 
 1. **Add a voice provider:** Settings › Providers › Add has a **For Phone** group: Deepgram, ElevenLabs, and Speech server. Or they skip this: a Mistral, Groq, OpenAI, or Cloudflare login already serves.
-2. **Pick the voice:** phone's tab, Voice: listening Deepgram Flux, speaking ElevenLabs Flash, with a voice. Or This device.
-3. **Talk in the app:** a bot's chat, Talk. They speak, the bot answers in a second or two, and they cut in the moment they say two words. The chat shows the call as a phone call does.
+2. **Pick the voice:** phone's tab, Voice. Live, with ElevenLabs' agent and a voice they like. Or the bot's own words, with ElevenLabs Scribe and Flash, or This device.
+3. **Talk in the app:** a bot's chat, Talk. "Hey, what's up?" They talk as they would to a person. The voice answers small talk at once and says it's checking when it hands off. The bot's answer comes in the voice's own words, and they cut in whenever they like. The chat shows each handoff, and the call's transcript at the end.
 4. **On a phone line,** after part 2: Call me rings their phone, and the call behaves the same.
 
 ### Docs, when it's built
@@ -415,13 +483,15 @@ Built only after the proof, the first item of its checklist, passes.
   - `call.ts`: 20
   - the page: 300
   - settings and the migration: 50
+- **Live:** about 250 lines, in `live.ts` and the page.
 - **Part 2:** about 600 lines: `sip.ts` 500, and phone-signalwire 100.
+- **Removed:** `relay.ts` (419 lines), and phone's text-line paths, about 60.
 
 ### Not in this phase
 
 - **Models in the page** (Moonshine, Kokoro.js, Silero), Smart Turn, and RNNoise. The energy detector comes first, and each of these waits for a measured need.
 - **The next adapters:** xAI, Gemini, Cartesia, AssemblyAI, and Soniox.
-- **Speech-to-speech models as the brain** (GPT-Live, Gemini Live). The bot's own model, memory, and tools stay the brain.
+- **More live voices:** Gemini's Live API, xAI's voice, and Nova Sonic, one file each. The bot's own model, memory, and tools stay the brain through handoffs whichever voice talks.
 - **Calling a bot,** over the SIP registration: [Phone calls](phone-calls.md).
 - **Telnyx and Twilio,** unless SignalWire's proof fails.
 - **Telling headphones from speakers,** which Pi does to turn echo cancellation off.
@@ -466,7 +536,15 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
   - End ends it.
   - Last calls shows it.
   - On a phone-sized page in dark mode, the bar fits.
-- [ ] This device in Chromium: speaking, with `speechSynthesis` stubbed to count utterances, and a cut cancels it. Listening is stubbed the same way. And it isn't offered where `SpeechRecognition` is missing.
+- [ ] Live, first: what's unverified about GPT-Live's endpoint and ElevenLabs' agents is checked against their docs, and with the owner's go-ahead on their own keys, since it spends credit. That covers the WebSocket's address and auth from a server, the audio formats, the cut-in signal, making an agent, and its progress. What's found goes here, and a "no" changes the plan before more is built.
+- [ ] `live.ts` against a fake of each live session, built from their docs' messages:
+  - "Hey, what's up?"
+  - A handoff sends the owner's words to the bot's chat. A tool call goes in quietly, and the answer comes back to be said.
+  - An answer past 500 tokens is cut, with "There's more in the chat."
+  - A subagent's report is handed over when it's back.
+  - Hanging up cancels the turn.
+  - The cut-in signal empties playback.
+- [ ] This device in Chromium: speaking, with `speechSynthesis` stubbed to count utterances, and a cut cancels it. Listening is stubbed the same way. It isn't offered where `SpeechRecognition` is missing. Chrome's Google toggle starts off, and with it off and no language on the device, it says why. In Firefox through Playwright, listening is offered where the browser has it.
 - [ ] Over web pairing locally: `npm run dev --prefix packages/web-app` with the new policy. The frame gets the microphone, and a call works through the bridge.
 - [ ] A local Speaches container, run disposably under podman, if its image and a small model fit on this machine. It hears a WAV and speaks a sentence through the speech server entry. If it doesn't fit, it's said here, and the fake stands in.
 - [ ] phone's README (Voice, the app's call, and line 3), the how-tos, CHANGELOG, and the README's Phases line.
@@ -479,12 +557,13 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
 **The owner's own** (only a person can):
 - [ ] A Deepgram key and an ElevenLabs key added from For Phone.
 - [ ] A call in Chrome on a computer, and on the iPhone app over web pairing, on speaker: cutting in mid-sentence, no echo heard as them, and pacing that sounds right.
-- [ ] One call with This device in Chrome.
+- [ ] One call with This device in Chrome, and one in Firefox.
+- [ ] A Live call with ElevenLabs' agent and one with GPT-Live: small talk, a handoff that runs a tool, a cut-in, and how natural it sounds.
 - [ ] One with a Mistral or Groq login reused.
 - [ ] One with Speaches on their machine.
 - [ ] On Android, whether echo cancellation holds.
 
-**Part 2, phone lines** (after part 1, with the owner's go-ahead, since it uses their SignalWire account, rings their phone, and spends credit):
+**Part 2, phone lines** (this release waits for it; with the owner's go-ahead, since it uses their SignalWire account, rings their phone, and spends credit):
 - [ ] The proof, a script run from the release's container under rootless podman, on the owner's router and on a phone hotspot. Each answer goes in this doc:
   - REGISTER and an INVITE to the owner's number over TLS, from a SIP endpoint the script makes, show the SignalWire number.
   - Which SDP address SignalWire takes, private or STUN's, and whether its RTP comes back.
@@ -496,14 +575,26 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
   - `{ "line": 3 }` and `sip.ts`.
   - phone-signalwire 0.2.0's SIP way, with its endpoint made through the REST API.
   - The voice loop on a line, against a fake carrier: a local SIP-over-TLS and RTP script made for the check.
-- [ ] If it fails: what failed goes here, and [open question 2](#5-open-questions) is answered before anything is built.
-- [ ] The owner's call from their watch on speaker: they cut in mid-sentence.
+- [ ] If it fails: what failed goes here, and the same proof runs on Twilio's Elastic SIP Trunking before anything is built.
+- [ ] RELAY goes:
+  - `relay.ts`, its voices, and phone's lines 1 and 2.
+  - phone-signalwire's settings keep the project, token, and number, and lose the voice and language.
+  - A test call's checks are replaced by the SIP fake's.
+- [ ] The owner's calls from their watch on speaker, Live and in the bot's own words: they cut in mid-sentence, and it sounds natural. 0.12.0 is cut only after these, as the owner said.
 
 ## 5. Open questions
 
-1. **The first adapters:** the OpenAI shape (local servers and ten hosted), Deepgram (with Cloudflare), ElevenLabs, Mistral's realtime listening, and This device? Recommended: yes, with xAI and Gemini next. They reuse logins too, and each is one file.
-2. **Part 2 in this phase,** behind its proof, or a phase of its own? Recommended: this phase, behind the proof. If SignalWire's audio doesn't come back, should Telnyx or Twilio come next? Recommended: Twilio's Elastic SIP Trunking, the one with a documented latch.
-3. **This device's listening in Chrome:** only on the device, or Google's cloud too, with a note? Recommended: on the device when its language is installed, and otherwise ask once.
-4. **RELAY, once SIP works on the owner's network:** keep it as phone-signalwire's other way, or remove it? Recommended: keep it for a release, then decide.
-5. **A greeting in the app:** none, or a short one? Recommended: none. The owner pressed Talk.
-6. **Where Phone v2 goes in the Phases list,** before or after Coding.
+Answered on 2026-11-25:
+- ElevenLabs first.
+- Google's servers are a toggle, and This device works across browsers.
+- RELAY goes, and this release waits for SIP.
+- "Hey, what's up?" opens an app call.
+- Phone v2 comes before Coding.
+- The first adapters stand, since the owner didn't object.
+- Twilio's trunking is next if SignalWire's audio doesn't come back.
+
+Still open:
+1. **"Get rid of signalwire":** is that its RELAY way only, with SignalWire kept as the first SIP carrier on the owner's account and number? Recommended: yes. If it means SignalWire altogether, Twilio's Elastic SIP Trunking becomes the first carrier, and the proof runs there.
+2. **The default way to talk:** Live with ElevenLabs' agent when an ElevenLabs login is added, else Live with GPT-Live when an OpenAI login is, else the bot's own words? Recommended: yes. GPT-Live is the more natural, being full duplex, and ElevenLabs' voices are the owner's favorite.
+3. **"Handoffs" may also mean moving a call:** Talk in the app, then "Move to my phone" as the owner leaves, and the same conversation rings their phone. Recommended: yes, after part 2. It's small, since both use one conversation.
+4. **The live voice's persona:** it speaks as the bot, with the bot's name and the start of its instructions? Recommended: yes.
