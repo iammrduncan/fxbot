@@ -1,11 +1,11 @@
 {
   "name": "pages",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Bots write reports, guides, and plans to read outside the chat, kept in the library with every version.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {
-      "minFxbot": "0.7.0",
+      "minFxbot": "0.12.0",
       "server": "./fxbot/server.ts",
       "page": "./fxbot/page.js",
       "css": "./fxbot/page.css",

@@ -44,6 +44,7 @@ import { BotForm } from "./bot-form.tsx";
 import { LookDialog, type BotLook } from "./look-picker.tsx";
 import { Fold, type Folded } from "./fold.tsx";
 import { Onboarding } from "./onboarding.tsx";
+import { BesidePanel, useBeside } from "./beside.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
 import { BotMemories } from "./memories.tsx";
 import { PluginsPage, BotPlugins } from "./plugins-page.tsx";
@@ -715,6 +716,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
     if (view && view.scrollHeight <= view.clientHeight) more();
   });
   const panel = usePanel();
+  const beside = useBeside();
   // A provider switch starts a new chat. The earlier ones stay readable above the handoff, though the bot now sees only
   // their summary and its chat_history search.
   const [earlier, setEarlier] = useState<Turn[]>([]);
@@ -854,7 +856,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   const empty = turns.length === 0 && earlier.length === 0 && (ready || !profile?.sessionId);
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      <div data-chat className="relative flex min-w-0 flex-1 flex-col">
         {!settled && slow && profile && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center" aria-hidden="true">
             <Blob {...profile} size={72} busy />
@@ -864,7 +866,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
         <Header title={<span className="sr-only">{profile?.name ?? "Chat"}</span>}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Bot panel" aria-expanded={panel.open} onClick={() => panel.setOpen(!panel.open)}>
+              <Button variant="ghost" size="icon" aria-label="Bot panel" aria-expanded={panel.open && !beside.path} onClick={() => (beside.path ? (beside.close(), panel.setOpen(true)) : panel.setOpen(!panel.open))}>
                 <PanelRightIcon />
               </Button>
             </TooltipTrigger>
@@ -1004,7 +1006,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
           </div>
         </MessageScrollerProvider>
       </div>
-      {profile && <BotPanel profile={profile} profiles={profiles} panel={panel} version={finished} />}
+      {beside.path ? <BesidePanel path={beside.path} close={beside.close} /> : profile && <BotPanel profile={profile} profiles={profiles} panel={panel} version={finished} />}
     </div>
   );
 }

@@ -138,3 +138,10 @@
 @media (prefers-color-scheme: dark) {
     .plugin-icon { --c0: var(--d0); --c1: var(--d1); --c2: var(--d2); --c3: var(--d3); }
 }
+
+/* A screen beside the chat, such as a page, prints alone. */
+@media print {
+  body:has([data-beside]) [data-chat] {
+    display: none !important;
+  }
+}

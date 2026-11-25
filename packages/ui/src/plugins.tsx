@@ -23,7 +23,7 @@ import { Blob } from "./blob.tsx";
 import { ModelField } from "./providers.tsx";
 import { client } from "./client.ts";
 import { Header } from "./header.tsx";
-import { follow, go } from "./nav.ts";
+import { followBeside, go, openBeside } from "./nav.ts";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { useReorder } from "./reorder.ts";
 import { Reply } from "./steps.tsx";
@@ -118,6 +118,9 @@ function appModule(name: string) {
     applyLine,
     api: (path: string, init?: RequestInit) => fetch(`/api/plugins/${name}/${path.replace(/^\//, "")}`, init),
     go,
+    // A path opened beside the chat when one is showing, such as a page from a card in a reply, so the chat stays.
+    // Anywhere else, or for a path that isn't a plugin's screen, it's go.
+    openBeside,
     useBots: useAppBots,
     // Every plugin's @ sources, with its name and icon, for a box that lists them.
     useMentions: () => usePlugins().flatMap(({ name, iconKey, places }) => places.mentions.map((source) => ({ ...source, plugin: name, iconKey }))),
@@ -281,12 +284,12 @@ export function Markdown({ plugins, components, ...props }: ComponentProps<typeo
   return <Streamdown {...props} components={links} plugins={merged} />;
 }
 
-// A link to a place in the app, such as a page's /pages/<id>, opens here, in place. Any other link is Streamdown's,
-// which asks before it opens another site in a new tab.
+// A link to a place in the app opens here: a plugin's screen, such as a page's /pages/<id>, beside the chat, and any
+// other in place. Any other link is Streamdown's, which asks before it opens another site in a new tab.
 function AppLink({ node, ...props }: ComponentProps<"a"> & ExtraProps) {
   const href = props.href ?? "";
   if (!/^\/(?!\/|api\/)/.test(href)) return <defaultComponents.a node={node} {...props} />;
-  return <a {...props} target={undefined} rel={undefined} className={`wrap-anywhere font-medium text-primary underline ${props.className ?? ""}`} data-streamdown="link" onClick={follow} />;
+  return <a {...props} target={undefined} rel={undefined} className={`wrap-anywhere font-medium text-primary underline ${props.className ?? ""}`} data-streamdown="link" onClick={followBeside} />;
 }
 
 // What the owner or a plugin said, with each match of a plugin's `said` pattern drawn by its part.
@@ -343,7 +346,9 @@ export function usePluginSettings() {
 
 // The plugin screen for a path, `/<plugin>/…`, checked after the app's own.
 export function usePluginScreen(path: string): ReactNode | undefined {
-  const plugins = usePlugins();
+  return pluginScreen(usePlugins(), path);
+}
+export function pluginScreen(plugins: Loaded[], path: string): ReactNode | undefined {
   const [, top, ...rest] = path.split("/");
   const plugin = plugins.find((p) => p.name === top);
   if (!plugin) return undefined;
