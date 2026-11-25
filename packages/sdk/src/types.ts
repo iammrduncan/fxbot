@@ -456,4 +456,11 @@ export type StreamLine = {
   from?: string;
   /** On `moved`, the stream's last line: the session the chat started over in. */
   sessionId?: string;
+  /** On `pill`: an entry a plugin added in the middle of the chat. Since 0.12.0. */
+  pill?: Pill;
 };
+
+/** An entry a plugin added in the middle of a chat (`fx.chats.pill`): its words, the message whose turn it follows, or
+ * none for the chat's start, its text, a path in the app it opens beside the chat, and whether it's in the model's
+ * context. Since 0.12.0. */
+export type Pill = { id: number; after: string | null; label: string; text?: string; open?: string; from: string; inContext?: boolean };

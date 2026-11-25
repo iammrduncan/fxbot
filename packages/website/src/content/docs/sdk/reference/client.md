@@ -176,6 +176,7 @@ stream(id: string, options?: { cursor?: number; session?: string; signal?: Abort
 | `user_message` | Adds a `user` part to the running turn, `{ type: "user", id, text, files?, from? }`, and drops the turn the page made for that message. |
 | `tool_end` | Ends the tool part of the same `id`, with `output` from `content` and `error` from `isError`. A tool that started before the replay's cursor is added here. |
 | `turn_end` | Sets `done`. `note` is `Error: <message>` for an error, or `Stopped: <stopReason>` when the reason isn't `end_turn`. A tool still running is marked done. |
+| `pill` | Adds an entry for the pill, once, right after the turn its `after` names and any pills already after it, or first for none: `messageId` `pill-<id>`, `done`, and `pill`. One whose turn isn't in the list goes last. Since 0.12.0. |
 | Any other type | Nothing |
 
 A line for a message not in the list adds a turn for it.
@@ -192,6 +193,17 @@ type Turn = {
   done: boolean;
   note?: string; // an error, or why it stopped
   unsent?: boolean; // for a page: a message the server never took
+  pill?: Pill; // a plugin's pill in the middle of the chat, with no message or reply, since 0.12.0
+};
+
+type Pill = {
+  id: number;
+  after: string | null; // the messageId of the turn it follows, or null for the chat's start
+  label: string; // its words
+  text?: string; // what it holds
+  open?: string; // a path in the app it opens beside the chat
+  from: string; // the plugin that added it
+  inContext?: boolean; // whether the model reads it
 };
 
 type Part =
@@ -224,6 +236,7 @@ A turn from `profiles.earlier` has `reply` and no `parts`.
 | `cursor` | `number` | Where to start again to get the lines after this one |
 | `epoch` | `number` | The lease epoch of the line's writer |
 | `sessionId` | `string` | On `moved`: the session the chat started over in |
+| `pill` | `Pill` | On `pill`: a plugin's pill. It has no `cursor`. Since 0.12.0. |
 
 The types `applyLine` reads:
 
@@ -236,6 +249,7 @@ The types `applyLine` reads:
 | `tool_start` | A tool call starts |
 | `tool_end` | A tool call ends |
 | `turn_end` | A turn ends |
+| `pill` | A plugin added a pill, with `fx.chats.pill`: once a stream has caught up, or right after the end of the turn it follows on replay, and at once while a stream is open. fxbot's own. Since 0.12.0. |
 
 libfx writes other types too, such as `turn_yield` and `idle`. `applyLine` passes over them, and over `moved`, fxbot's own last line of a chat that started over, by a provider switch or a plugin's `startOver`, with the new `sessionId`. Since 0.5.0.
 

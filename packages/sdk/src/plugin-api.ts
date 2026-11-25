@@ -115,6 +115,12 @@ export type PluginApi = {
     send(bot: string, message: { text: string; shown?: string; label?: string; steer?: boolean; files?: Upload[]; session?: string; messageId?: string; asked?: string; effort?: string }): Promise<{ messageId: string; sessionId: string; joined?: string }>;
     /** A session's lines as NDJSON, from `cursor` on, then each new one. */
     stream(bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
+    /** A pill in the middle of the bot's own chat, or of one of the plugin's sessions, after its newest turn: `label`, up
+     * to 80 characters, is its words, `text`, up to 8,000, what it holds, and `open` a path in the app it opens beside
+     * the chat, such as `/phone/calls/14`. Without `open`, it unfolds to show its text. With `inContext`, the model gets
+     * its text ahead of the chat's next turn, once, and it's in the chat's history from then on, as messages are. The
+     * bot's `chat_history` finds it. Since 0.12.0. */
+    pill(bot: string, pill: { label: string; text?: string; open?: string; inContext?: boolean; session?: string }): Promise<{ id: number }>;
     /** The owner's newest messages in the bot's own chat, oldest first: no plugin's, and no other bot's. Since 0.6.0. */
     ownerSaid(bot: string, limit: number): Promise<string[]>;
     /** Stops the turn running in one of the plugin's own sessions, if one runs: it ends `cancelled`. With no session,

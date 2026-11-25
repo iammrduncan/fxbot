@@ -279,6 +279,31 @@ export async function createFxbot(options: FxbotOptions) {
           }
           await (await open(profile, session ?? profile.sessionId!)).cancel();
         },
+        // A pill in the middle of a chat, after its newest turn. It's found by chat_history as the plugin's, and each
+        // stream of the chat open now shows it at once.
+        async pill(plugin, bot, { label, text = "", open: path, inContext = false, session } = {} as never) {
+          started();
+          let profile = await get(bot);
+          if (typeof label !== "string" || !label.trim() || label.length > 80) fail(400, "label must be 1 to 80 characters");
+          if (typeof text !== "string" || text.length > 8000) fail(400, "text must be up to 8,000 characters");
+          if (path !== undefined && (typeof path !== "string" || path.length > 300 || !/^\/(?!\/|api\/)\S*$/.test(path))) fail(400, "open must be a path in the app, such as /phone/calls/1");
+          if (typeof inContext !== "boolean") fail(400, "inContext must be true or false");
+          if (session) await pluginSession(plugin, profile, session);
+          else if (!profile.sessionId) {
+            if (!profile.provider) fail(400, "This bot has no provider.");
+            profile = (await store.profiles.claimSession(bot, await (await providers.agentFor(profile.provider, "")).newSessionId())) ?? fail(404, "profile not found");
+          }
+          const sessionId = session ?? profile.sessionId!;
+          const [last] = await store.sql<{ messageId: string }[]>`select message_id from messages
+            where profile_id = ${bot} and session_id = ${sessionId} and role = 'user' and message_id not like 'pill-%' order by id desc limit 1`;
+          const [row] = await store.sql<PillRow[]>`insert into pills (profile_id, session_id, after, plugin, label, text, open, in_context)
+            values (${bot}, ${sessionId}, ${last?.messageId ?? null}, ${plugin}, ${label.trim()}, ${text}, ${path ?? null}, ${inContext})
+            returning id, after, plugin, label, text, open, in_context`;
+          await store.sent.save(bot, `pill-${row.id}`, { input: text || row.label, files: [], plugin });
+          await history.record(bot, sessionId, `pill-${row.id}`, "user", text ? `${row.label}\n${text}` : row.label);
+          for (const heard of pillsHeard.get(sessionId) ?? []) heard(pillLine(row));
+          return { id: row.id };
+        },
       },
       async addServer({ url, headers, transport, allowLocal }) {
         const ref = { url, headers, allowLocal, ...(transport ? { transport } : {}) };
@@ -608,6 +633,9 @@ export async function createFxbot(options: FxbotOptions) {
       : `${label} rejected ${whose} key. Replace it in Settings › Providers.`;
   }
   const byPlugin = new Set((await store.sent.byPlugins()).map((row) => `${row.profileId}:${row.messageId}`));
+  // So does a message that carried pills to the model: the chat shows its own words, from `sent`.
+  for (const row of await store.sql<{ profileId: string; givenWith: string }[]>`select distinct profile_id, given_with from pills where given_with is not null`)
+    byPlugin.add(`${row.profileId}:${row.givenWith}`);
   function withSent(id: string) {
     let rest = "";
     const fill = async (part: string) => {
@@ -644,8 +672,64 @@ export async function createFxbot(options: FxbotOptions) {
     return (await open(profile, sessionId))
       .stream(cursor)
       .pipeThrough(new TextDecoderStream() as TransformStream<Uint8Array, string>)
-      .pipeThrough(withSent(profile.id));
+      .pipeThrough(withSent(profile.id))
+      .pipeThrough(await withPills(profile.id, sessionId, cursor));
   }
+
+  // Pills (docs/phases/phone-v3.md): a stream gives each of its chat's once, by the client's applyLine placed after the
+  // turn it follows. One that follows no turn comes first, from the chat's start. Replayed, one comes after its turn's
+  // end, or, when that came before the cursor, once the stream has caught up. Added while the stream is open, at once.
+  type PillRow = { id: number; after: string | null; plugin: string; label: string; text: string; open: string | null; inContext: boolean };
+  const pillLine = (r: PillRow) =>
+    JSON.stringify({ type: "pill", pill: { id: r.id, after: r.after, label: r.label, ...(r.text ? { text: r.text } : {}), ...(r.open ? { open: r.open } : {}), from: r.plugin, ...(r.inContext ? { inContext: true } : {}) } }) + "\n";
+  const pillsHeard = new Map<string, Set<(line: string) => void>>();
+  async function withPills(profileId: string, sessionId: string, cursor: number) {
+    const pills = await store.sql<PillRow[]>`select id, after, plugin, label, text, open, in_context from pills
+      where profile_id = ${profileId} and session_id = ${sessionId} order by id`;
+    // The newest line's cursor: the stream has caught up once it gives that line.
+    const end = await sessions.end(sessionId).catch(() => 0);
+    const given = new Set<number>();
+    let caught = cursor >= end;
+    let heard: ((line: string) => void) | undefined;
+    const leave = () => {
+      const all = pillsHeard.get(sessionId);
+      if (heard) all?.delete(heard);
+      if (all && !all.size) pillsHeard.delete(sessionId);
+      heard = undefined;
+    };
+    const give = (out: TransformStreamDefaultController<string>, rows: PillRow[]) => {
+      for (const r of rows) if (!given.has(r.id)) (given.add(r.id), out.enqueue(pillLine(r)));
+    };
+    return new TransformStream<string, string>({
+      start(out) {
+        if (cursor === 0) give(out, pills.filter((r) => r.after === null));
+        if (caught) give(out, pills);
+        heard = (line) => {
+          try {
+            out.enqueue(line);
+          } catch {
+            leave();
+          }
+        };
+        (pillsHeard.get(sessionId) ?? pillsHeard.set(sessionId, new Set()).get(sessionId)!).add(heard);
+      },
+      transform(chunk, out) {
+        out.enqueue(chunk);
+        if (pills.length && chunk.includes('"turn_end"')) {
+          const id = (JSON.parse(chunk) as StreamLine).messageId;
+          give(out, pills.filter((r) => r.after === id));
+        }
+        const at = caught ? undefined : /"cursor":(\d+)/.exec(chunk)?.[1];
+        if (at !== undefined && Number(at) >= end) ((caught = true), give(out, pills));
+      },
+      flush: () => leave(),
+    });
+  }
+  // In-context pills a chat hasn't given the model yet, as they go ahead of a message.
+  const pending = (profileId: string, sessionId: string) =>
+    store.sql<PillRow[]>`select id, after, plugin, label, text, open, in_context from pills
+      where profile_id = ${profileId} and session_id = ${sessionId} and in_context and given_with is null order by id`;
+  const pillText = (rows: PillRow[]) => rows.map((r) => `[From ${r.plugin}, ${r.label}:]${r.text ? `\n${r.text}` : ""}`).join("\n\n");
 
   // One start-over of a bot's own chat at a time. A send to that chat, and a provider switch, wait for the one running;
   // a start-over a message asked for holds it until that message is in the new chat, so one sent meanwhile lands after.
@@ -698,6 +782,12 @@ export async function createFxbot(options: FxbotOptions) {
   // The bot's own chat, begun again: a new session on `provider`, whose handoff goes in the bot's instructions. Each
   // open stream of the chat ends with a moved line.
   async function restart(profile: StoredProfile, provider: string, model: string, handoff: string) {
+    // In-context pills the old chat never gave the model go with its handoff.
+    const left = profile.sessionId ? await pending(profile.id, profile.sessionId) : [];
+    if (left.length) {
+      handoff = `${handoff}\n\n${pillText(left)}`;
+      await store.sql`update pills set given_with = 'handoff' where id in ${store.sql(left.map((r) => r.id))}`;
+    }
     const sessionId = await (await providers.agentFor(provider, "")).newSessionId();
     const saved = (await store.profiles.update(profile.id, { provider, model, sessionId, handoff })) ?? fail(404, "profile not found");
     for (const stream of following.get(profile.id) ?? []) stream.move(sessionId);
@@ -964,8 +1054,17 @@ export async function createFxbot(options: FxbotOptions) {
       // A messageId the session already accepted runs nothing new and resolves to the same ids. A message's own thinking
       // level is its turn's.
       const chat = await open(profile, sessionId, messageId, effort?.trim());
-      const turn = chat.prompt(read, { messageId });
+      // In-context pills the chat hasn't given the model go ahead of a message that starts a turn, once. The chat still
+      // shows the message alone, from `sent`.
+      const carried = await pending(id, sessionId);
+      const block = carried.length ? `${pillText(carried)}\n\n` : "";
+      const turn = chat.prompt(block ? (typeof read === "string" ? `${block}${read}` : [{ type: "text" as const, text: block }, ...read]) : read, { messageId });
       const accepted = await turn.accepted;
+      if (carried.length) {
+        await store.sql`update pills set given_with = ${messageId} where id in ${store.sql(carried.map((r) => r.id))} and given_with is null`;
+        if (!from && input === text) await store.sent.save(id, messageId, { input: shown ?? text, files: [] });
+        byPlugin.add(`${id}:${messageId}`);
+      }
       await history.record(id, accepted.sessionId, messageId, "user", text + names);
       // A turn behind another starts when that one ends.
       const first = own ? working.get(sessionId)?.[0] : workingOn(id, messageId, sent);

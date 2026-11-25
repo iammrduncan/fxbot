@@ -42,7 +42,7 @@ import { maxFiles, maxTogether, readFile, sizeOf } from "./attachments.ts";
 import { Blob } from "./blob.tsx";
 import { BotForm } from "./bot-form.tsx";
 import { LookDialog, type BotLook } from "./look-picker.tsx";
-import { Fold, type Folded } from "./fold.tsx";
+import { Fold, PillEntry, type Folded } from "./fold.tsx";
 import { Onboarding } from "./onboarding.tsx";
 import { BesideHost, BesidePanel, useBeside } from "./beside.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
@@ -1145,6 +1145,13 @@ function Thread({ turns, color, skills, retry, anchored }: { turns: Turn[]; colo
   };
   return runs.map(({ folded, shown }) => {
     const first = folded[0];
+    // A plugin's pill, in the middle of the chat.
+    if (!first && shown?.pill)
+      return (
+        <MessageScrollerItem key={shown.messageId} messageId={shown.messageId}>
+          <PillEntry pill={shown.pill} />
+        </MessageScrollerItem>
+      );
     return (
       <Fragment key={(first ?? shown)!.messageId}>
         {first && (

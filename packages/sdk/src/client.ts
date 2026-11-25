@@ -32,6 +32,7 @@ import type {
   SkillRef,
   SkillSearch,
   StreamLine,
+  Pill,
   Team,
   UpdateStatus,
   Upload,
@@ -295,10 +296,21 @@ export type Part =
 // One message and its reply. `parts` is the reply step by step; `reply` is its text alone, the parts' text joined, and
 // all a turn from an earlier chat has. `unsent` marks a message the server never took, which can be sent again.
 // `from` names the plugin that sent the message, when one did. `handled` is for a page: a plugin took the message.
-export type Turn = { messageId: string; text: string; files?: Upload[]; reply: string; parts?: Part[]; done: boolean; note?: string; unsent?: boolean; from?: string; handled?: true };
+// `pill` makes the entry a plugin's pill, in the middle of the chat, with no message or reply of its own.
+export type Turn = { messageId: string; text: string; files?: Upload[]; reply: string; parts?: Part[]; done: boolean; note?: string; unsent?: boolean; from?: string; handled?: true; pill?: Pill };
 
 // Folds one stream line into a thread. Lines without a messageId, such as `idle`, change nothing.
 export function applyLine(turns: Turn[], line: StreamLine): Turn[] {
+  // A pill goes after the turn it follows and any pills already after it, once. One whose turn isn't here goes last.
+  if (line.type === "pill" && line.pill) {
+    const key = `pill-${line.pill.id}`;
+    if (turns.some((turn) => turn.messageId === key)) return turns;
+    const entry: Turn = { messageId: key, text: "", reply: "", done: true, pill: line.pill };
+    let at = line.pill.after === null ? 0 : turns.findLastIndex((turn) => turn.messageId === line.pill!.after) + 1;
+    if (at === 0 && line.pill.after !== null) return [...turns, entry];
+    while (turns[at]?.pill) at++;
+    return turns.toSpliced(at, 0, entry);
+  }
   const { messageId } = line;
   if (!messageId) return turns;
   const i = turns.findLastIndex((turn) => turn.messageId === messageId);
