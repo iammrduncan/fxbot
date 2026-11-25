@@ -42,6 +42,8 @@ On the first draft of this plan:
 - "room calls are treated same. pill in middle with phone call and compacted summary. chat history of phone calls available via search. opens on sidebar like pages if clicked etc..."
 - "keep flash v2 thats fine." "phone call 4 min is fine yeah..."
 
+On the revised plan: "sidekick should be part of bobs instructions only during the phone call..." "reaching model with next turn is the correct thing. We maintain context not libfx..." "recap for call makes sense."
+
 On research: "skip research directive atm." "What I want here is different from anyone else."
 
 From phone-v2, still the bar: "it can talk to me and delegate behin tthe scenes and keep our conversation interactive. A true sidekick..."
@@ -92,7 +94,7 @@ Today a call's words go to the bot's own chat, as "From your call", and phone sp
 
 ### What core has for pills
 
-- **libfx 0.0.16 can't add to a session's history without a turn.** A session's history is opaque bytes, and only `prompt` and `steer` add to it (`node_modules/libfx/types/libfx.d.cts`). So core keeps a pill in a table of its own, and hands it to the model with the chat's next turn. From then on it's in the session's history, and in its compactions, like any message.
+- **fxbot keeps the context, not libfx.** A pill lives in fxbot's own table, and fxbot hands it to the model with the chat's next turn. From then on it's in the session's history, and in its compactions, like any message. libfx 0.0.16 has no way to add history without a turn anyway: a session's history is opaque bytes, and only `prompt` and `steer` add to it (`node_modules/libfx/types/libfx.d.cts`).
 - **The chat already shows a message apart from what the model got.** Core's `sent` table holds what the chat shows of a message, and the stream shows that in place of libfx's input. A turn that carries pills to the model still shows only the owner's words.
 - **A fold isn't a pill.** `app.fold`'s pills count what a plugin folded out of view, and unfold in place. A call's pill is an entry of its own: its words, its text in context, and a place it opens.
 - **Search is there.** `chat_history` already searches every message of a bot, plugin sessions included, with the plugin each came from (`packages/sdk/src/history.ts`). A call's session is then searchable by the bot as it is.
@@ -346,7 +348,8 @@ Answered on 2026-11-25:
 - **Call chats are searchable,** and open beside the chat.
 - **The voice stays Flash v2.**
 - **The pill reads "Phone call · 4 min".**
+- **An in-context pill reaches the model with the chat's next turn,** ahead of that turn's message: "reaching model with next turn is the correct thing. We maintain context not libfx..."
+- **A call starts with a recap of the main chat,** about its last 6,000 characters, pills included: "recap for call makes sense."
+- **The sidekick note is in the bot's instructions only during the call:** "sidekick should be part of bobs instructions only during the phone call..."
 
-Still open:
-1. **A pill's place in the history.** It reaches the model with the next turn, ahead of that turn's message, since libfx can't add history without a turn. Is that close enough to "just like rest of chat history", or should the pill wait for a libfx that can?
-2. **The recap's size.** A call starts with the main chat's last 6,000 characters or so, pills included. Is that the right amount?
+Nothing is still open.
