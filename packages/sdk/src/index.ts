@@ -686,12 +686,11 @@ export async function createFxbot(options: FxbotOptions) {
   async function withPills(profileId: string, sessionId: string, cursor: number) {
     const pills = await store.sql<PillRow[]>`select id, after, plugin, label, text, open, in_context from pills
       where profile_id = ${profileId} and session_id = ${sessionId} order by id`;
-    // The newest line's cursor: the stream has caught up once it gives that line.
-    const end = await sessions.end(sessionId).catch(() => 0);
     const given = new Set<number>();
-    let caught = cursor >= end;
     let heard: ((line: string) => void) | undefined;
+    let quiet: NodeJS.Timeout | undefined;
     const leave = () => {
+      clearTimeout(quiet);
       const all = pillsHeard.get(sessionId);
       if (heard) all?.delete(heard);
       if (all && !all.size) pillsHeard.delete(sessionId);
@@ -700,10 +699,24 @@ export async function createFxbot(options: FxbotOptions) {
     const give = (out: TransformStreamDefaultController<string>, rows: PillRow[]) => {
       for (const r of rows) if (!given.has(r.id)) (given.add(r.id), out.enqueue(pillLine(r)));
     };
+    // The rest, once the replay has gone quiet: libfx gives a session's stored lines at once, then waits. It isn't asked
+    // for the newest line's cursor: asking a session that a turn was starting in raced its own writing, and turns failed
+    // with ConflictingIdentity, in phone's calls on the owner's dev (2026-11-25).
+    const settle = (out: TransformStreamDefaultController<string>) => {
+      clearTimeout(quiet);
+      if (given.size < pills.length)
+        quiet = setTimeout(() => {
+          try {
+            give(out, pills);
+          } catch {
+            leave();
+          }
+        }, 100);
+    };
     return new TransformStream<string, string>({
       start(out) {
         if (cursor === 0) give(out, pills.filter((r) => r.after === null));
-        if (caught) give(out, pills);
+        settle(out);
         heard = (line) => {
           try {
             out.enqueue(line);
@@ -719,8 +732,7 @@ export async function createFxbot(options: FxbotOptions) {
           const id = (JSON.parse(chunk) as StreamLine).messageId;
           give(out, pills.filter((r) => r.after === id));
         }
-        const at = caught ? undefined : /"cursor":(\d+)/.exec(chunk)?.[1];
-        if (at !== undefined && Number(at) >= end) ((caught = true), give(out, pills));
+        settle(out);
       },
       flush: () => leave(),
     });
