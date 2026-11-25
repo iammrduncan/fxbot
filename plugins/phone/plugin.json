@@ -13,7 +13,8 @@
         { "name": "to", "description": "Your phone, the only number bots call, such as +15557654321" },
         { "name": "minutes", "description": "The longest call, 5 to 120 minutes", "default": "30" },
         { "name": "quiet", "description": "Hours a bot doesn't call on its own, in your time zone", "default": "22:00-07:00" },
-        { "name": "perDay", "description": "The most calls one bot makes on its own in a day, 1 to 20", "default": "3" }
+        { "name": "perDay", "description": "The most calls one bot makes on its own in a day, 1 to 20", "default": "3" },
+        { "name": "pause", "description": "How long you can go quiet on a call before the bot answers, so you can think or stumble mid-sentence, 1 to 5 seconds", "default": "2" }
       ]
     }
   }

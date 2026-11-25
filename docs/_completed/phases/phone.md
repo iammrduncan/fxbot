@@ -188,5 +188,23 @@ The owner, on 2026-11-24, after a call to their Apple Watch on speaker: "the pho
   - The confirm, talk, repeat, deaf, and rules checks pass. The repeat check now waits 3 seconds before saying the bot's last line back, since the mock bot repeats what it's told.
   - **With phone-signalwire 0.1.1,** a line 1: the confirm and talk checks pass, and no echo reached the bot. The old provider still cut the greeting and the next line, as expected. The repeat check's second "Same again." was taken as echo, since with no `hearing` the start of a final is estimated, and the fake gives a final the moment it's asked.
   - **Not checked:** a real call. The log's new lines say how late an echo comes. No call so far logged `start_of_input` during a line, and whether SignalWire sends partial results on a real call isn't known: without them, the line works as with an old provider's finals.
-- **If it isn't enough:** a partial could need three words to cut in, as Vapi suggests for noisy calls, and then a setting could make the call take turns. Separately, a pause of a second mid-sentence ends what the owner said, and "One moment." can play while they go on: the call's "take a look at" was likely that.
+- **If it isn't enough:** a partial could need three words to cut in, as Vapi suggests for noisy calls, and then a setting could make the call take turns. Separately, a pause of a second mid-sentence ended what the owner said, and "One moment." could play while they went on: the call's "take a look at" was likely that. See [Time to think](#time-to-think-012-for-0120).
 - **For checks under dev:** fxbot reloads a local plugin's entry file when its files change, but its other files, such as `call.ts` and `relay.ts`, stay as first imported until fxbot restarts. A plugin added from GitHub gets a folder for each commit, so an update isn't affected.
+
+### Time to think (0.1.2, for 0.12.0)
+
+The owner, the same day: "it needs a bit of pause after I speak cause I may stutter, stumble, or brain pause before finishing my statement if I'm talking and thinking at the same time." SignalWire ends what it heard after a second of quiet, so a pause to think sent half a sentence, "take a look at", and the bot answered it.
+
+- **What the owner says is held** until they've been quiet for `pause`, a new setting of 1 to 5 seconds, 2 by default. Words after a shorter pause join it, and go as one message. The pause is phone's, so it's the same with any provider, and the provider keeps its own short wait.
+  - Quiet is counted from the owner's last `hearing`, near the end of their speech. With only `heard`, it's counted from about a second before it, the recognizer's own wait.
+  - Words begun, a `hearing` with no `heard` yet, hold it up to 2 seconds more.
+- **What acts at once:** "wait" and "hold on" stop the bot talking, and what's held still goes after the pause. "Stop" stops the call's work and drops what's held. The owner cutting in still stops the bot at once.
+- **"One moment."** waits 1.5 seconds after the words go, as before, and doesn't play if the owner has talked since.
+- **Words held when the call ends** still go to the bot, once.
+- **The cost:** every answer starts the pause later than before, about a second more with 2 seconds.
+- **Checked** against the fake RELAY:
+  - Two parts a second apart went as one message, 2.1 seconds after the last. A final alone went about a second after it.
+  - "Hold on" stopped the bot at once, and what was held went after it. "Stop" dropped what was held.
+  - No "One moment." while the owner talked again, and words held at a hang-up reached the bot once.
+  - The confirm, talk, echo, repeat, deaf, and rules checks pass. The talk check's "One moment." now comes at 3.5 seconds, and its steps that speak again wait for the pause first.
+  - **Not checked:** a real call, and whether 2 seconds suits the owner. A "stop" said just as held words go may find the bot's turn not started yet, and say "Okay." without stopping it, as before.

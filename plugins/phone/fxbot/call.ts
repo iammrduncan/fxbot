@@ -35,6 +35,8 @@ type Options = {
   open: (events: LineEvents) => Line;
   /** A line 2: the call decides what cuts the bot off, from the words as they come. */
   turns: boolean;
+  /** How long, in ms, the owner may go quiet before what they said goes to the bot. */
+  pause: number;
   /** A turn the owner's words joined or started, for the plugin to count as theirs. */
   onSpoken: (turn: string) => void;
   onEnd: (how: string) => void;
@@ -154,10 +156,16 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   let greeting = true;
   // When the words heard now began, as their first partial came, on a line 2.
   let began = 0;
+  // What the owner said, held until they've been quiet for o.pause, so a stumble or a thought mid-sentence doesn't end
+  // it: words after a shorter pause join it. When their words last sounded, and when any last reached the call.
+  let held: string[] = [];
+  let lastWords = 0;
+  let talked = 0;
+  let release: NodeJS.Timeout | undefined;
 
   const line = o.open({
     hearing: (text) => void (o.turns && hearing(text)),
-    heard: (text) => void (owners(text) && hear(text).catch((error) => fx.log(`What the owner said didn't reach ${o.name}: ${error.message}`))),
+    heard: (text) => void (owners(text) && take(text)),
     interrupted: () => interrupted(),
     played: (text) => {
       played = `${played} ${text}`.trim();
@@ -212,7 +220,9 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   // Words as they come, on a line 2.
   function hearing(text: string) {
     if (!began) began = Date.now();
-    if (!echoed(text, began)) cutIn(text);
+    if (echoed(text, began)) return;
+    lastWords = talked = Date.now();
+    cutIn(text);
   }
   // Words finished: whether they're the owner's, to send. They began at their first partial, or with only a final,
   // about a second of silence and half a second a word before it. The log says each echo dropped, and how long after
@@ -221,13 +231,31 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     const dated = began > 0;
     const at = dated ? began : Date.now() - 1000 - 500 * wordsOf(text).length;
     began = 0;
-    if (!echoed(text, at)) return (cutIn(text), true);
+    // Words a final alone brought sounded last about a second before it, the recognizer's own wait.
+    if (!echoed(text, at)) return ((talked = Date.now()), (lastWords = Math.max(lastWords, dated ? 0 : talked - 1000)), cutIn(text), true);
     const last = aired.at(-1);
     const after = !airing.length && last && at > last.end ? at - last.end : 0;
     const when = after ? `${(after / 1000).toFixed(1)} s after a line ended` : "during a line";
     fx.log(`The bot's own voice came back ${when}${dated ? "" : " (its start estimated)"}, and wasn't sent: "${text.slice(0, 80)}"`);
     return false;
   }
+
+  // The owner's finished words: "wait" or "stop" acts at once, and the rest waits for the pause.
+  function take(text: string) {
+    const words = text.trim();
+    if (!stopWords.test(words) && !floorWords.test(words)) return (held.push(words), wait());
+    if (stopWords.test(words)) held = [];
+    send(words);
+  }
+  // Sends what's held once the owner has been quiet for the pause, or words begun have waited 2 seconds more for their
+  // end.
+  function wait() {
+    clearTimeout(release);
+    const until = lastWords + o.pause + (began ? 2000 : 0);
+    if (Date.now() < until) return void (release = setTimeout(wait, until - Date.now()));
+    if (held.length) send(held.splice(0).join(" "));
+  }
+  const send = (text: string) => void hear(text).catch((error) => fx.log(`What the owner said didn't reach ${o.name}: ${error.message}`));
 
   async function hear(text: string) {
     heardAt = Date.now();
@@ -259,7 +287,8 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     if (result.joined) running.add(turn);
     if (muted === turn) muted = "";
     const asked = heardAt;
-    timers.push(setTimeout(() => !over && saidAt < asked && say("One moment."), 1500));
+    // Unless the owner has talked again since.
+    timers.push(setTimeout(() => !over && saidAt < asked && talked <= asked && say("One moment."), 1500));
     void follow();
   }
 
@@ -321,6 +350,9 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
 
   function finish(how: string) {
     if (over) return;
+    // What the owner said just before the call ended still goes.
+    clearTimeout(release);
+    if (held.length) send(held.splice(0).join(" "));
     over = true;
     timers.forEach((timer) => clearTimeout(timer));
     stopFollowing.abort();

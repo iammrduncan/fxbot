@@ -5,7 +5,8 @@
 export type Outcome = "answered" | "voicemail" | "missed" | "busy" | "declined" | "failed";
 /** What the line tells the call. */
 export type LineEvents = {
-  /** The owner finished something they said. */
+  /** The owner finished something they said, after the recognizer's own short wait, about a second. phone holds it for
+   * the owner's pause setting, joining what follows sooner. */
   heard: (text: string) => void;
   /** Line 2: the words of what the owner is saying so far, as they come. phone decides from them, and from heard, what
    * cuts the bot off, and stops the line itself. */

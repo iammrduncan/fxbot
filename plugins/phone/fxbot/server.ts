@@ -28,7 +28,7 @@ type Features = { provider: string | null; voice: string | null; button: boolean
 // line is the contract the provider speaks: 2, or the older 1, where the provider decides what cuts the bot off.
 type Found = { name: string; api: Provider; line: number };
 
-const limits = { minutes: [5, 120, 30], perDay: [1, 20, 3] } as const;
+const limits = { minutes: [5, 120, 30], perDay: [1, 20, 3], pause: [1, 5, 2] } as const;
 const phone = /^\+[1-9]\d{6,14}$/;
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const finished = (text: string) => (/[.!?…]$/.test(text) ? text : `${text}.`);
@@ -128,6 +128,7 @@ export default async function setup(fx: PluginApi) {
       name,
       greeting,
       minutes: limit("minutes"),
+      pause: limit("pause") * 1000,
       id,
       open: (events) => p.api.line(events),
       turns: p.line === 2,

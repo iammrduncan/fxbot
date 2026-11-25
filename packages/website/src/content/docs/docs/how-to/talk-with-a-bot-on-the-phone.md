@@ -41,7 +41,7 @@ Save the number you bought as a contact on your phone, such as "Bob (fxbot)". Th
 
 ## On a call
 
-- **Talk as you would to a person.** Keep going after the bot's greeting. It answers in a sentence or two, with nothing it can't say aloud: a link is "a link in the chat," and a code block is "There's more in the chat."
+- **Talk as you would to a person.** Keep going after the bot's greeting. Pause to think or stumble mid-sentence if you need to: the bot waits for 2 seconds of quiet before it takes what you said, and words after a shorter pause join it. phone's `pause` setting makes it 1 to 5 seconds. It answers in a sentence or two, with nothing it can't say aloud: a link is "a link in the chat," and a code block is "There's more in the chat."
 - **Its tools work as in the chat,** and each one it runs shows in the chat, under what you said. It's told to check how something stands now with them, rather than answer from what's earlier in the chat.
 - **While it thinks,** you hear "One moment.", and "Still working on it." while a tool runs. Long work goes to a subagent, if the bot has the subagents plugin, and its report is read out when it's back, if you're still on.
 - **Talk over it** to cut it off, after its greeting, which plays to the end. Its work goes on, and it knows where you stopped listening. Its own voice coming back, as from a speakerphone or a watch, isn't taken as yours.
