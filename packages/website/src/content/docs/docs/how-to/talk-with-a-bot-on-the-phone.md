@@ -1,9 +1,29 @@
 ---
 title: "Talk with a bot on the phone"
-description: "Press Call me and a bot rings your phone, greets you, and you talk with it, hands-free: its own model, memory, and tools answer. SignalWire carries the call."
+description: "Talk with a bot by voice in the app, or press Call me and it rings your phone. Its own model, memory, and tools answer, and it hands long work to the background while you talk."
 ---
 
-With the phone plugin, **Call me** in a bot's message box rings your phone. Answer and the bot says "Hey, this is your fxbot Bob. How can I help today?" Then you talk, as you'd chat by text: what you say goes to the bot's own chat, and its own model, memory, and tools answer, read out to you. The chat keeps the whole conversation.
+With the phone plugin, you talk with a bot by voice. **Talk** in its message box starts a call in the app, below. **Call me** rings your phone: answer and the bot says "Hey, this is your fxbot Bob. How can I help today?" Either way, you talk as you'd chat by text: what you say goes to the bot's own chat, and its own model, memory, and tools answer, read out to you. The chat keeps the whole conversation.
+
+## In the app
+
+**Talk**, the microphone in a bot's message box, starts a call right there, in the browser. On a phone it's with the box's other buttons. The bot says "Hey, what's up?", and you talk.
+
+1. Add **phone** from **Plugins**, on **Browse**. Talk needs Phone 0.2.0 and fxbot 0.12.0 or newer.
+2. Pick what hears you and what speaks, in phone's tab under **Voice**: ElevenLabs or Deepgram with a key, a login you have, a speech server on your machine, or **This device**, the browser's own. See [Add a voice provider](/docs/how-to/add-a-voice-provider/).
+3. Press **Talk**, and allow the microphone.
+
+The bar above the message box shows the call: how long, whether the bot is listening or speaking, which of its subagents are working, **Mute**, and **End**.
+
+- **Cut in whenever you like.** Your second word stops it mid-sentence, and it knows where you stopped listening. With a listener that hears one stretch at a time, talking over it for most of a second does. On speaker, the browser cancels the bot's own voice, so it isn't taken as yours.
+- **It answers quickly,** in a sentence or two. A call's turns think at phone's `callThinking` level, `low` unless you change it.
+- **Long work goes to the background.** Ask for work on its computer, a herdr agent's task, or some digging, and it starts a subagent or prompts the agent, says what's under way, and keeps talking with you. A subagent works at the bot's own thinking level. What it reports is said at your next pause, never over you. Ask how it's going, and the bot checks.
+- **What you say and what it answers** are in its chat, as text, with your words marked **From your call**.
+- **The call ends** when you press **End**, say goodbye, or put the app in the background, since a phone takes the microphone from it then.
+
+Talk works over [web pairing](/docs/how-to/pair-another-device/) too. In a room, **Talk** calls all its bots: see [Talk with several bots in a room](/docs/how-to/talk-in-a-room/#by-voice).
+
+## On a phone line
 
 A provider plugin carries the call. The one today is **phone-signalwire**: fxbot opens a connection to SignalWire for each call, and SignalWire places the call, hears you, and speaks the bot's words. SignalWire never connects to fxbot.
 

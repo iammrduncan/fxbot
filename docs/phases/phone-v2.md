@@ -8,7 +8,7 @@ Talk with a bot by voice, in the app or on a phone line, as naturally as realtim
 - **In-app calls:** a Talk button in a bot's chat, over the connection the app already has, web pairing included. The bot opens with "Hey, what's up?"
 - **A carrier plugin only places the call and carries its sound,** over a SIP user agent phone offers. `phone-signalwire` becomes SignalWire's SIP account, and its RELAY way goes. This release waits until SIP works well on the owner's network.
 
-Status: **planned on 2026-11-25, not built.** Researched the same day against the research directive's references, Pipecat and LiveKit Agents, about 40 voice providers, the browsers' own speech, local speech servers, and nine phone carriers. Revised twice the same night with the owner's answers: the bot speaks in its own words, as a sidekick that works in the background while it talks. Live voice models are an option to test, not the plan. Then the owner added calls in chat rooms, to the first version. Nothing here has run on a real account or network except the two calls on dev that showed why it's needed. What's unverified says so.
+Status: **part 1 built on 2026-11-25** on `release/0.12.0`: the core hooks, Phone 0.2.0's calls in the app and in rooms, Chat rooms 0.6.0, and Subagents 0.3.0, checked against fakes of each voice service, a real Speaches, a mock model, and Chromium ([What the build changed](#what-the-build-changed-part-1)). web.fxbot.sh's new policy waits for the owner's deploy. **Part 2, SIP, isn't started:** its proof needs the owner's go-ahead. It was planned on 2026-11-25. Researched the same day against the research directive's references, Pipecat and LiveKit Agents, about 40 voice providers, the browsers' own speech, local speech servers, and nine phone carriers. Revised twice the same night with the owner's answers: the bot speaks in its own words, as a sidekick that works in the background while it talks. Live voice models are an option to test, not the plan. Then the owner added calls in chat rooms, to the first version. Nothing here has run on a real account or network except the two calls on dev that showed why it's needed. What's unverified says so.
 
 ## What the owner asked
 
@@ -506,7 +506,7 @@ A call in a room is the room's conversation, said aloud. The room keeps who answ
   - Text crosses the socket in place of audio.
 - **Over web pairing:**
   - The bridge already carries the socket.
-  - web.fxbot.sh's policy becomes `microphone=(self "https://*.web.fxbot.sh")` on the shell, and `microphone=(self)` on frames.
+  - web.fxbot.sh's policy becomes `microphone=(self "https://*.fxbot.sh")` on the shell, whose frames are `<frame>.fxbot.sh`, and `microphone=(self)` on frames.
   - It's checked first against `npm run dev --prefix packages/web-app`, then deployed with the owner's approval.
 
 ### Part 2: phone lines that carry audio
@@ -575,50 +575,50 @@ This release waits for it, since RELAY goes. The proof, the first item of its ch
 Checks run against fakes and a disposable fxbot, never dev or a real account, until the owner's own items.
 
 **Part 1, core** (fxbot 0.12.0):
-- [ ] `catalog.ts`: `models: "none"` and `hosts` pass `usable()`. A plugin's `providers` join the catalog while it's added and leave when it's removed. An id fxbot's catalog or another plugin has is left out, with a log line.
-- [ ] The Add provider page shows a plugin's group under its name.
+- [x] `catalog.ts`: `models: "none"` and `hosts` pass `usable()`. A plugin's `providers` join the catalog while it's added and leave when it's removed. An id fxbot's catalog or another plugin has is left out, with a log line.
+- [x] The Add provider page shows a plugin's group under its name.
   - Added from it, a key provider checks its key at `keyCheck`: a fake service answering 401 refuses it.
   - Its key is sealed.
   - It's in no place that picks a model.
   - Settings › Providers marks it, and marks it again when its plugin is removed.
-- [ ] `fx.providers.list()` answers no key.
-- [ ] `fetch` and `socket` reach a fake voice service (HTTP and WebSocket in one script), which records the headers: `Token {key}` for a `headers` entry, and `Bearer` for OpenAI's shape.
+- [x] `fx.providers.list()` answers no key.
+- [x] `fetch` and `socket` reach a fake voice service (HTTP and WebSocket in one script), which records the headers: `Token {key}` for a `headers` entry, and `Bearer` for OpenAI's shape.
   - They refuse a URL off the provider's hosts, a plan sign-in, and a provider with no key.
-- [ ] `effort` on `fx.chats.send`: the turn a message starts thinks at that level, seen in the mock model's request, and a turn it joins keeps its own.
-- [ ] Docs: the plugin API reference, and CHANGELOG's For plugins line.
+- [x] `effort` on `fx.chats.send`: the turn a message starts thinks at that level, seen in the mock model's request, and a turn it joins keeps its own.
+- [x] Docs: the plugin API reference, and CHANGELOG's For plugins line.
 - [ ] `npm run typecheck`, `npm run build-site`, and `git diff --check` pass.
 
 **Part 1, phone 0.2.0:**
-- [ ] `0002_voice.sql`, and the Voice section:
+- [x] `0002_voice.sql`, and the Voice section:
   - Its lists hold only what phone can use, plus This device.
   - The defaults follow the order in [the adapters](#phone-listeners-speakers-and-adapters-speechts).
   - A bot's voice comes from the speaker.
-- [ ] `voice.ts` against a fake transport, listener, and speaker:
+- [x] `voice.ts` against a fake transport, listener, and speaker:
   - Words as they come cut the bot within one frame, and so does 700 ms of voice with a batch listener.
   - `clear` drops what was held, and what played becomes `played`.
   - A cut reply's next message says where.
   - A listener with turns holds nothing more.
   - The echo window and the pause work as in 0.1.2.
-- [ ] Each adapter against a fake of its protocol, built from its docs' messages:
+- [x] Each adapter against a fake of its protocol, built from its docs' messages:
   - `openai.ts`: one stretch, then a sentence's PCM, with a speech server's address and with a key's.
   - `deepgram.ts`: Flux's `EndOfTurn`, then Aura's `Clear` on a cut, and Cloudflare's address.
   - `elevenlabs.ts`: commits, and a context closed on a cut.
   - `mistral.ts`: `turn.end`.
-- [ ] The app's call, in Chromium with a fake microphone (`--use-fake-device-for-media-stream --use-file-for-fake-audio-capture=<wav>`), with the fake Deepgram and a mock model:
+- [x] The app's call, in Chromium with a fake microphone (`--use-fake-device-for-media-stream --use-file-for-fake-audio-capture=<wav>`), with the fake Deepgram and a mock model:
   - Talk starts a call, and the words reach the bot.
   - The reply plays, and the marks come back.
   - Words over a sentence stop the playback within 300 ms, and the next message says where.
   - End ends it.
   - Last calls shows it.
   - On a phone-sized page in dark mode, the bar fits.
-- [ ] The sidekick, with a mock model, the subagents plugin, and the check-only waiter tool:
+- [x] The sidekick, with a mock model, the subagents plugin, and the check-only waiter tool:
   - A call's message carries `effort` `low`.
   - A request for long work starts a subagent, and the call's turn ends in seconds while the subagent works.
   - The owner talks on, and gets answers.
   - The subagent's `subagents_tell` and its report are spoken at the owner's next pause, never over their words, even when the owner is speaking as they arrive.
   - "How's it going?" is answered from `subagents_list`.
   - The call's bar shows the subagent by name.
-- [ ] A room's call, in Chromium, with two mock bots in a room, the fake speaker recording which voice each reply asked for:
+- [x] A room's call, in Chromium, with two mock bots in a room, the fake speaker recording which voice each reply asked for:
   - "Bob, …" wakes Bob, and "…, Bob?" does too. "Mister Robot, …" wakes Mr Robot, and "everyone" wakes both.
   - A question with no name wakes the lead.
   - A reply that tags the other bot is said next, in that bot's voice, with the tag said as its name.
@@ -627,12 +627,12 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
   - A cut stops the speaker and drops what waits, and the next message carries the note, which the room doesn't show.
   - "Stop" stops the room.
   - A room's call shows in Last calls with the room.
-- [ ] Chat rooms 0.6.0: `post`, `stop`, `on`, and `wake`, `label` shown and `note` not, and its README's For other plugins.
-- [ ] Subagents 0.3.0: a bot in a room starts one. Its `subagents_tell` and report wake that bot in the room, and on a call they're said at a pause. Its README, and the "not in a room" line, change.
-- [ ] This device in Chromium: speaking, with `speechSynthesis` stubbed to count utterances, and a cut cancels it. Listening is stubbed the same way. It isn't offered where `SpeechRecognition` is missing. Chrome's Google toggle starts off, and with it off and no language on the device, it says why. In Firefox through Playwright, listening is offered where the browser has it.
-- [ ] Over web pairing locally: `npm run dev --prefix packages/web-app` with the new policy. The frame gets the microphone, and a call works through the bridge.
-- [ ] A local Speaches container, run disposably under podman, if its image and a small model fit on this machine. It hears a WAV and speaks a sentence through the speech server entry. If it doesn't fit, it's said here, and the fake stands in.
-- [ ] phone's README (Voice, the app's call, and line 3), the how-tos, CHANGELOG, and the README's Phases line.
+- [x] Chat rooms 0.6.0: `post`, `stop`, `on`, and `wake`, `label` shown and `note` not, and its README's For other plugins.
+- [x] Subagents 0.3.0: a bot in a room starts one. Its `subagents_tell` and report wake that bot in the room, and on a call they're said at a pause. Its README, and the "not in a room" line, change.
+- [x] This device in Chromium: speaking, with `speechSynthesis` stubbed to count utterances, and a cut cancels it. Listening is stubbed the same way. It isn't offered where `SpeechRecognition` is missing. Chrome's Google toggle starts off, and with it off and no language on the device, it says why. In Firefox through Playwright, listening is offered where the browser has it.
+- [x] Over web pairing locally: `npm run dev --prefix packages/web-app` with the new policy. The frame gets the microphone, and a call works through the bridge.
+- [x] A local Speaches container, run disposably under podman, if its image and a small model fit on this machine. It hears a WAV and speaks a sentence through the speech server entry. If it doesn't fit, it's said here, and the fake stands in.
+- [x] phone's README (Voice, the app's call, and line 3), the how-tos, CHANGELOG, and the README's Phases line.
 - [ ] Dev: phone 0.2.0 landed in one write a file, and the API restarted. Its log shows the providers phone found.
 
 **Part 1, web.fxbot.sh:**
@@ -681,3 +681,45 @@ None left. Answered on 2026-11-25:
 - A call's turns think at `low` (`callThinking`), and subagents at the bot's own level unless the owner changes the subagents plugin's `thinking`.
 - The GPT-Live test runs once the rest works.
 - Calls in chat rooms, with several bots, are in the first version.
+
+## What the build changed (part 1)
+
+Built on 2026-11-25 in a worktree of `release/0.12.0`, and landed there. Part 2 comes next, and the release waits for it.
+
+**As planned:**
+- **Core,** about 220 lines: `providers` in `plugin.json`, the **For <plugin>** groups on **Add provider**, `fx.providers` with `list`, `fetch`, and `socket`, and `effort` on `fx.chats.send`. A provider from a plugin's entry is in no model picker, and a bot or a default can't use it ("Deepgram serves no chat model.").
+- **Phone 0.2.0,** about 1,140 lines of server code and 415 of page: `voice.ts` 209, `talk.ts` 40, `room.ts` 82, `audio.ts` and `speech.ts` 112, the four adapters 361, and the page's call, `talk.jsx`, 299. `call.ts` grew by about 120 lines, for the app, the sidekick, and rooms, and `server.ts` by about 220, for the voice, Talk, and its routes.
+- **Chat rooms 0.6.0,** about 100 lines, and **Subagents 0.3.0,** about 25.
+
+**What changed from the plan:**
+- **`fx.providers.list()` gives `baseUrl` too,** since a speech server's or Cloudflare's address is where its adapter goes. A plugin's entry can't be a device sign-in or a service account, and a Vercel sign-in opens no socket.
+- **`audio.ts` came out of `speech.ts`,** which imported the adapters that imported it, so an adapter loaded before what it needed.
+- **A room's call shows above its message box,** in a new place, `chat-rooms.room-box`. In the room's header, where the plan put it, the bar pushed the room's name and End off a phone's screen. The header keeps **Talk**.
+- **This device listening is offered only where the browser has speech recognition,** or when it's already picked, as "This device: not in this browser". Firefox has none.
+- **The call's bar names the subagents working,** from the subagents plugin's list, every 3 seconds.
+- **Found by the checks, and fixed:**
+  - The page lost what phone sent while the microphone opened: the call's start and the greeting. It's held now, in order.
+  - A call the page ended, such as for Chrome's Google toggle, came back on with the server's next message. Once over, a call stays over.
+  - Firefox can leave the screen's wake lock pending, which held up the call. It isn't waited for now.
+  - A browser that can't play sound left the call at "Starting…". After 3 seconds it ends, with "The browser didn't start its audio for this page."
+  - In a room, the next bot's words go to the speaker while one speaks, so a cut named the bot waiting, not the one heard. The note names who was heard and what of it played, and the bots dropped: "They cut off Bob after: "…". The rest wasn't heard, nor Mr Robot's reply."
+  - A name at the end of a sentence took its period: "…, Mr Robot." tagged without the ".".
+  - A reply's tag being written is `@Name` until the room saves it, and was said "at Bob". It's said as the name.
+- **web.fxbot.sh:** the shell's frames are `<frame>.fxbot.sh`, not `*.web.fxbot.sh` as planned, so the shell's policy is `microphone=(self "https://*.fxbot.sh")`, from the frame host it already allows. Frames get `microphone=(self)`. Chromium 156 honors the wildcard: `()` and `(self)` block a subdomain frame's microphone, and the wildcard allows it.
+
+**The checks,** against a disposable fxbot from the worktree, never dev or a real account:
+- **Core:** the catalog, the Add page and the providers' rows, `fetch` and `socket` with `Token` and `Bearer` keys over HTTP and WebSocket, refusals, and no keys listed. All passed.
+- **Adapters,** against fakes built from each service's documented messages: ElevenLabs' Scribe and multi-context voices, Deepgram's Flux and Aura, Cloudflare's Flux address, Mistral's realtime transcription, and OpenAI's audio shape. All passed.
+- **Calls in the app,** with a fake page that plays audio at real speed and answers marks, and a mock model that answers as each bot in a room: the greeting, words to the bot with the app's note, the reply sentence by sentence, a cut 242 ms after the owner's words began, ElevenLabs' context closed, the next message's note, a listener that ends turns holding nothing more (454 ms), a batch listener cut by the voice detector, This device's text, `callThinking` sent with each message, and Last calls. All passed.
+- **The sidekick:** a subagent started, the call's turn answered in about 250 ms while it worked, the owner talked on, and the report, arriving mid-sentence, was said 1.4 s after the owner's last words, nothing over them. "How's it going" ran `subagents_list`. All passed.
+- **Rooms:** names at the start and end, "Mister" for "Mr", "everyone", no name to the lead, a hand-off said as a name in the other bot's voice, one at a time, a cut that drops the waiting bot, "stop", the room showing no note, and Last calls with the room. Subagents from a room report there and wake the bot. All passed.
+- **The page,** in Chromium on a desktop in light and a phone in dark: Add provider's For phone group, the providers' rows, the Voice section, Talk, the bar's states, Mute, End, and a room's call. Over web pairing, with the Worker run locally on the new policy: the frame got the microphone, and a call went both ways through the bridge. This device with the browser's speech stubbed: speaking, listening on the device with the echo-cancelled track, a cut cancelling speech, and the Google toggle's reason. All passed.
+- **A real Speaches,** run disposably under podman: Whisper heard Kokoro's spoken line through the fake microphone, and Kokoro said the greeting and the reply.
+- **The earlier phone checks,** against the fake RELAY: confirm, talk, echo, pause, repeat, a deaf provider, and the rules. All passed.
+
+**Not checked here:**
+- **The real services:** only fakes of ElevenLabs, Deepgram, Cloudflare, Mistral, and OpenAI ran. The owner's keys are the first real check.
+- **A thinking level reaching a model:** libfx sends one only to AI Gateway, Vercel, ChatGPT, and Grok, and no fake of those ran. fxbot checking the level showed phone sends it.
+- **Firefox's audio:** headless Firefox here has no sound output, so its call ends with the browser's reason. Its microphone, worklet, and wake lock worked, and it doesn't offer This device listening.
+- **Safari, an iPhone, and Android,** and how echo cancellation holds there.
+- **web.fxbot.sh's new policy,** until the owner deploys it.
