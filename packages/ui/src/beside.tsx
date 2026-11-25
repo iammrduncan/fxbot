@@ -1,9 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { BesideFrame } from "./header.tsx";
 import { besideWith, go } from "./nav.ts";
 import { pluginRoute, usePluginRoute, usePlugins } from "./plugins.tsx";
+import { PaneGutter, useWidth } from "./resize.tsx";
 
 // A plugin's screen beside the chat, such as a page a bot linked, so the chat stays where it was: a bot's chat, or a
 // plugin's screen that asks for it, such as a room. Its path is in the chat's address, as ?beside=/pages/<id>, so a
@@ -42,10 +43,12 @@ export function useBeside() {
   return { path, close };
 }
 
-// Half the chat's width on a computer, between 22rem and 50rem, in place of the bot panel; the whole screen on a
+// Half the chat's width on a computer, between 22rem and 50rem, or as its gutter makes it, in place of the bot panel; the whole screen on a
 // phone, over the chat, which stays as it was underneath.
 export function BesidePanel({ path, close }: { path: string; close: () => void }) {
   const mobile = useIsMobile();
+  const aside = useRef<HTMLElement>(null);
+  const [width, setWidth] = useWidth("beside");
   const route = usePluginRoute(path);
   if (!route || route.beside) return null;
   const screen = route.screen;
@@ -67,7 +70,13 @@ export function BesidePanel({ path, close }: { path: string; close: () => void }
       </Sheet>
     );
   return (
-    <aside aria-label="Beside the chat" className="flex w-[clamp(22rem,50%,50rem)] shrink-0 flex-col border-l print:w-full print:border-0">
+    <aside
+      ref={aside}
+      aria-label="Beside the chat"
+      className="relative flex max-w-[calc(100%-20rem)] shrink-0 flex-col border-l print:w-full! print:max-w-none print:border-0"
+      style={{ width: width ?? "clamp(22rem, 50%, 50rem)" }}
+    >
+      <PaneGutter pane={aside} label="Resize the page beside the chat" min={320} home={(row) => Math.min(Math.max(352, row / 2), 800)} width={width} setWidth={setWidth} />
       {body}
     </aside>
   );

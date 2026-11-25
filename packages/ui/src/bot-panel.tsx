@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { XIcon } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -9,6 +9,7 @@ import { client } from "./client.ts";
 import { Preview, Thumb } from "./library.tsx";
 import { follow } from "./nav.ts";
 import { Place } from "./plugins.tsx";
+import { PaneGutter, useWidth } from "./resize.tsx";
 
 type Tab = "details" | "library";
 
@@ -45,6 +46,8 @@ export function usePanel() {
 // turn ends, so the Library tab reads the list again and shows what the bot saved.
 export function BotPanel({ profile, profiles, panel, version }: { profile: Profile; profiles: Profile[] | null; panel: ReturnType<typeof usePanel>; version: number }) {
   const mobile = useIsMobile();
+  const aside = useRef<HTMLElement>(null);
+  const [width, setWidth] = useWidth("panel");
   // The bot is the one picked in the sidebar, so the panel goes straight to its tabs, under what plugins put above them.
   const body = (
     <Tabs value={panel.tab} onValueChange={(tab) => panel.setTab(tab as Tab)} className="min-h-0 flex-1 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
@@ -77,8 +80,10 @@ export function BotPanel({ profile, profiles, panel, version }: { profile: Profi
       </Sheet>
     );
   if (!panel.open) return null;
+  // 360 pixels by default, 280 to 720 by its gutter, which closes it dragged well past its narrowest.
   return (
-    <aside aria-label={`${profile.name} panel`} className="flex w-[360px] shrink-0 flex-col border-l">
+    <aside ref={aside} aria-label={`${profile.name} panel`} className="relative flex max-w-[calc(100%-20rem)] shrink-0 flex-col border-l" style={{ width: width ?? 360 }}>
+      <PaneGutter pane={aside} label="Resize the bot panel" min={280} max={720} home={() => 360} width={width} setWidth={setWidth} close={() => panel.setOpen(false)} />
       {body}
     </aside>
   );

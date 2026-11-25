@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type ReactNode } from "react";
 import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, Maximize2Icon, MessageCircleDashedIcon, Minimize2Icon, PanelRightIcon, PaperclipIcon, PencilIcon, PinIcon, PinOffIcon, PlusIcon, PuzzleIcon, SettingsIcon, SquareIcon, StarIcon, Trash2Icon, XIcon } from "lucide-react";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -46,6 +46,7 @@ import { Fold, type Folded } from "./fold.tsx";
 import { Onboarding } from "./onboarding.tsx";
 import { BesideHost, BesidePanel, useBeside } from "./beside.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
+import { SidebarGutter, sidebarWidth, useWidth } from "./resize.tsx";
 import { BotMemories } from "./memories.tsx";
 import { PluginsPage, BotPlugins } from "./plugins-page.tsx";
 import { LibraryPage } from "./library.tsx";
@@ -126,6 +127,7 @@ export function App() {
     );
   }, []);
   const pluginRoute = usePluginRoute(path);
+  const [sidebarPx] = useWidth("sidebar");
 
   const [creating, setCreating] = useState(false);
   const created = (profile: Profile) => {
@@ -173,7 +175,7 @@ export function App() {
   return (
     <BotsProvider value={profiles}>
       <TooltipProvider>
-        <SidebarProvider className={shown || whole ? undefined : hidden}>
+        <SidebarProvider className={shown || whole ? undefined : hidden} style={{ "--sidebar-width": sidebarWidth(sidebarPx) } as CSSProperties}>
           {!onboarding && <BotSidebar profiles={profiles} offline={offline} active={id} onNew={() => setCreating(true)} onChange={refresh} />}
           {/* An installed app draws under the notch and the home indicator (viewport-fit=cover), so each edge pads by its
               inset. The left one belongs to the sidebar while it is open beside the page. */}
@@ -431,6 +433,7 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
           </Tooltip>
         </div>
       </SidebarFooter>
+      <SidebarGutter />
     </Sidebar>
   );
 }
