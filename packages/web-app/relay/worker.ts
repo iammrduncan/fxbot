@@ -73,9 +73,11 @@ export default {
       // The relay is any wss: address, since an owner may run their own; ws: only when the shell itself is plain http,
       // on a machine of the owner's own.
       const ws = url.protocol === "http:" ? " ws:" : "";
+      // Fathom's script and its counts, on web.fxbot.sh only (shell.ts countVisits).
+      const fathom = url.host === "web.fxbot.sh" ? " https://cdn.usefathom.com" : "";
       return withHeaders(res, {
         ...security,
-        "content-security-policy": `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self' wss:${ws}; frame-src ${url.protocol}//*.${base}; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'`,
+        "content-security-policy": `default-src 'none'; script-src 'self'${fathom}; style-src 'self'; img-src 'self' data:${fathom}; media-src 'self'; connect-src 'self' wss:${ws}${fathom}; frame-src ${url.protocol}//*.${base}; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'`,
         ...(url.pathname === "/sw.js" ? { "cache-control": "no-cache" } : {}),
       });
     }
