@@ -1,7 +1,7 @@
 // The rooms in the app: a Rooms group in the sidebar, each room with its bots' avatars, + to make one, and a screen for
 // each room, where the owner tags bots with @ and each reply shows as it's written. Built into page.js; see the README.
 import { useEffect, useRef, useState } from "react";
-import { api, client, go, openBeside, ui, useBots, Slot } from "@fxbot/app";
+import { api, client, formatting, go, openBeside, ui, useBots, Slot } from "@fxbot/app";
 import { Composer } from "./composer.jsx";
 import { Chip, Stack } from "./faces.jsx";
 import { tokens } from "./mentions.ts";
@@ -370,15 +370,12 @@ const tagged = (text) =>
     .map((part, i) => (i % 2 ? part : part.replace(tokens, (_, bot) => `<mention bot="${bot ?? "all"}"></mention>`)))
     .join("");
 const chips = { mention: ({ bot }) => <Chip id={bot} /> };
-function Owned({ text }) {
-  const parts = text.split(/<@(?:bot:([0-9a-f]{12})|(all))>/);
-  const out = [];
-  for (let i = 0; i < parts.length; i += 3) {
-    if (parts[i]) out.push(parts[i]);
-    if (i + 1 < parts.length) out.push(<Chip key={i} id={parts[i + 1] ?? "all"} />);
-  }
-  return out;
-}
+// What the owner said: Markdown, as a bot's words are, whole, with each line kept as they typed it.
+const Owned = ({ text }) => (
+  <ui.Streamdown mode="static" parseIncompleteMarkdown={false} allowedTags={{ mention: ["bot"] }} components={chips}>
+    {tagged(formatting.breaks(text))}
+  </ui.Streamdown>
+);
 const Markdown = ({ text }) => (
   <ui.Streamdown allowedTags={{ mention: ["bot"] }} components={chips}>
     {tagged(text)}
@@ -438,7 +435,7 @@ function Said({ message, bot }) {
         {/* What the owner said on a call carries its label, "your call". */}
         {message.label && <span className="text-xs text-muted-foreground">From {message.label}</span>}
         <ui.Bubble align="end" variant="muted">
-          <ui.BubbleContent className="whitespace-pre-wrap">
+          <ui.BubbleContent className="said-md">
             <Owned text={message.text} />
           </ui.BubbleContent>
         </ui.Bubble>
@@ -556,6 +553,7 @@ function RoomScreen({ params }) {
           </div>
         )}
         <div className="flex items-end gap-2">
+          <ui.FormatButton className="mb-1 shrink-0" />
           <Composer bots={members} placeholder={room ? `Message ${room.name}` : "Loading…"} disabled={!room} onSend={send} submitRef={submit} onEmpty={setEmpty} />
           <ui.Button type="button" disabled={empty || !room} onClick={() => submit.current?.()}>
             Send

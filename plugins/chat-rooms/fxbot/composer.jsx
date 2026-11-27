@@ -1,69 +1,50 @@
-// The room's message box. It's ProseMirror, so a bot you tag is a chip with its avatar, which deletes as one piece. `@`
-// at the start of a line or after a space lists the room's bots, then Everyone, filtered by what follows, and the pick
-// replaces what was typed. `/` at the start of the message lists the room's commands, /fresh. Enter sends, and
-// Shift+Enter starts a new line. Sending writes each chip as its token.
+// The room's message box. It's ProseMirror, the app's own, with the app's formatting, so it formats as the owner types,
+// as a bot's chat box does, and a bot you tag is a chip with its avatar, which deletes as one piece. `@` at the start of
+// a line or after a space lists the room's bots, then Everyone, filtered by what follows, and the pick replaces what was
+// typed. `/` at the start of the message lists the room's commands, /fresh. Enter sends, but in a code block, where it
+// starts a line, and Shift+Enter starts a new line, or the next item in a list. Sending writes standard Markdown, with
+// each chip as its token.
 import { useEffect, useRef, useState } from "react";
 import * as app from "@fxbot/app";
-import { baseKeymap, splitBlock } from "prosemirror-commands";
-import { history, redo, undo } from "prosemirror-history";
-import { keymap } from "prosemirror-keymap";
 import { Schema } from "prosemirror-model";
 import { EditorState, TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { Chip, Stack } from "./faces.jsx";
 import { all, tokenOf, tokens } from "./mentions.ts";
 
+const { formatting } = app;
 const schema = new Schema({
   nodes: {
-    doc: { content: "paragraph+" },
-    paragraph: { content: "inline*", parseDOM: [{ tag: "p" }], toDOM: () => ["p", 0] },
-    text: { group: "inline" },
+    ...formatting.nodes,
     mention: {
       attrs: { bot: {} },
       group: "inline",
       inline: true,
       atom: true,
       selectable: false,
+      // A mention in a bold line is bold, and never code or a link.
+      marks: "strong em strike",
       parseDOM: [{ tag: "span[data-bot]", getAttrs: (dom) => ({ bot: dom.getAttribute("data-bot") }) }],
       toDOM: (node) => ["span", { "data-bot": node.attrs.bot }],
     },
   },
+  marks: formatting.marks,
 });
 
-// The box's text, each chip as its token.
-function textOf(doc) {
-  const lines = [];
-  doc.forEach((paragraph) => {
-    let line = "";
-    paragraph.forEach((node) => (line += node.type.name === "mention" ? (node.attrs.bot === "all" ? all : tokenOf(node.attrs.bot)) : (node.text ?? "")));
-    lines.push(line);
-  });
-  return lines.join("\n").trim();
-}
-// A text back in the box, its tokens as chips, after a send that failed.
-function docOf(text) {
-  const paragraph = (line) => {
-    const parts = [];
-    let at = 0;
-    for (const m of line.matchAll(tokens)) {
-      if (m.index > at) parts.push(schema.text(line.slice(at, m.index)));
-      parts.push(schema.nodes.mention.create({ bot: m[1] ?? "all" }));
-      at = m.index + m[0].length;
-    }
-    if (at < line.length) parts.push(schema.text(line.slice(at)));
-    return schema.node("paragraph", null, parts);
-  };
-  return schema.node("doc", null, text.split("\n").map(paragraph));
-}
+// A chip as its token, and a token back as a chip.
+const chips = { type: "mention", pattern: tokens, write: (node) => (node.attrs.bot === "all" ? all : tokenOf(node.attrs.bot)), read: (m) => schema.nodes.mention.create({ bot: m[1] ?? "all" }) };
+// The box's text, Markdown, each chip as its token, and a text back in the box, after a send that failed.
+const textOf = (doc) => formatting.toMarkdown(doc, chips).trim();
+const docOf = (text) => formatting.fromMarkdown(text, schema, chips);
 // The room's commands, for `/` at the start of the message.
 const commands = [{ id: "/fresh", name: "/fresh", description: "Start the room over toward what you write next", command: true }];
-const fresh = (doc) => EditorState.create({ schema, doc, plugins: [history(), keymap({ "Mod-z": undo, "Shift-Mod-z": redo, "Mod-y": redo, "Shift-Enter": splitBlock }), keymap(baseKeymap)] });
+const fresh = (doc) => EditorState.create({ schema, doc, plugins: formatting.plugins(schema, chips) });
 
 // The @ being typed before the caret, and what follows it: at the start of a line or after a space. Or a / at the
-// start of the message, and the letters after it.
+// start of the message, and the letters after it. Not in a code block.
 function typing(state) {
   const { $from, empty } = state.selection;
-  if (!empty) return null;
+  if (!empty || $from.parent.type.spec.code) return null;
   const before = $from.parent.textBetween(0, $from.parentOffset, null, "￼");
   const command = state.doc.firstChild === $from.parent && /^\/([a-z]{0,10})$/.exec(before);
   if (command) return { from: $from.pos - command[0].length, to: $from.pos, query: command[1], command: true };
@@ -85,6 +66,8 @@ function rank(choices, query) {
 export function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmpty }) {
   const box = useRef(null);
   const view = useRef(null);
+  // The view, once it's made, for the format bar above the box.
+  const [made, setMade] = useState(null);
   // The room's bots, then Everyone, for the list.
   const choices = useRef([]);
   choices.current = [...bots.map((bot) => ({ id: bot.id, name: bot.name, bot })), ...(bots.length > 1 ? [{ id: "all", name: "Everyone" }] : [])];
@@ -104,8 +87,7 @@ export function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmp
   useEffect(() => told.current?.(empty), [empty]);
 
   function refresh(state) {
-    const first = state.doc.firstChild;
-    setEmpty(state.doc.childCount === 1 && first.childCount === 0);
+    setEmpty(formatting.isEmpty(state.doc));
     const at = typing(state);
     if (!at || at.from !== dismissed.current) dismissed.current = -1;
     const matches = !at || at.from === dismissed.current ? [] : at.command ? commands.filter((c) => c.name.startsWith(`/${at.query}`)) : rank(choices.current, at.query);
@@ -163,7 +145,8 @@ export function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmp
         return true;
       }
     }
-    if (event.key === "Enter" && !event.shiftKey) {
+    // Enter sends, but in a code block, where it's the box's: a line. Cmd or Ctrl+Enter sends from there too.
+    if (event.key === "Enter" && !event.shiftKey && !formatting.ownsKey(view.current.state, event)) {
       submit();
       return true;
     }
@@ -193,7 +176,7 @@ export function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmp
     const v = new EditorView(box.current, {
       state: fresh(),
       nodeViews: { mention: chip },
-      attributes: { role: "textbox", "aria-multiline": "true", "aria-label": "Message the room", "aria-autocomplete": "list", class: "cr-editor" },
+      attributes: { role: "textbox", "aria-multiline": "true", "aria-label": "Message the room", "aria-autocomplete": "list", autocorrect: "on", autocapitalize: "sentences", spellcheck: "true", class: "cr-editor fx-formatted" },
       handleKeyDown: (_view, event) => key(event),
       dispatchTransaction(tr) {
         v.updateState(v.state.apply(tr));
@@ -201,7 +184,8 @@ export function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmp
       },
     });
     view.current = v;
-    return () => v.destroy();
+    setMade(v);
+    return () => (setMade(null), v.destroy());
   }, []);
 
   useEffect(() => void view.current?.setProps({ editable: () => !disabled }), [disabled]);
@@ -215,6 +199,7 @@ export function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmp
 
   return (
     <div className="cr-box">
+      <app.ui.FormatBar view={made} className="pb-1" />
       {list && (
         <div id="cr-mentions" role="listbox" aria-label={list.command ? "Commands" : "Bots"} className="absolute right-0 bottom-full left-0 z-10 mb-2 max-h-72 overflow-y-auto rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md">
           {list.matches.map((choice, i) => (
@@ -236,12 +221,14 @@ export function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmp
           ))}
         </div>
       )}
-      <div ref={box} />
-      {empty && (
-        <span className="cr-placeholder" aria-hidden="true">
-          {placeholder}
-        </span>
-      )}
+      <div className="relative">
+        <div ref={box} />
+        {empty && (
+          <span className="cr-placeholder" aria-hidden="true">
+            {placeholder}
+          </span>
+        )}
+      </div>
       <div aria-live="polite" className="sr-only">
         {said}
       </div>

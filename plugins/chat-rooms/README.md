@@ -4,6 +4,7 @@ A plugin for [fxbot](https://fxbot.sh): rooms where several of your bots talk wi
 
 - **Rooms** in the sidebar lists your rooms, each with its bots' avatars. **+** makes one: name it, and pick its bots. The first one leads.
 - **Tagging:** in a room, `@` lists its bots and **Everyone**. A pick becomes a chip with the bot's avatar.
+- **Formatting,** since 0.6.0, on fxbot 0.12.0 or newer: the box formats as you type, as a bot's chat box does, with the app's ProseMirror and its formatting, and **Aa** beside it opens the format bar. What you sent shows formatted, with its chips. See [Format a message](https://fxbot.sh/docs/how-to/format-a-message/).
 - **Who answers:** a message wakes the bots it tags. One that tags no one wakes the lead, or every bot in order, by the room's setting.
 - **Handing on:** a reply that tags another bot wakes that bot next. A reply that tags no one ends the round.
 - **Limits:**
@@ -56,25 +57,23 @@ The room's header leaves a place, `chat-rooms.room-header`, which a plugin fills
 | File | What it is |
 | --- | --- |
 | `plugin.json` | Its name, version, and parts |
-| `package.json` | What the page is built from, ProseMirror, and `"type": "module"` for the server code |
+| `package.json` | `"type": "module"`, for the server code |
 | `fxbot/server.ts` | Its routes, under `/api/plugins/chat-rooms/`, who answers, the queue and its limits, Stop, and what a bot is sent |
 | `fxbot/mentions.ts` | The mention token, `<@bot:id>` or `<@all>`, and `@Name` to token and back. The page and the server share it |
 | `fxbot/migrations/` | Its tables, in the schema `plugin_chat_rooms` |
 | `fxbot/page.jsx` | The sidebar group, the room screen, and its settings |
-| `fxbot/composer.jsx` | The message box: ProseMirror, the `@` list, and chips |
+| `fxbot/composer.jsx` | The message box: the app's ProseMirror and formatting, the `@` list, and chips |
 | `fxbot/faces.jsx` | A mention's chip, and a room's bots, stacked |
-| `fxbot/page.css` | The box's, the chips', and the stacks' styles, and ProseMirror's |
-| `fxbot/page.js` | The page, built |
-| `fxbot/page-licenses.txt` | The licenses of the packages `page.js` bundles |
+| `fxbot/page.css` | The box's, the chips', and the stacks' styles |
+| `fxbot/page.js` | The page, built, with nothing bundled |
 | `skills/` | `chat-room`, `room-handoff`, and `room-lead` |
 
 ## Build the page
 
-`page.js` is `page.jsx` bundled with [rolldown](https://rolldown.rs), which comes with fxbot's packages. It's built without comments: ProseMirror's are long, and `page.jsx` keeps the plugin's own. Run these in this folder, in a checkout of fxbot, after changing the page or `package.json`:
+`page.js` is `page.jsx` bundled with [rolldown](https://rolldown.rs), which comes with fxbot's packages. Run this in this folder, in a checkout of fxbot, after changing the page:
 
 ```sh
-npm install
-npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app --no-comments --file fxbot/page.js
+npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app -e prosemirror-model -e prosemirror-state -e prosemirror-view --no-comments --file fxbot/page.js
 ```
 
-React and `@fxbot/app` stay out of the bundle: the page hands over its own. When the bundled packages change, write `fxbot/page-licenses.txt` again from their `LICENSE` files.
+React, ProseMirror, and `@fxbot/app` stay out of the bundle: the page hands over its own, so it bundles nothing of anyone else's.
