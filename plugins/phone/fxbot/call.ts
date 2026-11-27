@@ -2,7 +2,7 @@ import type { PluginApi } from "@fxbot/sdk";
 import type { Line, LineEvents, Outcome, Place } from "./line.ts";
 import { roomNote, spoken, tagged, type Rooms, type RoomEvent } from "./room.ts";
 
-// A call's conversation (docs/phases/phone-v3.md). It names no phone service: it holds the call through a provider's
+// A call's conversation (docs/_completed/phases/phone-v3.md). It names no phone service: it holds the call through a provider's
 // line. A call is a side conversation: what the owner says goes to the call's own session, a session of phone's for the
 // bot, joining a turn that's running, and every reply there is spoken while the call lasts, sentence by sentence, made
 // fit to hear. The bot's instructions there say how to talk on a call (server.ts adds them, only while it's on), and
@@ -102,7 +102,7 @@ function inOrder(words: string[], said: string[]) {
   }
   return row[said.length];
 }
-// How the bot talks on a call (docs/phases/phone-v3.md, the sidekick): in its own words at once, and longer work in the
+// How the bot talks on a call (docs/_completed/phases/phone-v3.md, the sidekick): in its own words at once, and longer work in the
 // background, so the conversation never waits. It's in the bot's instructions for the call's session while the call is
 // on, and never a message.
 const sidekick =

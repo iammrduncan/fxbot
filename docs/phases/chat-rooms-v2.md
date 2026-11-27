@@ -77,7 +77,7 @@ A room is drawn by chat-rooms' own page, close to a bot's chat but its own copy,
   - **No tools in sight,** for the same reason as the goodbye: no "Let me check." before a tool and no "Still working on it.". The idle goodbye can hang up while a bot works.
   - **Answers aren't held** while the owner is still talking (`!o.room`, `call.ts`).
   - **The call's chat beside** is phone's plain text copy of the call room.
-  - **No phone line.**
+  - **No phone line.** Built since, with phone-v2's part 2 on 2026-11-27: one call path serves both, so a room's phone has **Call me**, through the default carrier.
   - **The summary isn't retried.**
 - **Already alike:** voices for each bot, cut-in, the thinking level, the pill after, the bar's subagents, and the recap of what came before.
 
@@ -199,7 +199,7 @@ A room is drawn by chat-rooms' own page, close to a bot's chat but its own copy,
 - **Checks when a call starts:** a room call checks that phone is on for each of the room's bots, and says which isn't.
 - **The call's chat beside** is the call room itself, as a room beside its room. Phone's own copy goes.
 - **The summary** is asked again once if it doesn't come, as on a one-bot call.
-- **Call me for a room:** the room's call menu offers **Call me** too, a room call over the phone line through phone's softphone (phone-v2's part 2), once that works on the owner's network.
+- **Call me for a room:** the room's call menu offers **Call me** too, a room call over the phone line through phone's softphone. Built with phone-v2's part 2 on 2026-11-27, since a room's call and a bot's take the same path; untried on a real call.
 
 ### What the owner sees
 
@@ -265,7 +265,7 @@ A room is drawn by chat-rooms' own page, close to a bot's chat but its own copy,
   - [ ] The call room opens beside the room.
   - [ ] The summary asked again once.
 - [ ] **On dev, with the owner's bots,** a real room call: the goodbye, the quick word, and the room drawn as a chat. The owner's to try too.
-- [ ] **Call me for a room** on the owner's phone line, once phone-v2's part 2 works on their network. The owner's to try.
+- [ ] **Call me for a room** on the owner's phone line: built with phone-v2's part 2 on 2026-11-27. The owner's to try.
 - [ ] The docs listed above.
 - [ ] The repo checks:
   - [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.

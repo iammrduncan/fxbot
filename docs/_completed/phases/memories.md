@@ -347,7 +347,7 @@ A memory is `{ id, text, savedBy, createdAt, updatedAt, messageId }`. `@fxbot/sd
 - **Elsewhere:**
   - the compose file's `embed` service and its GPU override files, which the [containers](containers.md) phase's `setup.sh` chooses between
   - the README's checkout setup and `CHANGELOG.md`
-  - the site's docs: a Memories section in [bots and chats](../../../packages/website/docs/explanation/bots-and-chats.md), and a how-to for choosing where vectors come from
+  - the site's docs: a Memories section in [bots and chats](../../../packages/website/src/content/docs/docs/explanation/bots-and-chats.md), and a how-to for choosing where vectors come from
 
 ### Speed
 

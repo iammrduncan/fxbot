@@ -162,7 +162,7 @@ export default async function setup(fx: PluginApi) {
     if (live?.id === id) live = null;
   }
 
-  // A call is a side conversation (docs/phases/phone-v3.md): a session of its own for the bot, kept on its row. While the
+  // A call is a side conversation (docs/_completed/phases/phone-v3.md): a session of its own for the bot, kept on its row. While the
   // call is on, the bot's instructions there say how to talk on a call, and what's recent in its main chat.
   const onCall = new Map<string, { id: number; bot: string; note: string; recap: string }>();
   // A room's call runs in its call room: each of its bots' sessions there gets the room call's note while it's on. The
@@ -299,7 +299,7 @@ export default async function setup(fx: PluginApi) {
     },
   });
 
-  // How phone hears and speaks on a call it carries itself (docs/phases/phone-v2.md, Voice settings): the providers the
+  // How phone hears and speaks on a call it carries itself (docs/_completed/phases/phone-v2.md, Voice settings): the providers the
   // owner added that phone has an adapter for, the Voice section's picks, and, with none picked, the first in the
   // adapters' order, ElevenLabs first, or This device.
   type VoiceRow = { listen_provider: string | null; listen_model: string | null; speak_provider: string | null; speak_model: string | null; speak_voice: string | null };
@@ -365,7 +365,7 @@ export default async function setup(fx: PluginApi) {
     return level === "same" ? undefined : level;
   };
 
-  // Every call goes one way (docs/phases/phone-v2.md, part 2): its row, one at a time, its own session and note, the
+  // Every call goes one way (docs/_completed/phases/phone-v2.md, part 2): its row, one at a time, its own session and note, the
   // Voice section's listener and voice, the conversation and its rules, its bar, and its summary. Where its audio goes
   // is the only difference: the page's socket, for a call in the app, or the owner's phone, on a carrier's SIP account,
   // for Call me and a bot's call. The carrier only gives the account.

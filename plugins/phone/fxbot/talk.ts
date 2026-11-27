@@ -2,7 +2,7 @@ import type { PluginSocket } from "@fxbot/sdk";
 import { pcmOf } from "./audio.ts";
 import type { Input, Transport } from "./voice.ts";
 
-// The app's call (docs/phases/phone-v2.md, the app's call): the page's socket at /talk/:bot, or /talk/room/:room. Up
+// The app's call (docs/_completed/phases/phone-v2.md, the app's call): the page's socket at /talk/:bot, or /talk/room/:room. Up
 // come the microphone, 16 kHz PCM16 in binary frames, `{"played": n}` as each sentence plays to its end, the page's
 // own words as `{"heard": {"partial" | "final": text}}` when This device listens, `{"mute": true|false}`, and
 // `{"end": true}`. Down go the bot's voice, binary, `{"mark": n}` after a sentence's audio, `{"say": n, "text", "voice"}`

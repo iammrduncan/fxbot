@@ -11,6 +11,8 @@ It's the first of two phone plugins. [Phone: Telnyx](../../phases/phone-telnyx.m
 
 Since 2026-11-18 the call is the [phone](phone.md) plugin's, and `phone-signalwire` is its provider for SignalWire: what this doc plans for the conversation, the tools, the rules, the number, and the page is phone's now ([Split into phone](#split-into-phone)).
 
+**Since 0.12.0,** phone-signalwire is only SignalWire's SIP account, which phone's own softphone calls from, and RELAY, its voices, and its listening are gone ([Phone v2, part 2](phone-v2.md#what-the-build-changed-part-2)). What follows is the 0.11.0 build.
+
 Status: built on 2026-11-14 on `release/0.11.0`, at the owner's /goal, and checked against a fake RELAY, a mock model, and Chromium. The same day, on the owner's own SignalWire account, the confirming call went through after three fixes. The first call with a bot, on 2026-11-15, connected but couldn't listen, which a fourth fix addresses, and a conversation hasn't happened yet ([What the build changed](#what-the-build-changed), [First real calls](#first-real-calls)). Planned the same day at the owner's word, it replaces the same day's plans for a call that only read a message out, and then for Twilio's ConversationRelay through a public path, which the owner ruled out: fxbot has no public endpoint. Researched against the research directive's references, OpenClaw, Hermes Agent and its phone plugins, Twring, the coding-agent phone projects, ChatGPT, Home Assistant, the phone services, ElevenLabs, xAI, Cartesia, the other speech providers, and the realtime voice models, read on 2026-11-14. It needed no change to the plugin API, and its first real calls added one: a setting's `options`, for the voice list.
 
 ## What the owner asked

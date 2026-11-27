@@ -1,4 +1,4 @@
-// A phone line that carries the call's own audio (docs/phases/phone-v2.md, part 2): phone is a softphone on the
+// A phone line that carries the call's own audio (docs/_completed/phases/phone-v2.md, part 2): phone is a softphone on the
 // carrier's SIP account. It connects out over TLS, registers, and calls the owner's number with SRTP, so nothing on the
 // internet connects in. The call's audio goes through phone's voice loop, as an app call's does: the same listener, the
 // same voice, the same rules. A carrier plugin, such as phone-signalwire, only gives the account.

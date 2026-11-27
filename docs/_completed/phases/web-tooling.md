@@ -37,7 +37,7 @@ Status: **built on 2026-11-27** on `release/0.12.0`, the day after it was planne
 - Each other provider they choose to get a key for.
 
 Planned on 2026-11-26:
-- **References:** each one in the [research directive](../research-directive.md) that has a repository was cloned and searched on 2026-11-26, and Grok Bot's docs were read.
+- **References:** each one in the [research directive](../../research-directive.md) that has a repository was cloned and searched on 2026-11-26, and Grok Bot's docs were read.
 - **Other agents:** Hermes Agent's and OpenClaw's source, and Claude Code's, Codex's, and Open WebUI's docs, were read on 2026-11-26.
 - **Providers:**
   - Each provider's own docs and prices were read on 2026-11-26.
@@ -57,7 +57,7 @@ It replaces the Web search stub, which it removes.
 
 ## 0. Core or plugin
 
-**A plugin, `web`, one of fxbot's own, in its list** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)).
+**A plugin, `web`, one of fxbot's own, in its list** ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)).
 - The conventions name it: "A knowledge graph, chat rooms, web search, a password manager, and herdr are plugins."
 - Reaching the web isn't what every bot needs to run, and an owner who doesn't want bots on the web removes it.
 - "Core plugin," as the owner put it, is one of fxbot's own, in `plugins/` and its list. Whether it's also one of the **Essentials** that first-run setup suggests is an [open question](#5-open-questions).
@@ -78,9 +78,9 @@ It replaces the Web search stub, which it removes.
 **The computer provides one function, `read`,** so web can read a page on a bot's computer ([The computer's browser](#the-computers-browser)).
 - It's a change to the computer plugin, not core: about 25 lines, through `fx.provide`, as chat rooms provides rooms to the computer.
 
-**The machine.** Bots never reach the owner's machine through web ([Bots and the owner's machine](../../CONVENTIONS.md#bots-and-the-owners-machine)):
+**The machine.** Bots never reach the owner's machine through web ([Bots and the owner's machine](../../../CONVENTIONS.md#bots-and-the-owners-machine)):
 - A provider's request goes to that provider's own addresses only, as `fx.providers.fetch` allows.
-- A page fetched directly goes from fxbot's process to the internet. An address on this machine, the owner's network, or the tailnet is refused after DNS, on every redirect, and the connection goes to the address that was checked ([Fetching a page](#fetching-a-page)). [Embedded links](embedded-links.md) planned the same rule, and MCP servers follow a looser form of it today.
+- A page fetched directly goes from fxbot's process to the internet. An address on this machine, the owner's network, or the tailnet is refused after DNS, on every redirect, and the connection goes to the address that was checked ([Fetching a page](#fetching-a-page)). [Embedded links](../../phases/embedded-links.md) planned the same rule, and MCP servers follow a looser form of it today.
 - A self-hosted Firecrawl or SearXNG on the owner's network is the owner's to add by its address, as Ollama is. Only the plugin's requests to that provider reach it, never a URL a bot gives.
 - The computer's browser reaches the internet, and not this machine or its network, as it does today.
 - Its tools are never `safe`. A search carries its query out, which is why core never counts an MCP tool as safe. So the permissions plugin treats web's tools as it treats Keiro's MCP tools today.
@@ -353,7 +353,7 @@ An adapter is one file of about 40 lines. It exports the kinds it serves and up 
 
 ### Fetching a page (`fetch.ts`)
 
-`get(url, { accept, maxBytes, signal })`, about 90 lines, on the rules [embedded links](embedded-links.md#fetching) planned and fx0's `lib/public-fetch.ts` follows:
+`get(url, { accept, maxBytes, signal })`, about 90 lines, on the rules [embedded links](../../phases/embedded-links.md#fetching) planned and fx0's `lib/public-fetch.ts` follows:
 - **The address:**
   - `http:` and `https:` only, on ports 80 and 443, with no user name or password.
   - Names ending in `localhost`, `local`, `internal`, `home`, or `lan` are refused.

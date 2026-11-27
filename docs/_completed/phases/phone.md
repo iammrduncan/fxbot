@@ -33,7 +33,7 @@ The computer plugin finds the plugins that name computers of their own the same 
 
 - **The line is the boundary.** It's text both ways, and SignalWire does the speech. That's the contract a provider fills now.
 - **Providers as plugins, not a setting,** as the owner asked. OpenClaw's one plugin carries every carrier's code. Here each is added only by an owner who wants it, and someone else can write one.
-- **Kinds of provider, as Assist and Pipecat have them:** a line that rings a phone and speaks (SignalWire), a line that carries audio only (an in-app call, a Telnyx softphone), and speech to text and back (ElevenLabs, Deepgram, Cartesia). The last two meet in `phone`, in a later phase ([Phone in the app](../../phases/phone-in-app.md)).
+- **Kinds of provider, as Assist and Pipecat have them:** a line that rings a phone and speaks (SignalWire), a line that carries audio only (an in-app call, a Telnyx softphone), and speech to text and back (ElevenLabs, Deepgram, Cartesia). The last two meet in `phone`, in a later phase ([Phone in the app](phone-v2.md)).
 - **Twilio needs a way in.** A live conversation over Twilio, by Media Streams or ConversationRelay, has Twilio connect to fxbot, which the owner ruled out: "I want no public endpoint of fxbot." OpenClaw needs a public webhook for Twilio, Telnyx's Call Control, and Plivo alike. So `phone-twilio` isn't planned.
 
 ## 3. Implementation
@@ -118,7 +118,7 @@ fxbot's own providers import these types from `phone`; Node erases a type-only i
 
 ### Not in this phase
 
-- **Calls in the app,** with speech providers, such as `phone-elevenlabs`: [Phone in the app](../../phases/phone-in-app.md).
+- **Calls in the app,** with speech providers, such as `phone-elevenlabs`: [Phone in the app](phone-v2.md).
 - **[Phone: Telnyx](../../phases/phone-telnyx.md),** a softphone, becomes a provider of `phone`.
 - **A provider's own per-bot settings,** beyond the voice.
 
@@ -171,7 +171,7 @@ The owner, on 2026-11-24, after a call to their Apple Watch on speaker: "the pho
   - Pipecat [mutes the owner](https://docs.pipecat.ai/server/utilities/user-mute-strategies) until the bot's first speech is done, then asks for some words before cutting in.
   - LiveKit [asks for some words](https://docs.livekit.io/agents/logic/turns/tuning/), and resumes when a cut turns out to be nothing.
   - OpenClaw had the same bug ([#159140](https://github.com/openclaw/openclaw/issues/159140)): it drops what's heard while the bot plays and about 400 ms after.
-- **The rules moved to phone,** since they're the same for any provider, and [Phone: Telnyx](../../phases/phone-telnyx.md) and [Phone in the app](../../phases/phone-in-app.md) need them too. The contract is line 2:
+- **The rules moved to phone,** since they're the same for any provider, and [Phone: Telnyx](../../phases/phone-telnyx.md) and [Phone in the app](phone-v2.md) need them too. The contract is line 2:
   - A provider needs phone with `{ "line": 2 }`. Its line gives the words as they come, `hearing(text)`, as well as `heard(text)` once they're finished, and never cuts the bot off itself: phone calls `stop()`.
   - phone still takes a line 1 provider, which cuts the bot off itself and says `interrupted()`. phone drops the echo in its finished words too, so phone 0.1.2 helps with phone-signalwire 0.1.1. But an old provider still cuts the greeting and the next line, so update both.
 - **What `call.ts` does now:**
@@ -218,4 +218,4 @@ The owner, after a call from their watch with dev's phone 0.1.2: "I wasn't able 
 - **Echo is matched in order.** The owner's "hold on so you can't hear me", said as Bob ended "...it can't hear you while it's talking, so you have to wait... when you say hold on... stops me", was dropped as the bot's own voice: every word of it was in his reply, in another order. An echo is the bot's words as it said them, so most of the words heard must now come in that order.
 - **The next call proved it.** With a log of when SignalWire gave what it heard, the owner's "okay yeah but what's the fx bot doing", said over one of Bob's sentences, came as 8 words at once, its first words 32 ms and its final 97 ms into the next line, as the last one ended. Phone cut that next line off 157 ms later, as it should. So with `calling.play` and `calling.collect`, the bot hears the owner only once it stops speaking, whatever phone decides. The log was removed with the plays.
 - **Checked** against the fake RELAY: all seven checks pass, and the echo check now has the owner's words in the bot's words, in another order, right as it ends, reaching the bot. The fake gives words during a play, so it can't show what SignalWire does.
-- **Cutting in mid-sentence needs the call's audio itself,** as [Phone: Telnyx](../../phases/phone-telnyx.md) and [Phone in the app](../../phases/phone-in-app.md) plan, with a `cascade.ts` in phone: a voice detector, noise removal, and a turn detector, as realtime voice products have. `calling.play_and_collect` may stop a prompt on speech, untested.
+- **Cutting in mid-sentence needs the call's audio itself,** as [Phone: Telnyx](../../phases/phone-telnyx.md) and [Phone in the app](phone-v2.md) plan, with a `cascade.ts` in phone: a voice detector, noise removal, and a turn detector, as realtime voice products have. `calling.play_and_collect` may stop a prompt on speech, untested.

@@ -1,4 +1,4 @@
-// What a carrier plugin offers phone (docs/phases/phone-v2.md, part 2): a SIP account, and nothing more. A carrier names
+// What a carrier plugin offers phone (docs/_completed/phases/phone-v2.md, part 2): a SIP account, and nothing more. A carrier names
 // phone under needs, with { "line": 3 }, and offers a Provider with fx.provide. phone signs in to the account with its
 // own softphone (sip.ts) and rings the owner's phone from it, and everything else about a call is phone's, the same as a
 // call in the app: the voice, the listening, the conversation, and its rules. A call on the owner's phone is a call in

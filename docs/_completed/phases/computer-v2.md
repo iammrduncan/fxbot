@@ -12,7 +12,7 @@ Status: built on 2026-11-04, on the release/0.4.0 branch, in `plugins/computer`,
 
 ## 0. Core or plugin
 
-**Plugin: the computer, one plugin** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). As in v1, many bots need no computer, and an owner who never adds it runs nothing.
+**Plugin: the computer, one plugin** ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). As in v1, many bots need no computer, and an owner who never adds it runs nothing.
 
 The plugin API gains one piece, the smallest that a live desktop and a live terminal need:
 - **`fx.socket(path, handler)`:** a WebSocket route under `/api/plugins/<name>/`, next to `fx.route`. Today a plugin's routes are web `Request → Response`, which can stream a response but can't carry the two-way, ordered stream a VNC session is.
@@ -21,7 +21,7 @@ The core never names the computer. v1's pieces stay: `needs`, `fx.dependents()`,
 
 ## 1. Research
 
-Checked on 2026-11-03 against each project's source and docs, through four parallel reads, and with prototypes on this machine (Debian 13, podman 5.4.2, rootful and rootless). Clones and prototypes stayed in the scratchpad. Where a point is missing, the source doesn't cover it. The [v1 research](../_completed/phases/computer.md#1-research) still holds for the engine, the firewall, and commands.
+Checked on 2026-11-03 against each project's source and docs, through four parallel reads, and with prototypes on this machine (Debian 13, podman 5.4.2, rootful and rootless). Clones and prototypes stayed in the scratchpad. Where a point is missing, the source doesn't cover it. The [v1 research](computer.md#1-research) still holds for the engine, the firewall, and commands.
 
 ### What v1 missed
 

@@ -676,7 +676,7 @@ export async function createFxbot(options: FxbotOptions) {
       .pipeThrough(await withPills(profile.id, sessionId, cursor));
   }
 
-  // Pills (docs/phases/phone-v3.md): a stream gives each of its chat's once, by the client's applyLine placed after the
+  // Pills (docs/_completed/phases/phone-v3.md): a stream gives each of its chat's once, by the client's applyLine placed after the
   // turn it follows. One that follows no turn comes first, from the chat's start. Replayed, one comes after its turn's
   // end, or, when that came before the cursor, once the stream has caught up. Added while the stream is open, at once.
   type PillRow = { id: number; after: string | null; plugin: string; label: string; text: string; open: string | null; inContext: boolean };

@@ -146,7 +146,7 @@ export default async function setup(fx: PluginApi) {
       listeners.get(id)!.add(listener);
       return () => void listeners.get(id)?.delete(listener);
     },
-    // Since 0.6.0, for phone 0.2.0 (docs/phases/phone-v3.md): a room's call is a side conversation in a call room of its
+    // Since 0.6.0, for phone 0.2.0 (docs/_completed/phases/phone-v3.md): a room's call is a side conversation in a call room of its
     // own, with the room's bots and settings, left out of the list. A pill in the middle of a room, such as the call's,
     // which the bots read when it's in context.
     callRoom: async (id: number) => {

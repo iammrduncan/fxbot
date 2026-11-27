@@ -689,7 +689,7 @@ export default async function setup(fx: PluginApi) {
   }
   // For the web plugin's web_fetch with browser: true, a page read in the bot's own Chromium, in its or its subagent's
   // own tab, with its sign-ins: agent-browser opens it, then reads it as Markdown, into a file, since a command's
-  // output is cut past 60 KiB (docs/phases/web-tooling.md, The computer's browser).
+  // output is cut past 60 KiB (docs/_completed/phases/web-tooling.md, The computer's browser).
   fx.provide({
     on: (bot: string) => fx.bots.on(bot),
     async read(call: { bot: string; session: string; label: string | null }, url: string, signal: AbortSignal) {

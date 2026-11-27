@@ -1,6 +1,6 @@
 import type { PluginApi } from "@fxbot/sdk";
 
-// Listening and speaking, from the voice providers the owner added (docs/phases/phone-v2.md, listeners, speakers, and
+// Listening and speaking, from the voice providers the owner added (docs/_completed/phases/phone-v2.md, listeners, speakers, and
 // adapters). An adapter serves providers by their catalog entry, the kind: the voice services phone brings, and the
 // chat logins that also speak. phone's voice loop (voice.ts) holds a call's listener and speaker; this names no call.
 // Audio is 16 kHz mono PCM16 throughout, and each adapter asks its provider for that, or converts.

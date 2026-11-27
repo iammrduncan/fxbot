@@ -6,7 +6,7 @@ import { textFrom, toMarkdown } from "./read.ts";
 import { adapterFor, adapters, freeSearch, ProviderError, type Added, type Depth, type Job, type Options, type Recency, type Result, type Searched } from "./providers/index.ts";
 
 // Web: bots search, read, and research the web through providers the owner adds, as they add a model provider, and
-// read a page on fxbot's own, or in their own browser with the computer (docs/phases/web-tooling.md). Each tool works
+// read a page on fxbot's own, or in their own browser with the computer (docs/_completed/phases/web-tooling.md). Each tool works
 // the same whichever provider answers it, and a result names the provider and says it's the sites' words.
 
 /** What the computer offers: a page read in the bot's own browser, in its or its subagent's own tab. */

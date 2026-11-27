@@ -1,4 +1,4 @@
-// Talk: a call in the app, over the page's own socket to phone (docs/phases/phone-v2.md, the app's call). The page
+// Talk: a call in the app, over the page's own socket to phone (docs/_completed/phases/phone-v2.md, the app's call). The page
 // carries the audio: the microphone, echo-cancelled by the browser, as 16 kHz PCM16, and the bot's voice, played as it
 // comes and dropped at once when the owner cuts in. Or the browser's own speech, This device. One call at a time.
 import { useEffect, useState, useSyncExternalStore } from "react";

@@ -640,7 +640,7 @@ function useCallRoom(id) {
   return messages;
 }
 
-// A call's chat, read only, beside the main chat from its pill or Last calls (docs/phases/phone-v3.md): when, how long,
+// A call's chat, read only, beside the main chat from its pill or Last calls (docs/_completed/phases/phone-v3.md): when, how long,
 // and who, the summary the bot wrote for its main chat, and the call as it went. The turn that asked for the summary
 // isn't shown: its answer is the summary.
 function CallChat({ params }) {

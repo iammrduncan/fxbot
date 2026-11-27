@@ -1,7 +1,7 @@
 import type { PluginApi } from "@fxbot/sdk";
 
 // What every adapter shares: the providers it serves, the jobs it can do, and the one shape each job gives back, so a
-// tool works the same whichever provider answers it (docs/phases/web-tooling.md, The providers).
+// tool works the same whichever provider answers it (docs/_completed/phases/web-tooling.md, The providers).
 
 /** A provider the owner added, as fx.providers lists it. */
 export type Added = { id: string; kind: string; name: string; label: string; baseUrl: string | null };

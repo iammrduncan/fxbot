@@ -8,13 +8,13 @@ Talk with a bot by voice, in the app or on a phone line, as naturally as realtim
 - **In-app calls:** a Talk button in a bot's chat, over the connection the app already has, web pairing included. The bot opens with "Hey, what's up?"
 - **A carrier plugin only places the call and carries its sound,** over a SIP user agent phone offers. `phone-signalwire` becomes SignalWire's SIP account, and its RELAY way goes. This release waits until SIP works well on the owner's network.
 
-Status: the sidekick, and a call's own chat, moved to [phone-v3](phone-v3.md) on 2026-11-25, after the owner's first calls showed part 1's sidekick fell short. **Part 1 built on 2026-11-25** on `release/0.12.0`: the core hooks, Phone 0.2.0's calls in the app and in rooms, Chat rooms 0.6.0, and Subagents 0.3.0, checked against fakes of each voice service, a real Speaches, a mock model, and Chromium ([What the build changed](#what-the-build-changed-part-1)). web.fxbot.sh's new policy is deployed. **Part 2, SIP, isn't started:** its proof needs the owner's go-ahead. It was planned on 2026-11-25. Researched the same day against the research directive's references, Pipecat and LiveKit Agents, about 40 voice providers, the browsers' own speech, local speech servers, and nine phone carriers. Revised twice the same night with the owner's answers: the bot speaks in its own words, as a sidekick that works in the background while it talks. Live voice models are an option to test, not the plan. Then the owner added calls in chat rooms, to the first version. Nothing here has run on a real account or network except the two calls on dev that showed why it's needed. What's unverified says so.
+Status: the sidekick, and a call's own chat, moved to [phone-v3](phone-v3.md) on 2026-11-25, after the owner's first calls showed part 1's sidekick fell short. **Part 1 built on 2026-11-25** on `release/0.12.0`: the core hooks, Phone 0.2.0's calls in the app and in rooms, Chat rooms 0.6.0, and Subagents 0.3.0, checked against fakes of each voice service, a real Speaches, a mock model, and Chromium ([What the build changed](#what-the-build-changed-part-1)). web.fxbot.sh's new policy is deployed. **Part 2, SIP, built on 2026-11-27,** in dev, with the owner calling from their phone: Call me is the same call as in the app, on phone's own softphone, and phone-signalwire only gives the SIP account ([What the build changed (part 2)](#what-the-build-changed-part-2)). Released in 0.12.0; what's left unticked below is the owner's to try, or a check that needs a fake SIP carrier. It was planned on 2026-11-25. Researched the same day against the research directive's references, Pipecat and LiveKit Agents, about 40 voice providers, the browsers' own speech, local speech servers, and nine phone carriers. Revised twice the same night with the owner's answers: the bot speaks in its own words, as a sidekick that works in the background while it talks. Live voice models are an option to test, not the plan. Then the owner added calls in chat rooms, to the first version. Nothing here has run on a real account or network except the two calls on dev that showed why it's needed. What's unverified says so.
 
 ## What the owner asked
 
 On 2026-11-25, after two test calls on dev from their Apple Watch on speaker:
 - "I wasn't able to intterject/interrupt it at all." Of a build that spoke one sentence at a time: "very unnatural pacing of the audio."
-- "why is gpt live or other phone demos able to instantly stop and allow user to cut in, block out background noise, etc? is this cause we are using signal wires tuff and not our own?" It is: SignalWire gives nothing it hears while it speaks ([The first call on dev](../_completed/phases/phone.md#the-first-call-on-dev-2026-11-25)).
+- "why is gpt live or other phone demos able to instantly stop and allow user to cut in, block out background noise, etc? is this cause we are using signal wires tuff and not our own?" It is: SignalWire gives nothing it hears while it speaks ([The first call on dev](phone.md#the-first-call-on-dev-2026-11-25)).
 - Then the ask: "ok. we need to make this better... true own the voice... phone plugin should own this, it should offer the various voice providers as logins (like our provider login does) or reuse existing logged in providers (phone plugin adds voice providers to the provider screen in settings). So first identify which existing providers would overlap that we can start with plus some premium ones that we know folks use like elevenlabs, deepgram, etc... Then each phone-* plugin becomes just the SIP/comms plugin to call outbound but the root `phone` plugin allows in app calling with whatever voice provider you choose (You should also be able to do this locally with a locally hosted model if you want or built in tts/stt provider in browser/device etc). So use @docs/research-directive.md and plan out a phase for `phone-v2` that does this and works with main providers etc..."
 
 Earlier that night they asked for time to think, "I may stutter, stumble, or brain pause before finishing my statement", which phone 0.1.2's `pause` setting built.
@@ -31,7 +31,7 @@ And one more, for the first version: "I want this to work in a chat room too wit
 
 ## 0. Core or plugin
 
-**A plugin, `phone` 0.2.0, with three small hooks in the plugin API** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Talking by voice isn't what every bot needs. phone owns the voice loop, how a bot works on a call, the in-app call, the voice providers' adapters, and a phone line's audio. Carriers stay plugins that need phone.
+**A plugin, `phone` 0.2.0, with three small hooks in the plugin API** ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). Talking by voice isn't what every bot needs. phone owns the voice loop, how a bot works on a call, the in-app call, the voice providers' adapters, and a phone line's audio. Carriers stay plugins that need phone.
 
 **Provider logins are core:** the Add provider page, keys sealed in Postgres, and the key check. The owner asked for voice providers on that page, and for logins already added to serve. A plugin can do neither today. `fx.models.ask` makes one chat request, and nothing lets a plugin add a kind of provider or reach an added one's API. So the plugin API widens, with nothing in it about voice, and a call needs one more hook to be quick:
 1. **Provider entries a plugin brings.** `plugin.json` may carry `providers`: catalog entries of the same shape as `providers-registry.json`'s, checked by the same rules, with a new `models: "none"`. While the plugin is added, the Add provider page lists them in a group under the plugin's name. They're added, sealed, and key-checked like any provider, and they're never a bot's model.
@@ -56,13 +56,13 @@ Any plugin can use the first two: an image plugin bringing fal.ai, a search plug
   - A provider's line passes text both ways (`{ "line": 2 }`: `hearing`, `heard`, `played`, `say`, `stop`).
   - SignalWire's RELAY speaks and listens.
 - **Why that can't be fixed in phone:** two calls on dev proved that SignalWire gives nothing it hears while a play runs. The owner's 8 words, said over a sentence, came at once, 32 and 97 ms into the next line. One sentence per play let them in at each sentence's end, but the pacing was wrong, and it was undone. With text in and text out, the bot can't be cut off mid-sentence, and fxbot can't touch the noise.
-- **The sidekick's parts are built** ([subagents](../../plugins/subagents/README.md)):
+- **The sidekick's parts are built** ([subagents](../../../plugins/subagents/README.md)):
   - `subagents_start` runs the bot again on one task, in the background, "with the bot's instructions, tools, computer, skills, and memories", and the bot "can start several, for parallel work, and keep talking with you".
   - `subagents_tell` brings what can't wait into the chat while the subagent works. Reports come back together as one message, which joins the bot's turn or starts its next.
   - `subagents_list` answers "how's it going?"
   - herdr's `herdr_prompt` sets an agent to work in its pane, and the computer's tools work for a subagent as for the bot.
   - phone already speaks the bot's reply to a report while a call lasts, and its note on a call says to hand long work to a subagent.
-- **Chat rooms already decide who answers** ([chat-rooms](../../plugins/chat-rooms/README.md), 0.5.2):
+- **Chat rooms already decide who answers** ([chat-rooms](../../../plugins/chat-rooms/README.md), 0.5.2):
   - A message wakes the bots it tags (`<@bot:id>`, or `<@all>`). One that tags no one wakes the lead, or every bot in order, by the room's setting.
   - The lead's skill, `room-lead`, has it answer or tag "another bot in the room [that] fits it better".
   - A reply that tags another bot wakes that bot next, up to 3 tags a reply and 10 replies a message. A new message from the owner replaces the queue. Stop ends the reply being written.
@@ -529,7 +529,7 @@ This release waits for it, since RELAY goes. The proof, the first item of its ch
   - It makes its SIP endpoint itself through SignalWire's REST API, with the project and token it already holds, `call_handler: passthrough`, and `send_as` the owner's SignalWire number.
   - It places calls through phone's `sip`.
   - `relay.ts` and its voice list go. A bot's voice is phone's now.
-- **If SignalWire's audio doesn't come back** through the owner's router, Twilio's Elastic SIP Trunking is next, the one carrier with a documented latch, and then Telnyx, with STUN in the SDP ([Phone: Telnyx](phone-telnyx.md)).
+- **If SignalWire's audio doesn't come back** through the owner's router, Twilio's Elastic SIP Trunking is next, the one carrier with a documented latch, and then Telnyx, with STUN in the SDP ([Phone: Telnyx](../../phases/phone-telnyx.md)).
 
 ### What the owner sees
 
@@ -566,7 +566,7 @@ This release waits for it, since RELAY goes. The proof, the first item of its ch
 - **Models in the page** (Moonshine, Kokoro.js, Silero), Smart Turn, and RNNoise. The energy detector comes first, and each of these waits for a measured need.
 - **The next adapters:** xAI, Gemini, Cartesia, AssemblyAI, and Soniox.
 - **Live voice models** (GPT-Live, ElevenLabs' agents, Gemini Live, xAI's voice, and Nova Sonic) as the bot's ears and mouth. They come only if the test in the checklist shows the bot's words come through unchanged.
-- **Calling a bot,** over the SIP registration: [Phone calls](phone-calls.md).
+- **Calling a bot,** over the SIP registration: [Phone calls](../../phases/phone-calls.md).
 - **Telnyx and Twilio,** unless SignalWire's proof fails.
 - **Telling headphones from speakers,** which Pi does to turn echo cancellation off.
 
@@ -637,7 +637,7 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
 
 **Part 1, web.fxbot.sh:**
 - [x] The relay's `permissions-policy` changed and checked locally, then deployed with the owner's approval. Changed and checked locally (b54b4ac), and deployed on 2026-11-25.
-- [ ] The live `shell.js` hash matches a local build.
+- [x] The live `shell.js` hash matches a local build (2026-11-25, in What the build changed (part 1)).
 
 **The owner's own** (only a person can):
 - [ ] A Deepgram key and an ElevenLabs key added from For Phone.

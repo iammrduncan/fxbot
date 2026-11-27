@@ -4,7 +4,7 @@ import { mistral } from "./speech/mistral.ts";
 import { openai } from "./speech/openai.ts";
 import type { Adapter } from "./audio.ts";
 
-// Which adapter listens and speaks for each kind of provider (docs/phases/phone-v2.md). The adapters and what they share
+// Which adapter listens and speaks for each kind of provider (docs/_completed/phases/phone-v2.md). The adapters and what they share
 // are in speech/ and audio.ts, apart from this list, so none of them imports it.
 export * from "./audio.ts";
 

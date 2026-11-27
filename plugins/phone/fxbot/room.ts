@@ -1,4 +1,4 @@
-// A call in a chat room (docs/phases/phone-v2.md, a conference call in a room): the room's conversation said aloud. The
+// A call in a chat room (docs/_completed/phases/phone-v2.md, a conference call in a room): the room's conversation said aloud. The
 // room keeps who answers and its limits, exactly as in text. phone adds a voice for each bot, one speaking at a time,
 // and tags: a bot named at the start or end of what the owner says is tagged, as `@` does in the room's box.
 

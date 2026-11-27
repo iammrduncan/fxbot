@@ -1,7 +1,7 @@
 import type { Line, LineEvents, Outcome, Place } from "./line.ts";
 import { rate, type Heard, type Listener, type Speaking } from "./audio.ts";
 
-// The voice loop (docs/phases/phone-v2.md): a call's Line, made from where the audio goes (the app's socket, or the
+// The voice loop (docs/_completed/phases/phone-v2.md): a call's Line, made from where the audio goes (the app's socket, or the
 // owner's phone over a carrier's SIP account), a listener, and a speaker. call.ts holds the conversation and its rules, as with any line. This hears
 // the owner, cuts what a batch listener sends with a voice detector, and speaks the bot's sentences in order, one voice
 // at a time, each sentence's mark coming back once the page has played it.

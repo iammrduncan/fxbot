@@ -68,7 +68,7 @@ So:
 
 ## 0. Core or plugin
 
-**Plugin: `web-pairing`,** in `plugins/web-pairing/` ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)), with all of the peer-to-peer code, by the owner's decision. It's in the Essentials pack, STUN only, so a new install has it. It connects to the relay only once a pairing opens or a device is paired, so an owner who never pairs still runs nothing. Reaching fxbot from elsewhere isn't something every bot needs, isn't what plugins plug into, and isn't what fxbot needs to run: Tailscale, a proxy, or the machine itself already work. As a plugin, an owner who doesn't add it has no relay connection, no timer, no table, and no code in the page. It needs nothing it can't have already:
+**Plugin: `web-pairing`,** in `plugins/web-pairing/` ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)), with all of the peer-to-peer code, by the owner's decision. It's in the Essentials pack, STUN only, so a new install has it. It connects to the relay only once a pairing opens or a device is paired, so an owner who never pairs still runs nothing. Reaching fxbot from elsewhere isn't something every bot needs, isn't what plugins plug into, and isn't what fxbot needs to run: Tailscale, a proxy, or the machine itself already work. As a plugin, an owner who doesn't add it has no relay connection, no timer, no table, and no code in the page. It needs nothing it can't have already:
 - tables of its own, for devices
 - routes of its own, for pairing
 - a Settings tab, for Devices
@@ -93,7 +93,7 @@ CONVENTIONS says a new package needs a second real consumer. Here it's a deploya
 
 ### fxbot today: how the page reaches the server
 
-fxbot has no login. The server listens on 127.0.0.1:8787 (`packages/server/src/index.ts:15-16`), and whoever reaches it is the owner: today that's the machine itself, or the owner's tailnet through `tailscale serve` ([Reach it](../../packages/website/src/content/docs/docs/how-to/reach-it.md)). The one check is the page's origin: a write whose `Origin` names another host than the one it reached is refused, so a site open in the same browser can't change fxbot (`index.ts:309-312`), and a WebSocket upgrade checks it the same way (`index.ts:337-338`). A request with no `Origin`, from a tool, passes.
+fxbot has no login. The server listens on 127.0.0.1:8787 (`packages/server/src/index.ts:15-16`), and whoever reaches it is the owner: today that's the machine itself, or the owner's tailnet through `tailscale serve` ([Reach it](../../../packages/website/src/content/docs/docs/how-to/reach-it.md)). The one check is the page's origin: a write whose `Origin` names another host than the one it reached is refused, so a site open in the same browser can't change fxbot (`index.ts:309-312`), and a WebSocket upgrade checks it the same way (`index.ts:337-338`). A request with no `Origin`, from a tool, passes.
 
 Every way the page reaches the server assumes the page and the API share an origin:
 

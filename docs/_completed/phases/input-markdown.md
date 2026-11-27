@@ -18,7 +18,7 @@ The message box formats what the owner types, as Slack's does, and what they sen
 - **Every box,** the app's own, Messages' box with its bot chips, and a room's with its mentions, through one copy of ProseMirror that the app shares with plugins. An owner with Messages and chat rooms loads about 89 KB less than before, gzipped, and one with neither about 78 KB more.
 
 Status: **built on 2026-11-27** on `release/0.12.0`, the day after it was planned, and checked in Chromium on a disposable fxbot and on the owner's dev. Every checklist item is done but the iPhone's, which is the owner's ([What the build changed](#what-the-build-changed)).
-- **References:** each one in the [research directive](../research-directive.md) that has a repository was cloned and searched for its chat box on 2026-11-26.
+- **References:** each one in the [research directive](../../research-directive.md) that has a repository was cloned and searched for its chat box on 2026-11-26.
 - **Slack and other apps:** Slack's help center, and Discord's, Element's, Telegram's, GitHub's, and Linear's boxes, were read on 2026-11-26.
 - **Editors:** ProseMirror, TipTap, Lexical, and CodeMirror were bundled and measured on 2026-11-26.
 
@@ -33,7 +33,7 @@ Status: **built on 2026-11-27** on `release/0.12.0`, the day after it was planne
 - **A plugin can't do it.**
   - **One box at a time:** `app.box` gives the box to the first plugin that sets one. Messages sets one, so a formatting plugin would have to take over Messages' chips too.
   - **Not in rooms:** a room's box is chat rooms' own, and no place reaches it.
-- **Core behavior goes through what plugins get,** as the conventions ask ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). So the app gives its ProseMirror and the formatting to plugins' page code, through the `require` it already gives React by, and to `@fxbot/app`.
+- **Core behavior goes through what plugins get,** as the conventions ask ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). So the app gives its ProseMirror and the formatting to plugins' page code, through the `require` it already gives React by, and to `@fxbot/app`.
   - Messages' and chat rooms' boxes use them and stop bundling ProseMirror of their own.
   - The plugin API only gains, so there's no line in `plugin-breaks.json`. The two plugins raise their `minFxbot`.
 - **No server, SDK, or migration change.** What's sent is text, as now.
@@ -275,7 +275,7 @@ About 30 lines change:
 ### Docs, when it's built
 
 - **A new how-to, `how-to/format-a-message.md`,** listed in the sidebar: what to type, the keys, the bar, Enter in a list and in code, and pasting.
-- **[Bots and chats](../../packages/website/src/content/docs/docs/explanation/bots-and-chats.md)'s Sending line:** formatting, and Enter in a code block.
+- **[Bots and chats](../../../packages/website/src/content/docs/docs/explanation/bots-and-chats.md)'s Sending line:** formatting, and Enter in a code block.
 - **The plugin API reference, Page code:**
   - the modules `require` gives
   - `formatting`, and `ui.FormatBar`

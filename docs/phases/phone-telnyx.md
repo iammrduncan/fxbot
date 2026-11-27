@@ -8,7 +8,7 @@ The same call as [Phone: SignalWire](../_completed/phases/phone-signalwire.md), 
 - It signs in to Telnyx over a connection it opens, as a phone app does, and places the call.
 - It carries the call's audio, 8 kHz μ-law, so no codec is needed.
 - Its speech runs on providers the owner picks, over WebSockets fxbot opens: Deepgram's Flux, which hears when the owner has finished, and ElevenLabs' v4 Turbo, the #2 voice, or Cartesia's Sonic 3.6 or xAI.
-- phone's `call.ts` is the same. What's new is the carrier, here, and two parts shared with [Phone in the app](phone-in-app.md), which carries audio too: speech providers as plugins, and a `cascade.ts` in phone, which makes a line from audio and a speech provider. That file takes turns, cuts the bot off when the owner talks, keeps track of what was heard, and keeps the bot's own voice from cutting it off.
+- phone's `call.ts` is the same. What's new is the carrier, here, and two parts shared with [Phone v2](../_completed/phases/phone-v2.md), which carries audio too: speech providers as plugins, and a `cascade.ts` in phone, which makes a line from audio and a speech provider. That file takes turns, cuts the bot off when the owner talks, keeps track of what was heard, and keeps the bot's own voice from cutting it off.
 
 Found on 2026-11-14, before planning:
 - **Cost:** $0.005 to $0.007 a minute for the phone, and about $0.025 all-in with Flux and v4 Turbo. That's $0.25 to $0.27 for 10 minutes, or $27 to $29 for 18 hours, against SignalWire's $85 to $109.
@@ -32,6 +32,8 @@ Found on 2026-11-14, before planning:
   - Telnyx's WebRTC only if it doesn't
   - which way through the router a call takes, and whether Telnyx bills its $0.002 WebRTC fee
 
-**Since [Phone v2](phone-v2.md) was planned (2026-11-25):** phone carries the voice, with the owner's voice providers, and offers its carriers a SIP user agent. So this plugin would be only Telnyx's account and settings on that user agent. Telnyx refuses a private address in the SDP with 488, so the address STUN finds goes there. If SignalWire's audio doesn't come back through the owner's router, Twilio's Elastic SIP Trunking is next, with its documented latch, and then Telnyx.
+**Since [Phone v2](../_completed/phases/phone-v2.md) was planned (2026-11-25):** phone carries the voice, with the owner's voice providers, and offers its carriers a SIP user agent. So this plugin would be only Telnyx's account and settings on that user agent. Telnyx refuses a private address in the SDP with 488, so the address STUN finds goes there. If SignalWire's audio doesn't come back through the owner's router, Twilio's Elastic SIP Trunking is next, with its documented latch, and then Telnyx.
+
+**Since Phone v2's part 2 was built (2026-11-27):** a carrier needs phone with `{ "line": 3 }` and gives only `sip()`, a SIP account, as phone-signalwire 0.2.0 does in about 60 lines. SignalWire's audio came back through the owner's router with STUN's address in the SDP, so this plugin would be a Telnyx credential connection, made through its API, and its settings. The same proof call comes first: sign-in domain, SRTP, and audio both ways.
 
 Not planned yet.

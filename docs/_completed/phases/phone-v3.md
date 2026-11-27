@@ -20,7 +20,9 @@ A call with a bot is a conversation of its own, beside its main chat, as a chat 
 Status: **built on 2026-11-25** on `release/0.12.0`, the day it was planned, and checked on real calls with Bob on the owner's dev. All but three checklist items are done ([What the build changed](#what-the-build-changed)):
 - Bob's first words come about 5 seconds after the owner's last, not 2.
 - Speakers, the watch, and Flash v2's line are the owner's to try.
-- Phone-v2's part 2, SIP, stays there. The reference research was skipped at the owner's word.
+- Phone-v2's part 2, SIP, stays there, and was built on 2026-11-27: a call on the phone is this same side conversation. The reference research was skipped at the owner's word.
+
+Released in 0.12.0, with those items open.
 
 ## What the owner asked
 
