@@ -52,43 +52,84 @@ function Job({ job, label, config, save }) {
 	};
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		className: "grid gap-1",
-		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
-			className: "grid gap-1",
-			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: label }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-				className: "flex items-center gap-2",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.NativeSelect, {
-					"aria-label": label,
-					className: "w-full",
-					value: picked,
-					disabled: none,
-					onChange: (e) => save({ [job]: e.target.value || null }),
-					children: [
-						job === "read" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
-							value: "",
-							children: "fxbot itself"
-						}),
-						none && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
-							value: "",
-							children: config.freeSearch ? "Parallel's free search" : "Nothing: add a provider"
-						}),
-						can.map((p) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
-							value: p.id,
-							children: p.name
-						}, p.id))
-					]
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
-					variant: "outline",
-					size: "sm",
-					disabled: trying || none && !config.freeSearch,
-					onClick: tryIt,
-					children: trying ? "Trying…" : "Try it"
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+				className: "grid gap-1",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: label }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+					className: "flex items-center gap-2",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.NativeSelect, {
+						"aria-label": label,
+						className: "w-full",
+						value: picked,
+						disabled: none,
+						onChange: (e) => save({ [job]: e.target.value || null }),
+						children: [
+							job === "read" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+								value: "",
+								children: "fxbot itself"
+							}),
+							none && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+								value: "",
+								children: config.freeSearch ? "Parallel's free search" : "Nothing: add a provider"
+							}),
+							can.map((p) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+								value: p.id,
+								children: p.name
+							}, p.id))
+						]
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+						variant: "outline",
+						size: "sm",
+						disabled: trying || none && !config.freeSearch,
+						onClick: tryIt,
+						children: trying ? "Trying…" : "Try it"
+					})]
 				})]
-			})]
-		}), said && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-			className: said.ok ? "text-muted-foreground" : "text-destructive",
-			style: wraps,
-			children: said.text
-		})]
+			}),
+			said && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: said.ok ? "text-muted-foreground" : "text-destructive",
+				style: wraps,
+				children: said.text
+			}),
+			job === "read" && !picked && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Blocked, {
+				config,
+				can,
+				save
+			})
+		]
+	});
+}
+function Blocked({ config, can, save }) {
+	const value = config.picks.blocked ?? "";
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+		className: "mt-2 grid gap-1",
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "If fxbot is blocked, read with" }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.NativeSelect, {
+				"aria-label": "If fxbot is blocked, read with",
+				className: "w-full",
+				value,
+				onChange: (e) => save({ blocked: e.target.value || null }),
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+						value: "",
+						children: "Nothing: tell the bot what else could"
+					}),
+					config.computer && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+						value: "browser",
+						children: "The bot's own browser"
+					}),
+					can.map((p) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.NativeSelectOption, {
+						value: p.id,
+						children: p.name
+					}, p.id))
+				]
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				className: "text-muted-foreground",
+				children: ["When a site refuses fxbot, or a page is only JavaScript.", value === "browser" ? " A bot with its computer off is told what else could read it." : value ? " Each page read this way costs what the provider charges." : ""]
+			})
+		]
 	});
 }
 function WebSection() {

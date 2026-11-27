@@ -57,7 +57,32 @@ function Job({ job, label, config, save }) {
           {said.text}
         </p>
       )}
+      {job === "read" && !picked && <Blocked config={config} can={can} save={save} />}
     </div>
+  );
+}
+
+// Where a page goes when fxbot reads pages itself and a site blocks it: refuses it (HTTP 401, 403, or 429), or is only
+// JavaScript. None tells the bot what else could read it, for it to choose.
+function Blocked({ config, can, save }) {
+  const value = config.picks.blocked ?? "";
+  return (
+    <label className="mt-2 grid gap-1">
+      <span>If fxbot is blocked, read with</span>
+      <ui.NativeSelect aria-label="If fxbot is blocked, read with" className="w-full" value={value} onChange={(e) => save({ blocked: e.target.value || null })}>
+        <ui.NativeSelectOption value="">Nothing: tell the bot what else could</ui.NativeSelectOption>
+        {config.computer && <ui.NativeSelectOption value="browser">The bot's own browser</ui.NativeSelectOption>}
+        {can.map((p) => (
+          <ui.NativeSelectOption key={p.id} value={p.id}>
+            {p.name}
+          </ui.NativeSelectOption>
+        ))}
+      </ui.NativeSelect>
+      <span className="text-muted-foreground">
+        When a site refuses fxbot, or a page is only JavaScript.
+        {value === "browser" ? " A bot with its computer off is told what else could read it." : value ? " Each page read this way costs what the provider charges." : ""}
+      </span>
+    </label>
   );
 }
 

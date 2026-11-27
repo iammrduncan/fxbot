@@ -38,7 +38,7 @@ A PDF goes to your library: read it with library_read. An image comes back for y
 
 ## A page that won't load
 
-When a page refuses fxbot, needs JavaScript, or says nothing, web_fetch says what else could read it. Try, in order:
+When a page refuses fxbot or needs JavaScript, web_fetch first tries what the owner picked for that, if they did, and says so: "Read by your browser, since the site refused fxbot". Otherwise, or when that fails too, or when a page says nothing, web_fetch says what else could read it. Try, in order:
 
 1. **Your own browser,** with `browser: true`, if you have a computer. It runs JavaScript and has your sign-ins.
 2. **A provider that reads,** with `provider`, such as one web_fetch names.

@@ -618,3 +618,15 @@ Built on 2026-11-27, as planned, with these differences:
   - Try it's research gives an answer with its 5 sources.
   - Cost: 9 Keiro credits for the checks, three rounds of a read (2) and an answer (1).
 - **Not checked:** Keiro's web agent, `web_research` at `deep`, which costs 7 credits and up a call. It's read as before, guessing at fields its docs don't show.
+
+**The owner's next ask (2026-11-27):** "I just want a bit more explicit on the fallaback in the settings for web."
+- **Built:** **If fxbot is blocked, read with**, under **Read pages with** while fxbot reads. It's `picks.blocked`, from `0002_blocked.sql`: none (the default, as before), `browser`, or an added provider that reads.
+- **How it works:** when a site refuses fxbot (401, 403, or 429), or a page is only JavaScript, `web_fetch` reads it there on its own. The result says so, such as "Read by your browser, since the site refused fxbot (HTTP 403)". If that fails too, the bot is told both, with what's left to try. A bot with its computer off is told what else could read it. A provider the bot asks for, or **Read pages with** set to a provider, works as before. The instructions line names the pick, and the `web` skill says what happened.
+- **This changes one takeaway, "No quiet failover":** it still holds with nothing picked. With a pick, the switch is the owner's, and the result names it.
+- **Checked** on a disposable fxbot with the mock model, a stand-in computer whose `read` answers, and a stand-in Keiro answering in the shape its real replies had:
+  - **The setting:** saved, refused for a provider that isn't added, and cleared.
+  - **Nothing picked:** a real 403 from httpbin.org tells the bot what else could read it.
+  - **The browser picked:** a 403, a 429, and excalidraw.com, which is only JavaScript, are read there and say why. example.com is still fxbot's own. The browser failing too says both. A bot with its computer off is told the rest.
+  - **Keiro picked:** a 403 is read by Keiro, with its cost. Keiro failing too says both. example.com spends no credits.
+  - **A provider the bot names,** and the instructions line.
+  - **The setting in Chromium,** desktop light and phone dark: under **Read pages with** while fxbot reads, gone with a provider reading, and back with the pick kept.

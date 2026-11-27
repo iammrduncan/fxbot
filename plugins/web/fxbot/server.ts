@@ -12,9 +12,20 @@ import { adapterFor, adapters, freeSearch, ProviderError, type Added, type Depth
 /** What the computer offers: a page read in the bot's own browser, in its or its subagent's own tab. */
 type Computer = { on?: (bot: string) => boolean; read?: (call: { bot: string; session: string; label: string | null }, url: string, signal: AbortSignal) => Promise<{ title?: string; url?: string; text?: string; error?: string }> };
 type Usable = Added & { can: Job[] };
-type Picks = { search: string | null; read: string | null; research: string | null };
+// `blocked` is where a page goes when a site blocks fxbot's own read: "browser", an added provider's id, or none, which
+// tells the bot what else could read it.
+type Picks = { search: string | null; read: string | null; research: string | null; blocked: string | null };
 type Call = { bot: string; session: string; label: string | null; messageId: string; signal: AbortSignal };
-type Page = { title: string; url: string; markdown: string; by: string; cost?: string } | { pdf: { id: string; name: string }; url: string; by: string } | { image: { type: string; data: string }; url: string; by: string };
+type Page = { title: string; url: string; markdown: string; by: string; cost?: string; after?: string } | { pdf: { id: string; name: string }; url: string; by: string } | { image: { type: string; data: string }; url: string; by: string };
+
+/** A site that blocks fxbot's own read: it refused it, or it's only JavaScript. `why` says so in a few words. */
+class Blocked extends Refused {
+  why: string;
+  constructor(message: string, why: string) {
+    super(message);
+    this.why = why;
+  }
+}
 
 const jobs: Job[] = ["search", "read", "research"];
 const doing = { search: "search", read: "read pages", research: "research" } as const;
@@ -44,8 +55,8 @@ export default async function setup(fx: PluginApi) {
       .sort((a, b) => rank(a.kind) - rank(b.kind));
   }
   async function picks(): Promise<Picks> {
-    const [row] = await fx.sql<Picks[]>`select search, read, research from picks`;
-    return row ?? { search: null, read: null, research: null };
+    const [row] = await fx.sql<Picks[]>`select search, read, research, blocked from picks`;
+    return row ?? { search: null, read: null, research: null, blocked: null };
   }
   const free = () => (fx.settings.freeSearch ?? "on") !== "off";
   const named = (list: Usable[]) => list.map((p) => `${p.name} (provider: "${p.name}")`).join(", ");
@@ -176,7 +187,7 @@ export default async function setup(fx: PluginApi) {
   // to see. A page that refuses fxbot, or that's only JavaScript, says what else could read it.
   async function readOwn(url: string, call: Call): Promise<Page> {
     const got = await get(url, { maxBytes: (type) => (type === "application/pdf" ? 8 * mib : type.startsWith("image/") ? 3.75 * mib : 5e6), signal: call.signal });
-    if ([401, 403, 429].includes(got.status)) throw new Refused(`${got.url} refused fxbot (HTTP ${got.status}).${await elsewhere(url, call)}`);
+    if ([401, 403, 429].includes(got.status)) throw new Blocked(`${got.url} refused fxbot (HTTP ${got.status})`, `the site refused fxbot (HTTP ${got.status})`);
     if (got.status >= 400) throw new Refused(`${got.url} answered HTTP ${got.status}.`);
     const head = got.bytes.subarray(0, 512).toString("latin1");
     const type = got.type || (head.startsWith("%PDF") ? "application/pdf" : /^\s*</.test(head) ? "text/html" : "text/plain");
@@ -188,21 +199,52 @@ export default async function setup(fx: PluginApi) {
     if (imageTypes.includes(type)) return { image: { type, data: got.bytes.toString("base64") }, url: got.url, by: "fxbot" };
     if (type === "text/html" || type === "application/xhtml+xml") {
       const page = toMarkdown(textFrom(got.bytes, got.charset), got.url);
-      if (page.needsBrowser) throw new Refused(`${got.url} is only JavaScript, with no text of its own for fxbot to read.${await elsewhere(url, call)}`);
+      if (page.needsBrowser) throw new Blocked(`${got.url} is only JavaScript, with no text of its own for fxbot to read`, "the page is only JavaScript, which fxbot doesn't run");
       return { title: page.title, url: got.url, markdown: page.markdown, by: "fxbot" };
     }
     if (textTypes.test(type)) return { title: "", url: got.url, markdown: textFrom(got.bytes, got.charset), by: "fxbot" };
     throw new Refused(`${got.url} is ${type}, which web_fetch doesn't read.`);
   }
-  // What else could read a page fxbot couldn't: the bot's browser, an added provider, and the Wayback Machine.
-  async function elsewhere(url: string, call: Call) {
+  // What else could read a page fxbot couldn't: the bot's browser, an added provider, and the Wayback Machine, but the
+  // one already tried.
+  async function elsewhere(url: string, call: Call, tried?: string) {
     const computer = fx.need<Computer>("computer");
     const ways = [
-      computer?.read && computer.on?.(call.bot) ? "in your own browser, with browser: true" : "",
-      ...(await usable()).filter((p) => p.can.includes("read")).map((p) => `through ${p.name}, with provider: "${p.name}"`),
+      tried !== "browser" && computer?.read && computer.on?.(call.bot) ? "in your own browser, with browser: true" : "",
+      ...(await usable()).filter((p) => p.can.includes("read") && p.id !== tried).map((p) => `through ${p.name}, with provider: "${p.name}"`),
       `from the Wayback Machine, https://web.archive.org/web/2026/${url}`,
     ].filter(Boolean);
     return ` Try reading it ${ways.join(", or ")}.`;
+  }
+  // A page in the bot's own browser, on its computer.
+  async function inBrowser(url: string, call: Call): Promise<Page> {
+    const computer = fx.need<Computer>("computer");
+    if (!computer?.read) throw new Refused("The computer isn't added, so there's no browser to read it in.");
+    if (computer.on && !computer.on(call.bot)) throw new Refused("The computer is off for you, so there's no browser to read it in.");
+    const got = await computer.read(call, url, call.signal);
+    if (got.error || got.text === undefined) throw new Refused(`Your browser couldn't read it: ${got.error ?? "it said nothing"}`);
+    return { title: got.title ?? "", url: got.url || url, markdown: got.text, by: "your browser" };
+  }
+  // fxbot's own read, and when a site blocks it, the owner's pick for that: the bot's browser or a provider. With none
+  // picked, or one that can't, the bot is told what else could read it.
+  async function readOwnOr(url: string, call: Call, blocked: string | null): Promise<Page> {
+    try {
+      return await readOwn(url, call);
+    } catch (error) {
+      if (!(error instanceof Blocked)) throw error;
+      const computer = fx.need<Computer>("computer");
+      const p = blocked && blocked !== "browser" ? (await usable()).find((u) => u.id === blocked && u.can.includes("read")) : undefined;
+      const browser = blocked === "browser" && Boolean(computer?.read && (!computer.on || computer.on(call.bot)));
+      if (!p && !browser) throw new Refused(`${error.message}.${await elsewhere(url, call)}`);
+      const by = p ? p.name : "your browser";
+      try {
+        const page = p ? { ...(await adapterFor(p.kind)!.read!(fx, p, { url, options: {} }, call.signal)), by: p.name } : await inBrowser(url, call);
+        return { ...page, after: error.why };
+      } catch (again) {
+        fx.log(`${by} couldn't read ${url} after fxbot was blocked: ${(again as Error).message}`);
+        throw new Refused(`${error.message}, and ${by} couldn't read it either: ${(again as Error).message.replace(/^Your browser couldn't read it: /, "").replace(/\.$/, "")}.${await elsewhere(url, call, p ? p.id : "browser")}`);
+      }
+    }
   }
 
   const fetchTool = {
@@ -231,19 +273,14 @@ export default async function setup(fx: PluginApi) {
       const options = optionsIn(input.options);
       let page: Page;
       if (input.browser === true) {
-        const computer = fx.need<Computer>("computer");
-        if (!computer?.read) throw new Refused("The computer isn't added, so there's no browser to read it in.");
-        if (computer.on && !computer.on(call.bot)) throw new Refused("The computer is off for you, so there's no browser to read it in.");
-        page = await cached(`read\0browser\0${call.bot}\0${call.session}\0${url}`, 15, async () => {
-          const got = await computer.read!(call, url, call.signal);
-          if (got.error || got.text === undefined) throw new Refused(`Your browser couldn't read it: ${got.error ?? "it said nothing"}`);
-          return { title: got.title ?? "", url: got.url || url, markdown: got.text, by: "your browser" };
-        });
+        page = await cached(`read\0browser\0${call.bot}\0${call.session}\0${url}`, 15, () => inBrowser(url, call));
       } else {
         const p = input.provider !== undefined && input.provider !== "" ? await who("read", input.provider) : await who("read", undefined);
-        // fxbot's own read is kept for one chat, since a PDF it read is that chat's in the library.
-        page = await cached(`read\0${p?.id ?? `fxbot\0${call.bot}\0${call.session}`}\0${url}\0${JSON.stringify(options)}`, 15, async () =>
-          p ? { ...(await adapterFor(p.kind)!.read!(fx, p, { url, options }, call.signal).catch((error) => failed(error, `${p.name}'s read`))), by: p.name } : readOwn(url, call),
+        const { blocked } = await picks();
+        // fxbot's own read is kept for one chat, since a PDF it read is that chat's in the library, and by what reads a
+        // page that blocks it.
+        page = await cached(`read\0${p?.id ?? `fxbot\0${call.bot}\0${call.session}\0${blocked ?? ""}`}\0${url}\0${JSON.stringify(options)}`, 15, async () =>
+          p ? { ...(await adapterFor(p.kind)!.read!(fx, p, { url, options }, call.signal).catch((error) => failed(error, `${p.name}'s read`))), by: p.name } : readOwnOr(url, call, blocked),
         );
       }
       if ("pdf" in page) {
@@ -260,7 +297,7 @@ export default async function setup(fx: PluginApi) {
       const body = whole.slice(start, start + partChars);
       const end = start + body.length;
       const more = end < whole.length ? `\n\n[Characters ${n(start)} to ${n(end)} of ${n(whole.length)}${page.markdown.length > keptChars ? ", the most kept" : ""}. Read on with start: ${end}.]` : start ? `\n\n[Characters ${n(start)} to ${n(end)}, the end.]` : "";
-      const head = [page.title && `# ${page.title}`, page.url, `Read by ${page.by}. ${sites.replace("the sites say", "the site says")}`].filter(Boolean).join("\n");
+      const head = [page.title && `# ${page.title}`, page.url, `Read by ${page.by}${"after" in page && page.after ? `, since ${page.after}` : ""}. ${sites.replace("the sites say", "the site says")}`].filter(Boolean).join("\n");
       return cutBytes(`${head}\n\n${body || "(The page has no text.)"}${more}${"cost" in page && page.cost ? `\n\nThis cost ${page.cost}.` : ""}`, resultBytes);
     },
   };
@@ -345,6 +382,7 @@ export default async function setup(fx: PluginApi) {
     const chosen = await picks();
     const searcher = list.find((p) => p.id === chosen.search && p.can.includes("search")) ?? list.find((p) => p.can.includes("search"));
     const reader = list.find((p) => p.id === chosen.read && p.can.includes("read"));
+    const fallback = reader ? undefined : chosen.blocked === "browser" ? (browser ? "your own browser" : undefined) : list.find((p) => p.id === chosen.blocked && p.can.includes("read"))?.name;
     const researcher = list.find((p) => p.id === chosen.research && p.can.includes("research")) ?? list.find((p) => p.can.includes("research"));
     const skills = [...new Set(list.map((p) => skillOf(p.kind)?.name).filter(Boolean))];
     event.instructions.push(
@@ -352,7 +390,7 @@ export default async function setup(fx: PluginApi) {
         `You can search and read the web: web_search finds pages, and web_fetch reads one${browser ? ", or with browser: true, reads it in your own browser, for a page that needs JavaScript or a sign-in. For clicks, forms, and sign-ins, use your computer's tools and its browser skill" : ""}.`,
         researcher ? "web_research answers a question from several sources." : "",
         "Search with web_search, never by opening a search engine in a browser. Cite each page you use as a link.",
-        `Searches go to ${searcher ? searcher.name : free() ? "Parallel's free search" : "no one yet: no search provider is added"}, pages are read by ${reader ? reader.name : "fxbot itself"}${researcher ? `, and research goes to ${researcher.name}` : ""}.`,
+        `Searches go to ${searcher ? searcher.name : free() ? "Parallel's free search" : "no one yet: no search provider is added"}, pages are read by ${reader ? reader.name : "fxbot itself"}${fallback ? `, or by ${fallback} when a site blocks fxbot` : ""}${researcher ? `, and research goes to ${researcher.name}` : ""}.`,
         skills.length ? `The skill${skills.length > 1 ? "s" : ""} ${skills.join(", ")} say${skills.length > 1 ? "" : "s"} more.` : "",
       ]
         .filter(Boolean)
@@ -366,11 +404,18 @@ export default async function setup(fx: PluginApi) {
     const chosen = await picks();
     return {
       providers: list.map(({ id, name, label, kind, can }) => ({ id, name, label, kind, can })),
-      picks: { search: list.some((p) => p.id === chosen.search) ? chosen.search : null, read: list.some((p) => p.id === chosen.read) ? chosen.read : null, research: list.some((p) => p.id === chosen.research) ? chosen.research : null },
+      picks: {
+        search: list.some((p) => p.id === chosen.search) ? chosen.search : null,
+        read: list.some((p) => p.id === chosen.read) ? chosen.read : null,
+        research: list.some((p) => p.id === chosen.research) ? chosen.research : null,
+        blocked: blockedOk(chosen.blocked, list) ? chosen.blocked : null,
+      },
       freeSearch: free(),
       computer: Boolean(fx.need<Computer>("computer")?.read),
     };
   }
+  // What reads a page that blocks fxbot: the bot's browser, with the computer added, or an added provider that reads.
+  const blockedOk = (value: string | null, list: Usable[]) => value === "browser" ? Boolean(fx.need<Computer>("computer")?.read) : list.some((p) => p.id === value && p.can.includes("read"));
   fx.route("GET", "/config", async () => json(await config()));
   fx.route("PUT", "/config", async (request) => {
     const body = (await request.json().catch(() => null)) as Partial<Picks> | null;
@@ -383,8 +428,12 @@ export default async function setup(fx: PluginApi) {
       if (id !== null && !list.some((p) => p.id === id && p.can.includes(job))) return json({ error: `That provider can't ${doing[job]}.` }, 400);
       next[job] = id ?? null;
     }
-    await fx.sql`insert into picks (only_one, search, read, research) values (true, ${next.search}, ${next.read}, ${next.research})
-      on conflict (only_one) do update set search = excluded.search, read = excluded.read, research = excluded.research`;
+    if ("blocked" in body) {
+      if (body.blocked !== null && !blockedOk(body.blocked ?? null, list)) return json({ error: body.blocked === "browser" ? "The computer isn't added, so there's no browser to read in." : "That provider can't read pages." }, 400);
+      next.blocked = body.blocked ?? null;
+    }
+    await fx.sql`insert into picks (only_one, search, read, research, blocked) values (true, ${next.search}, ${next.read}, ${next.research}, ${next.blocked})
+      on conflict (only_one) do update set search = excluded.search, read = excluded.read, research = excluded.research, blocked = excluded.blocked`;
     return json(await config());
   });
   // Try it: one small call with a provider, and what came back, or the provider's own error.

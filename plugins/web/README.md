@@ -11,7 +11,7 @@ Each works the same whichever provider answers it. A result's first line names t
 - **`web_search`** `{ query, count?, depth?, text?, recency?, domains?, exclude?, provider?, options? }`: a numbered list of title, address, date, and snippet, 5 results unless asked, 20 at most. `depth` is `quick`, `normal`, or `deep`. `text: true` brings each page's text too, up to 50,000 characters in all.
 - **`web_fetch`** `{ url, start?, browser?, provider?, options? }`: a page as Markdown, 20,000 characters at a time from `start`, saying where the next part starts. A PDF goes to the bot's library, for `library_read`, and an image comes back for the bot to see.
   - **Who reads it:** with `browser: true`, the bot's own browser on its computer. With `provider`, or the owner's pick, that provider. Otherwise fxbot itself.
-  - **A page that refuses fxbot,** with 401, 403, or 429, or that's only JavaScript, says what else could read it: the browser, an added provider that reads, and the Wayback Machine.
+  - **A page that refuses fxbot,** with 401, 403, or 429, or that's only JavaScript, goes to the owner's pick for that, **If fxbot is blocked, read with**: the bot's browser or an added provider that reads. The result says so. With nothing picked, or if that fails too, it says what else could read it: the browser, an added provider that reads, and the Wayback Machine.
 - **`web_research`** `{ question, depth?, provider?, options? }`, once a provider that researches is added: the answer, with its sources as links. Research a provider runs in the background is asked after for up to 3 minutes. A plugin can't take a tool back, so after the last such provider goes, it says none is added until the plugin reloads.
 
 `provider` asks another added provider, by its name or kind, for one call. `options` goes to the provider as it is, inside the request: each provider's skill says what it takes.
@@ -58,7 +58,7 @@ With the computer added and on for the bot, `browser: true` calls the computer's
 
 ## The Web section
 
-On the plugin's tab in Settings: **Search with**, **Read pages with** (fxbot itself first), and **Research with**, each listing the added providers that can, with **Try it**. With nothing picked, search and research go to the first added that can, in the table's order, and reading is fxbot's own. A bot can ask another for one call.
+On the plugin's tab in Settings: **Search with**, **Read pages with** (fxbot itself first), with **If fxbot is blocked, read with** under it while fxbot reads, and **Research with**, each listing the added providers that can, with **Try it**. With nothing picked, search and research go to the first added that can, in the table's order, and reading is fxbot's own. A bot can ask another for one call.
 
 ## Settings
 
@@ -68,13 +68,13 @@ On the plugin's tab in Settings: **Search with**, **Read pages with** (fxbot its
 
 ## Tables
 
-- `picks`: one row, the provider for `search`, `read`, and `research`. One that's gone counts as none.
+- `picks`: one row, the provider for `search`, `read`, and `research`, and `blocked`, what reads a page that blocks fxbot: `browser`, a provider's id, or none. One that's gone counts as none. `blocked` came in `0002_blocked.sql`.
 - `calls`: what each call showed, by the model's id for it, for its view in the chat, which gets only a preview of a result. Kept 30 days.
 
 ## Routes
 
 - `GET /config`: the added web providers and what each does, the picks, `freeSearch`, and whether the computer is there.
-- `PUT /config`: the picks, `{ search?, read?, research? }`, each an added provider's id or null.
+- `PUT /config`: the picks, `{ search?, read?, research?, blocked? }`, each an added provider's id or null, and `blocked` also `browser` with the computer added.
 - `POST /try`: `{ job, provider }`, one small search, read of `https://example.com`, or research question, with what came back or the provider's error.
 - `GET /calls/:id`: one call's view.
 

@@ -47,6 +47,12 @@ In **Settings** › **Plugins** › **web**, under **Web**:
 
 - **Search with:** the provider bots search with. With none picked, it's the first one added that searches, in the table's order. With none added, it's Parallel's free search.
 - **Read pages with:** fxbot itself, the default, which costs nothing, or a provider, which gets past more pages that refuse a plain request.
+- **If fxbot is blocked, read with:** while fxbot reads pages itself, what reads a page when a site refuses fxbot (HTTP 401, 403, or 429) or the page is only JavaScript:
+  - **Nothing,** the default: the bot is told what else could read it, and picks one.
+  - **The bot's own browser,** with the computer added. It costs nothing. A bot with its computer off is told what else could read it.
+  - **A provider that reads,** such as Keiro, which charges for each page read this way.
+
+  `web_fetch` tries it on its own, and its result says so, such as "Read by your browser, since the site refused fxbot (HTTP 403)". If that fails too, the bot is told both, and what else is left.
 - **Research with:** once a provider that researches is added. With none picked, it's the first one added that can.
 
 Each provider you add brings a skill of its own, such as `web-exa`, which tells bots what it's best at and its own options. They come and go with the providers.
