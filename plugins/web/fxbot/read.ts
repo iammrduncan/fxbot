@@ -37,46 +37,131 @@ const chrome = (attrs: string) => chromeRole.test(attr(attrs, "role")) || chrome
 const line = (text: string) => text.replace(/\s+/g, " ").trim();
 
 // The HTML as a tree, the way a browser mostly reads it: an unclosed tag closes with its parent, and a close tag with
-// no open one is skipped.
-function parse(html: string): Node {
+// no open one is skipped. It reads the page once, from start to end, so no page takes longer than its size: a tag,
+// comment, or quoted value left open runs to the end of the page, as in a browser, and past 256 tags inside one another,
+// a tag's words join its parent's, as a browser's do past 512.
+const deepest = 256;
+const space = (c: number) => c === 32 || c === 9 || c === 10 || c === 12 || c === 13;
+const nameChar = (c: number) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95 || c === 58 || c === 45;
+const letter = (c: number) => (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
+// Lower case for A to Z only, so each character stays where it was: toLowerCase makes some longer, such as İ.
+const ascii = (html: string) => html.replace(/[A-Z]+/g, (m) => m.toLowerCase());
+function parse(html: string) {
   const root: Node = { tag: "#root", attrs: "", kids: [] };
   const stack = [root];
+  // Where each tag is open in the stack, and where its scopes are, so closing one doesn't walk the stack.
+  const where = new Map<string, number[]>();
+  const scoped: number[] = [];
+  const push = (node: Node) => {
+    let at = where.get(node.tag);
+    if (!at) where.set(node.tag, (at = []));
+    at.push(stack.length);
+    if (scopes.has(node.tag)) scoped.push(stack.length);
+    stack.push(node);
+  };
+  const cut = (to: number) => {
+    while (stack.length > to) {
+      const node = stack.pop()!;
+      where.get(node.tag)!.pop();
+      if (scopes.has(node.tag)) scoped.pop();
+    }
+  };
+  const last = (tag: string) => where.get(tag)?.at(-1) ?? -1;
+  // The open `tag` a new one ends, above the nearest scope, so a <li> in a nested list doesn't end its parent's.
   const open = (tag: string) => {
-    for (let i = stack.length - 1; i > 0; i--) {
-      if (stack[i].tag === tag) return i;
-      if (scopes.has(stack[i].tag)) break;
+    const at = last(tag);
+    return at > (scoped.at(-1) ?? 0) ? at : -1;
+  };
+  const text = (words: string) => stack.at(-1)!.kids.push(decode(words));
+  // The first `what` at or after `from`, kept, since `from` only grows: a page that never closes one is searched once.
+  const seen = new Map<string, number>();
+  const next = (what: string, from: number) => {
+    const at = seen.get(what);
+    if (at !== undefined && (at < 0 || at >= from)) return at;
+    const found = html.indexOf(what, from);
+    seen.set(what, found);
+    return found;
+  };
+  // Where a tag's `>` is: one in a quoted value, after `=`, doesn't end it. -1 if the page ends first.
+  const tagEnd = (from: number) => {
+    for (let k = from; k < html.length; k++) {
+      const c = html.charCodeAt(k);
+      if (c === 62) return k;
+      if (c !== 61) continue;
+      k++;
+      while (k < html.length && space(html.charCodeAt(k))) k++;
+      const quote = html[k];
+      if (quote === '"' || quote === "'") {
+        k = html.indexOf(quote, k + 1);
+        if (k < 0) return -1;
+      } else k--;
     }
     return -1;
   };
-  const lower = html.toLowerCase();
-  const token = /<!--[\s\S]*?(?:-->|$)|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>|<\?[^>]*>|<(\/?)([a-zA-Z][\w:-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>|[^<]+|</g;
-  for (let m: RegExpExecArray | null; (m = token.exec(html)); ) {
-    const [all, slash, name, attrs = ""] = m;
-    if (!name) {
-      if (all[0] !== "<" || all === "<") stack.at(-1)!.kids.push(decode(all));
+  const lower = ascii(html);
+  let title: string | null = null;
+  let og = "";
+  for (let i = 0; i < html.length; ) {
+    const lt = next("<", i);
+    if (lt < 0) {
+      text(html.slice(i));
+      break;
+    }
+    if (lt > i) text(html.slice(i, lt));
+    i = lt;
+    if (html.startsWith("<!--", i)) {
+      const close = next("-->", i + 4);
+      i = close < 0 ? html.length : close + 3;
       continue;
     }
-    const tag = name.toLowerCase();
+    if (html.startsWith("<![CDATA[", i)) {
+      const close = next("]]>", i + 9);
+      if (close >= 0) {
+        i = close + 3;
+        continue;
+      }
+    }
+    if (html[i + 1] === "!" || html[i + 1] === "?") {
+      const close = next(">", i + 2);
+      i = close < 0 ? html.length : close + 1;
+      continue;
+    }
+    const slash = html[i + 1] === "/";
+    const from = slash ? i + 2 : i + 1;
+    if (!letter(html.charCodeAt(from))) {
+      text("<");
+      i++;
+      continue;
+    }
+    let after = from + 1;
+    while (after < html.length && nameChar(html.charCodeAt(after))) after++;
+    const close = tagEnd(after);
+    if (close < 0) break;
+    const tag = lower.slice(from, after);
+    const attrs = html.slice(after, close);
+    i = close + 1;
     if (slash) {
-      const at = stack.findLastIndex((n) => n.tag === tag);
-      if (at > 0) stack.length = at;
+      const at = last(tag);
+      if (at > 0) cut(at);
       continue;
     }
     for (const ends of closes[tag] ?? []) {
       const at = open(ends);
-      if (at > 0) stack.length = at;
+      if (at > 0) cut(at);
     }
-    if (blocks.has(tag) && stack.at(-1)!.tag === "p") stack.pop();
+    if (blocks.has(tag) && stack.at(-1)!.tag === "p") cut(stack.length - 1);
     const node: Node = { tag, attrs, kids: [] };
     stack.at(-1)!.kids.push(node);
+    if (tag === "meta" && !og && [attr(attrs, "property"), attr(attrs, "name")].some((v) => v.toLowerCase() === "og:title")) og = attr(attrs, "content");
     if (raw.has(tag)) {
-      const end = lower.indexOf(`</${tag}`, token.lastIndex);
-      const body = html.slice(token.lastIndex, end < 0 ? html.length : end);
+      const end = lower.indexOf(`</${tag}`, i);
+      const body = html.slice(i, end < 0 ? html.length : end);
       node.kids.push(tag === "title" || tag === "textarea" ? decode(body) : body);
-      token.lastIndex = end < 0 ? html.length : html.indexOf(">", end) + 1 || html.length;
-    } else if (!voids.has(tag) && !all.endsWith("/>")) stack.push(node);
+      if (tag === "title" && title === null) title = node.kids[0] as string;
+      i = end < 0 ? html.length : html.indexOf(">", end) + 1 || html.length;
+    } else if (!voids.has(tag) && html[close - 1] !== "/" && stack.length < deepest) push(node);
   }
-  return root;
+  return { tree: root, title: title ?? "", og };
 }
 
 const find = (node: Node, tag: string): Node | null => {
@@ -95,6 +180,7 @@ const shownLength = (node: Node | string): number =>
 // A mark around text, with the spaces that were around it kept outside.
 const mark = (text: string, by: string) => (text.trim() ? `${/^\s/.test(text) ? " " : ""}${by}${text.trim()}${by}${/\s$/.test(text) ? " " : ""}` : text);
 
+let quoted = 0;
 // One node as Markdown. Only `pre` keeps its spaces. `header`: whether a <header> is the page's words, as an article's
 // is, or the site's, which is dropped.
 function render(node: Node, base: string, depth: number, header: boolean): string {
@@ -141,8 +227,17 @@ function render(node: Node, base: string, depth: number, header: boolean): strin
       const fence = "`".repeat(Math.max(3, ...[...code.matchAll(/`{3,}/g)].map((m) => m[0].length + 1)));
       return code ? block(`${fence}${language}\n${code}\n${fence}`) : "";
     }
-    case "blockquote":
-      return block(inner().trim().split("\n").map((l) => `> ${l}`.trimEnd()).join("\n"));
+    case "blockquote": {
+      // Past 4 quotes inside one another, one adds no more ">", as past 8 lists one indents no more, so a page of them
+      // can't make its text longer at every one.
+      if (quoted >= 4) return block(inner());
+      quoted++;
+      try {
+        return block(inner().trim().split("\n").map((l) => `> ${l}`.trimEnd()).join("\n"));
+      } finally {
+        quoted--;
+      }
+    }
     case "ul":
     case "ol": {
       let n = Number(attr(node.attrs, "start")) || 1;
@@ -150,7 +245,7 @@ function render(node: Node, base: string, depth: number, header: boolean): strin
       const said = items.map((item) => {
         const marker = tag === "ol" ? `${n++}. ` : "- ";
         const body = inner(item, depth + 1).trim().replace(/\n{3,}/g, "\n\n");
-        return marker + body.split("\n").join(`\n${" ".repeat(marker.length)}`);
+        return depth >= 8 ? `${marker}${body}` : marker + body.split("\n").join(`\n${" ".repeat(marker.length)}`);
       });
       return said.length ? (depth ? `\n${said.join("\n")}\n` : block(said.join("\n"))) : "";
     }
@@ -189,9 +284,8 @@ export function textFrom(bytes: Buffer, charset: string) {
 
 /** An HTML page as its title and Markdown, and whether it seems to need a browser: little text, and scripts. */
 export function toMarkdown(html: string, base: string) {
-  const tree = parse(html);
-  const og = /<meta[^>]+(?:property|name)\s*=\s*["']og:title["'][^>]*>/i.exec(html)?.[0];
-  const title = line((og && attr(og, "content")) || decode(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? ""));
+  const { tree, title: named, og } = parse(html);
+  const title = line(og || named);
   // The page's main part, or the article in it that holds most of its words, as a README does on its repository's page.
   const outer = find(tree, "main");
   const inside = outer && find({ ...outer, tag: "#main" }, "article");
@@ -208,9 +302,36 @@ export function toMarkdown(html: string, base: string) {
     .trim();
   const words = markdown.replace(/[#*_`>[\]()!|~-]/g, " ").split(/\s+/).filter(Boolean).length;
   // Only JavaScript: scripts and next to no words, and an empty app root, or words asking for JavaScript, or none at all.
-  const outside = html.replace(/<script\b[\s\S]*?<\/script>/gi, "");
-  const root = /<div[^>]+id=["']?(?:root|app|__next|__nuxt|___gatsby|svelte)["']?[^>]*>\s*<\/div>/i.test(outside);
-  const asks = /enable javascript|requires? javascript|need javascript|javascript is (?:disabled|required|turned off)|turn on javascript/i.test(outside);
-  const needsBrowser = /<script\b/i.test(html) && (words < 5 || (words < 60 && root) || (words < 150 && asks));
+  const scripted = /<script\b/i.test(html);
+  const needsBrowser = scripted && (words < 5 || (words < 60 && emptyRoot(tree)) || (words < 150 && asks.test(withoutScripts(html))));
   return { title, markdown, needsBrowser };
+}
+
+// An app's root, a <div> with an id such as root, with nothing in it: the page is drawn by its scripts.
+const roots = new Set(["root", "app", "__next", "__nuxt", "___gatsby", "svelte"]);
+function emptyRoot(tree: Node) {
+  for (const todo: Node[] = [tree]; todo.length; ) {
+    const node = todo.pop()!;
+    if (node.tag === "div" && roots.has(attr(node.attrs, "id").toLowerCase()) && node.kids.every((k) => typeof k === "string" && !k.trim())) return true;
+    for (const kid of node.kids) if (typeof kid !== "string" && kid.tag !== "script") todo.push(kid);
+  }
+  return false;
+}
+const asks = /enable javascript|requires? javascript|need javascript|javascript is (?:disabled|required|turned off)|turn on javascript/i;
+// The page without its scripts, in one pass: one with no </script> after it stays, as does every one after it.
+function withoutScripts(html: string) {
+  const lower = ascii(html);
+  let kept = "";
+  let from = 0;
+  for (let at = lower.indexOf("<script"); at >= 0; at = lower.indexOf("<script", at)) {
+    if (/\w/.test(lower[at + 7] ?? "")) {
+      at += 7;
+      continue;
+    }
+    const end = lower.indexOf("</script>", at + 7);
+    if (end < 0) break;
+    kept += html.slice(from, at);
+    at = from = end + 9;
+  }
+  return kept + html.slice(from);
 }
