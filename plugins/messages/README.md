@@ -2,7 +2,7 @@
 
 A plugin for [fxbot](https://fxbot.sh): the owner's bots message each other in their own chats, so one can ask another for what it knows, or hand it a job, and the owner sees the work where it happens.
 
-Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.6.0 or newer. See [Let bots work together](https://fxbot.sh/docs/how-to/let-bots-work-together/).
+Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.12.0 or newer. See [Let bots work together](https://fxbot.sh/docs/how-to/let-bots-work-together/).
 
 Its skill, `messages`, says when to message another bot, how to write a message it can act on, how replies go, and what to do when one reaches you.
 
@@ -21,6 +21,8 @@ Messages between bots fold into a pill in the middle of the chat, with each bot'
 ## Tags
 
 This plugin replaces the message box in a bot's chat with an editor, as a room's is. `@` at the start of a line or after a space lists the bots it can reach, each with its line, or its id if it has none. The one you pick is a chip with its face, in the sentence, which deletes as one piece. It's sent as a link, `[@Name](/profiles/<id>)`, so the bot knows exactly which one you mean, even with two of one name, and it shows as a chip in the message too. A name you type out stays plain text.
+
+The box formats as you type, as the app's own box does, with the app's ProseMirror and its formatting: `*bold*`, a quote, code, lists, the keys, and the format bar. A tag can sit in a formatted line, and a bold tag stays bold. In a code block, `@` lists nothing. See [Format a message](https://fxbot.sh/docs/how-to/format-a-message/).
 
 A tag names a bot, and wakes no one. The bot you're talking to does the sending, with `messages_send`, and everything here applies to it. `to` takes the whole tag, as well as a name or an id.
 
@@ -84,7 +86,7 @@ Each send deletes conversations older than 30 days. Removing the plugin drops th
 - **A message to an idle bot:** one turn at its whole chat, cached where the provider caches. This is the cost to watch: a conversation of 20 messages is at most 20 turns.
 - **A message to a working bot:** no new turn.
 - **Storage:** 30 days of rows. The turns are in the chats, so a message adds no session.
-- **The page:** `page.js` is about 370 KB, most of it ProseMirror, which a plugin bundles for itself.
+- **The page:** `page.js` is about 23 KB, or 7 KB gzipped. It bundles nothing: the app gives it React and ProseMirror.
 
 ## Files
 
@@ -96,15 +98,13 @@ Each send deletes conversations older than 30 days. Removing the plugin drops th
 | `fxbot/migrations/0002_asked.sql` | The owner's words on a conversation |
 | `fxbot/page.jsx` | The Messages screen, the card in a reply, the line in a bot's settings, and a tag in a sent message |
 | `fxbot/box.jsx` | The message box, with `@` and its chips |
-| `fxbot/page.css` | The box's styles, and the rules ProseMirror needs |
-| `fxbot/page.js` | `page.jsx` and `box.jsx`, built |
+| `fxbot/page.css` | The box's and its chips' styles |
+| `fxbot/page.js` | `page.jsx` and `box.jsx`, built, with nothing bundled |
 | `skills/messages/SKILL.md` | Its skill |
-| `fxbot/page-licenses.txt` | The licenses of what `page.js` bundles |
-| `package.json` | `"type": "module"`, for the server code, and what the page is built from |
+| `package.json` | `"type": "module"`, for the server code |
 
-Build `page.js` from this folder with these. It's built without comments, since ProseMirror's are long. When the bundled packages change, write `fxbot/page-licenses.txt` again from their `LICENSE` files.
+Build `page.js` from this folder, in a checkout of fxbot, which has rolldown, after changing `page.jsx` or `box.jsx`. React, ProseMirror, and `@fxbot/app` are left out, since the app gives them:
 
 ```sh
-npm install
-npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app --no-comments --file fxbot/page.js
+npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app -e prosemirror-model -e prosemirror-state -e prosemirror-view --no-comments --file fxbot/page.js
 ```

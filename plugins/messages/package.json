@@ -2,13 +2,5 @@
   "name": "@fxbot/plugin-messages",
   "private": true,
   "type": "module",
-  "description": "What the messages plugin's page is built from: ProseMirror, for the message box.",
-  "devDependencies": {
-    "prosemirror-commands": "1.7.2",
-    "prosemirror-history": "1.5.1",
-    "prosemirror-keymap": "1.2.3",
-    "prosemirror-model": "1.25.12",
-    "prosemirror-state": "1.4.4",
-    "prosemirror-view": "1.42.6"
-  }
+  "description": "The messages plugin. Its page is built from page.jsx with nothing bundled: the app gives it React and ProseMirror. fxbot reads only type, which makes its server code an ES module."
 }
