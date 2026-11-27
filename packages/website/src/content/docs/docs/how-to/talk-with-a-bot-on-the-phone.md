@@ -1,55 +1,51 @@
 ---
 title: "Talk with a bot on the phone"
-description: "Talk with a bot by voice in the app, or press Call me and it rings your phone. Its own model, memory, and tools answer, and it hands long work to the background while you talk."
+description: "Talk with a bot by voice in the app, or press Call me and it rings your phone for the same call. Its own model, memory, and tools answer, and it hands long work to the background while you talk."
 ---
 
-With the phone plugin, you talk with a bot by voice. The phone at the top of its chat offers two calls: **In-app call**, below, and **Call me**, which rings your phone. Answer, and the bot says "Hey, this is your fxbot Bob. How can I help today?" Either way, you talk as you'd chat by text, and the bot's own model, memory, and tools answer, read out to you.
+With the phone plugin, you talk with a bot by voice. The phone at the top of its chat offers two ways: **In-app call**, in the browser, and **Call me**, which rings your phone. They're the same call, with the same voice, the same bar, and the same rules. Only where the sound goes differs. The bot says "Hey, what's up?", and you talk as you'd chat by text, and the bot's own model, memory, and tools answer, read out to you.
 
 A call is a conversation of its own, beside the bot's chat. The bot starts it knowing what's recent in its chat, and can do anything there that it can in the chat. When the call ends, the bot writes what its chat should keep of it into a pill in the middle of the chat, **Phone call · 4 min**. From then on the bot knows what was said and decided, in its chat and on its next calls. Click the pill to read the whole call, on the right.
 
 ## In the app
 
-**In-app call**, from the phone at the top of a bot's chat, starts a call right there, in the browser. The bot says "Hey, what's up?", and you talk.
-
 1. Add **phone** from **Plugins**, on **Browse**. It needs Phone 0.2.0 and fxbot 0.12.0 or newer.
-2. Pick what hears you and what speaks, in phone's tab under **Voice**: ElevenLabs or Deepgram with a key, a login you have, a speech server on your machine, or **This device**, the browser's own. See [Add a voice provider](/docs/how-to/add-a-voice-provider/).
+2. Pick what hears you and what speaks, in phone's tab under **Voice**: ElevenLabs or Deepgram with a key, a login you have, a speech server on your machine, or **This device**, the browser's own. See [Add a voice provider](/docs/how-to/add-a-voice-provider/). With ElevenLabs, **v4 Turbo** sounds the most natural.
 3. Press the phone at the top of the chat, choose **In-app call**, and allow the microphone.
-
-The bar above the message box shows the call: how long, whether the bot is listening or speaking, which of its subagents are working, a button that opens the call's own chat on the right as it goes, **Mute**, and **End**.
-
-- **Cut in whenever you like.** Your second word stops it mid-sentence, and it knows where you stopped listening. With a listener that hears one stretch at a time, talking over it for most of a second does. On speaker, the browser cancels the bot's own voice, so it isn't taken as yours.
-- **It answers quickly,** in a sentence or two. A call's turns think at phone's `callThinking` level, `low` unless you change it.
-- **It talks first, then works.** Before it uses a tool, it says what it's doing in its own words, such as "Oh, let me check that." If it starts one without a word, the call says "Let me check." at once. Anything that takes more than a moment, such as work on its computer, a herdr agent's task, or some digging, it hands to a subagent, and keeps talking with you about anything. A subagent works at the bot's own thinking level. What it reports is said at your next pause, never over you. Ask how it's going, and the bot checks.
-- **What you say and what it answers** are in the call's own chat, as text, not in the bot's chat. Open it from the bar while you talk, or from the pill after.
-- **The call ends** when you press **End**, say goodbye, or put the app in the background, since a phone takes the microphone from it then.
 
 It works over [web pairing](/docs/how-to/pair-another-device/) too. In a room, the phone at the top calls all its bots: see [Talk with several bots in a room](/docs/how-to/talk-in-a-room/#by-voice).
 
-## On a phone line
+## On your phone
 
-A provider plugin carries the call. The one today is **phone-signalwire**: fxbot opens a connection to SignalWire for each call, and SignalWire places the call, hears you, and speaks the bot's words. SignalWire never connects to fxbot.
+**Call me** rings your phone for the same call. A carrier plugin carries its sound: the one today is **phone-signalwire**. fxbot signs in to your SignalWire account as a phone of its own would, rings your number from it, and speaks and listens with what you picked in **Voice**. SignalWire never connects to fxbot.
 
 1. Set up SignalWire, below.
-2. Add **phone**, then **phone-signalwire**, from **Plugins**, on **Browse**. They aren't in **Essentials**. They need fxbot 0.9.0 or newer.
+2. Add **phone**, then **phone-signalwire**, from **Plugins**, on **Browse**. They aren't in **Essentials**.
 3. Fill in phone-signalwire's settings, then phone's, and confirm your number in phone's tab.
-4. Press the phone at the top of a bot's chat, and choose **Call me**. It's there while a phone-line plugin, such as phone-signalwire, is added and on.
+4. In phone's **Voice**, pick a provider to listen and one to speak. **This device** works only in the app.
+5. Press the phone at the top of a bot's chat, or a room's, and choose **Call me**.
 
-## Set up SignalWire
+fxbot reaches SignalWire on port 5061, and sends and takes the call's sound over UDP. A network that blocks outgoing port 5061 stops the call before it rings, and the call's bar says why.
 
-1. Sign up at [signalwire.com](https://signalwire.com).
+### Set up SignalWire
+
+1. Sign up at [signalwire.com](https://signalwire.com). Your space's name is the first part of its address, as in `<space>.signalwire.com`.
 2. In your space's **API Credentials**, copy the **Project ID**, all 36 characters, and make an **API token** with the **Voice** scope.
 3. Buy a phone number, $0.50 a month in the US. Calls come from it.
 4. A trial account calls only numbers you've verified. Verify your own phone there, and you can try it before paying. Adding $5 ends the trial.
 
-## Fill in the settings
+### Fill in the settings
 
 In **Settings** › **phone-signalwire**:
 
 | Setting | What to put |
 | --- | --- |
+| `space` | Your space's name |
 | `project` | The Project ID |
 | `token` | The API token, which fxbot keeps sealed |
 | `from` | The number you bought, such as `+15551234567` |
+
+The first call makes a SIP account on your space, named `fxbot-` and 8 characters, which shows in SignalWire's dashboard under **SIP**. fxbot keeps its password sealed.
 
 In **Settings** › **phone**:
 
@@ -63,15 +59,16 @@ Save the number you bought as a contact on your phone, such as "Bob (fxbot)". Th
 
 ## On a call
 
-- **Talk as you would to a person.** Keep going after the bot's greeting. Pause to think or stumble mid-sentence if you need to: the bot waits for 2 seconds of quiet before it takes what you said, and words after a shorter pause join it. phone's `pause` setting makes it 1 to 5 seconds. It answers in a sentence or two, with nothing it can't say aloud: a link is "a link in the chat," and a code block is "There's more in the chat."
-- **Its tools work as in the chat,** and each one it runs shows in the call's chat, under what you said. It's told to check how something stands now with them, rather than answer from what's earlier in the chat.
-- **It says what it's doing first,** as in the app, with its turns at `callThinking`. If it starts a tool without a word, you hear "Let me check." at once. If it says nothing for 3 seconds after you, you hear "One moment.", and "Still working on it." while a tool runs. Long work goes to a subagent, if the bot has the subagents plugin, and its report is read out when it's back, if you're still on. A report that comes after the call goes to the bot's chat.
-- **Talk over it,** and it stops once it finishes what it's saying, and drops the rest: SignalWire passes on what you say only when the bot stops speaking. The greeting plays to the end. Its work goes on, and it knows where you stopped listening. Its own voice coming back, as from a speakerphone or a watch, isn't taken as yours.
+The bar above the message box shows the call: ringing, how long, whether the bot is listening or speaking, which of its subagents are working, a button that opens the call's own chat on the right as it goes, **Mute**, and **End**.
+
+- **Talk as you would to a person.** Pause to think or stumble mid-sentence if you need to: the bot waits for 2 seconds of quiet before it takes what you said, and words after a shorter pause join it. phone's `pause` setting makes it 1 to 5 seconds. If you go on before the bot has said or done anything about what you said, it starts over with all of it.
+- **Cut in whenever you like.** Your second word stops it mid-sentence, and it knows where you stopped listening. "Mm-hmm" and "yeah" don't: they only say you're listening. Its own voice coming back, as from a speakerphone or a watch, isn't taken as yours.
+- **It answers quickly,** in a sentence or two, with nothing it can't say aloud: a link is "a link in the chat," and a code block is "There's more in the chat." A call's turns think at phone's `callThinking` level, `low` unless you change it.
+- **It talks first, then works.** Before it uses a tool, it says what it's doing in its own words, such as "Oh, let me check that." If it starts one without a word, the call says "Let me check." at once, and if it says nothing for 3 seconds after you, "One moment." Anything that takes more than a moment, such as work on its computer, a herdr agent's task, or some digging, it hands to a subagent, and keeps talking with you about anything. A subagent works at the bot's own thinking level. What it reports is said at your next pause, never over you. Ask how it's going, and the bot checks. A report that comes after the call goes to the bot's chat.
+- **What you say and what it answers** are in the call's own chat, as text, not in the bot's chat. Each tool it runs shows there too. Open it from the bar while you talk, or from the pill after.
 - **Say "stop"** to stop the work the call started. "Wait" or "hold on" only stops it talking.
 - **Anything that needs your OK** waits on your screen. Answer it when you can look.
-- **Say goodbye** and the bot hangs up, or hang up yourself. A call ends too after a minute with nothing said, and at `minutes`, 30 by default.
-
-The bar above the message box shows the call, ringing and then on, with **End call**.
+- **The call ends** when you hang up or press **End**, or say goodbye and the bot hangs up. It hangs up only after your goodbye. A call ends too after a minute with nothing said, and at `minutes`, 30 by default. A call in the app ends when you put the app in the background, since a phone takes the microphone from it then.
 
 ## After the call
 
@@ -84,28 +81,19 @@ When a call you spoke on ends, the bot writes a summary of it: what you talked a
 
 ## Let a bot call you
 
-Ask it: "Call me." Or "Call me when the build is done": the bot keeps one call-back, for 12 hours, and rings you when it's done, with why it called.
+Ask it: "Call me." Or "Call me when the build is done": the bot keeps one call-back, for 12 hours, and rings you when it's done. It opens with why it called: "Hey, this is your fxbot Bob. The build finished."
 
 Each bot's settings have a **Phone** section with what it gets:
 - **Call me**, in the phone at the top of its chat, on by default.
 - **Calls when you ask**, now or later, on by default.
-- **Calls on its own**, when the bot decides to, off by default. It calls at most `perDay` times a day, 3 by default, and never in your quiet hours, 22:00 to 07:00 by default. A call it makes listens for voicemail first, and leaves a short message there.
+- **Calls on its own**, when the bot decides to, off by default. It calls at most `perDay` times a day, 3 by default, and never in your quiet hours, 22:00 to 07:00 by default.
 
-phone's `minutes`, `quiet`, and `perDay` settings change those limits.
+If your voicemail answers a bot's call, its greeting, with why it called, is the message it leaves. phone's `minutes`, `quiet`, and `perDay` settings change those limits.
 
-## Pick a voice
+## Voices and cost
 
-**voice**, in phone-signalwire's settings, lists SignalWire's English voices by engine, and under each engine what a 10-minute call costs. Joanna, on Amazon Polly Neural, is the default. The lists need fxbot 0.11.0 or newer; an older one has a box to type a voice's name in. To give one bot a voice of its own, pick it under **Voice** in the bot's **Phone** section. **language** says which English you speak, for SignalWire to hear. To use a voice the list doesn't have, pick **Another, typed in…** and type its ID from SignalWire's [voices](https://signalwire.com/docs/platform/voice/tts) page, as `engine.voice:model`. SignalWire plays its own default voice for an ID it doesn't know.
+A call speaks in the voice picked in phone's **Voice**, in the app and on your phone alike. To give one bot a voice of its own, pick it under **Voice** in the bot's **Phone** section.
 
-SignalWire bills a call, listening throughout so you can cut in:
+SignalWire bills the minutes of each call to your phone: see its pricing for your country. What hears you and the bot's voice are billed by their providers, as on a call in the app. Each thing you say is also a turn on the bot's own model.
 
-| Voices | 10 minutes |
-| --- | --- |
-| Amazon Polly Neural and Generative, and Google Neural2 | about $0.79 |
-| ElevenLabs Flash, Cartesia Sonic 3, OpenAI, Deepgram Aura-1, Azure, Grok, Groq, and Inworld | about $1.02 |
-| Deepgram Aura-2 and Google Chirp 3 HD | about $1.19 |
-| Rime Coda | about $1.36 |
-
-That's $0.008 a minute to call out, $0.06 a minute to listen, and the voice by the character, for about 3,400 characters in 10 minutes. Each thing you say is also a turn on the bot's own model.
-
-SignalWire hears the call, as any phone service does. fxbot records nothing: what was said is in the bot's chat.
+SignalWire carries the call, as any phone service does. fxbot records nothing: what was said is in the call's chat.

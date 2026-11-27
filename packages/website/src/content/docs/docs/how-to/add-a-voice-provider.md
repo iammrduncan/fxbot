@@ -1,6 +1,6 @@
 ---
 title: "Add a voice provider"
-description: "Pick how bots hear you and speak on a call in the app: ElevenLabs or Deepgram with a key, a login you already have, a speech server on your machine, or the browser's own speech."
+description: "Pick how bots hear you and speak on a call, in the app or on your phone: ElevenLabs or Deepgram with a key, a login you already have, a speech server on your machine, or the browser's own speech."
 ---
 
 An in-app call, from the phone at the top of a bot's chat, needs something to hear you and something to speak. The phone plugin picks one of each in its tab, under **Voice**. Each can be:
@@ -18,7 +18,7 @@ An in-app call, from the phone at the top of a bot's chat, needs something to he
 
 | Service | What it does on a call | The key |
 | --- | --- | --- |
-| **ElevenLabs** | Listens with Scribe, as you speak, and speaks with Flash v2, in English, in any of your voices, cloned ones too. For another language, pick Multilingual v2 or Flash v2.5. v4 Turbo, v3 Conversational, v4, and v3 speak too, over ElevenLabs' dialogue connection: they cost more for each character, and each call takes one of the account's dialogue sessions | **Create API key**, with Text to Speech, Speech to Text, and Voices read access |
+| **ElevenLabs** | Listens with Scribe, as you speak, and speaks with Flash v2, in English, in any of your voices, cloned ones too. For another language, pick Multilingual v2 or Flash v2.5. v4 Turbo, v3 Conversational, v4, and v3 speak too, over ElevenLabs' dialogue connection: they cost more for each character, and each call takes one of the account's dialogue sessions. **v4 Turbo** sounds the most natural on a call, on your phone above all | **Create API key**, with Text to Speech, Speech to Text, and Voices read access |
 | **Deepgram** | Listens with Flux, which hears when you've finished, and speaks with Aura | **API Keys** › **Create a New API Key** |
 
 A voice provider serves no chat model, so no bot or default offers it. **Settings** › **Providers** lists it with "For phone".
@@ -50,6 +50,6 @@ The model lists under each say which model it uses. Leave them as they are unles
 
 ## This device
 
-**This device** listens and speaks in the browser, with no service. Speaking works everywhere. Listening needs the browser's speech recognition, which Chrome, Edge, and Safari have, and Firefox doesn't, so Firefox doesn't offer it.
+**This device** listens and speaks in the browser, with no service, so it works only on a call in the app: **Call me** needs a provider for each. Speaking works everywhere. Listening needs the browser's speech recognition, which Chrome, Edge, and Safari have, and Firefox doesn't, so Firefox doesn't offer it.
 
 Chrome listens on your computer when it has your language there. Otherwise it would send what you say to Google, so a call says why it can't listen, until you turn on phone's `googleListening` setting. An iPhone app added to the home screen has no speech recognition: pick a service there.

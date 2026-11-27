@@ -651,22 +651,22 @@ Checks run against fakes and a disposable fxbot, never dev or a real account, un
 - [ ] On Android, whether echo cancellation holds.
 
 **Part 2, phone lines** (this release waits for it; with the owner's go-ahead, since it uses their SignalWire account, rings their phone, and spends credit):
-- [ ] The proof, a script run from the release's container under rootless podman, on the owner's router and on a phone hotspot. Each answer goes in this doc:
-  - REGISTER and an INVITE to the owner's number over TLS, from a SIP endpoint the script makes, show the SignalWire number.
-  - Which SDP address SignalWire takes, private or STUN's, and whether its RTP comes back.
-  - Two-way audio for 30 minutes, with long silences from the bot, and the TLS connection kept.
-  - SRTP agreed with `encryption: required`.
-  - Mouth to fxbot and back, in ms.
-  - Whether SignalWire bills both legs.
+- [ ] The proof, a script run from the release's container under rootless podman, on the owner's router and on a phone hotspot. Each answer goes in this doc. It ran as the build itself, from dev on the owner's lab machine, not the container, and not on a hotspot (see What the build changed, part 2):
+  - [x] REGISTER and an INVITE to the owner's number over TLS, from a SIP endpoint the plugin makes, show the SignalWire number.
+  - [x] Which SDP address SignalWire takes, private or STUN's, and whether its RTP comes back: STUN's, and it comes back, every frame.
+  - [ ] Two-way audio for 30 minutes, with long silences from the bot, and the TLS connection kept. The longest call so far was 4 minutes.
+  - [x] SRTP agreed with `encryption: required`: no frame failed to decrypt on any call.
+  - [ ] Mouth to fxbot and back, in ms.
+  - [ ] Whether SignalWire bills both legs.
 - [ ] If it passes:
-  - `{ "line": 3 }` and `sip.ts`.
-  - phone-signalwire 0.2.0's SIP way, with its endpoint made through the REST API.
-  - The voice loop on a line, against a fake carrier: a local SIP-over-TLS and RTP script made for the check.
+  - [x] `{ "line": 3 }` and `sip.ts`.
+  - [x] phone-signalwire 0.2.0's SIP way, with its endpoint made through the REST API.
+  - [ ] The voice loop on a line, against a fake carrier: a local SIP-over-TLS and RTP script made for the check.
 - [ ] If it fails: what failed goes here, and the same proof runs on Twilio's Elastic SIP Trunking before anything is built.
 - [ ] RELAY goes:
-  - `relay.ts`, its voices, and phone's lines 1 and 2.
-  - phone-signalwire's settings keep the project, token, and number, and lose the voice and language.
-  - A test call's checks are replaced by the SIP fake's.
+  - [x] `relay.ts`, its voices, and phone's lines 1 and 2.
+  - [x] phone-signalwire's settings keep the project, token, and number, and lose the voice and language. They gain `space`.
+  - [ ] A test call's checks are replaced by the SIP fake's.
 - [ ] The owner's calls from their watch on speaker, in the app and on the phone: they cut in mid-sentence, the bot works in the background while they talk, and it sounds natural. 0.12.0 is cut only after these, as the owner said.
 
 ## 5. Open questions
@@ -728,3 +728,22 @@ Built on 2026-11-25 in a worktree of `release/0.12.0`, and landed there. Part 2 
 - **Safari, an iPhone, and Android,** and how echo cancellation holds there.
 
 **web.fxbot.sh** was deployed on 2026-11-25, at the owner's word (Worker version `0904783f`). The live shell sends `microphone=(self "https://*.fxbot.sh")`, and its `shell.js` matches a local build.
+
+## What the build changed (part 2)
+
+Built on 2026-11-27 on `release/0.12.0`, in dev, with the owner calling from their phone as it went.
+
+- **One call, two ways to carry it.** At the owner's word, "it should be exactly the same as in app calling just... audio is carried over phone line instead of in app", phone starts every call with one `start()`: its row, the Voice section's listener and voice, the call's note, greeting, and session, the conversation, the bar, and the summary. Where the audio goes is the only difference: the page's socket, or `sip.ts` on the carrier's account. The plan's line 3 had a carrier carry 8 kHz audio; the build has the carrier give only a SIP account, `sip()`, and phone runs the softphone, so phone-signalwire is its settings and about 60 lines. Call me greets with "Hey, what's up?", as the app does; a bot's own call still opens with why it rang. One call note serves both, saying who started the call.
+- **The page shows a call on the phone with the app's bar,** read from `GET /calls/live` every second, with `POST /calls/:id/mute`, and why the last call failed, for a minute. A room's phone has **Call me**, through the default carrier.
+- **SignalWire's SIP domain isn't `<space>.sip.signalwire.com`.** A softphone signs in at the space's SIP profile's domain, `<space>-<12 characters>.sip.signalwire.com`, which the dashboard shows on the endpoint. Every sign-in at the plain domain was refused with 401, from endpoints made through the Fabric API and the older endpoints API alike, and after about eight in a few minutes SignalWire stopped answering for a while. phone-signalwire reads the domain from `GET /api/relay/rest/sip_profile`, and makes its endpoint with `/api/relay/rest/endpoints/sip`.
+- **The lab machine's firewall** let only ports 443, 80, and 22 out, so the first call sat ringing: the connection now gives up after 10 seconds, saying the network may block outbound SIP. The lab opened TCP 5061 out; UDP out was already open.
+- **The bot hung up on the owner,** after "Hey man, how's it going?": the note left the end of a call to it. `phone_hang_up` now refuses unless the owner's last words said goodbye or asked it to hang up, and says so to the bot.
+- **"Mm-hmm" cut the bot off** mid-question. Words that only say the owner is listening neither cut it off nor go to it as a turn while it talks.
+- **A reply waited for the owner's next words,** then came with the next one: a partial from line noise, empty or never finished, left the call thinking they were mid-words. A partial counts now only while more keep coming, for 2 seconds, and an empty one not at all.
+- **The owner's sentence went in two,** at a pause mid-sentence, and the rest waited 16 seconds behind the bot's turn on the first half. Words that come before that turn has said or done anything stop it, and all of it goes as one.
+- **The bot's voice reached the phone as pair averages,** which fold what's over 4 kHz back in as hiss. A 31-tap low-pass at 3.6 kHz does it now: flat to 3 kHz, and 56 dB down from 4.5 kHz. The log counts frames sent late; on the calls since, none were. The owner found the voice better on ElevenLabs' v4 Turbo than Flash v2.5, and the docs say so.
+- **A call's chat opened early showed nothing:** the bar's button came with the row, a moment before the session, while the recap is read. It comes once the call has its chat.
+
+**Checked:** typecheck; a call in the app on dev, after the change, by its socket (greeting audio at 0.74 s, ended on hang-up, its chat kept); the owner's calls on their phone, up to 4 minutes, with audio both ways, cutting in, a subagent started from the call, and the summary; the filter's response to tones, across uneven chunks; the goodbye and listening words against their matchers.
+
+**Not checked here:** a call over 4 minutes or 30; SIP against a fake carrier, so no check runs without a real account; a room's Call me; a bot's own call reaching voicemail; the changes after the owner's last call (listening words, the owner going on, the stale partial, the filter, the chat link) on a real call; the release's container and a hotspot.
