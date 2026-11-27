@@ -195,18 +195,24 @@ export function createHistory(sql: Sql, embeddings?: Embeddings, zone: () => str
     },
     // The bot's chats before `sessionId`, as finished turns, oldest first: the newest `limit` messages of them. A provider
     // switch starts a new session, and the old one may not open again, so the chat shows these above the handoff.
-    // A message that sent files gets its saved text and files back.
+    // A message that sent files gets its saved text and files back, and a plugin's pill comes back as the pill it was.
     async earlier(bot: string, sessionId: string | null, limit = 400): Promise<Turn[]> {
-      const rows = await sql<{ messageId: string; role: string; text: string; input: string | null; files: Upload[] | null; plugin: string | null }[]>`
-        select m.message_id, m.role, m.text, s.input, s.files, s.plugin
+      type Said = { messageId: string; role: string; text: string; input: string | null; files: Upload[] | null; plugin: string | null };
+      type Pilled = { pillId: number | null; after: string | null; pillFrom: string | null; label: string | null; pillText: string | null; open: string | null; inContext: boolean | null };
+      const rows = await sql<(Said & Pilled)[]>`
+        select m.message_id, m.role, m.text, s.input, s.files, s.plugin,
+          p.id as pill_id, p.after, p.plugin as pill_from, p.label, p.text as pill_text, p.open, p.in_context
         from (select * from messages where profile_id = ${bot} and session_id is distinct from ${sessionId} and role in ${sql(said)}
           and session_id not in (select id from plugin_sessions) order by id desc limit ${limit}) m
         left join sent s on m.role = 'user' and s.profile_id = m.profile_id and s.message_id = m.message_id
+        left join pills p on m.message_id like 'pill-%' and p.profile_id = m.profile_id and m.message_id = 'pill-' || p.id
         order by m.id`;
       const turns = new Map<string, Turn>();
-      for (const { messageId, role, text, input, files, plugin } of rows) {
+      for (const { messageId, role, text, input, files, plugin, pillId, after, pillFrom, label, pillText, open, inContext } of rows) {
         const turn = turns.get(messageId) ?? { messageId, text: "", reply: "", done: true };
-        if (role === "user") Object.assign(turn, { text: input ?? text, ...(files?.length ? { files } : {}), ...(plugin ? { from: plugin } : {}) });
+        if (pillId !== null && label !== null)
+          turn.pill = { id: pillId, after, label, ...(pillText ? { text: pillText } : {}), ...(open ? { open } : {}), from: pillFrom ?? "", ...(inContext ? { inContext: true } : {}) };
+        else if (role === "user") Object.assign(turn, { text: input ?? text, ...(files?.length ? { files } : {}), ...(plugin ? { from: plugin } : {}) });
         else turn.reply = text;
         turns.set(messageId, turn);
       }

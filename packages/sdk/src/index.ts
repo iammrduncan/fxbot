@@ -633,9 +633,11 @@ export async function createFxbot(options: FxbotOptions) {
       : `${label} rejected ${whose} key. Replace it in Settings › Providers.`;
   }
   const byPlugin = new Set((await store.sent.byPlugins()).map((row) => `${row.profileId}:${row.messageId}`));
-  // So does a message that carried pills to the model: the chat shows its own words, from `sent`.
-  for (const row of await store.sql<{ profileId: string; givenWith: string }[]>`select distinct profile_id, given_with from pills where given_with is not null`)
-    byPlugin.add(`${row.profileId}:${row.givenWith}`);
+  // A message of the owner's that carried pills to the model stays the owner's, but its chat shows its own words too,
+  // from `sent`, not what the model read.
+  const carriedPills = new Set(
+    (await store.sql<{ profileId: string; givenWith: string }[]>`select distinct profile_id, given_with from pills where given_with is not null`).map((row) => `${row.profileId}:${row.givenWith}`),
+  );
   function withSent(id: string) {
     let rest = "";
     const fill = async (part: string) => {
@@ -653,7 +655,7 @@ export async function createFxbot(options: FxbotOptions) {
         const joined = line.id ? await store.sent.get(id, line.id) : null;
         return JSON.stringify(joined ? { ...line, text: joined.input, files: joined.files, ...(joined.plugin ? { from: joined.plugin } : {}) } : { ...line, text: unstamped(line.text ?? "") }) + "\n";
       }
-      const sent = line?.type === "turn_start" && (line.input === undefined || byPlugin.has(`${id}:${line.messageId}`)) && (await store.sent.get(id, line.messageId!));
+      const sent = line?.type === "turn_start" && (line.input === undefined || byPlugin.has(`${id}:${line.messageId}`) || carriedPills.has(`${id}:${line.messageId}`)) && (await store.sent.get(id, line.messageId!));
       if (!sent) return line?.type === "turn_start" && typeof line.input === "string" ? JSON.stringify({ ...line, input: unstamped(line.input) }) + "\n" : part + "\n";
       const { plugin, ...saved } = sent;
       return JSON.stringify({ ...line, ...saved, ...(plugin ? { from: plugin } : {}) }) + "\n";
@@ -1075,7 +1077,7 @@ export async function createFxbot(options: FxbotOptions) {
       if (carried.length) {
         await store.sql`update pills set given_with = ${messageId} where id in ${store.sql(carried.map((r) => r.id))} and given_with is null`;
         if (!from && input === text) await store.sent.save(id, messageId, { input: shown ?? text, files: [] });
-        byPlugin.add(`${id}:${messageId}`);
+        carriedPills.add(`${id}:${messageId}`);
       }
       await history.record(id, accepted.sessionId, messageId, "user", text + names);
       // A turn behind another starts when that one ends.

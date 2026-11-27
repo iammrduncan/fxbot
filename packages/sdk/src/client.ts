@@ -301,12 +301,14 @@ export type Turn = { messageId: string; text: string; files?: Upload[]; reply: s
 
 // Folds one stream line into a thread. Lines without a messageId, such as `idle`, change nothing.
 export function applyLine(turns: Turn[], line: StreamLine): Turn[] {
-  // A pill goes after the turn it follows and any pills already after it, once. One whose turn isn't here goes last.
+  // A pill goes after the turn it follows and any pills already after it, once: the turn its message started, or joined.
+  // One whose turn isn't here goes last.
   if (line.type === "pill" && line.pill) {
     const key = `pill-${line.pill.id}`;
     if (turns.some((turn) => turn.messageId === key)) return turns;
     const entry: Turn = { messageId: key, text: "", reply: "", done: true, pill: line.pill };
-    let at = line.pill.after === null ? 0 : turns.findLastIndex((turn) => turn.messageId === line.pill!.after) + 1;
+    const after = line.pill.after;
+    let at = after === null ? 0 : turns.findLastIndex((turn) => turn.messageId === after || Boolean(turn.parts?.some((part) => part.type === "user" && part.id === after))) + 1;
     if (at === 0 && line.pill.after !== null) return [...turns, entry];
     while (turns[at]?.pill) at++;
     return turns.toSpliced(at, 0, entry);
