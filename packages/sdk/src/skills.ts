@@ -184,12 +184,15 @@ export async function createSkills(options: { store: Store; archives: Archives; 
         return row ? [{ row, id: r.source.skill, on: r.enabled && (r.bots === "all" || Boolean(on.get(r.id)?.has(bot))) }] : [];
       }),
       ...carried().map(({ id, row, applies }) => ({ row, id, on: applies(bot) })),
-    ].map((skill) => {
-      const name = seen.has(skill.row.name) ? skill.id : skill.row.name;
-      seen.add(skill.row.name);
-      return { ...skill, name };
-    });
-    return all.filter((skill) => skill.on);
+    ]
+      // Only this bot's count toward a clash: a plugin gives each bot its own, which another bot's mustn't rename.
+      .filter((skill) => skill.on)
+      .map((skill) => {
+        const name = seen.has(skill.row.name) ? skill.id : skill.row.name;
+        seen.add(skill.row.name);
+        return { ...skill, name };
+      });
+    return all;
   }
 
   const tool: FxAgentTool = {
