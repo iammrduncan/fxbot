@@ -142,7 +142,7 @@ export async function talk(target, label) {
     sound?.stop();
     void lock?.release?.().catch(() => {});
     document.removeEventListener("visibilitychange", hidden);
-    if (socket.readyState === WebSocket.OPEN) (socket.send(JSON.stringify({ end: true })), socket.close());
+    if (socket.readyState === WebSocket.OPEN) (socket.send(JSON.stringify({ end: true, why: why || "End" })), socket.close());
   };
   // A phone takes the microphone from an app in the background, so the call ends there.
   const hidden = () => document.visibilityState === "hidden" && end("The app went to the background.");
@@ -215,15 +215,16 @@ function useWorking(bots) {
   return names;
 }
 
-// The call's bar: who it's with, how long, what's happening, what's under way in the background, Mute, and End.
-function Bar({ now, title, bots = [] }) {
+// The call's bar: who it's with, how long, what's happening, what's under way in the background, Mute, and End. The
+// same for a call in the app and one on the owner's phone, which page.jsx reads from phone instead of a socket.
+export function Bar({ now, title, bots = [] }) {
   const [, tick] = useState(0);
   const working = useWorking(bots);
   useEffect(() => {
     const timer = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(timer);
   }, []);
-  const doing = now.status === "starting" ? "Starting…" : now.speaking ? `${now.whoName || now.label} is speaking` : now.muted ? "Muted" : "Listening";
+  const doing = now.status === "starting" ? "Starting…" : now.status === "ringing" ? "Ringing your phone…" : now.speaking ? `${now.whoName || now.label} is speaking` : now.muted ? "Muted" : "Listening";
   return (
     <section className="flex min-w-0 items-center gap-2 rounded-lg border bg-background p-2 pl-3 text-sm" aria-label={title}>
       <span className="text-muted-foreground">
@@ -252,20 +253,20 @@ function Bar({ now, title, bots = [] }) {
   );
 }
 
+// Why the last call ended, when it failed.
+export const Ended = ({ error }) => <p className="rounded-lg border p-2 text-sm text-destructive">The call ended: {error}</p>;
+
 // Above the bot's message box while its call in the app is on, and why the last one ended, if it failed.
 export function TalkBar({ bot }) {
   const now = useTalk();
   if (!mine(now, { bot: bot.id })) return null;
-  if (now.status === "ended") return now.error ? <p className="rounded-lg border p-2 text-sm text-destructive">The call ended: {now.error}</p> : null;
+  if (now.status === "ended") return now.error ? <Ended error={now.error} /> : null;
   return <Bar now={now} title={`Talking with ${bot.name}`} bots={[bot.id]} />;
 }
 
-// Above a room's message box while its call is on: who's speaking, with the call's bar, or why the last one ended.
-export function RoomTalkBar({ room }) {
-  const now = useTalk();
+// A room's call: who's speaking, with the call's bar.
+export function RoomBar({ now, room }) {
   const bots = useBots() ?? [];
-  if (!room || !mine(now, { room: room.id })) return null;
-  if (now.status === "ended") return now.error ? <p className="rounded-lg border p-2 text-sm text-destructive">The call ended: {now.error}</p> : null;
   const who = bots.find((b) => b.id === now.who);
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -275,4 +276,12 @@ export function RoomTalkBar({ room }) {
       </div>
     </div>
   );
+}
+
+// Above a room's message box while its call in the app is on, or why the last one ended.
+export function RoomTalkBar({ room }) {
+  const now = useTalk();
+  if (!room || !mine(now, { room: room.id })) return null;
+  if (now.status === "ended") return now.error ? <Ended error={now.error} /> : null;
+  return <RoomBar now={now} room={room} />;
 }

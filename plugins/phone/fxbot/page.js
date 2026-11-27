@@ -149,7 +149,10 @@ async function talk(target, label) {
 		sound?.stop();
 		lock?.release?.().catch(() => {});
 		document.removeEventListener("visibilitychange", hidden);
-		if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ end: true })), socket.close();
+		if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({
+			end: true,
+			why: why || "End"
+		})), socket.close();
 	};
 	const hidden = () => document.visibilityState === "hidden" && end("The app went to the background.");
 	document.addEventListener("visibilitychange", hidden);
@@ -215,7 +218,7 @@ const Mic = () => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
 		})
 	]
 });
-const clock$1 = (from) => {
+const clock = (from) => {
 	const s = Math.max(0, Math.floor((Date.now() - from) / 1e3));
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
@@ -239,7 +242,7 @@ function Bar({ now, title, bots = [] }) {
 		const timer = setInterval(() => tick((n) => n + 1), 1e3);
 		return () => clearInterval(timer);
 	}, []);
-	const doing = now.status === "starting" ? "Starting…" : now.speaking ? `${now.whoName || now.label} is speaking` : now.muted ? "Muted" : "Listening";
+	const doing = now.status === "starting" ? "Starting…" : now.status === "ringing" ? "Ringing your phone…" : now.speaking ? `${now.whoName || now.label} is speaking` : now.muted ? "Muted" : "Listening";
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 		className: "flex min-w-0 items-center gap-2 rounded-lg border bg-background p-2 pl-3 text-sm",
 		"aria-label": title,
@@ -253,7 +256,7 @@ function Bar({ now, title, bots = [] }) {
 				children: [
 					title,
 					" · ",
-					clock$1(now.at),
+					clock(now.at),
 					" · ",
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 						className: "text-muted-foreground",
@@ -316,28 +319,22 @@ function Bar({ now, title, bots = [] }) {
 		]
 	});
 }
+const Ended = ({ error }) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+	className: "rounded-lg border p-2 text-sm text-destructive",
+	children: ["The call ended: ", error]
+});
 function TalkBar({ bot }) {
 	const now = useTalk();
 	if (!mine(now, { bot: bot.id })) return null;
-	if (now.status === "ended") return now.error ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
-		className: "rounded-lg border p-2 text-sm text-destructive",
-		children: ["The call ended: ", now.error]
-	}) : null;
+	if (now.status === "ended") return now.error ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Ended, { error: now.error }) : null;
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Bar, {
 		now,
 		title: `Talking with ${bot.name}`,
 		bots: [bot.id]
 	});
 }
-function RoomTalkBar({ room }) {
-	const now = useTalk();
-	const bots = (0, _fxbot_app.useBots)() ?? [];
-	if (!room || !mine(now, { room: room.id })) return null;
-	if (now.status === "ended") return now.error ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
-		className: "rounded-lg border p-2 text-sm text-destructive",
-		children: ["The call ended: ", now.error]
-	}) : null;
-	const who = bots.find((b) => b.id === now.who);
+function RoomBar({ now, room }) {
+	const who = ((0, _fxbot_app.useBots)() ?? []).find((b) => b.id === now.who);
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		className: "flex min-w-0 items-center gap-2",
 		children: [who && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
@@ -358,6 +355,15 @@ function RoomTalkBar({ room }) {
 		})]
 	});
 }
+function RoomTalkBar({ room }) {
+	const now = useTalk();
+	if (!room || !mine(now, { room: room.id })) return null;
+	if (now.status === "ended") return now.error ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Ended, { error: now.error }) : null;
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(RoomBar, {
+		now,
+		room
+	});
+}
 // fxbot/page.jsx
 async function call(path, method = "GET", body) {
 	const res = await (0, _fxbot_app.api)(path, {
@@ -375,27 +381,45 @@ const settingsTab = "/settings/plugins/phone";
 const live = /* @__PURE__ */ new Map();
 const listeners = /* @__PURE__ */ new Map();
 const timers = /* @__PURE__ */ new Map();
-async function read(bot) {
-	clearTimeout(timers.get(bot));
+async function read(key) {
+	if (!key) return;
+	clearTimeout(timers.get(key));
 	if (document.visibilityState === "visible") {
-		const next = await call(`calls/live?bot=${bot}`).then((answer) => ({
+		const next = await call(`calls/live?${key.startsWith("room-") ? `room=${key.slice(5)}` : `bot=${key}`}`).then((answer) => ({
 			call: answer.call,
+			failed: answer.failed || "",
 			button: answer.button !== false,
 			lines: answer.lines === true
-		}), () => live.get(bot) ?? null);
-		live.set(bot, next);
-		listeners.get(bot)?.forEach((listen) => listen());
+		}), () => live.get(key) ?? null);
+		live.set(key, next);
+		listeners.get(key)?.forEach((listen) => listen());
 	}
-	timers.set(bot, listeners.get(bot)?.size ? setTimeout(() => read(bot), live.get(bot)?.call ? 2e3 : 15e3) : null);
+	timers.set(key, listeners.get(key)?.size ? setTimeout(() => read(key), live.get(key)?.call ? 1e3 : 15e3) : null);
 }
-function useLive(bot) {
+function useLive(key) {
 	return (0, react.useSyncExternalStore)((listen) => {
-		if (!listeners.has(bot)) listeners.set(bot, /* @__PURE__ */ new Set());
-		listeners.get(bot).add(listen);
-		if (!timers.get(bot)) read(bot);
-		return () => void listeners.get(bot).delete(listen);
-	}, () => live.get(bot) ?? null);
+		if (!key) return () => {};
+		if (!listeners.has(key)) listeners.set(key, /* @__PURE__ */ new Set());
+		listeners.get(key).add(listen);
+		if (!timers.get(key)) read(key);
+		return () => void listeners.get(key).delete(listen);
+	}, () => key && live.get(key) || null);
 }
+const ringFor = (key, body, setError, setOpen) => () => {
+	setError("");
+	call("calls", "POST", body).then(() => setTimeout(() => void read(key), 500), (e) => e.answer?.missing ? (0, _fxbot_app.go)(settingsTab) : (setError(e.message), setOpen(true)));
+};
+const onPhone = (c, label, key) => ({
+	status: c.status === "on" ? "on" : "ringing",
+	at: new Date(c.answeredAt ?? c.at).getTime(),
+	speaking: c.speaking,
+	muted: c.muted,
+	who: c.who,
+	open: c.open,
+	label,
+	mute: (muted) => call(`calls/${c.id}/mute`, "POST", { muted }).finally(() => void read(key)),
+	end: () => call(`calls/${c.id}/end`, "POST").finally(() => void read(key))
+});
 const Phone = () => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
 	xmlns: "http://www.w3.org/2000/svg",
 	width: "16",
@@ -458,10 +482,7 @@ function CallMenu({ bot }) {
 	const app = useTalk();
 	const [open, setOpen] = (0, react.useState)(false);
 	const [error, setError] = (0, react.useState)("");
-	const ring = () => {
-		setError("");
-		call("calls", "POST", { bot: bot.id }).then(() => void read(bot.id), (e) => e.answer?.missing || /confirm/i.test(e.message) ? (0, _fxbot_app.go)(settingsTab) : (setError(e.message), setOpen(true)));
-	};
+	const ring = ringFor(bot.id, { bot: bot.id }, setError, setOpen);
 	const choices = [{
 		key: "app",
 		label: "In-app call",
@@ -487,61 +508,53 @@ function CallMenu({ bot }) {
 }
 function RoomCall({ room }) {
 	const app = useTalk();
+	const key = room ? `room-${room.id}` : "";
+	const state = useLive(key);
 	const [open, setOpen] = (0, react.useState)(false);
+	const [error, setError] = (0, react.useState)("");
 	if (!room?.members?.length) return null;
 	const choices = [{
 		key: "app",
 		label: "In-app call",
 		hint: "Talk with all its bots, in this browser",
 		icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Mic, {}),
-		run: () => void talk({ room: room.id }, room.name)
-	}];
+		run: () => (setError(""), void talk({ room: room.id }, room.name))
+	}, ...state?.lines ? [{
+		key: "line",
+		label: "Call me",
+		hint: "Its bots ring your phone",
+		icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Phone, {}),
+		run: ringFor(key, { room: room.id }, setError, setOpen)
+	}] : []];
+	const busy = Boolean(state?.call) || Boolean(app && app.status !== "ended");
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(CallChoices, {
 		label: `Call ${room.name}`,
-		busy: Boolean(app && app.status !== "ended"),
+		busy,
 		choices,
+		error,
 		open,
 		setOpen,
 		size: "icon-sm"
 	});
 }
-const clock = (from) => {
-	const s = Math.max(0, Math.floor((Date.now() - new Date(from).getTime()) / 1e3));
-	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
 function CallBar({ bot }) {
-	const now = useLive(bot.id)?.call ?? null;
-	const [, tick] = (0, react.useState)(0);
-	const [ending, setEnding] = (0, react.useState)(false);
-	(0, react.useEffect)(() => {
-		if (!now) return setEnding(false);
-		const timer = setInterval(() => tick((n) => n + 1), 1e3);
-		return () => clearInterval(timer);
-	}, [now?.id]);
-	if (!now) return null;
-	const end = () => (setEnding(true), call(`calls/${now.id}/end`, "POST").finally(() => void read(bot.id)));
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-		className: "flex min-w-0 items-center gap-2 rounded-lg border bg-background p-2 pl-3 text-sm",
-		"aria-label": `Your call with ${bot.name}`,
-		children: [
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-				className: "text-muted-foreground",
-				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Phone, {})
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-				className: "min-w-0 flex-1 truncate",
-				children: now.status === "on" && now.answeredAt ? `On the phone with ${bot.name} · ${clock(now.answeredAt)}` : `Ringing your phone…`
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
-				type: "button",
-				size: "sm",
-				variant: "destructive",
-				disabled: ending,
-				onClick: end,
-				children: "End call"
-			})
-		]
+	const state = useLive(bot.id);
+	if (state?.call) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Bar, {
+		now: onPhone(state.call, bot.name, bot.id),
+		title: `Talking with ${bot.name}`,
+		bots: [bot.id]
 	});
+	return state?.failed ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Ended, { error: state.failed }) : null;
+}
+function RoomCallBar({ room }) {
+	const key = room ? `room-${room.id}` : "";
+	const state = useLive(key);
+	if (!room) return null;
+	if (state?.call) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(RoomBar, {
+		now: onPhone(state.call, room.name, key),
+		room
+	});
+	return state?.failed ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Ended, { error: state.failed }) : null;
 }
 function CallCard({ call: tool }) {
 	const reason = typeof tool.input?.reason === "string" ? tool.input.reason : "";
@@ -578,7 +591,7 @@ function Providers({ status, onPick }) {
 	const running = status.providers.filter((p) => p.running);
 	if (!status.providers.length) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 		className: "text-muted-foreground",
-		children: "Add a provider plugin from Plugins, such as phone-signalwire: it carries the calls."
+		children: "For calls on your phone, add a provider plugin from Plugins, such as phone-signalwire: it carries their audio over your phone line."
 	});
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		className: "grid gap-1",
@@ -589,7 +602,10 @@ function Providers({ status, onPick }) {
 			}),
 			status.providers.map((p) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 				className: "flex flex-wrap items-center gap-x-2",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: p.label }), !p.running ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: p.label }), p.old ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "text-muted-foreground",
+					children: "is from before this phone, and needs its update, in Plugins."
+				}) : !p.running ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 					className: "text-muted-foreground",
 					children: "is off. Plugins says why."
 				}) : p.missing.length ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
@@ -874,7 +890,7 @@ function VoiceSection() {
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "text-muted-foreground",
-				children: "How bots hear you and speak on an in-app call, from the phone at the top of a chat. Add voice providers in Settings › Providers: ElevenLabs and Deepgram, under For phone, or a speech server on your machine. A Mistral, Groq, OpenAI, or Cloudflare login listens too."
+				children: "How bots hear you and speak on a call, in the app or on your phone, from the phone at the top of a chat. Add voice providers in Settings › Providers: ElevenLabs and Deepgram, under For phone, or a speech server on your machine. A Mistral, Groq, OpenAI, or Cloudflare login listens too. This device works only in the app."
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
 				className: "grid gap-1",
@@ -1245,6 +1261,7 @@ function setup(app) {
 	app.chat(CallBar);
 	app.slot?.("chat-rooms.room-header", RoomCall);
 	app.slot?.("chat-rooms.room-box", RoomTalkBar);
+	app.slot?.("chat-rooms.room-box", RoomCallBar);
 	app.toolView("call", CallCard, { open: true });
 	app.route("/calls/:id", CallChat);
 	app.settings(Tab);

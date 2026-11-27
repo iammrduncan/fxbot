@@ -2,7 +2,7 @@
 // in the chat, the plugin's tab, and a section in each bot's settings. Built into page.js; see the README.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { api, applyLine, go, openBeside, ui, useBots } from "@fxbot/app";
-import { Mic, RoomTalkBar, TalkBar, talk, useTalk } from "./talk.jsx";
+import { Bar, Ended, Mic, RoomBar, RoomTalkBar, TalkBar, talk, useTalk } from "./talk.jsx";
 
 async function call(path, method = "GET", body) {
   const res = await api(path, { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
@@ -12,34 +12,57 @@ async function call(path, method = "GET", body) {
 }
 const settingsTab = "/settings/plugins/phone";
 
-// Each bot's call that's ringing or on, and whether its Call me shows, read every 2 seconds while there's a call, and
-// every 15 while a chat is open.
+// A bot's call on the owner's phone, or a room's (keyed room-<id>), ringing or on, with what its bar shows; why the last
+// one failed; and whether Call me shows. Read every second while there's a call, and every 15 while a chat is open.
 const live = new Map();
 const listeners = new Map();
 const timers = new Map();
-async function read(bot) {
-  clearTimeout(timers.get(bot));
+async function read(key) {
+  if (!key) return;
+  clearTimeout(timers.get(key));
   if (document.visibilityState === "visible") {
-    const next = await call(`calls/live?bot=${bot}`).then(
-      (answer) => ({ call: answer.call, button: answer.button !== false, lines: answer.lines === true }),
-      () => live.get(bot) ?? null,
+    const next = await call(`calls/live?${key.startsWith("room-") ? `room=${key.slice(5)}` : `bot=${key}`}`).then(
+      (answer) => ({ call: answer.call, failed: answer.failed || "", button: answer.button !== false, lines: answer.lines === true }),
+      () => live.get(key) ?? null,
     );
-    live.set(bot, next);
-    listeners.get(bot)?.forEach((listen) => listen());
+    live.set(key, next);
+    listeners.get(key)?.forEach((listen) => listen());
   }
-  timers.set(bot, listeners.get(bot)?.size ? setTimeout(() => read(bot), live.get(bot)?.call ? 2000 : 15000) : null);
+  timers.set(key, listeners.get(key)?.size ? setTimeout(() => read(key), live.get(key)?.call ? 1000 : 15000) : null);
 }
-function useLive(bot) {
+function useLive(key) {
   return useSyncExternalStore(
     (listen) => {
-      if (!listeners.has(bot)) listeners.set(bot, new Set());
-      listeners.get(bot).add(listen);
-      if (!timers.get(bot)) void read(bot);
-      return () => void listeners.get(bot).delete(listen);
+      if (!key) return () => {};
+      if (!listeners.has(key)) listeners.set(key, new Set());
+      listeners.get(key).add(listen);
+      if (!timers.get(key)) void read(key);
+      return () => void listeners.get(key).delete(listen);
     },
-    () => live.get(bot) ?? null,
+    () => (key && live.get(key)) || null,
   );
 }
+// Call me: phone rings the owner's phone, for the same call as in the app. Until phone and a carrier are set up and the
+// number confirmed, it opens phone's tab.
+const ringFor = (key, body, setError, setOpen) => () => {
+  setError("");
+  call("calls", "POST", body).then(
+    () => setTimeout(() => void read(key), 500),
+    (e) => (e.answer?.missing ? go(settingsTab) : (setError(e.message), setOpen(true))),
+  );
+};
+// What the call's bar shows for a call on the owner's phone, from phone, with Mute and End.
+const onPhone = (c, label, key) => ({
+  status: c.status === "on" ? "on" : "ringing",
+  at: new Date(c.answeredAt ?? c.at).getTime(),
+  speaking: c.speaking,
+  muted: c.muted,
+  who: c.who,
+  open: c.open,
+  label,
+  mute: (muted) => call(`calls/${c.id}/mute`, "POST", { muted }).finally(() => void read(key)),
+  end: () => call(`calls/${c.id}/end`, "POST").finally(() => void read(key)),
+});
 
 const Phone = () => (
   <svg
@@ -58,9 +81,9 @@ const Phone = () => (
   </svg>
 );
 
-// The phone at the top of a bot's chat, or a room's: a choice of calls, so a tap never starts one by itself. An in-app
-// call is phone's own. Call me shows when a plugin that carries phone lines, such as phone-signalwire, is added, and Call
-// me is on for the bot. Until phone and that plugin are set up and the number confirmed, Call me opens phone's tab.
+// The phone at the top of a bot's chat, or a room's: a choice of calls, so a tap never starts one by itself. Both are the
+// same call: in the app, or on the owner's phone. Call me shows when a carrier, such as phone-signalwire, is added, and
+// Call me is on for the bot.
 function CallChoices({ label, busy, choices, error, open, setOpen, size = "icon" }) {
   return (
     <ui.Popover open={open} onOpenChange={setOpen}>
@@ -96,13 +119,7 @@ function CallMenu({ bot }) {
   const app = useTalk();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
-  const ring = () => {
-    setError("");
-    call("calls", "POST", { bot: bot.id }).then(
-      () => void read(bot.id),
-      (e) => (e.answer?.missing || /confirm/i.test(e.message) ? go(settingsTab) : (setError(e.message), setOpen(true))),
-    );
-  };
+  const ring = ringFor(bot.id, { bot: bot.id }, setError, setOpen);
   const choices = [
     { key: "app", label: "In-app call", hint: "Talk here, in this browser", icon: <Mic />, run: () => (setError(""), void talk({ bot: bot.id }, bot.name)) },
     ...(state?.lines && state.button ? [{ key: "line", label: "Call me", hint: `${bot.name} rings your phone`, icon: <Phone />, run: ring }] : []),
@@ -111,45 +128,36 @@ function CallMenu({ bot }) {
   return <CallChoices label={`Call ${bot.name}`} busy={busy} choices={choices} error={error} open={open} setOpen={setOpen} />;
 }
 
-// The same in a room's header, for a call with all its bots in the app. A room has no phone line yet.
+// The same in a room's header, for a call with all its bots.
 function RoomCall({ room }) {
   const app = useTalk();
+  const key = room ? `room-${room.id}` : "";
+  const state = useLive(key);
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
   if (!room?.members?.length) return null;
-  const choices = [{ key: "app", label: "In-app call", hint: "Talk with all its bots, in this browser", icon: <Mic />, run: () => void talk({ room: room.id }, room.name) }];
-  return <CallChoices label={`Call ${room.name}`} busy={Boolean(app && app.status !== "ended")} choices={choices} open={open} setOpen={setOpen} size="icon-sm" />;
+  const choices = [
+    { key: "app", label: "In-app call", hint: "Talk with all its bots, in this browser", icon: <Mic />, run: () => (setError(""), void talk({ room: room.id }, room.name)) },
+    ...(state?.lines ? [{ key: "line", label: "Call me", hint: "Its bots ring your phone", icon: <Phone />, run: ringFor(key, { room: room.id }, setError, setOpen) }] : []),
+  ];
+  const busy = Boolean(state?.call) || Boolean(app && app.status !== "ended");
+  return <CallChoices label={`Call ${room.name}`} busy={busy} choices={choices} error={error} open={open} setOpen={setOpen} size="icon-sm" />;
 }
 
-const clock = (from) => {
-  const s = Math.max(0, Math.floor((Date.now() - new Date(from).getTime()) / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
-
-// Above the message box, while a call rings or is on: how long it's been, and End call.
+// Above the message box, while a call on the owner's phone rings or is on: the same bar as a call in the app. Or why the
+// last one failed, for a minute.
 function CallBar({ bot }) {
-  const now = useLive(bot.id)?.call ?? null;
-  const [, tick] = useState(0);
-  const [ending, setEnding] = useState(false);
-  useEffect(() => {
-    if (!now) return setEnding(false);
-    const timer = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(timer);
-  }, [now?.id]);
-  if (!now) return null;
-  const end = () => (setEnding(true), call(`calls/${now.id}/end`, "POST").finally(() => void read(bot.id)));
-  return (
-    <section className="flex min-w-0 items-center gap-2 rounded-lg border bg-background p-2 pl-3 text-sm" aria-label={`Your call with ${bot.name}`}>
-      <span className="text-muted-foreground">
-        <Phone />
-      </span>
-      <span className="min-w-0 flex-1 truncate">
-        {now.status === "on" && now.answeredAt ? `On the phone with ${bot.name} · ${clock(now.answeredAt)}` : `Ringing your phone…`}
-      </span>
-      <ui.Button type="button" size="sm" variant="destructive" disabled={ending} onClick={end}>
-        End call
-      </ui.Button>
-    </section>
-  );
+  const state = useLive(bot.id);
+  if (state?.call) return <Bar now={onPhone(state.call, bot.name, bot.id)} title={`Talking with ${bot.name}`} bots={[bot.id]} />;
+  return state?.failed ? <Ended error={state.failed} /> : null;
+}
+// The same above a room's message box.
+function RoomCallBar({ room }) {
+  const key = room ? `room-${room.id}` : "";
+  const state = useLive(key);
+  if (!room) return null;
+  if (state?.call) return <RoomBar now={onPhone(state.call, room.name, key)} room={room} />;
+  return state?.failed ? <Ended error={state.failed} /> : null;
 }
 
 // phone_call in a reply: why the bot called, then how it went.
@@ -173,14 +181,17 @@ const length = (seconds) => (seconds == null ? "" : seconds < 60 ? `${seconds} s
 // Each provider added: ready, what it still needs in its own settings, or off. With two or more running, the default.
 function Providers({ status, onPick }) {
   const running = status.providers.filter((p) => p.running);
-  if (!status.providers.length) return <p className="text-muted-foreground">Add a provider plugin from Plugins, such as phone-signalwire: it carries the calls.</p>;
+  if (!status.providers.length)
+    return <p className="text-muted-foreground">For calls on your phone, add a provider plugin from Plugins, such as phone-signalwire: it carries their audio over your phone line.</p>;
   return (
     <div className="grid gap-1">
       <h3 className="font-medium">Ways to call</h3>
       {status.providers.map((p) => (
         <p key={p.name} className="flex flex-wrap items-center gap-x-2">
           <span>{p.label}</span>
-          {!p.running ? (
+          {p.old ? (
+            <span className="text-muted-foreground">is from before this phone, and needs its update, in Plugins.</span>
+          ) : !p.running ? (
             <span className="text-muted-foreground">is off. Plugins says why.</span>
           ) : p.missing.length ? (
             <>
@@ -302,8 +313,8 @@ function Tab() {
   );
 }
 
-// How phone hears and speaks on a call it carries itself, in the app: a provider the owner added for each, with its model,
-// and a voice, or This device, the browser's own speech.
+// How phone hears and speaks on every call, in the app or on the owner's phone: a provider the owner added for each, with
+// its model, and a voice, or This device, the browser's own speech, which only a call in the app has.
 function VoiceSection() {
   const [voice, setVoice] = useState(null);
   const [voices, setVoices] = useState([]);
@@ -390,8 +401,8 @@ function VoiceSection() {
     <section className="grid gap-3" aria-label="Voice">
       <h2 className="font-medium">Voice</h2>
       <p className="text-muted-foreground">
-        How bots hear you and speak on an in-app call, from the phone at the top of a chat. Add voice providers in Settings › Providers: ElevenLabs and Deepgram, under For phone, or a
-        speech server on your machine. A Mistral, Groq, OpenAI, or Cloudflare login listens too.
+        How bots hear you and speak on a call, in the app or on your phone, from the phone at the top of a chat. Add voice providers in Settings › Providers: ElevenLabs and Deepgram,
+        under For phone, or a speech server on your machine. A Mistral, Groq, OpenAI, or Cloudflare login listens too. This device works only in the app.
       </p>
       <label className="grid gap-1">
         <span>Listening</span>
@@ -718,6 +729,7 @@ export default function setup(app) {
   app.chat(CallBar);
   app.slot?.("chat-rooms.room-header", RoomCall);
   app.slot?.("chat-rooms.room-box", RoomTalkBar);
+  app.slot?.("chat-rooms.room-box", RoomCallBar);
   app.toolView("call", CallCard, { open: true });
   app.route("/calls/:id", CallChat);
   app.settings(Tab);

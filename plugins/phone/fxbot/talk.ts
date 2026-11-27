@@ -19,12 +19,12 @@ export function transport(socket: PluginSocket): Transport {
 }
 
 /** What the page sends, to the call's voice loop, until the page goes, which ends the call. */
-export function listen(socket: PluginSocket, input: () => Input | null, end: (why: string) => void) {
+export function listen(socket: PluginSocket, input: () => Input | null, end: (why: string) => void, log: (line: string) => void) {
   socket.onmessage = (data) => {
     const to = input();
     if (!to) return;
     if (typeof data !== "string") return to.audio(pcmOf(data));
-    let m: { played?: unknown; heard?: { partial?: unknown; final?: unknown }; mute?: unknown; end?: unknown };
+    let m: { played?: unknown; heard?: { partial?: unknown; final?: unknown }; mute?: unknown; end?: unknown; why?: unknown };
     try {
       m = JSON.parse(data);
     } catch {
@@ -34,7 +34,8 @@ export function listen(socket: PluginSocket, input: () => Input | null, end: (wh
     else if (typeof m.heard?.partial === "string") to.heard({ type: "partial", text: m.heard.partial.slice(0, 4000) });
     else if (typeof m.heard?.final === "string") to.heard({ type: "final", text: m.heard.final.slice(0, 4000) });
     else if (typeof m.mute === "boolean") to.muted(m.mute);
-    else if (m.end === true) end("hung up");
+    // How the page ended the call goes in the log: End, or the app going to the background.
+    else if (m.end === true) (log(`The app ended the call: ${typeof m.why === "string" ? m.why.slice(0, 100) : "End"}.`), end("hung up"));
   };
   socket.onclose = () => end("The app closed the call.");
 }

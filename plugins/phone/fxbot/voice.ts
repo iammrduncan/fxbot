@@ -1,8 +1,8 @@
 import type { Line, LineEvents, Outcome, Place } from "./line.ts";
 import { rate, type Heard, type Listener, type Speaking } from "./audio.ts";
 
-// The voice loop (docs/phases/phone-v2.md): a call's Line, made from where the audio goes (the app's socket, or later a
-// phone line), a listener, and a speaker. call.ts holds the conversation and its rules, as with any line. This hears
+// The voice loop (docs/phases/phone-v2.md): a call's Line, made from where the audio goes (the app's socket, or the
+// owner's phone over a carrier's SIP account), a listener, and a speaker. call.ts holds the conversation and its rules, as with any line. This hears
 // the owner, cuts what a batch listener sends with a voice detector, and speaks the bot's sentences in order, one voice
 // at a time, each sentence's mark coming back once the page has played it.
 
@@ -162,9 +162,10 @@ export function voiceLine(o: { transport: Transport; ear: Ear; mouth: Mouth; voi
     },
   };
 
-  const self: Line & { input: Input; ends: boolean } = {
+  const self: Line & { input: Input; ends: boolean; fail(why: string): void } = {
     async place(call: Place) {
-      if (ear.way === "stream") listener = await ear.open(heard, (why) => failed(`Listening stopped: ${why}`));
+      // A call that only speaks, such as a number's code, opens no listener.
+      if (ear.way === "stream" && !call.quiet) listener = await ear.open(heard, (why) => failed(`Listening stopped: ${why}`));
       answered = true;
       transport.send({ state: "on" });
       if (call.greeting) self.say(call.greeting, call.voice);
@@ -204,6 +205,8 @@ export function voiceLine(o: { transport: Transport; ear: Ear; mouth: Mouth; voi
       return ear.way === "stream" && ear.turns;
     },
     input,
+    // Where the audio goes ended the call, and why.
+    fail: (why) => failed(why),
   };
   return self;
 }

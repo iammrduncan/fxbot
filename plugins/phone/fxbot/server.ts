@@ -1,18 +1,21 @@
 import { randomInt } from "node:crypto";
-import type { PluginApi } from "@fxbot/sdk";
+import type { PluginApi, PluginSocket } from "@fxbot/sdk";
 import { callNote, conversation, lines, roomCallNote, type Conversation } from "./call.ts";
-import type { Outcome, Provider } from "./line.ts";
+import type { Outcome, Provider, SipAccount } from "./line.ts";
+import { checkSignIn, sipCall } from "./sip.ts";
 import { voicesFor, type Rooms } from "./room.ts";
 import { wav } from "./audio.ts";
 import { adapters, listenerFor, speakerFor, type Added, type Voice as Spoken } from "./speech.ts";
 import { listen as fromPage, transport } from "./talk.ts";
-import { voiceLine, type Ear, type Input, type Mouth } from "./voice.ts";
+import { voiceLine, type Ear, type Mouth, type Transport } from "./voice.ts";
 
-// phone: a bot rings the owner's own phone, and they talk, with the bot's own turn deciding everything
-// (docs/_completed/phases/phone.md). This holds the call: Call me, the tools, who may call and when, the owner's number, the conversation, and
-// the last calls. A provider plugin, such as phone-signalwire, carries it: it needs phone with { "line": 2 } and offers
-// a Provider (line.ts). The owner starts a call with Call me; a bot starts one when the owner asked, on a call-back they
-// gave, or on its own when the owner allowed that.
+// phone: calls with a bot, in the app or on the owner's own phone, with the bot's own turn deciding everything
+// (docs/_completed/phases/phone.md, phone-v2.md). This holds every call: in-app calls, Call me, the tools, who may call
+// and when, the owner's number, the voice and listening, the conversation, and the last calls. A call on the owner's
+// phone is the same call as one in the app, with its audio over their phone: a carrier plugin, such as
+// phone-signalwire, only gives a SIP account. It needs phone with { "line": 3 } and offers a Provider (line.ts). The
+// owner starts a call in the app or with Call me; a bot rings them when the owner asked, on a call-back they gave, or on
+// its own when the owner allowed that.
 
 type Why = "button" | "asked" | "callback" | "own" | "confirm";
 type Row = {
@@ -34,8 +37,8 @@ type Row = {
 };
 // What a bot gets. A provider or voice of null is the default's.
 type Features = { provider: string | null; voice: string | null; button: boolean; asked: boolean; own: boolean };
-// line is the contract the provider speaks: 2, or the older 1, where the provider decides what cuts the bot off.
-type Found = { name: string; api: Provider; line: number };
+// A carrier added and running.
+type Found = { name: string; api: Provider };
 
 const limits = { minutes: [5, 120, 30], perDay: [1, 20, 3], pause: [1, 5, 2] } as const;
 const phone = /^\+[1-9]\d{6,14}$/;
@@ -44,7 +47,7 @@ const finished = (text: string) => (/[.!?…]$/.test(text) ? text : `${text}.`);
 const words: Record<Outcome, string> = {
   answered: "Answered.",
   voicemail: "It went to voicemail, and I left the reason.",
-  missed: "Not answered after 30 seconds of ringing.",
+  missed: "Not answered after 45 seconds of ringing.",
   busy: "Busy.",
   declined: "They declined it.",
   failed: "The call failed",
@@ -108,13 +111,13 @@ export default async function setup(fx: PluginApi) {
   const setting = (name: string) => (fx.settings[name] ?? "").trim();
   const confirmed = async () => phone.test(setting("to")) && (await fx.secrets.get("confirmed")) === setting("to");
 
-  // The providers: the plugins that need phone with { "line": 2 } or { "line": 1 }, added, and the ones of them running
-  // now, by name.
-  const added = () => fx.dependents().filter((d) => d.needs.line === 1 || d.needs.line === 2);
+  // The carriers: the plugins that need phone with { "line": 3 }, added, and the ones of them running now, by name. One
+  // that needs line 1 or 2 is from before phone 0.2.0, and is listed only to say it needs updating.
+  const added = () => fx.dependents().filter((d) => d.needs.line === 1 || d.needs.line === 2 || d.needs.line === 3);
   const providers = (): Found[] =>
     added()
-      .filter((d) => typeof (d.api as Partial<Provider> | null)?.line === "function")
-      .map((d) => ({ name: d.name, api: d.api as unknown as Provider, line: Number(d.needs.line) }))
+      .filter((d) => d.needs.line === 3 && typeof (d.api as Partial<Provider> | null)?.sip === "function")
+      .map((d) => ({ name: d.name, api: d.api as unknown as Provider }))
       .sort((a, b) => (a.name < b.name ? -1 : 1));
   // The default: the one picked, while it runs, or else the first running.
   async function chosen() {
@@ -143,9 +146,11 @@ export default async function setup(fx: PluginApi) {
   fx.on("turn.start", (event) => void (!event.from && typed.add(event.messageId)));
   fx.on("turn.end", (event) => void (typed.delete(event.messageId), spoken.delete(event.messageId)));
 
-  // The one call at a time: its row, its bot, and its conversation. A call that confirms the owner's number counts too.
-  // A call in the app or a room keeps the bots who may hang it up: in a room, any of its bots.
-  let live: { id: number; bot: string; conversation: Conversation; members?: string[] } | null = null;
+  // The one call at a time: its row, its bot, its conversation, and the bots who may hang it up: in a room, any of its
+  // bots. A call on the owner's phone keeps what its bar shows, which the page reads, since no socket carries it there.
+  // A call that confirms the owner's number counts too.
+  type Loop = ReturnType<typeof voiceLine>;
+  let live: { id: number; bot: string; conversation: Conversation; members: string[]; loop: () => Loop | null; shown: { who: string; muted: boolean } } | null = null;
   let confirming = false;
 
   // A call's end. The owner or the bot hanging up, a voicemail left, and the call's length are how calls end; anything
@@ -360,22 +365,70 @@ export default async function setup(fx: PluginApi) {
     return level === "same" ? undefined : level;
   };
 
-  // A call in the app: the page's socket, for a bot, or a chat room's bots. It's a call as phone's others are, with its
-  // row, its limits, and one call at a time, carried by phone's own voice loop.
-  async function talk(socket: Parameters<Parameters<typeof fx.socket>[1]>[0], target: { bot?: string; room?: number }) {
-    const refuse = (why: string) => (socket.send(JSON.stringify({ ended: why })), socket.close(1000, why.slice(0, 100)));
-    if (live || confirming) return refuse("A call is on already.");
+  // Every call goes one way (docs/phases/phone-v2.md, part 2): its row, one at a time, its own session and note, the
+  // Voice section's listener and voice, the conversation and its rules, its bar, and its summary. Where its audio goes
+  // is the only difference: the page's socket, for a call in the app, or the owner's phone, on a carrier's SIP account,
+  // for Call me and a bot's call. The carrier only gives the account.
+  type Target = { bot?: string; room?: number };
+  type Via = { app: PluginSocket } | { phone: Found | null };
+
+  // Why a call can't start now, in words for the owner or a bot, or nothing.
+  async function blocked(via: Via, cfg: VoiceConfig) {
+    if (live) return "A call is on already, and there's one at a time.";
+    if (confirming) return "The owner is confirming their number on a call now.";
+    if (!("phone" in via)) return "";
+    const problem = unready(via.phone);
+    if (problem) return problem;
+    if (!(await confirmed())) return "The owner's number isn't confirmed yet: they confirm it in Settings › Plugins › phone.";
+    if (cfg.listen === "device" || cfg.speak === "device")
+      return "A call on the owner's phone needs phone's Voice section to listen and speak with providers, not This device, which is the browser's own.";
+    return "";
+  }
+
+  // The owner's phone as a call's audio: phone's softphone on the carrier's account (sip.ts) into the voice loop, which
+  // answers once they pick up.
+  function onPhone(account: SipAccount, loopOf: (transport: Transport) => Loop): Loop {
+    let loop: Loop | null = null;
+    const line = sipCall({
+      account: async () => account,
+      log: (l) => fx.log(l),
+      heard: (pcm) => loop?.input.audio(pcm),
+      played: (n) => loop?.input.played(n),
+      ended: (how) => void (how === "hung up" ? loop?.hangUp(true) : loop?.fail(`The call ended: ${how}.`)),
+    });
+    const made = loopOf(line.transport);
+    loop = made;
+    const answer = made.place;
+    made.place = async (c) => {
+      const rang = await line.dial(c.to);
+      if (rang.outcome !== "answered") fx.log(`The call to the owner's phone ${rang.outcome === "failed" ? "failed" : `was ${rang.outcome}`}${rang.error ? `: ${rang.error}` : ""}.`);
+      return rang.outcome === "answered" ? answer(c) : rang;
+    };
+    return made;
+  }
+
+  // Starts a call with a bot, or a chat room's bots, and answers once it's answered, or isn't. A refusal throws, in words
+  // for the owner or a bot. The owner starts one in the app ("talk") or with Call me ("button"); a bot rings them for
+  // another reason, which its greeting says.
+  async function start(target: Target, via: Via, why: Why | "talk", reason = ""): Promise<{ id: number; outcome: Outcome; error?: string }> {
+    const page = "app" in via ? via.app : null;
+    const carrier = "phone" in via ? via.phone : null;
     const cfg = await voiceConfig();
+    const problem = await blocked(via, cfg);
+    if (problem) throw new Error(problem);
+    // The account first, so a carrier that can't give one fails before anything is made.
+    const account = carrier ? await carrier.api.sip() : null;
+    if (carrier && !account) throw new Error(`${carrier.api.label} isn't set up: ${carrier.api.missing().join(", ") || "it has no SIP account"}.`);
     let bot = target.bot ?? "";
     let name = "";
     let room: Parameters<typeof conversation>[1]["room"];
     if (target.room !== undefined) {
       const rooms = fx.need<Rooms>("chat-rooms");
-      if (!rooms?.post || !rooms.on || !rooms.stop || !rooms.callRoom || !rooms.pill) return refuse("A call in a room needs chat rooms 0.6.0 or newer.");
+      if (!rooms?.post || !rooms.on || !rooms.stop || !rooms.callRoom || !rooms.pill) throw new Error("A call in a room needs chat rooms 0.6.0 or newer.");
       const found = (await rooms.rooms()).find((r) => r.id === target.room);
-      if (!found?.members.length) return refuse("That room has no bots.");
+      if (!found?.members.length) throw new Error("That room has no bots.");
       const made = await rooms.callRoom(found.id);
-      if (!made) return refuse("The room's call didn't start.");
+      if (!made) throw new Error("The room's call didn't start.");
       const all = await fx.bots.list();
       const names = new Map(found.members.map((id) => [id, all.find((b) => b.id === id)?.name ?? "A bot"]));
       const own = new Map((await fx.sql<{ bot: string; voice: string | null }[]>`select bot, voice from bots where bot in ${fx.sql(found.members)}`).map((r) => [r.bot, r.voice]));
@@ -384,17 +437,22 @@ export default async function setup(fx: PluginApi) {
       name = names.get(bot)!;
       room = { id: made.id, rooms, names, voices, lead: bot, parent: found.id };
     } else {
-      if (!bot || !fx.bots.on(bot)) return refuse("Phone is off for this bot.");
+      if (!bot || !fx.bots.on(bot)) throw new Error("Phone is off for this bot.");
       name = (await fx.bots.get(bot)).name;
     }
-    if (live || confirming) return refuse("A call is on already.");
-    const [{ id }] = await fx.sql<{ id: number }[]>`insert into calls (bot, why, provider, status, answered_at, room, call_room)
-      values (${bot}, 'talk', 'app', 'on', now(), ${room?.parent ?? null}, ${room?.id ?? null}) returning id::int as id`;
+    if (live || confirming) throw new Error("A call is on already, and there's one at a time.");
+    const theirs = why === "talk" || why === "button";
+    const greeting = theirs ? "Hey, what's up?" : `Hey, this is your fxbot ${name}. ${reason ? finished(reason.trim()) : ""}`.trim();
+    const [{ id }] = await fx.sql<{ id: number }[]>`insert into calls (bot, why, reason, provider, status, answered_at, room, call_room)
+      values (${bot}, ${why}, ${reason || null}, ${carrier?.name ?? "app"}, ${page ? "on" : "ringing"}, ${page ? fx.sql`now()` : null}, ${room?.parent ?? null}, ${room?.id ?? null})
+      returning id::int as id`;
     if (room) onRoomCall = { room: room.id, rooms: room.rooms };
     const voice = room ? room.voices.get(bot)! : await voiceFor(cfg, bot);
-    let input: Input | null = null;
-    const greeting = "Hey, what's up?";
-    const session = room ? "" : await callSession(id, bot, callNote(greeting, true));
+    const session = room ? "" : await callSession(id, bot, callNote(greeting, theirs));
+    const ear = earOf(cfg, room ? [...room.names.values()] : [name]);
+    const mouth = mouthOf(cfg);
+    const shown = { who: "", muted: false };
+    let loop: Loop | null = null;
     const call: Conversation = conversation(fx, {
       bot,
       name,
@@ -404,28 +462,49 @@ export default async function setup(fx: PluginApi) {
       id,
       session,
       open: (events) => {
-        const line = voiceLine({ transport: transport(socket), ear: earOf(cfg, room ? [...room.names.values()] : [name]), mouth: mouthOf(cfg), voice, log: (l) => fx.log(l) }, events);
-        input = line.input;
-        return line;
+        const loopOf = (t: Transport) => voiceLine({ transport: t, ear, mouth, voice, log: (l) => fx.log(l) }, events);
+        // On the owner's phone, who speaks in a room is kept for the bar, as the page's socket would carry it.
+        const watched = (t: Transport): Transport => ({ ...t, send: (m) => (typeof (m as { who?: unknown }).who === "string" && (shown.who = (m as { who: string }).who), t.send(m)) });
+        loop = page ? loopOf(transport(page)) : onPhone(account!, (t) => loopOf(watched(t)));
+        return loop;
       },
-      turns: true,
-      app: true,
+      // The call's thinking level, for a quick first word (phone-v3, the sidekick).
       effort: callEffort(),
       room,
       onSpoken: (turn) => void spoken.add(turn),
       onEnd: room ? afterRoomCall(id, room, () => call) : afterCall(id, bot, session, () => call),
     });
-    live = { id, bot, conversation: call, members: room ? [...room.names.keys()] : [bot] };
-    fromPage(socket, () => input, () => void call.end());
-    // The page says what it can do with This device: listening, in its own browser, or not.
-    // And where the call's own chat is, for the bar to open beside the chat while it's on (phone-v3).
-    const open = `/phone/calls/${id}`;
-    socket.send(JSON.stringify({ state: "starting", listen: cfg.listen === "device" ? "device" : "server", speak: cfg.speak === "device" ? "device" : "server", google: setting("googleListening") === "on", open }));
-    const result = await call.place({ to: "", greeting, voice });
-    if (result.outcome !== "answered") await finish(id, result.error ?? "The call didn't start.");
+    live = { id, bot, conversation: call, members: room ? [...room.names.keys()] : [bot], loop: () => loop, shown };
+    if (page) {
+      fromPage(page, () => loop?.input ?? null, () => void call.end(), (l) => fx.log(l));
+      // The page says what it can do with This device: listening, in its own browser, or not. And where the call's own
+      // chat is, for the bar to open beside the chat while it's on (phone-v3).
+      page.send(JSON.stringify({ state: "starting", listen: cfg.listen === "device" ? "device" : "server", speak: cfg.speak === "device" ? "device" : "server", google: setting("googleListening") === "on", open: `/phone/calls/${id}` }));
+    }
+    const result = await call.place({ to: setting("to"), greeting, voice });
+    if (result.outcome === "answered") {
+      if (!page) await fx.sql`update calls set status = 'on', answered_at = now() where id = ${id} and ended_at is null`;
+    } else {
+      await fx.sql`update calls set status = ${statusOf[result.outcome]}, error = ${result.error ?? null}, ended_at = now() where id = ${id} and ended_at is null`;
+      if (live?.id === id) live = null;
+      if (room && onRoomCall?.room === room.id) onRoomCall = null;
+      onCall.delete(session);
+      call.close();
+    }
+    return { id, ...result };
   }
-  fx.socket("/talk/:bot", (socket, _request, { bot }) => void talk(socket, { bot }).catch((error) => (fx.log(`A call in the app failed: ${error.message}`), socket.close(1011, "The call failed."))));
-  fx.socket("/talk/room/:room", (socket, _request, { room }) => void talk(socket, { room: Number(room) }).catch((error) => (fx.log(`A room's call failed: ${error.message}`), socket.close(1011, "The call failed."))));
+  // A call to the owner's phone, through the bot's carrier, or a room's through the default.
+  const ring = async (target: Target, why: Why, reason = "") => start(target, { phone: target.bot ? await providerOf(await features(target.bot)) : await chosen() }, why, reason);
+
+  // A call in the app: the page's socket, for a bot, or a chat room's bots.
+  const inApp = (socket: PluginSocket, target: Target) =>
+    void start(target, { app: socket }, "talk").catch((error: Error) => {
+      fx.log(`A call in the app didn't start: ${error.message}`);
+      socket.send(JSON.stringify({ ended: error.message }));
+      socket.close(1000, error.message.slice(0, 100));
+    });
+  fx.socket("/talk/:bot", (socket, _request, { bot }) => inApp(socket, { bot }));
+  fx.socket("/talk/room/:room", (socket, _request, { room }) => inApp(socket, { room: Number(room) }));
 
   // The page's audio: the microphone at 16 kHz and the bot's voice as it comes, as an AudioWorklet module of the page's
   // own origin, which web pairing's frames allow where a blob's address isn't.
@@ -500,48 +579,7 @@ export default async function setup(fx: PluginApi) {
     return json({ ok: true });
   });
 
-  // Places a call to the owner's phone and answers once they answer, or don't. A refusal throws, in words for a bot.
-  async function place(bot: string, why: Why, reason = "") {
-    const f = await features(bot);
-    const p = await providerOf(f);
-    const problem = unready(p);
-    if (problem || !p) throw new Error(problem);
-    if (!(await confirmed())) throw new Error("The owner's number isn't confirmed yet.");
-    if (live) throw new Error(live.bot === bot ? "You're on a call with the owner now: just tell them." : "A call is on already, and there's one at a time.");
-    if (confirming) throw new Error("The owner is confirming their number on a call now.");
-    const { name } = await fx.bots.get(bot);
-    const told = reason ? finished(reason.trim()) : "";
-    const greeting = why === "button" ? `Hey, this is your fxbot ${name}. How can I help today?` : `Hey, this is your fxbot ${name}. ${told}`.trim();
-    const voicemail = why === "button" ? undefined : `Hi, it's ${name} from fxbot. ${told} Talk to me in the app anytime.`.replace(/\s+/g, " ");
-    // The bot's voice, while its provider still offers it, or the provider's own.
-    const voice = f.voice && p.api.voices().some((v) => v.value === f.voice) ? f.voice : undefined;
-    const [{ id }] = await fx.sql<{ id: number }[]>`insert into calls (bot, why, reason, provider) values (${bot}, ${why}, ${reason || null}, ${p.name}) returning id::int as id`;
-    const session = await callSession(id, bot, callNote(greeting));
-    const call: Conversation = conversation(fx, {
-      bot,
-      name,
-      greeting,
-      minutes: limit("minutes"),
-      pause: limit("pause") * 1000,
-      id,
-      session,
-      open: (events) => p.api.line(events),
-      turns: p.line === 2,
-      // The call's thinking level, as an app call's, for a quick first word (phone-v3, the sidekick).
-      effort: callEffort(),
-      onSpoken: (turn) => void spoken.add(turn),
-      onEnd: afterCall(id, bot, session, () => call),
-    });
-    live = { id, bot, conversation: call };
-    const result = await call.place({ to: setting("to"), greeting, voicemail, hints: [name], ...(voice ? { voice } : {}) });
-    await fx.sql`update calls set status = ${statusOf[result.outcome]}, error = ${result.error ?? null},
-      answered_at = ${result.outcome === "answered" || result.outcome === "voicemail" ? fx.sql`now()` : null},
-      ended_at = ${result.outcome === "answered" ? null : fx.sql`now()`} where id = ${id} and ended_at is null`;
-    if (result.outcome !== "answered" && live?.id === id) live = null;
-    return { id, ...result };
-  }
-
-  // After a restart, a call the last process left is over here. Its provider ends it at the service, if it's still up.
+  // After a restart, a call the last process left is over here. The carrier ends it once fxbot's line to it is gone.
   async function sweep() {
     await fx.sql`update calls set status = case when status = 'on' then 'ended' else 'failed' end, ended_at = now(), error = 'fxbot restarted.',
       seconds = extract(epoch from now() - answered_at)::int where status in ('ringing', 'on')`;
@@ -606,8 +644,9 @@ export default async function setup(fx: PluginApi) {
           why = "own";
         }
       }
+      if (live?.bot === call.bot) return "You're on a call with the owner now: just tell them.";
       try {
-        const result = await place(call.bot, why, reason);
+        const result = await ring({ bot: call.bot }, why, reason);
         return result.outcome === "failed" ? `${words.failed}: ${result.error ?? "The provider didn't say why."}` : words[result.outcome];
       } catch (error) {
         return error instanceof Error ? error.message : String(error);
@@ -617,13 +656,15 @@ export default async function setup(fx: PluginApi) {
 
   fx.tool({
     name: "hang_up",
-    description: "End the call with the owner, after this reply is spoken. Use it once they've said goodbye, or asked you to hang up.",
+    description: "End the call with the owner, after this reply is spoken. Only once they've said goodbye, or asked you to hang up.",
     inputSchema: { type: "object", properties: {} },
     idempotent: true,
     safe: true,
     // Safe: it can only end the owner's own call, so Permissions doesn't hold it while they drive.
     execute(_input: unknown, call) {
       if (!live || !(live.members ?? [live.bot]).includes(call.bot)) return "You're not on a call.";
+      if (!live.conversation.saidBye())
+        return "Not hung up: the owner hasn't said goodbye or asked you to hang up, so the call goes on. Don't say goodbye; keep talking with them, or wait for them.";
       live.conversation.hangUpAfter(call.messageId);
       return "Hanging up after this reply.";
     },
@@ -639,9 +680,11 @@ export default async function setup(fx: PluginApi) {
       provider: pick?.name ?? null,
       providers: added()
         .sort((a, b) => (a.name < b.name ? -1 : 1))
-        .map(({ name, api }) => {
-          const p = api as unknown as Provider | null;
-          return typeof p?.line === "function" ? { name, label: p.label, running: true, missing: p.missing() } : { name, label: name, running: false, missing: [] };
+        .map(({ name, api, needs }) => {
+          const p = api as unknown as Partial<Provider> | null;
+          if (needs.line === 3 && typeof p?.sip === "function") return { name, label: p.label, running: true, missing: p.missing!() };
+          // A carrier from before phone 0.2.0, which only its update fixes.
+          return { name, label: name, running: false, missing: [], old: needs.line !== 3 };
         }),
     });
   });
@@ -653,32 +696,60 @@ export default async function setup(fx: PluginApi) {
   });
 
   fx.route("POST", "/calls", async (request) => {
-    const { bot } = (await request.json().catch(() => ({}))) as { bot?: unknown };
-    if (typeof bot !== "string" || !fx.bots.on(bot)) return json({ error: "Phone is off for this bot." }, 400);
-    const f = await features(bot);
-    if (!f.button) return json({ error: "Call me is off for this bot." }, 400);
-    const problem = unready(await providerOf(f));
-    if (problem) return json({ error: problem, missing: true }, 400);
-    if (!(await confirmed())) return json({ error: "Confirm your number first, in Settings › Plugins › phone." }, 400);
-    if (live || confirming) return json({ error: "A call is on already." }, 409);
+    const body = (await request.json().catch(() => ({}))) as { bot?: unknown; room?: unknown };
+    const target: Target = typeof body.room === "number" ? { room: body.room } : { bot: typeof body.bot === "string" ? body.bot : "" };
+    if (target.bot !== undefined) {
+      if (!target.bot || !fx.bots.on(target.bot)) return json({ error: "Phone is off for this bot." }, 400);
+      if (!(await features(target.bot)).button) return json({ error: "Call me is off for this bot." }, 400);
+    }
+    const p = target.bot ? await providerOf(await features(target.bot)) : await chosen();
+    const problem = await blocked({ phone: p }, await voiceConfig());
+    if (problem) return json({ error: problem, missing: Boolean(unready(p)) || !(await confirmed()) }, live || confirming ? 409 : 400);
+    // The account now, so a carrier that can't give one says why here.
+    const account = await p!.api.sip().catch((error: Error) => error);
+    if (!account || account instanceof Error) return json({ error: account instanceof Error ? account.message : `${p!.api.label} has no SIP account yet.` }, 502);
     // It rings in the background: the bar follows it.
-    void place(bot, "button").catch((error) => fx.log(`Call me didn't call: ${error.message}`));
+    void start(target, { phone: p }, "button").catch((error) => fx.log(`Call me didn't call: ${error.message}`));
     return json({ ok: true }, 202);
   });
 
-  // The bot's call ringing or on, and whether its Call me shows.
+  // A bot's or a room's call on the owner's phone, ringing or on, with what its bar shows; why the last one failed, in
+  // the last minute; and whether Call me shows. A call in the app is the page's own, which shows it from its socket.
   fx.route("GET", "/calls/live", async (request) => {
-    const bot = new URL(request.url).searchParams.get("bot") ?? "";
-    // A call in the app is the page's own, which shows it from its socket.
-    const [row] = await fx.sql<Row[]>`select * from calls where bot = ${bot} and why not in ('confirm', 'talk') and status in ('ringing', 'on') order by id desc limit 1`;
-    // lines: whether a plugin that carries phone lines is added and running, for Call me in the chat's phone.
-    return json({ call: row ? { id: row.id, status: row.status, at: row.at, answeredAt: row.answered_at } : null, button: (await features(bot)).button, lines: added().some((d) => d.api !== null) });
+    const q = new URL(request.url).searchParams;
+    const room = q.has("room") ? Number(q.get("room")) : null;
+    const bot = q.get("bot") ?? "";
+    const [row] =
+      room === null
+        ? await fx.sql<Row[]>`select * from calls where bot = ${bot} and room is null and why not in ('confirm', 'talk') order by id desc limit 1`
+        : await fx.sql<Row[]>`select * from calls where room = ${room} and why <> 'talk' order by id desc limit 1`;
+    const on = row && (row.status === "ringing" || row.status === "on") ? row : null;
+    const now = on && live?.id === on.id ? live : null;
+    const failed = row && !on && row.error && row.ended_at && Date.now() - new Date(row.ended_at).getTime() < 60_000 ? row.error : "";
+    return json({
+      call: on
+        ? // The call's chat once it has one: its row comes a moment before, while the recap is read.
+          { id: on.id, status: on.status, at: on.at, answeredAt: on.answered_at, open: on.session ? `/phone/calls/${on.id}` : null, speaking: Boolean(now?.loop()?.speaking), muted: now?.shown.muted ?? false, who: now?.shown.who ?? "" }
+        : null,
+      failed,
+      button: room === null ? (await features(bot)).button : true,
+      // Whether a carrier is added and running, for Call me in the chat's phone.
+      lines: providers().length > 0,
+    });
   });
 
   fx.route("POST", "/calls/:id/end", async (_request, { id }) => {
     if (live?.id !== Number(id)) return json({ error: "That call isn't on." }, 404);
     await live.conversation.end();
     return json({ ok: true });
+  });
+  fx.route("POST", "/calls/:id/mute", async (request, { id }) => {
+    const { muted } = (await request.json().catch(() => ({}))) as { muted?: unknown };
+    if (typeof muted !== "boolean") return json({ error: "muted is true or false." }, 400);
+    if (live?.id !== Number(id)) return json({ error: "That call isn't on." }, 404);
+    live.shown.muted = muted;
+    live.loop()?.input.muted(muted);
+    return json({ muted });
   });
 
   fx.route("GET", "/calls", async () => {
@@ -721,20 +792,40 @@ export default async function setup(fx: PluginApi) {
     return new Response(await fx.chats.stream(row.bot, row.session, Number.isInteger(cursor) && cursor >= 0 ? cursor : 0), { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store" } });
   });
 
-  // Confirming the owner's number: a call through the default provider that plays a code, which the owner types back.
+  // Whether the chosen carrier's SIP account signs in, placing no call (phone-v2, part 2).
+  fx.route("POST", "/sip/try", async () => {
+    const p = await chosen();
+    if (!p) return json({ error: "Phone has no carrier: add one, such as phone-signalwire, from Plugins." }, 400);
+    try {
+      const account = await p.api.sip();
+      if (!account) return json({ error: `${p.api.label} isn't set up: ${p.api.missing().join(", ")}.` }, 400);
+      await checkSignIn(account);
+      return json({ said: `Signed in to ${account.domain} as ${account.username}.` });
+    } catch (error) {
+      return json({ error: (error as Error).message }, 502);
+    }
+  });
+
+  // Confirming the owner's number: a call through the default carrier that plays a code, in the Voice section's voice,
+  // which the owner types back.
   fx.route("POST", "/confirm", async () => {
     const p = await chosen();
     const problem = unready(p);
     if (problem || !p) return json({ error: problem }, 400);
     if (live || confirming) return json({ error: "A call is on already." }, 409);
+    const cfg = await voiceConfig();
+    if (cfg.speak === "device") return json({ error: "Confirming your number needs phone's Voice section to speak with a provider, not This device." }, 400);
+    const account = await p.api.sip().catch((error: Error) => error);
+    if (!account || account instanceof Error) return json({ error: account instanceof Error ? account.message : `${p.api.label} has no SIP account yet.` }, 502);
     confirming = true;
     const code = String(randomInt(1000, 10000));
     await fx.secrets.set("code", JSON.stringify({ code, to: setting("to"), until: Date.now() + 10 * 60_000 }));
     const spaced = code.split("").join(" ");
     const [{ id }] = await fx.sql<{ id: number }[]>`insert into calls (bot, why, provider) values ('', 'confirm', ${p.name}) returning id::int as id`;
-    const confirm = p.api.line({ heard: () => {}, interrupted: () => {}, played: () => {}, ended: () => {} });
+    const voice = await voiceFor(cfg);
+    const confirm = onPhone(account, (t) => voiceLine({ transport: t, ear: { way: "device" }, mouth: mouthOf(cfg), voice, log: (l) => fx.log(l) }, { heard: () => {}, played: () => {}, ended: () => {} }));
     void (async () => {
-      const result = await confirm.place({ to: setting("to"), greeting: `Your fxbot code is ${spaced}. Again: ${spaced}. Goodbye.`, quiet: true });
+      const result = await confirm.place({ to: setting("to"), greeting: `Your fxbot code is ${spaced}. Again: ${spaced}. Goodbye.`, quiet: true, voice });
       // Answered when it's answered, so the call's length is how long the code took to read.
       if (result.outcome === "answered") await fx.sql`update calls set status = 'on', answered_at = now() where id = ${id}`, await confirm.hangUp();
       await fx.sql`update calls set status = ${result.outcome === "answered" ? "ended" : statusOf[result.outcome]}, error = ${result.error ?? null},
@@ -755,7 +846,7 @@ export default async function setup(fx: PluginApi) {
     return json({ confirmed: true });
   });
 
-  // A bot's section: what it gets, its provider and the voices that provider offers, and its open call-back.
+  // A bot's section: what it gets, its carrier, the voices phone's speaker offers, and its open call-back.
   async function section(bot: string) {
     const f = await features(bot);
     const p = await providerOf(f);
@@ -783,8 +874,6 @@ export default async function setup(fx: PluginApi) {
     }
     if (body.provider !== undefined) {
       if (body.provider !== null && !providers().some((p) => p.name === body.provider)) return json({ error: "That provider isn't added and running." }, 400);
-      // A voice is its provider's, so another provider starts from its own.
-      if (body.provider !== f.provider) f.voice = null;
       f.provider = body.provider as string | null;
     }
     if (body.voice !== undefined) {

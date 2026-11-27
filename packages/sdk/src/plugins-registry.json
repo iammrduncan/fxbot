@@ -62,15 +62,15 @@
     {
       "name": "phone",
       "description": "Talk with a bot by voice, in the app or on your phone, and cut in whenever you like. A call is a side conversation: the bot works in the background while you talk, and its summary lands in its chat. In a chat room, it calls all its bots. Voice providers are logins: ElevenLabs, Deepgram, one you have, a speech server on your machine, or your browser's own speech.",
-      "note": "Talk needs a voice, picked in its tab. Call me needs a provider plugin, such as phone-signalwire, and your own number confirmed there.",
+      "note": "A call needs a voice, picked in its tab. Call me needs a carrier plugin, such as phone-signalwire, and your own number confirmed there.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/phone",
       "docs": "/docs/how-to/talk-with-a-bot-on-the-phone/"
     },
     {
       "name": "phone-signalwire",
-      "description": "SignalWire for phone: a bot rings your phone through SignalWire, and you talk with it, hands-free. fxbot connects out to SignalWire for each call, and nothing reaches fxbot.",
-      "note": "It needs the phone plugin, added first, and a SignalWire project and number.",
+      "description": "SignalWire for phone: Call me rings your own phone, for the same call as in the app, with its audio over your phone line. fxbot signs in to SignalWire as a softphone and connects out, and nothing reaches fxbot.",
+      "note": "It needs the phone plugin 0.2.0, added first, and a SignalWire space, project, and number.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/phone-signalwire",
       "docs": "/docs/how-to/talk-with-a-bot-on-the-phone/"

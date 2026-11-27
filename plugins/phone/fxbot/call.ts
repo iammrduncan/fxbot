@@ -34,6 +34,8 @@ export type Conversation = {
   answer(messageId: string, send: () => Promise<unknown>): Promise<string>;
   /** Closes the call's reader, after its wrap-up. */
   close(): void;
+  /** Whether the owner's latest words on the call said goodbye or asked to hang up. */
+  saidBye(): boolean;
   /** Ends the call once this turn ends and its last words have played. */
   hangUpAfter(turn: string): void;
   /** Ends the call at once. */
@@ -50,15 +52,11 @@ type Options = {
   /** The call's own session for the bot, where what the owner says goes. A room's call has its call room instead. */
   session: string;
   open: (events: LineEvents) => Line;
-  /** A line 2: the call decides what cuts the bot off, from the words as they come. */
-  turns: boolean;
   /** How long, in ms, the owner may go quiet before what they said goes to the bot. */
   pause: number;
   /** A turn the owner's words joined or started, for the plugin to count as theirs. */
   onSpoken: (turn: string) => void;
   onEnd: (how: string) => void;
-  /** A call in the app, which the owner opened: its own note. */
-  app?: boolean;
   /** How hard a call's turns think, as fx.chats.send's effort, or none for the bot's own. */
   effort?: string;
   /** A call in a chat room: the room's bots answer, each in its own voice, one at a time. */
@@ -68,8 +66,19 @@ type Options = {
 
 const label = "your call";
 const floorWords = /^(?:wait|hold on|hang on|one (?:sec|second|moment)|sorry)[.!,]*$/i;
+// Words that end a call, or ask the bot to: only after them may the bot hang up. Bob hung up on the owner's first
+// "How's it going?" over SIP (2026-11-27), as the note left the end of a call to the bot.
+const byeWords =
+  /\b(?:(?:good)?bye|good ?night|gotta go|got to go|(?:have|need) to go|talk (?:to you )?(?:later|soon|tomorrow)|ttyl|see (?:you|ya)|catch you later|later,? (?:man|dude|bob)|hang up|end (?:the|this) call|that's all|i'm done|we're done|peace out|take care)\b/i;
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const wordsOf = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [];
+// Words that only say the owner is listening, such as "mm-hmm": over the bot, they neither cut it off nor go to it as a
+// turn. On the owner's long call over SIP (2026-11-27), "Mm-hmm" cut Bob off mid-question.
+const listening = new Set(["mm", "hmm", "mhm", "mmhmm", "uh", "huh", "uhhuh", "um", "yeah", "yep", "yup", "right", "okay", "ok", "sure", "cool", "nice", "gotcha", "got", "it", "i", "see", "ah", "oh", "alright"]);
+const onlyListening = (text: string) => {
+  const words = wordsOf(text);
+  return words.length > 0 && words.length <= 3 && words.every((w) => listening.has(w));
+};
 // A heard word is a said one when they're equal, or both have 4 letters or more and are one edit apart, two letters
 // swapped counting as one: the recognizer hears the bot's own voice back a little wrong, as "quite" for "quiet" on
 // 2026-11-25, which cut it off after one word.
@@ -103,11 +112,12 @@ const sidekick =
   "When a subagent tells you something or reports, say what matters, briefly. When the owner asks how it's going, check with subagents_list or herdr's agents, and don't guess. Without subagents, keep each turn short, and say so if a task will take a while.";
 /** A room call's instructions, for each bot's session in the call room, while it's on. */
 export const roomCallNote = `${roomNote} ${sidekick}`;
-/** The bot's instructions for a call's session, while it's on. */
-export const callNote = (greeting: string, app = false) =>
-  app
-    ? `You're in a voice chat with the owner in the app: they opened it, and you said "${greeting}" What they say comes to you as text, and what you write is read out to them. ${sidekick} Anything that needs their OK shows on their screen. When they're done, say goodbye and use phone_hang_up.`
-    : `You're on a live phone call with the owner, who may be driving. You called them and said: "${greeting}" What they say comes to you as text, and what you write is read out to them. ${sidekick} Anything that needs their OK shows on their screen, which they can't look at while driving. When they're done, say goodbye and use phone_hang_up.`;
+const byeNote =
+  "The call goes on until the owner says goodbye or asks you to hang up: then say goodbye and use phone_hang_up. A pause or a quiet moment isn't the end.";
+/** The bot's instructions for a call's session, while it's on: the same in the app and on the owner's phone, but for who
+ * started it. */
+export const callNote = (greeting: string, theirs: boolean) =>
+  `You're on a voice call with the owner, which ${theirs ? "they started" : "you started, ringing their phone"}, and you said: "${greeting}" What they say comes to you as text, and what you write is read out to them. ${sidekick} Anything that needs their OK shows on their screen, which they may not be looking at. ${byeNote}`;
 
 // NDJSON lines from a stream of bytes, until it ends or is cancelled.
 export async function* lines(reader: ReadableStreamDefaultReader<Uint8Array>) {
@@ -211,6 +221,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   let onItNext = 0;
   let heardAt = Date.now();
   let goodbyeAfter = "";
+  let ownerLast = "";
   let over = false;
   const timers: NodeJS.Timeout[] = [];
   // What the bot said that's playing or waiting to, and what stopped playing, with when: for telling its own voice coming
@@ -225,6 +236,10 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   let held: string[] = [];
   let lastWords = 0;
   let talked = 0;
+  // The owner's last words sent, and their turn, and the turns that have said or done something: words that come while
+  // that turn hasn't yet are the rest of the same words.
+  let lastAsk: { turn: string; words: string } | null = null;
+  const acted = new Set<string>();
   let release: NodeJS.Timeout | undefined;
   // A room's call: each bot's reply as it's said, how much of its text was taken, the bots cut off, and who was.
   const saying = new Map<string, { taken: number; words: ReturnType<typeof speech> }>();
@@ -233,9 +248,8 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   let cutOthers: string[] = [];
 
   const line = o.open({
-    hearing: (text) => void (o.turns && hearing(text)),
+    hearing: (text) => void hearing(text),
     heard: (text) => void (owners(text) && take(text)),
-    interrupted: () => interrupted(),
     played: (text) => {
       const i = unplayed.findIndex((u) => u.text === text.trim());
       const turn = i >= 0 ? unplayed.splice(0, i + 1).at(-1)!.turn : speaking;
@@ -246,13 +260,13 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     },
     ended: (how) => finish(how),
     // A listener with no words as they come: 700 ms of the owner's voice over the bot cuts it off, after the greeting.
-    voice: (ms) => void (o.turns && ms >= 700 && line.speaking && !greeting && (logCut(`${ms} ms of voice`), stop(), interrupted())),
+    voice: (ms) => void (ms >= 700 && line.speaking && !greeting && (logCut(`${ms} ms of voice`), stop(), interrupted())),
   });
 
   // The owner is speaking: words as they come, a final within the last moment, or words held for the pause. Mid-words is
   // the first and last of those, without the moment after a final, which an answer to their words doesn't wait out.
-  const talking = () => began > 0 || Date.now() - talked < 1200 || held.length > 0;
-  const midWords = () => began > 0 || held.length > 0;
+  const talking = () => stillTalking() || Date.now() - talked < 1200 || held.length > 0;
+  const midWords = () => stillTalking() || held.length > 0;
   // Nothing the bot says starts over the owner: what isn't an answer to their words, such as a subagent's report, and
   // since phone-v3 an answer to their earlier words too, waits while they speak, for their pause. On the owner's first
   // real call, the answer to "What's going on in the lab?" began 2 seconds into their next words, and was cut off.
@@ -272,7 +286,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     line.say(text, voice, turn.startsWith("room-") ? turn.slice(5) : undefined);
   }
 
-  // The bot cut off, by the call or by a line 1 provider: what was playing stopped, and what waited was dropped.
+  // The bot cut off: what was playing stopped, and what waited was dropped.
   function interrupted() {
     muted = speaking;
     speeches.delete(muted);
@@ -313,13 +327,19 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   }
   // On a line 2, two words of the owner's while the bot speaks cut it off, after the greeting. One may be a cough.
   function cutIn(text: string) {
-    if (o.turns && line.speaking && !greeting && wordsOf(text).length >= 2) (logCut(text), stop(), interrupted());
+    if (line.speaking && !greeting && wordsOf(text).length >= 2 && !onlyListening(text)) (logCut(text), stop(), interrupted());
   }
   // Each cut says what cut the bot off and what it was saying, to tell a misheard echo from the owner on real calls.
   const logCut = (heard: string) => fx.log(`Call ${o.id}: cut ${o.name} off on hearing "${heard.slice(0, 80)}", while saying "${(airing[0] ?? "").slice(0, 80)}"`);
   // Words as they come, on a line 2.
+  // Words begun count while their partials keep coming: a partial no final follows, as noise on a phone line gives, held
+  // the bot's replies until the owner's next words, over SIP (2026-11-27).
+  function stillTalking() {
+    return began > 0 && Date.now() - Math.max(began, lastWords) < 2000;
+  }
   function hearing(text: string) {
-    if (!began) began = Date.now();
+    if (!text.trim()) return;
+    if (!stillTalking()) began = Date.now();
     if (echoed(text, began)) return;
     lastWords = talked = Date.now();
     cutIn(text);
@@ -343,6 +363,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   // The owner's finished words: "wait" or "stop" acts at once, and the rest waits for the pause.
   function take(text: string) {
     const words = text.trim();
+    if (line.speaking && onlyListening(words)) return;
     if (!stopWords.test(words) && !floorWords.test(words)) return (held.push(words), wait());
     if (stopWords.test(words)) held = [];
     send(words);
@@ -352,7 +373,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   function wait() {
     clearTimeout(release);
     // A listener that ends turns itself has waited the pause already.
-    const until = lastWords + (line.ends ? 0 : o.pause) + (began ? 2000 : 0);
+    const until = lastWords + (line.ends ? 0 : o.pause) + (stillTalking() ? 2000 : 0);
     if (Date.now() < until) return void (release = setTimeout(wait, until - Date.now()));
     if (held.length) send(held.splice(0).join(" "));
   }
@@ -361,6 +382,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   async function hear(text: string) {
     heardAt = Date.now();
     const words = text.trim();
+    ownerLast = words;
     if (floorWords.test(words)) return stop();
     if (stopWords.test(words)) {
       stop();
@@ -375,19 +397,30 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     const cut =
       cutAfter === null ? "" : cutAfter ? `(They cut you off after: "${cutAfter.slice(-300)}")\n` : "(They cut you off before you'd said anything.)\n";
     cutAfter = null;
+    // The owner wasn't done: their words came while the turn on what they'd just said hasn't said or done anything. It's
+    // stopped, and all they said goes as one. Over SIP (2026-11-27), "...and then let" went alone at a pause mid-sentence,
+    // and the rest waited 16 seconds for the bot's turn on it.
+    const before = lastAsk && running.has(lastAsk.turn) && !acted.has(lastAsk.turn) && muted !== lastAsk.turn ? lastAsk : null;
+    if (before) {
+      muted = before.turn;
+      await fx.chats.cancel(o.bot, o.session).catch((error) => fx.log(`${o.name}'s turn on the owner's first words didn't stop: ${error.message}`));
+    }
+    const all = before ? `${before.words} ${words}` : words;
+    const joined = before ? `(They weren't done, so your answer to their first words was stopped. All they said:)\n` : "";
     // Without steer: in the call's own session, messages sent with it failed now and then with libfx's
     // ConflictingIdentity on the owner's OpenCode Go model (3 of 6 tries on dev, 2026-11-25), and without it none did,
     // a second one sent while the first turn ran included. Words said while a turn runs are the next turn.
     const result = await fx.chats.send(o.bot, {
       session: o.session,
-      text: `${cut}${words}`,
+      text: `${cut}${joined}${all}`,
       shown: words,
       label,
-      asked: words,
+      asked: all,
       messageId: id,
       ...(o.effort ? { effort: o.effort } : {}),
     });
     const turn = result.joined ?? result.messageId;
+    lastAsk = { turn, words: all };
     ours.add(turn);
     o.onSpoken(turn);
     if (result.joined) running.add(turn);
@@ -438,6 +471,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     // first, at once, so the owner hears it's on it. The bot's own words come first when it says them; "One moment."
     // stays the net for a slow start.
     if (l.type === "tool_start" && muted !== turn && ours.has(turn) && saidAt <= heardAt && !/^phone_/.test(l.name ?? "")) say(onIt[onItNext++ % onIt.length], turn);
+    if ((l.type === "text_delta" && l.delta?.trim()) || l.type === "tool_start") acted.add(turn);
     if (l.type === "turn_start") {
       running.add(turn);
       if (sent.has(turn)) started.add(turn);
@@ -545,6 +579,7 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
       return text;
     },
     close: () => stopFollowing.abort(),
+    saidBye: () => byeWords.test(ownerLast),
     hangUpAfter(turn) {
       // The tool runs inside its turn, which the chat may not have shown yet: the call ends at that turn's end, or in a
       // minute if the chat never says it ended.

@@ -1,76 +1,79 @@
-import { readFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
 import type { PluginApi } from "@fxbot/sdk";
-import type { LineEvents, Provider, Voice } from "../../phone/fxbot/line.ts";
-import { endKept, line, type Relay } from "./relay.ts";
+import type { Provider, SipAccount } from "../../phone/fxbot/line.ts";
 
-// phone-signalwire: SignalWire's RELAY as a line for phone (docs/_completed/phases/phone-signalwire.md and phone.md).
-// phone holds the call, its rules, and the owner's number. This holds the connection to SignalWire, one for each call,
-// and nothing ever connects to fxbot.
+// phone-signalwire: SignalWire for phone (docs/_completed/phases/phone-signalwire.md, and phone-v2.md's part 2). It's
+// only the line: a SIP account on the owner's SignalWire space, which phone's own softphone signs in to and rings their
+// phone from. Everything else about a call is phone's, the same as a call in the app: the voice, the listening, the
+// conversation, and its rules. Every connection goes out, and nothing ever connects in.
 
 const number = /^\+[1-9]\d{6,14}$/;
 
 export default async function setup(fx: PluginApi) {
   const setting = (name: string) => (fx.settings[name] ?? "").trim();
-  // RELAY has one address for every space: the project says whose. A checkout's checks point the plugin at a fake
-  // one, read once at start.
-  const fake = process.env.FXBOT_PHONE_RELAY ?? "";
-  const relay = (): Relay => ({
-    url: fake || "wss://relay.signalwire.com",
-    project: setting("project"),
-    token: setting("token"),
-    from: setting("from"),
-    voice: setting("voice") || "amazon.Joanna:neural:en-US",
-    language: setting("language") || "en-US",
-    log: (...parts) => fx.log(...parts),
-  });
+  // The space's name, from what the owner typed: a name, or its address.
+  const space = () => setting("space").replace(/^https?:\/\//, "").replace(/\.signalwire\.com.*$/, "");
   function missing() {
-    const out = ["project", "token"].filter((name) => !setting(name));
+    const out = ["space", "project", "token"].filter((name) => !(name === "space" ? space() : setting(name)));
     if (!number.test(setting("from"))) out.push("from");
     return out;
   }
-  // What a bot may pick is the voice setting's own list.
-  const manifest = JSON.parse(await readFile(new URL("../plugin.json", import.meta.url), "utf8"));
-  const voices: Voice[] = manifest.extensions["sh.fxbot"].settings.find((s: { name: string }) => s.name === "voice")?.options ?? [];
 
-  // After a restart, a call the last process left may still be up, since SignalWire keeps calls across connections:
-  // each is ended from a new connection with its protocol. Nothing is placed again.
-  async function sweep() {
-    for (const kept of await fx.sql<{ sid: string; node: string; protocol: string }[]>`select sid, node, protocol from kept`) {
-      if (!missing().length) await endKept(relay(), { id: kept.sid, node: kept.node, protocol: kept.protocol });
-      await fx.sql`delete from kept where sid = ${kept.sid}`;
-    }
+  // SignalWire's REST API on the owner's space, with the project and its token.
+  async function rest(method: string, path: string, body?: unknown) {
+    const res = await fetch(`https://${space()}.signalwire.com${path}`, {
+      method,
+      headers: { authorization: `Basic ${Buffer.from(`${setting("project")}:${setting("token")}`).toString("base64")}`, "content-type": "application/json", accept: "application/json" },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`SignalWire answered ${res.status} to ${method} ${path}: ${text.slice(0, 200)}`);
+    return text ? JSON.parse(text) : null;
   }
-  void sweep().catch((error) => fx.log(`The start's sweep failed: ${error.message}`));
 
-  // The lines that may still be up, which unloading ends.
-  const open = new Set<ReturnType<typeof line>>();
-  const provider: Provider = {
-    label: "SignalWire",
-    missing,
-    voices: () => voices,
-    line(events: LineEvents) {
-      let sid = "";
-      const one = line(relay(), { ...events, ended: (how) => (open.delete(one), events.ended(how)) }, (found) => {
-        // Saved as soon as SignalWire names the call, so a crash while it rings leaves nothing up.
-        if (found) (sid = found.id), void fx.sql`insert into kept (sid, node, protocol) values (${found.id}, ${found.node}, ${found.protocol})
-          on conflict (sid) do update set node = excluded.node, protocol = excluded.protocol`.catch(() => {});
-        else if (sid) void fx.sql`delete from kept where sid = ${sid}`.catch(() => {});
-      });
-      const place = one.place;
-      one.place = async (call) => {
-        const result = await place(call);
-        if (result.outcome !== "answered") open.delete(one);
-        return result;
-      };
-      open.add(one);
-      return one;
-    },
-  };
+  // The SIP endpoint phone signs in to: made once on the owner's space, calling as their number, with encryption
+  // required, and passed straight through to the phone network. Its password is kept sealed. It's made again when the
+  // space, the project, or the number changes, and the old one deleted.
+  type Kept = { space: string; project?: string; from: string; id: string; username: string; password: string; domain?: string };
+  let making: Promise<Kept> | null = null;
+  async function sip(): Promise<SipAccount | null> {
+    if (missing().length) return null;
+    const kept = JSON.parse((await fx.secrets.get("sip")) ?? "null") as Kept | null;
+    const same = kept && kept.space === space() && kept.from === setting("from") && (kept.project ?? setting("project")) === setting("project");
+    const ours = same ? kept : await (making ??= make(kept).finally(() => (making = null)));
+    if (!ours.domain) await fx.secrets.set("sip", JSON.stringify(Object.assign(ours, { domain: await domain() })));
+    return { domain: ours.domain!, username: ours.username, password: ours.password, from: ours.from };
+  }
+  // Where an endpoint signs in: the space's SIP domain, from its SIP profile, such as <space>-<12 characters>.sip.signalwire.com.
+  // The plain <space>.sip.signalwire.com refused every sign-in (2026-11-27).
+  async function domain() {
+    const profile = await rest("GET", "/api/relay/rest/sip_profile");
+    if (typeof profile?.domain !== "string" || !profile.domain) throw new Error("SignalWire's SIP profile has no domain.");
+    return profile.domain as string;
+  }
+  async function make(old: Kept | null): Promise<Kept> {
+    if (old?.id && old.space === space() && (old.project ?? setting("project")) === setting("project"))
+      await rest("DELETE", `/api/relay/rest/endpoints/sip/${old.id}`).catch((error) => fx.log(`The old SIP endpoint wasn't deleted: ${error.message}`));
+    const username = `fxbot-${randomBytes(4).toString("hex")}`;
+    // Letters and digits only, as SignalWire's own examples are.
+    const password = randomBytes(16).toString("hex");
+    const made = await rest("POST", "/api/relay/rest/endpoints/sip", {
+      username,
+      password,
+      caller_id: setting("from"),
+      send_as: setting("from"),
+      encryption: "required",
+      codecs: ["PCMU"],
+      ciphers: ["AES_CM_128_HMAC_SHA1_80"],
+      call_handler: "passthrough",
+    });
+    const kept: Kept = { space: space(), project: setting("project"), from: setting("from"), id: String(made?.id ?? ""), username: String(made?.username ?? username), password, domain: await domain() };
+    await fx.secrets.set("sip", JSON.stringify(kept));
+    fx.log(`Made the SIP endpoint ${kept.username} on SignalWire, calling as ${kept.from}.`);
+    return kept;
+  }
+
+  const provider: Provider = { label: "SignalWire", missing, sip };
   fx.provide(provider);
-
-  // Unloading ends this plugin's calls, which phone saves: fxbot waits 5 seconds at most for a cleanup.
-  return async () => {
-    const ending = Promise.all([...open].map((one) => one.drop("fxbot reloaded phone-signalwire.")));
-    await Promise.race([ending, new Promise((resolve) => setTimeout(resolve, 3000))]);
-  };
 }
