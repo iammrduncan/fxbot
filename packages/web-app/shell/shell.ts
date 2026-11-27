@@ -873,6 +873,28 @@ async function recover(relay: string) {
   }
 }
 
+// --- Counting: how many people open the app, and how many have it open now (Fathom, site web.fxbot.sh; the owner,
+// 2026-11-26). Only on web.fxbot.sh itself, never on a shell someone hosts, and never in a frame. Fathom's script tracks
+// nothing by itself here: the shell sends fixed addresses only, so no path, pairing link or fragment ever leaves.
+// "/" is an opening; "/active" is sent each 4 minutes the app is on screen, so a long session still counts as online
+// (each one is about 4 minutes of use). Fathom is cookieless; the frames and the relay see none of this.
+function countVisits() {
+  type Fathom = { trackPageview(o: { url: string; referrer?: string }): void };
+  const send = (path: string, referrer = "") =>
+    (window as unknown as { fathom?: Fathom }).fathom?.trackPageview({ url: `https://web.fxbot.sh${path}`, referrer });
+  const script = document.createElement("script");
+  script.src = "https://cdn.usefathom.com/script.js";
+  script.dataset.site = "ISSAGKRD";
+  script.dataset.auto = "false";
+  script.defer = true;
+  script.onload = () => {
+    send("/", document.referrer);
+    setInterval(() => document.visibilityState === "visible" && send("/active"), 4 * 60_000);
+  };
+  document.head.append(script);
+}
+if (location.host === "web.fxbot.sh") countVisits();
+
 // --- Start: the pairings, a link in the address if there is one, and reconnecting when the page or network comes back.
 for (const p of await allPairings()) links.set(p.rid, new Link(p));
 void navigator.storage?.persisted?.().then((v) => ((persisted = v), render()));
