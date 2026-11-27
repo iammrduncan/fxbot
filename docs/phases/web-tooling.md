@@ -601,3 +601,20 @@ Built on 2026-11-27, as planned, with these differences:
 - On dev: Computer 0.6.0 and Web 0.1.0 loaded, and `GET /config` answers, with free search on and no provider added.
 
 **Not run:** any real provider's key, as no one has one here. Those items are the owner's, above.
+
+**After the owner's first real test (2026-11-27), with their Keiro key on dev:**
+- **Found:**
+  - Search, with and without `text`, worked.
+  - Every `web_fetch` through Keiro said "(The page has no text.)" and was charged 2 credits, with or without `mode: "deep"` and `objective`.
+  - `web_research` at `quick` and `normal` said "(No answer.)".
+  - `browser: true` read the same pages.
+- **Why:** the adapter read Keiro's replies where its docs show the fields, and the real replies put them elsewhere. Its 79 wiring checks had used a stand-in that answered in the docs' shapes.
+  - **`/extract`:** the docs show `data.results[0].text`. The real reply has `results` at the top, each holding the page as `markdown_content` or `content`, with the site's `status` and an `error`.
+  - **`/answer` with `stream: false`:** the docs show `answer`, `sources`, and `stats` at the top. The real reply has them inside `data`, and its sources are plain addresses.
+- **Fixed** in `providers/keiro.ts`, from the shapes logged once on dev with field names only.
+  - A reply with no text, or no answer, now says so as an error. The error names the site's status, Keiro's own error, and the reply's shape (`shape()`, in `common.ts`: fields, string lengths, and counts, never values). It no longer passes as an empty page.
+- **Checked on dev, with the owner's key:**
+  - Try it's read gives example.com's text.
+  - Try it's research gives an answer with its 5 sources.
+  - Cost: 9 Keiro credits for the checks, three rounds of a read (2) and an answer (1).
+- **Not checked:** Keiro's web agent, `web_research` at `deep`, which costs 7 credits and up a call. It's read as before, guessing at fields its docs don't show.

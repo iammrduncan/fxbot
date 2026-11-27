@@ -64,6 +64,17 @@ export const withSites = (query: string, domains: string[], exclude: string[]) =
   [query, domains.length ? `(${domains.map((d) => `site:${d}`).join(" OR ")})` : "", ...exclude.map((d) => `-site:${d}`)].filter(Boolean).join(" ");
 /** The date `recency` reaches back to, as YYYY-MM-DD. */
 export const since = (recency: Recency) => new Date(Date.now() - { day: 1, week: 7, month: 31, year: 366 }[recency] * 86_400_000).toISOString().slice(0, 10);
+/** A reply's shape, its fields, each string's length, and each list's count, with none of its values: what a provider
+ * answered when it wasn't what was expected, for the bot and the owner to read. */
+export function shape(value: unknown, depth = 0): string {
+  if (Array.isArray(value)) return `[${value.length}${value.length && depth < 3 ? ` ${shape(value[0], depth + 1)}` : ""}]`;
+  if (value && typeof value === "object") {
+    if (depth >= 3) return "{…}";
+    const fields = Object.entries(value).slice(0, 20).map(([k, v]) => `${k}${v && typeof v === "object" ? shape(v, depth + 1) : `: ${typeof v}${typeof v === "string" ? ` (${v.length})` : ""}`}`);
+    return `{ ${fields.join(", ")} }`;
+  }
+  return typeof value;
+}
 export const str = (value: unknown) => (typeof value === "string" ? value : value == null ? "" : String(value));
 /** A provider's results, cut to the count asked for, with the ones that have no address left out. */
 export const results = (list: unknown, map: (item: any) => Result, count: number): Result[] =>

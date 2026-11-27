@@ -1,4 +1,4 @@
-import { baseOf, call, results, str, type Adapter, type Result } from "./common.ts";
+import { baseOf, call, ProviderError, results, shape, str, type Adapter, type Result } from "./common.ts";
 
 // Keiro Labs, sold as BrowserFoundry too: the owner's web before this plugin, through its MCP server. One key covers
 // search (lite, fast, slow, deep), search with each page's text, extract, answer, and its web agent
@@ -6,7 +6,7 @@ import { baseOf, call, results, str, type Adapter, type Result } from "./common.
 const base = (p: { baseUrl: string | null }) => baseOf(p as never, "https://api.keirolabs.cloud/api/v2");
 const origin = (p: { baseUrl: string | null }) => new URL(base(p)).origin;
 const credits = (body: any) => {
-  const n = body?.creditsCharged ?? body?.credits_used ?? body?.stats?.credits_used;
+  const n = body?.creditsCharged ?? body?.credits_used ?? body?.stats?.credits_used ?? body?.data?.credits_used ?? body?.data?.stats?.credits_used;
   return typeof n === "number" ? `${n} Keiro credit${n === 1 ? "" : "s"}` : undefined;
 };
 const result = (r: any): Result => ({ title: str(r.title), url: str(r.url), snippet: str(r.snippet ?? r.excerpt), ...(r.content ? { text: str(r.content) } : {}) });
@@ -31,9 +31,17 @@ export const keiro: Adapter = {
   },
   async read(fx, p, { url, options }, signal) {
     const answer = await call(fx, p, `${base(p)}/extract`, { body: { url, ...options } }, signal);
-    const got = answer?.data?.results?.[0] ?? {};
-    const schema = got.json_schema?.data;
-    const markdown = [str(got.text), schema ? `\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\`` : ""].filter(Boolean).join("\n\n");
+    // Its replies, seen on 2026-11-27, aren't its docs': `results` is at the top, not in `data`, and each has the page
+    // as `markdown_content` or `content`, with the site's `status` and an `error`. A reply with no text says what it held.
+    const got = (Array.isArray(answer?.results) ? answer.results[0] : Array.isArray(answer?.data?.results) ? answer.data.results[0] : null) ?? {};
+    const asked = Boolean((options as { json_schema?: unknown }).json_schema);
+    const schema = got.json_schema?.data ?? got.json_schema ?? (asked && got.structuredData && Object.keys(got.structuredData).length ? got.structuredData : undefined);
+    const text = [got.markdown_content, got.content, got.text, got.markdown].find((v) => typeof v === "string" && v.trim()) as string | undefined;
+    if (!text && !schema) {
+      const why = str(got.error?.message ?? (typeof got.error === "string" ? got.error : "")) || str(got.note?.message ?? "");
+      throw new ProviderError(`Keiro answered with none of the page's text${typeof got.status === "number" && got.status !== 200 ? `, after the site answered ${got.status}` : ""}${why ? `: ${why}` : ""}. Its reply: ${shape(answer)}.`);
+    }
+    const markdown = [str(text), schema ? `\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\`` : ""].filter(Boolean).join("\n\n");
     return { title: str(got.title), url: str(got.url) || url, markdown, cost: credits(answer) };
   },
   async research(fx, p, { question, depth, options }, signal) {
@@ -46,7 +54,14 @@ export const keiro: Adapter = {
       return { answer: text, sources, cost: credits(answer) ?? credits(answer?.metadata) };
     }
     const answer = await call(fx, p, `${base(p)}/answer`, { body: { query: question, stream: false, ...options } }, signal);
-    const sources = (Array.isArray(answer.sources) ? answer.sources : []).map((s: any) => ({ title: str(s.title), url: str(s.url) || (s.domain ? `https://${s.domain}` : "") })).filter((s: any) => s.url);
-    return { answer: str(answer.answer), sources, cost: credits(answer) };
+    // Its reply, seen on 2026-11-27: the answer, its sources as addresses, and its stats are in `data`, not at the top
+    // as its docs show. A reply with no answer says what it held.
+    const body = answer?.data && typeof answer.data === "object" && !Array.isArray(answer.data) ? answer.data : answer;
+    const text = [body?.answer, body?.text].find((v) => typeof v === "string" && v.trim()) as string | undefined;
+    if (!text) throw new ProviderError(`Keiro answered with no answer. Its reply: ${shape(answer)}.`);
+    const sources = (Array.isArray(body?.sources) ? body.sources : [])
+      .map((s: any) => (typeof s === "string" ? { title: "", url: s } : { title: str(s.title), url: str(s.url) || (s.domain ? `https://${s.domain}` : "") }))
+      .filter((s: { url: string }) => /^https?:\/\//.test(s.url));
+    return { answer: text, sources, cost: credits(answer) };
   },
 };
