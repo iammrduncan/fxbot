@@ -178,7 +178,8 @@ function Reader({ params: { id } }) {
   const restore = () => call(`${id}/restore`, "POST", { n }).then(() => (setPicked(null), read()), (e) => setError(e.message));
   const remove = async () => {
     if (!confirm(`Remove ${shown.title} from the library, for every bot? The chats it came from keep what the bots saw.`)) return;
-    await client.library.remove(id).then(() => go("/library"), (e) => setError(e.message));
+    // Beside a chat, it closes and the chat stays. On its own screen, the library opens.
+    await client.library.remove(id).then(() => go(new URLSearchParams(location.search).has("beside") ? location.pathname : "/library"), (e) => setError(e.message));
   };
   const copy = () => navigator.clipboard.writeText(shown.text).then(() => setCopied(true), (e) => setError(e.message));
   // One tick at a time, each against the version the last one answered.

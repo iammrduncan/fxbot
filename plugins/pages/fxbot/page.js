@@ -255,7 +255,7 @@ function Reader({ params: { id } }) {
 	const restore = () => call(`${id}/restore`, "POST", { n }).then(() => (setPicked(null), read()), (e) => setError(e.message));
 	const remove = async () => {
 		if (!confirm(`Remove ${shown.title} from the library, for every bot? The chats it came from keep what the bots saw.`)) return;
-		await _fxbot_app.client.library.remove(id).then(() => (0, _fxbot_app.go)("/library"), (e) => setError(e.message));
+		await _fxbot_app.client.library.remove(id).then(() => (0, _fxbot_app.go)(new URLSearchParams(location.search).has("beside") ? location.pathname : "/library"), (e) => setError(e.message));
 	};
 	const copy = () => navigator.clipboard.writeText(shown.text).then(() => setCopied(true), (e) => setError(e.message));
 	const tick = (line, done) => {
