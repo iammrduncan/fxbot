@@ -31,14 +31,18 @@
 - **The owner picks.** The plugin's tab in Settings says which provider searches, which reads, and which researches, with **Try it** for each. A bot can ask another added provider for one call.
 - **Light.** About 1,150 lines in the plugin and 25 in the computer, and no core change. A bot without the plugin pays nothing.
 
-Status: planned on 2026-11-26 at the owner's word, not built.
+Status: **built on 2026-11-27** on `release/0.12.0`, the day after it was planned, at the owner's word. Web 0.1.0 and Computer 0.6.0 run on the owner's dev. Every checklist item that needs no key of the owner's is done; the rest are theirs ([What the build changed](#what-the-build-changed)):
+- Keiro with their own key on dev, the search, read, and research it does, and Bob answering something current through it, before they turn off Keiro's MCP server.
+- Nous Portal's tools, with a Portal API key, if they have one.
+- Each other provider they choose to get a key for.
+
+Planned on 2026-11-26:
 - **References:** each one in the [research directive](../research-directive.md) that has a repository was cloned and searched on 2026-11-26, and Grok Bot's docs were read.
 - **Other agents:** Hermes Agent's and OpenClaw's source, and Claude Code's, Codex's, and Open WebUI's docs, were read on 2026-11-26.
 - **Providers:**
   - Each provider's own docs and prices were read on 2026-11-26.
   - Each key check was called from this machine with a made-up key.
   - No real key was used.
-- Nothing of the plugin has run.
 
 It replaces the Web search stub, which it removes.
 
@@ -487,10 +491,10 @@ No package is added to the server's code: Node's `https`, `dns`, and `net`, and 
 
 ## 4. Checklist
 
-- [ ] The plugin, `plugins/web/`, with `plugin.json`, its provider entries (eleven with Nous's, once its key test passes), `needs: { computer: { optional: true } }`, `freeSearch`, and `minFxbot` 0.12.0.
-- [ ] `fetch.ts`, checked by a node script against real addresses:
-  - [ ] `https://example.com` reads.
-  - [ ] Each of these is refused:
+- [x] The plugin, `plugins/web/`, with `plugin.json`, its provider entries (eleven with Nous's, once its key test passes), `needs: { computer: { optional: true } }`, `freeSearch`, and `minFxbot` 0.12.0.
+- [x] `fetch.ts`, checked by a node script against real addresses:
+  - [x] `https://example.com` reads.
+  - [x] Each of these is refused:
     - `http://127.0.0.1`
     - `http://localhost`
     - `http://169.254.169.254`
@@ -501,46 +505,46 @@ No package is added to the server's code: Node's `https`, `dns`, and `net`, and 
     - a port other than 80 or 443
     - `file:`
     - a URL with a user name
-  - [ ] A public page that redirects to `http://127.0.0.1`, such as `https://httpbin.org/redirect-to?url=http://127.0.0.1/`, is refused at the redirect.
-  - [ ] The connection goes to the checked address: a test `lookup` that answers a public address and then a private one never connects to the private one.
-- [ ] `read.ts` on real pages:
-  - [ ] Each of these reads as clean Markdown, with its title, headings, links, lists, and code:
+  - [x] A public page that redirects to `http://127.0.0.1`, such as `https://httpbin.org/redirect-to?url=http://127.0.0.1/`, is refused at the redirect.
+  - [x] The connection goes to the checked address: a test `lookup` that answers a public address and then a private one never connects to the private one.
+- [x] `read.ts` on real pages:
+  - [x] Each of these reads as clean Markdown, with its title, headings, links, lists, and code:
     - a docs page
     - a news article
     - a Wikipedia article
     - a GitHub README
     - a page that serves `text/markdown`
-  - [ ] An app that's only JavaScript says it needs a browser.
-- [ ] `web_fetch`:
-  - [ ] A PDF lands in the library and reads with `library_read`.
-  - [ ] An image comes back as an image.
-  - [ ] Parts come 20,000 characters at a time.
-  - [ ] The cache answers a second read.
-- [ ] Free search: a real query through Parallel's free search, with no key, gives results. Turned off, a search says to add a provider.
-- [ ] SearXNG, real, in a container of the check's own (`fxbot-check-web-searxng`), with JSON on:
-  - [ ] Added as a provider.
-  - [ ] Picked.
-  - [ ] Try it.
-  - [ ] A bot's search, on the disposable check fxbot with the mock model.
-- [ ] Each adapter against a stand-in server that answers with the shapes in the providers' docs, on the check fxbot, with a copy of `plugin.json` pointing at it. Each `depth`, `text`, `recency`, read, and research maps as the table says. Reported as wiring only.
-- [ ] The picks:
-  - [ ] `GET` and `PUT /config`.
-  - [ ] The first added provider by default.
-  - [ ] `provider` on a call.
-  - [ ] Try it, with a provider's error shown.
-- [ ] Skills:
-  - [ ] `web` for every bot the plugin is on for.
-  - [ ] `web-<id>` added when a provider is added, and gone when it's removed, as a chat next opens.
-  - [ ] The instructions line names only what's there.
-- [ ] `web_research` comes once a provider that researches is added.
-- [ ] The computer's `read`:
-  - [ ] `browser: true` reads a page in the bot's Chromium.
-  - [ ] A subagent's read uses its own tab.
-  - [ ] Without the computer, the call says so.
-  - [ ] The shell tool works as before.
-- [ ] The permissions plugin asks or reviews web's tools as it does an MCP tool's.
-- [ ] The tools' views in a chat, in Chromium, on a desktop in light and a phone in dark.
-- [ ] **With the owner's Keiro key,** added as a provider on dev by the owner:
+  - [x] An app that's only JavaScript says it needs a browser.
+- [x] `web_fetch`:
+  - [x] A PDF lands in the library and reads with `library_read`.
+  - [x] An image comes back as an image.
+  - [x] Parts come 20,000 characters at a time.
+  - [x] The cache answers a second read.
+- [x] Free search: a real query through Parallel's free search, with no key, gives results. Turned off, a search says to add a provider.
+- [x] SearXNG, real, in a container of the check's own (`fxbot-check-web-searxng`), with JSON on:
+  - [x] Added as a provider.
+  - [x] Picked.
+  - [x] Try it.
+  - [x] A bot's search, on the disposable check fxbot with the mock model.
+- [x] Each adapter against a stand-in server that answers with the shapes in the providers' docs, on the check fxbot, with a copy of `plugin.json` pointing at it. Each `depth`, `text`, `recency`, read, and research maps as the table says. Reported as wiring only.
+- [x] The picks:
+  - [x] `GET` and `PUT /config`.
+  - [x] The first added provider by default.
+  - [x] `provider` on a call.
+  - [x] Try it, with a provider's error shown.
+- [x] Skills:
+  - [x] `web` for every bot the plugin is on for.
+  - [x] `web-<id>` added when a provider is added, and gone when it's removed, as a chat next opens.
+  - [x] The instructions line names only what's there.
+- [x] `web_research` comes once a provider that researches is added.
+- [x] The computer's `read`:
+  - [x] `browser: true` reads a page in the bot's Chromium.
+  - [x] A subagent's read uses its own tab.
+  - [x] Without the computer, the call says so.
+  - [x] The shell tool works as before.
+- [x] The permissions plugin asks or reviews web's tools as it does an MCP tool's.
+- [x] The tools' views in a chat, in Chromium, on a desktop in light and a phone in dark.
+- [ ] **With the owner's Keiro key,** added as a provider on dev by the owner. The owner's to tick:
   - [ ] Try it searches.
   - [ ] Each row of [Keiro, tool for tool](#keiro-tool-for-tool) runs once.
   - [ ] Bob, asked something current, searches, reads a page, and answers with links. Then the owner turns off Keiro's MCP server.
@@ -548,16 +552,52 @@ No package is added to the server's code: Node's `https`, `dns`, and `net`, and 
   - [ ] If they answer, the `nous` entry and its adapter, and Try it for search and reading.
   - [ ] If they refuse the key, the build notes say so, and the entry waits for a sign-in.
 - [ ] **Other providers with real keys,** each one the owner adds: Try it for each job it does. These items are the owner's to tick, for the keys they choose to get.
-- [ ] The docs listed above.
-- [ ] The repo checks:
-  - [ ] `npm run typecheck`, `npm run build-site`, and `git diff --check`.
-  - [ ] `page.js` built and committed with its licenses.
-  - [ ] The computer's change and web's committed on the open release branch, each on its own.
-- [ ] Dev updated: the plugin's folder in `FXBOT_PLUGIN_DIRS`, and the computer's file landed in one write, then the API restarted.
+- [x] The docs listed above.
+- [x] The repo checks:
+  - [x] `npm run typecheck`, `npm run build-site`, and `git diff --check`.
+  - [x] `page.js` built and committed. It bundles nothing but its own code, so it has no licenses file, as phone's hasn't.
+  - [x] The computer's change and web's committed on the open release branch, each on its own.
+- [x] Dev updated: the plugin's folder in `FXBOT_PLUGIN_DIRS`, and the computer's file landed in one write, then the API restarted.
 
 ## 5. Open questions
 
-- **Essentials?** Should web be one of the plugins first-run setup suggests? It searches with no key and reads with no key, so it works for every new owner from the start. Recommended: yes.
-- **Free search on by default?** With no search provider added, should bots use Parallel's free search, which sends their queries to Parallel without a key? Five of the directive's references do it, and a bot with no search tool searches in its browser instead. Recommended: on, with `freeSearch` to turn it off, and the Web section saying it's on.
-- **Nous Portal, if its gateways refuse a key.** Hermes reaches them with a Portal sign-in. Should fxbot ask Nous for a sign-in client of its own? Until one exists, adding Perplexity and Firecrawl directly gives the same search and reading. Recommended: ask Nous, and add the sign-in when they give one.
-- **The browser tools.** By "web_browser tools for using the browser in the computer," did the owner mean reading a page through the bot's own browser, as `web_fetch`'s `browser: true` does, with clicks and forms left to the computer's tools? Or should web have browser tools of its own, such as open, click, and type? Recommended: the first. The computer has those tools already, and two sets would compete for the same tab.
+Answered on 2026-11-27, with the plan's recommendations, at the owner's word ("taking each doc's recommended answers to its open questions"):
+- **Web is one of the Essentials,** after Subagents. It searches and reads with no key, so it works for every new owner from the start.
+- **Free search is on by default,** with `freeSearch` to turn it off, and the Web section saying it's on.
+- **Nous Portal waits for the owner's key.** Its entry is built only once a Portal API key, sent to each gateway with one search and one read, shows they take it. No one asked Nous for a sign-in client.
+- **The browser is for reading.** `web_fetch` with `browser: true` reads a page in the bot's own browser. Clicks, forms, and sign-ins stay with the computer's tools, so web has no browser tools of its own.
+
+Nothing is still open.
+
+## What the build changed
+
+Built on 2026-11-27, as planned, with these differences:
+- **A core fix, in skills' names** (`packages/sdk/src/skills.ts`). A plugin's `fx.skills.set` gives each bot its own skills, and fxbot counted every bot's toward a name clash before keeping one bot's. So the second bot given `web-exa` saw it as `web/web-exa`, and the skill its chat named wasn't found. Only the bot's own count now. It's its own commit, and changes nothing in the plugin API.
+- **A second table, `calls`,** in the migration, which is `0001_web.sql`. A chat's stream gets only a preview of a tool's result, so a search's view couldn't list its results from it. Each call's view, its results, its page's title and who read it, or research's sources, is kept by the model's id for the call, which only `tool.before` has: web's own hook notes it for its own tools. `GET /calls/:id` gives it to the page. Kept 30 days.
+- **A search shows each page's text only with `text: true`.** Perplexity, Parallel, Jina, and Linkup give it anyway, at no extra cost, and their skills say `text: true` shows it. Free search's excerpts filled the result unasked.
+- **Reading a page:**
+  - It drops a page's chrome by its role, class, or id, too: menus, sidebars, dropdowns, banners, cookie notices, share buttons. Wikipedia's article opened with its 300-language list.
+  - An article inside `<main>` that holds over 40% of its words is read alone, as a README on its GitHub page is.
+  - A page is "only JavaScript" when it has scripts and next to no words, with an empty app root or words asking for JavaScript, or no words at all. example.com, 25 words and a script, first read as one.
+  - A compressed answer is unpacked, gzip, deflate, or Brotli, where fx0 refused one.
+- **fxbot's own read of a page is kept for one chat,** since a PDF it read is that chat's in the library.
+- **`fx.providers` answers once fxbot has started,** after the plugins' setups, so the first look at the providers, for the skills and `web_research`, waits for it.
+- **The computer reads into a file,** since a command's output is cut past 60 KiB, and provides `on(bot)` too, so web knows whether to offer the browser. It's Computer 0.6.0.
+- **Jina's search is at the reader's own address** when the reader isn't `r.jina.ai`, so a stand-in can serve both.
+- **The `nous` entry isn't there yet,** waiting on the owner's key, as decided.
+- **Sizes:** `server.ts` 422 lines, `fetch.ts` and `read.ts` 331, the adapters 456 with their common code, the page 190, and 11 skill files. The computer's change is 57 lines. `page.js` is 2.6 KB gzipped.
+
+**What ran,** on a disposable check fxbot on ports 8840 to 8849, with the mock model, the main tree's code, and a staged copy of web:
+- `fetch.ts` against real addresses: example.com read; 16 local, private, and odd addresses refused, among them `[::ffff:127.0.0.1]`, NAT64's `64:ff9b::7f00:1`, `100.100.100.100`, and `localtest.me`; a redirect from `postman-echo.com` to `127.0.0.1` and to `169.254.169.254` refused at the redirect (httpbin.org now refuses to redirect to an internal address itself); a lookup answering example.com's address and then `127.0.0.1` connected to the first, asking DNS once.
+- `read.ts` on MDN's Using Fetch, Wikipedia's Telephone and its HTTP status codes and browser comparison, agent-browser's GitHub README, a BBC News article, Parallel's docs served as `text/markdown`, and Excalidraw and Netlify's app, which say they need a browser.
+- The tools through Bob: a real search through Parallel's free search, five results; Wikipedia's Telephone in parts of 20,000 characters; random.org's number read twice from the cache; a PDF into the library and read with `library_read`; Google's logo as an image the model got; a 403 and a JavaScript app saying what else could read them; free search off saying to add a provider.
+- Each adapter against a stand-in answering in its docs' shapes, 79 checks: each depth, `text`, `recency`, `domains`, `exclude`, `options`, read, and research mapped as the table says, Tavily's and Parallel's research asked after until done, and a provider's error reaching the model and the plugin's log. Wiring only.
+- The picks, `GET` and `PUT /config`, a pick that can't do the job refused, `provider` on a call, Try it for each job, Try it with a wrong Keiro key showing Keiro's refusal, the instructions line following the picks, and `web_research` appearing once a provider that researches was added.
+- SearXNG, real, in `fxbot-check-web-searxng`: added by its address, picked, Try it, and Bob's search, with `recency` and `count`.
+- Skills: `web` and each added provider's for Bob, `web-linkup` gone when Linkup was removed, and a new bot given them as its chat opened, after the core fix.
+- The computer, real, in the agent user's rootless podman: `browser: true` read example.com in Bob's Chromium, a subagent read IANA's page in a tab of its own, `agent-browser tab` listed both, the shell answered `exit 3` and its output as before, and with the computer off for Bob, or removed, the call said so and the instructions line didn't offer it.
+- Permissions in ask mode: `web_search` and `web_fetch` waited for the owner's card, as an MCP tool's call does, ran once allowed and not when refused; `memory_search`, safe, ran at once.
+- The views, in Chromium, against the check fxbot serving `release/0.12.0`'s page before Input Markdown: the Web section with Try it, and a search, a read, and research in Bob's chat, on a desktop in light and a phone in dark.
+- On dev: Computer 0.6.0 and Web 0.1.0 loaded, and `GET /config` answers, with free search on and no provider added.
+
+**Not run:** any real provider's key, as no one has one here. Those items are the owner's, above.
