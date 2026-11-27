@@ -425,3 +425,10 @@ Built on 2026-11-27 on `release/0.12.0` in the main tree, beside the web tooling
 **Not checked, and why:**
 - **The owner's iPhone,** through web pairing: typing with autocorrect and dictation, the bar, Return, sending, and a list's Backspace. Headless Chromium has no iPhone keyboard.
 - **A real model:** the bots were the mock model. What a real model makes of the Markdown is what it already read, since the owner's words were Markdown before.
+
+**Fixes from the 0.12.0 release review:**
+- **A paste becomes formatting only when it writes back as the text pasted.** Markdown read `foo/__init__.py` as bold, so the bot got `foo/**init**.py`. Anything that doesn't write back the same goes in as it is, as if typed. Checked in node: Markdown such as `**bold** and _it_`, lists, and links still format, and `foo/__init__.py` and a `javascript:` link stay text.
+- **A link the box reads** goes to a website, a mail address, or a place in the app. Any other, such as `javascript:`, from a paste or a copied box, stays text.
+- **The owner's words in angle brackets show.** `Array<string>` showed as "Array" in their bubble, since Markdown takes `<string>` for HTML, which stays out. Each `<` outside code is text now, but an autolink's. Checked through Streamdown in node. A bot's reply still drops one, as Streamdown does.
+- **The link field doesn't block Send.** It was an `<input type="url">` in the message's form, so a half-typed address stopped the form sending, on a phone with no word why. It's a text field with the address keyboard now.
+- **`formatting` gives plugins what the plugin API lists,** and no more: `nodes`, `marks`, `plugins`, `toMarkdown`, `fromMarkdown`, `offsetOf`, `posOf`, `ownsKey`, `isEmpty`, and `breaks`.
