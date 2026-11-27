@@ -212,14 +212,15 @@ export default async function setup(fx: PluginApi) {
     const ways = [
       tried !== "browser" && computer?.read && computer.on?.(call.bot) ? "in your own browser, with browser: true" : "",
       ...(await usable()).filter((p) => p.can.includes("read") && p.id !== tried).map((p) => `through ${p.name}, with provider: "${p.name}"`),
-      `from the Wayback Machine, https://web.archive.org/web/2026/${url}`,
+      // Its capture nearest to today.
+      `from the Wayback Machine, https://web.archive.org/web/${new Date().toISOString().slice(0, 10).replace(/-/g, "")}/${url}`,
     ].filter(Boolean);
     return ` Try reading it ${ways.join(", or ")}.`;
   }
   // A page in the bot's own browser, on its computer.
   async function inBrowser(url: string, call: Call): Promise<Page> {
     const computer = fx.need<Computer>("computer");
-    if (!computer?.read) throw new Refused("The computer isn't added, so there's no browser to read it in.");
+    if (!computer?.read) throw new Refused("The computer isn't added, or is older than 0.6.0, so there's no browser to read it in.");
     if (computer.on && !computer.on(call.bot)) throw new Refused("The computer is off for you, so there's no browser to read it in.");
     const got = await computer.read(call, url, call.signal);
     if (got.error || got.text === undefined) throw new Refused(`Your browser couldn't read it: ${got.error ?? "it said nothing"}`);
@@ -429,7 +430,7 @@ export default async function setup(fx: PluginApi) {
       next[job] = id ?? null;
     }
     if ("blocked" in body) {
-      if (body.blocked !== null && !blockedOk(body.blocked ?? null, list)) return json({ error: body.blocked === "browser" ? "The computer isn't added, so there's no browser to read in." : "That provider can't read pages." }, 400);
+      if (body.blocked !== null && !blockedOk(body.blocked ?? null, list)) return json({ error: body.blocked === "browser" ? "The computer isn't added, or is older than 0.6.0, so there's no browser to read in." : "That provider can't read pages." }, 400);
       next.blocked = body.blocked ?? null;
     }
     await fx.sql`insert into picks (only_one, search, read, research, blocked) values (true, ${next.search}, ${next.read}, ${next.research}, ${next.blocked})
