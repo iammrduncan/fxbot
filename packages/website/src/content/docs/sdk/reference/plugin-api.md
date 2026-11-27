@@ -36,6 +36,7 @@ Only `plugin.json` is required, and only the paths it names count.
 | `extensions["sh.fxbot"].settings` | A list of settings, each with `name`, `description`, and optionally `default`, `isRequired`, `isSecret`, and `options`. `options` is a list for the owner to pick from, up to 500, each with `value`, and optionally `label`, the words shown, both up to 200 characters, and `group`, a heading to list it under, up to 100. The owner can still type a value that isn't listed. A secret offers no list. Since 0.11.0: an older fxbot shows a text box. |
 | `extensions["sh.fxbot"].commands` | Commands for the `/` list in a bot's message box, each with `name` (up to 40 lowercase letters, digits, and dashes) and `description` (up to 200 characters). Listing one runs nothing: the plugin's `message` hook sees `/name` as text. Since 0.5.0. |
 | `extensions["sh.fxbot"].needs` | The plugins it needs, each name mapped to an object for that plugin, up to 16 KiB in all. See [Plugins that need others](#plugins-that-need-others). |
+| `extensions["sh.fxbot"].providers` | Up to 20 services the plugin uses that serve no chat model, such as voices, up to 32 KiB in all. The owner adds them on **Add provider**, under "For <plugin>", while the plugin is added, and the plugin reaches them with `fx.providers`. See [Providers](#providers). Since 0.12.0. |
 
 ## Which fxbot it runs on
 
@@ -94,6 +95,7 @@ export default async function setup(fx: PluginApi) {
 | `fx.timeZone()` | The owner's time zone, such as `Europe/Berlin`: **Settings** › **General**'s, or the machine's. Read it at each use. Since 0.6.0. |
 | `fx.compaction()` | Idle compaction's setting, from **Settings** › **General**: `{ idleMinutes, minTokens, provider, model }`. `idleMinutes` is how long a chat sits idle before it's compacted, 0 when it's off, `minTokens` how long it must be, in tokens at 4 bytes of text each (since 0.11.0; undefined before), and `provider` and `model` the model that writes a summary, or `""` for each bot's own. Chat rooms compacts its rooms by it. Read it at each use. Since 0.10.0. |
 | `fx.chats` | Sessions and turns of its own. See [Turns](#turns). |
+| `fx.providers` | The providers the owner added, and requests to them with their keys, which stay on the server. See [Providers](#providers). Since 0.12.0. |
 | `fx.dependents()` | The added plugins that need this one: `{ name, version, needs, api }` each, where `needs` is its object for this plugin, and `api` what it provides, or null while it isn't running |
 | `fx.provide(api)` | Offers an object to the plugins that need this one, which get it with `fx.need`. Since 0.5.0. See [Plugins that need others](#plugins-that-need-others). |
 | `fx.need(name)` | What a plugin this one names under `needs` provides, or null while it isn't running. It throws for a plugin `needs` doesn't name. Since 0.5.0. |
@@ -208,7 +210,7 @@ A plugin's turns run as the owner's do, with the same hooks, history, library, a
 | Call | What it does |
 | --- | --- |
 | `fx.chats.newSession(bot, { label?, effort? })` | A session of the plugin's own for the bot, on the bot's provider now. Keep its id. `label`, since 0.9.0, names it, up to 80 characters, such as a subagent's name: each of its tool calls gets it, so a plugin such as the computer can tell the bot's sessions apart. `effort`, since 0.10.0, is the thinking level its turns ask for, such as `high`, in place of the bot's: the model's nearest lower level when it doesn't offer that one. |
-| `fx.chats.send(bot, { text, shown?, label?, steer?, files?, session?, messageId?, asked? })` | A message. `shown`, since 0.6.0, is what the chat shows of it, when that isn't `text`, which the model gets. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. `asked`, since 0.7.0, is the owner's own words the message carries on, up to 8,000 characters, which the plugin quotes from a chat of theirs, such as what they asked the bot it's from. Hooks get it with the message and its turn. Since 0.11.1, the model reads `text` after a line with the time it was sent, which hooks, history, and the chat leave off. |
+| `fx.chats.send(bot, { text, shown?, label?, steer?, files?, session?, messageId?, asked?, effort? })` | A message. `shown`, since 0.6.0, is what the chat shows of it, when that isn't `text`, which the model gets. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. `asked`, since 0.7.0, is the owner's own words the message carries on, up to 8,000 characters, which the plugin quotes from a chat of theirs, such as what they asked the bot it's from. Hooks get it with the message and its turn. Since 0.11.1, the model reads `text` after a line with the time it was sent, which hooks, history, and the chat leave off. `effort`, since 0.12.0, is the thinking level of the turn the message starts, such as `low`, in place of the chat's or the bot's, run as [Choose how hard a bot thinks](/docs/how-to/choose-how-hard-a-bot-thinks/) says; a turn it joins keeps its own. An older fxbot ignores it. |
 | `fx.chats.stream(bot, session, cursor?)` | That session's lines, as NDJSON, from `cursor` on, then each new one. The same lines as [`fxbot.stream`](/sdk/how-to/stream-replies/). |
 | `fx.chats.ownerSaid(bot, limit)` | The owner's newest messages in the bot's own chat, oldest first, with no plugin's or other bot's. Since 0.6.0. |
 | `fx.chats.cancel(bot, session?)` | Stops the turn running in one of the plugin's own sessions, if one runs. It ends `cancelled`, and the session's stream says so. Since 0.4.1. With no `session`, since 0.6.0, it stops the turn running in the bot's own chat, if this plugin started it. Any other turn there throws with `status` 409, and with nothing running it does nothing. |
@@ -222,6 +224,37 @@ In a bot's own chat, since 0.6.0, and in a session of the plugin's own, since 0.
 | `joined` | In the answer: the `messageId` of the turn the message joined, when it did. Its text reaches that turn, and the turn's hooks stay that turn's. A message that came just too late runs as a turn of its own, under its own `messageId`, with `turn.start` and `turn.end`. |
 
 A session belongs to the provider it started on. After the bot moves to another provider, `send` and `stream` for it fail with `status` 409: make a new one.
+
+## Providers
+
+A plugin that uses a service of its own, such as a voice, brings its entry to **Add provider** with `providers` in its `plugin.json`. The owner adds it there, as any provider, with its key sealed on the server. Phone brings ElevenLabs, Deepgram, and a speech server this way:
+
+```json
+"providers": [
+  {
+    "id": "deepgram",
+    "name": "Deepgram",
+    "about": "Listening with Flux, and Aura voices",
+    "group": "key",
+    "connect": "key",
+    "baseUrl": "https://api.deepgram.com/v1",
+    "headers": { "Authorization": "Token {apiKey}" },
+    "keyCheck": "https://api.deepgram.com/v1/projects",
+    "keyPage": "https://console.deepgram.com/",
+    "models": "none"
+  }
+]
+```
+
+- **An entry** has the fields of an entry in fxbot's own `providers-registry.json`, with `models` `"none"`: it serves no chat model, so no bot, default, or model picker offers it. `connect` can't be `device` or `service-account`. `hosts` lists the service's other origins, such as its WebSocket's on another host. Addresses are `https:` or `wss:`, or `http:` and `ws:` on `localhost`.
+- **While the plugin is added,** its entries show under "For <plugin>". One with the id of fxbot's own entry or another plugin's is left out, and the plugin's log says so. When the plugin is removed, **Settings** › **Providers** marks what was added from them.
+- **A provider the owner added** from any entry, the plugin's or fxbot's own, is the plugin's to use: Phone listens with a Groq or Mistral login too.
+
+| Member | What it is |
+| --- | --- |
+| `fx.providers.list()` | Each provider added: `{ id, kind, name, label, baseUrl }`, where `kind` is its entry's `id`, `label` the entry's name, and `baseUrl` the address it was added with, or null. No key. |
+| `fx.providers.fetch(id, url, init?)` | A request with the provider's key added as its entry's `headers` say, or `Authorization: Bearer <key>` without them. `url` must be on one of the provider's own origins: its base URL's, its key check's, or its entry's `hosts`. A provider with no key, such as a speech server, gets none. It throws for another address, and for a ChatGPT or Grok plan, which has no API for it. |
+| `fx.providers.socket(id, url, protocols?)` | A WebSocket to one of the same origins, as `ws:` or `wss:`, opened with the key in its headers. It answers once the socket is open, with `binaryType` `arraybuffer`. A Vercel sign-in opens none. |
 
 ## Plugins that need others
 
@@ -262,10 +295,11 @@ The computer and chat rooms provide objects of their own: see [the computer's](/
 
 | Call | Where it shows |
 | --- | --- |
-| `app.route(path, Component)` | The screen at `/<plugin><path>`. `path` may have `:name` parts, which `Component` gets as `params`. |
+| `app.route(path, Component, options?)` | The screen at `/<plugin><path>`. `path` may have `:name` parts, which `Component` gets as `params`. With `{ beside: true }`, since 0.12.0, it shows other plugins' screens beside it, as a bot's chat does, such as a page a link opens; use it for a screen with a conversation, such as a room. Such a screen never opens beside another. An older fxbot ignores the option. |
 | `app.sidebar(Component)` | A group in the sidebar, after the bots |
 | `app.nav({ label, path, icon? })` | A button in the sidebar's footer row, to `/<plugin><path>`. `icon` is a component; without one, the button shows the plugin's icon. |
 | `app.chat(Component)` | Above the message box in a bot's chat. It gets `bot`, and `reload()`, which reads the bot again, so the chat follows a session the plugin started, such as with `fx.chats.send` to a bot that had no chat. Since 0.6.0; `reload` since 0.10.0. |
+| `app.header(Component)` | In a bot chat's header, left of the bot panel's button, as Phone's calls are. It gets `bot`. Keep it to an icon button, since a phone's header has little room. Since 0.12.0: an older fxbot has no `app.header`, so call it as `app.header?.(…)`. |
 | `app.botPanel(Component)` | Above the tabs of a bot's panel, beside its chat. It gets `bot`. |
 | `app.libraryItem(Component)` | Beside **Download** in an item's preview, from the library or a bot's panel. It gets `item`. Since 0.7.0. |
 | `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. |
@@ -289,11 +323,12 @@ Each part sits in its own error boundary: one that throws shows a short card in 
 | `client` | The app's client, as [The client](/sdk/reference/client/) describes |
 | `applyLine` | Folds a stream line into turns |
 | `go(path)` | Opens a path in the app |
+| `openBeside(path)` | Opens one of a plugin's screens beside the chat, when a bot's chat or a screen with `beside` is showing, so it stays: a panel on a computer, over the chat on a phone, and in the address as `?beside=<path>`. Anywhere else, or for a path that isn't a plugin's screen, it's `go`. The screen's `Header` then has **Open full screen** and **Close** in place of the sidebar's button. A link in Markdown to a plugin's screen opens this way too. Since 0.12.0. |
 | `useBots()` | The app's list of bots, or `null` while it loads |
 | `useMentions()` | Every plugin's `app.mention` sources, each with its `plugin` and `iconKey`, for a box with an `@` list. Since 0.11.0. |
 | `createPortal(children, node)` | React's, from `react-dom`, for drawing a component into DOM the plugin doesn't render with React, such as an editor's node. Since 0.4.1. |
 | `Slot` | `<Slot name="<plugin>.<place>" props={…} />` leaves a place other plugins fill with `app.slot`, each part in its own error boundary. One nobody fills draws nothing. Since 0.5.0. |
-| `ui` | The app's components: Button, Input, Textarea, Badge, Switch, Checkbox, the Dialog, Empty, Sidebar (with `useSidebar`), Attachment, Message, Bubble, and MessageScroller parts, `Streamdown` for Markdown, with the code blocks plugins draw since 0.9.0, `Header` for a screen's top bar, `Blob` for a bot's look, given a whole bot, as in `<ui.Blob {...bot} size={24} />`, `PluginIcon` for a plugin's icon, given its `iconKey`, since 0.11.0, `NativeSelect`, `ModelField` for the app's model picker, since 0.6.0, `Reply` for a turn's reply, and since 0.7.0, `useReorder(onMove, axis?)`, the app's drag to reorder a list, by mouse or finger: the list's element takes its `list` ref, each item `item(id)`'s props, with `data-lifted` on the one held, `onMove` gets the ids in their new order, `dragging` is true while an item is held, and `cancel()` ends a drag, as when the item's menu opens |
+| `ui` | The app's components: Button, Input, Textarea, Badge, Switch, Checkbox, the Dialog, Empty, Sidebar (with `useSidebar`), Attachment, Message, Bubble, and MessageScroller parts, `Streamdown` for Markdown, with the code blocks plugins draw since 0.9.0, `Header` for a screen's top bar, with **Open full screen** and **Close** beside the chat since 0.12.0, `Blob` for a bot's look, given a whole bot, as in `<ui.Blob {...bot} size={24} />`, `PluginIcon` for a plugin's icon, given its `iconKey`, since 0.11.0, `NativeSelect`, the Popover's parts (`Popover`, `PopoverTrigger`, `PopoverContent`, and the rest) since 0.12.0, `ModelField` for the app's model picker, since 0.6.0, `Reply` for a turn's reply, and since 0.7.0, `useReorder(onMove, axis?)`, the app's drag to reorder a list, by mouse or finger: the list's element takes its `list` ref, each item `item(id)`'s props, with `data-lifted` on the one held, `onMove` gets the ids in their new order, `dragging` is true while an item is held, and `cancel()` ends a drag, as when the item's menu opens |
 
 The page's styles hold only the classes the app uses. A plugin brings its own CSS for anything else.
 

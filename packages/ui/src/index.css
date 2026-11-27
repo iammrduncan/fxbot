@@ -138,3 +138,75 @@
 @media (prefers-color-scheme: dark) {
     .plugin-icon { --c0: var(--d0); --c1: var(--d1); --c2: var(--d2); --c3: var(--d3); }
 }
+
+/* A screen beside the chat, such as a page, prints alone. */
+@media print {
+  body:has([data-beside]) [data-chat] {
+    display: none !important;
+  }
+}
+
+/* A gutter between panes (resize.tsx): 9 pixels to grab, 17 on a touch screen, centered on the pane's border. Its line
+   shows after a moment's hover, so passing over it doesn't flash, and at once while it's dragged or focused. */
+.gutter {
+  position: absolute;
+  inset-block: 0;
+  z-index: 30;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.gutter[data-edge="left"] {
+  left: -4px;
+}
+.gutter[data-edge="right"] {
+  right: -5px;
+}
+.gutter::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 3px;
+  width: 3px;
+  background: transparent;
+  transition: background-color 150ms;
+}
+.gutter:hover::after {
+  background: var(--ring);
+  transition-delay: 250ms;
+}
+.gutter[data-dragging]::after,
+.gutter:focus-visible::after {
+  background: var(--primary);
+  transition-delay: 0ms;
+}
+@media (pointer: coarse) {
+  .gutter {
+    width: 17px;
+  }
+  .gutter[data-edge="left"] {
+    left: -8px;
+  }
+  .gutter[data-edge="right"] {
+    right: -9px;
+  }
+  .gutter::after {
+    left: 7px;
+  }
+}
+/* While one is dragged: its cursor everywhere, no selecting, nothing easing behind it, and no frame taking the pointer. */
+html[data-resizing],
+html[data-resizing] * {
+  cursor: var(--resize-cursor) !important;
+  user-select: none !important;
+  transition: none !important;
+}
+html[data-resizing] iframe {
+  pointer-events: none;
+}
+@media print {
+  .gutter {
+    display: none;
+  }
+}

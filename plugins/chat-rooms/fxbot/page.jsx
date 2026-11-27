@@ -413,12 +413,22 @@ function Said({ message, bot }) {
   if (message.author === "summary") return <Summary text={message.text} />;
   if (message.author === "owner")
     return (
-      <div className="flex justify-end">
+      <div className="grid justify-items-end gap-1">
+        {/* What the owner said on a call carries its label, "your call". */}
+        {message.label && <span className="text-xs text-muted-foreground">From {message.label}</span>}
         <ui.Bubble align="end" variant="muted">
           <ui.BubbleContent className="whitespace-pre-wrap">
             <Owned text={message.text} />
           </ui.BubbleContent>
         </ui.Bubble>
+      </div>
+    );
+  // A message from another plugin, such as a subagent's report, under the plugin's name.
+  if (message.author === "plugin")
+    return (
+      <div className="grid min-w-0 grid-cols-1 gap-1 rounded-xl border p-3 wrap-break-word">
+        <span className="text-sm font-medium">{message.label ?? "A plugin"}</span>
+        <Markdown text={message.text} />
       </div>
     );
   return (
@@ -510,6 +520,12 @@ function RoomScreen({ params }) {
         </div>
       </main>
       <div className="mx-auto w-full max-w-3xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {/* A place above the box for plugins that need chat rooms, such as phone's call bar. */}
+        {Slot && room && (
+          <div className="grid gap-2 pb-2 empty:hidden">
+            <Slot name="chat-rooms.room-box" props={{ room }} />
+          </div>
+        )}
         {busy && (
           <div className="flex items-center justify-between gap-2 pb-2 text-xs text-muted-foreground">
             <span className="min-w-0 truncate">{next.length ? `Next: ${next.join(", ")}` : ""}</span>
@@ -534,5 +550,6 @@ function RoomScreen({ params }) {
 
 export default function setup(app) {
   app.sidebar(RoomsGroup);
-  app.route("/rooms/:id", RoomScreen);
+  // A page a bot links in the room opens beside it, as beside a bot's chat. An older fxbot ignores the option.
+  app.route("/rooms/:id", RoomScreen, { beside: true });
 }

@@ -55,7 +55,7 @@ function Card({ call: tool }) {
 		}), (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
 			size: "sm",
 			variant: "outline",
-			onClick: () => (0, _fxbot_app.go)(`/pages/${id}`),
+			onClick: () => (0, _fxbot_app.openBeside)(`/pages/${id}`),
 			children: "Open"
 		})]
 	});
@@ -396,7 +396,7 @@ function Reader({ params: { id } }) {
 							onClick: remove,
 							children: "Delete"
 						}),
-						bot && (0, react_jsx_runtime.jsxs)(Button, {
+						bot && location.pathname !== `/profiles/${bot.id}` && (0, react_jsx_runtime.jsxs)(Button, {
 							size: "sm",
 							variant: "ghost",
 							onClick: () => (0, _fxbot_app.go)(`/profiles/${bot.id}`),
@@ -458,7 +458,7 @@ function OpenPage({ item }) {
 	}, [item.id]);
 	return page ? (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
 		variant: "outline",
-		onClick: () => (0, _fxbot_app.go)(`/pages/${item.id}`),
+		onClick: () => (0, _fxbot_app.openBeside)(`/pages/${item.id}`),
 		children: "Open page"
 	}) : null;
 }

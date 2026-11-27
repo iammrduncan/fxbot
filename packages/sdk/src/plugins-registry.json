@@ -54,8 +54,8 @@
     },
     {
       "name": "phone",
-      "description": "Press Call me and a bot rings your phone, and you talk with it, hands-free. Its own model, memory, and tools answer. A provider plugin carries the call.",
-      "note": "It needs a provider plugin, such as phone-signalwire, and your own number confirmed, in the plugin's tab.",
+      "description": "Talk with a bot by voice, in the app or on your phone, and cut in whenever you like. It works in the background while you talk, and in a chat room, calls all its bots. Voice providers are logins: ElevenLabs, Deepgram, one you have, a speech server on your machine, or your browser's own speech.",
+      "note": "Talk needs a voice, picked in its tab. Call me needs a provider plugin, such as phone-signalwire, and your own number confirmed there.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/phone",
       "docs": "/docs/how-to/talk-with-a-bot-on-the-phone/"

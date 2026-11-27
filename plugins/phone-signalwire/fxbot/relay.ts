@@ -123,14 +123,6 @@ function connection(relay: Relay, onEvent: (type: string, params: any) => void, 
   };
 }
 
-// Words, for comparing what the recognizer heard with what's playing.
-const wordsOf = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [];
-// What the recognizer heard is the bot's own voice coming back when most of its words are in the line playing.
-function echo(heard: string, playing: string) {
-  const said = new Set(wordsOf(playing));
-  const words = wordsOf(heard);
-  return words.length > 0 && words.filter((word) => said.has(word)).length / words.length >= 0.6;
-}
 const outcomes: Record<string, Outcome> = { busy: "busy", noAnswer: "missed", decline: "declined" };
 
 // `kept` gets what ends the call after a restart once SignalWire names it, and null once the call is over.
@@ -185,7 +177,10 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
       for (const done of drained) done();
       return drained.clear();
     }
-    // What waited while the last line played goes as one, so sentences don't each wait on a round trip.
+    // What waited while the last line played goes as one, so sentences don't each wait on a round trip. SignalWire gives
+    // nothing it hears until a play ends (a real call, 2026-11-25: 8 words at once, 32 to 97 ms into the next line), so
+    // the owner can't cut in mid-play. A play a sentence let them in at each sentence's end, but the gaps between
+    // sentences sounded wrong, and it was undone.
     const text = queue.splice(0).join(" ");
     const control = randomUUID();
     playing = { control, text, cut: false, at: Date.now() };
@@ -298,11 +293,10 @@ export function line(relay: Relay, on: LineEvents, kept?: (found: Kept | null) =
       // A continuous collect gives each thing said as a final while it's collecting, then its last result again as it
       // ends, as SignalWire's own SDK reads it: when the owner hung up, their last words went to the bot a second time.
       if (ending && text && text === lastHeard) relay.log("SignalWire gave the last words again as its listening ended; they weren't sent again.");
-      else if (text && !(playing && !playing.cut && echo(text, playing.text))) {
-        // Two words while the bot speaks cut in. One may be a cough, or the bot's own voice; a final says what it was.
-        if (playing && wordsOf(text).length >= 2 && cut()) on.interrupted();
-        if (final) on.heard((lastHeard = text));
-      }
+      // The words as they come, and once finished: phone decides what's the bot's own voice coming back, and what cuts
+      // it off (line 2).
+      else if (text && final) on.heard((lastHeard = text));
+      else if (text) on.hearing?.(text);
       // A collect that ends with a result starts again too, below.
       if (!ending) return;
     }

@@ -1,7 +1,8 @@
-// phone in the app: Call me in the message box, the call's bar above it, a call's card in the chat, the plugin's tab,
-// and a section in each bot's settings. Built into page.js; see the README.
+// phone in the app: the phone at the top of a chat, with its calls, the call's bar above the message box, a call's card
+// in the chat, the plugin's tab, and a section in each bot's settings. Built into page.js; see the README.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { api, go, ui } from "@fxbot/app";
+import { Mic, RoomTalkBar, TalkBar, talk, useTalk } from "./talk.jsx";
 
 async function call(path, method = "GET", body) {
   const res = await api(path, { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
@@ -20,7 +21,7 @@ async function read(bot) {
   clearTimeout(timers.get(bot));
   if (document.visibilityState === "visible") {
     const next = await call(`calls/live?bot=${bot}`).then(
-      (answer) => ({ call: answer.call, button: answer.button !== false }),
+      (answer) => ({ call: answer.call, button: answer.button !== false, lines: answer.lines === true }),
       () => live.get(bot) ?? null,
     );
     live.set(bot, next);
@@ -57,34 +58,66 @@ const Phone = () => (
   </svg>
 );
 
-// Call me, beside the message box, unless it's off for the bot. Until phone and its provider are set up and the number
-// confirmed, it opens phone's tab.
-function CallButton({ bot }) {
+// The phone at the top of a bot's chat, or a room's: a choice of calls, so a tap never starts one by itself. An in-app
+// call is phone's own. Call me shows when a plugin that carries phone lines, such as phone-signalwire, is added, and Call
+// me is on for the bot. Until phone and that plugin are set up and the number confirmed, Call me opens phone's tab.
+function CallChoices({ label, busy, choices, error, open, setOpen, size = "icon" }) {
+  return (
+    <ui.Popover open={open} onOpenChange={setOpen}>
+      <ui.PopoverTrigger asChild>
+        <ui.Button type="button" variant="ghost" size={size} aria-label={busy ? "A call is on" : label} title={busy ? "A call is on" : label} disabled={busy}>
+          <Phone />
+        </ui.Button>
+      </ui.PopoverTrigger>
+      <ui.PopoverContent align="end" className="w-72 gap-1 p-1" aria-label={label}>
+        {error && <p className="px-2 py-1.5 text-xs text-destructive">{error}</p>}
+        {choices.map((choice) => (
+          <ui.Button
+            key={choice.key}
+            type="button"
+            variant="ghost"
+            className="h-auto w-full items-start justify-start gap-3 px-2 py-1.5 text-left whitespace-normal"
+            onClick={() => (setOpen(false), choice.run())}
+          >
+            <span className="mt-0.5 shrink-0 text-muted-foreground">{choice.icon}</span>
+            <span className="grid gap-0.5">
+              <span className="font-medium">{choice.label}</span>
+              <span className="text-xs font-normal text-muted-foreground">{choice.hint}</span>
+            </span>
+          </ui.Button>
+        ))}
+      </ui.PopoverContent>
+    </ui.Popover>
+  );
+}
+
+function CallMenu({ bot }) {
   const state = useLive(bot.id);
-  const now = state?.call ?? null;
+  const app = useTalk();
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const ring = () => {
     setError("");
     call("calls", "POST", { bot: bot.id }).then(
       () => void read(bot.id),
-      (e) => (e.answer?.missing || /confirm/i.test(e.message) ? go(settingsTab) : setError(e.message)),
+      (e) => (e.answer?.missing || /confirm/i.test(e.message) ? go(settingsTab) : (setError(e.message), setOpen(true))),
     );
   };
-  if (state && !state.button) return null;
-  return (
-    <ui.Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      className="rounded-full"
-      aria-label={error || `Call me: ${bot.name} rings your phone`}
-      title={error || `Call me: ${bot.name} rings your phone`}
-      disabled={Boolean(now)}
-      onClick={ring}
-    >
-      <Phone />
-    </ui.Button>
-  );
+  const choices = [
+    { key: "app", label: "In-app call", hint: "Talk here, in this browser", icon: <Mic />, run: () => (setError(""), void talk({ bot: bot.id }, bot.name)) },
+    ...(state?.lines && state.button ? [{ key: "line", label: "Call me", hint: `${bot.name} rings your phone`, icon: <Phone />, run: ring }] : []),
+  ];
+  const busy = Boolean(state?.call) || Boolean(app && app.status !== "ended");
+  return <CallChoices label={`Call ${bot.name}`} busy={busy} choices={choices} error={error} open={open} setOpen={setOpen} />;
+}
+
+// The same in a room's header, for a call with all its bots in the app. A room has no phone line yet.
+function RoomCall({ room }) {
+  const app = useTalk();
+  const [open, setOpen] = useState(false);
+  if (!room?.members?.length) return null;
+  const choices = [{ key: "app", label: "In-app call", hint: "Talk with all its bots, in this browser", icon: <Mic />, run: () => void talk({ room: room.id }, room.name) }];
+  return <CallChoices label={`Call ${room.name}`} busy={Boolean(app && app.status !== "ended")} choices={choices} open={open} setOpen={setOpen} size="icon-sm" />;
 }
 
 const clock = (from) => {
@@ -105,7 +138,7 @@ function CallBar({ bot }) {
   if (!now) return null;
   const end = () => (setEnding(true), call(`calls/${now.id}/end`, "POST").finally(() => void read(bot.id)));
   return (
-    <section className="flex items-center gap-2 rounded-lg border bg-background p-2 pl-3 text-sm" aria-label={`Your call with ${bot.name}`}>
+    <section className="flex min-w-0 items-center gap-2 rounded-lg border bg-background p-2 pl-3 text-sm" aria-label={`Your call with ${bot.name}`}>
       <span className="text-muted-foreground">
         <Phone />
       </span>
@@ -210,6 +243,7 @@ function Tab() {
   const ready = using && using.running && !using.missing.length;
   return (
     <section className="grid gap-3 text-sm" aria-label="Your phone">
+      <VoiceSection />
       <h2 className="font-medium">Your phone</h2>
       <Providers status={status} onPick={pick} />
       {status.missing.length ? (
@@ -263,6 +297,163 @@ function Tab() {
   );
 }
 
+// How phone hears and speaks on a call it carries itself, in the app: a provider the owner added for each, with its model,
+// and a voice, or This device, the browser's own speech.
+function VoiceSection() {
+  const [voice, setVoice] = useState(null);
+  const [voices, setVoices] = useState([]);
+  const [error, setError] = useState("");
+  // The model boxes open for typing a model the provider doesn't suggest, and whether Hear it is playing.
+  const [typing, setTyping] = useState({});
+  const [hearing, setHearing] = useState(false);
+  const load = () =>
+    call("voice").then(
+      (v) => (setVoice(v), v.speak.provider !== "device" ? call("voice/voices").then(setVoices, () => setVoices([])) : setVoices([])),
+      (e) => setError(e.message),
+    );
+  useEffect(() => void load(), []);
+  if (!voice) return error ? <p className="text-destructive">{error}</p> : null;
+  const save = (patch) => {
+    const next = {
+      listenProvider: voice.listen.provider,
+      listenModel: voice.listen.model,
+      speakProvider: voice.speak.provider,
+      speakModel: voice.speak.model,
+      speakVoice: voice.speak.voice,
+      ...patch,
+    };
+    setError("");
+    call("voice", "PUT", next).then(load, (e) => setError(e.message));
+  };
+  const listener = voice.listeners.find((p) => p.id === voice.listen.provider);
+  const speaker = voice.speakers.find((p) => p.id === voice.speak.provider);
+  // A provider's models, each listed, and Another model to type one it doesn't suggest. A box with suggestions in a
+  // datalist showed only the one already in it.
+  const models = (p, model, onPick, label) => {
+    if (!p) return null;
+    const own = typing[label] || (model && !p.models.includes(model)) || !p.models.length;
+    const box = <ui.Input aria-label={`${label}, typed`} value={model} placeholder="A model's id" onChange={(e) => onPick(e.target.value)} onBlur={(e) => onPick(e.target.value, true)} />;
+    if (!p.models.length)
+      return (
+        <label className="grid gap-1">
+          <span>{label}</span>
+          {box}
+        </label>
+      );
+    return (
+      <label className="grid gap-1">
+        <span>{label}</span>
+        <ui.NativeSelect
+          aria-label={label}
+          className="w-full"
+          value={own ? "" : model || p.models[0]}
+          onChange={(e) => (e.target.value ? (setTyping({ ...typing, [label]: false }), onPick(e.target.value, true)) : setTyping({ ...typing, [label]: true }))}
+        >
+          {p.models.map((m) => (
+            <ui.NativeSelectOption key={m} value={m}>
+              {m}
+            </ui.NativeSelectOption>
+          ))}
+          <ui.NativeSelectOption value="">Another model…</ui.NativeSelectOption>
+        </ui.NativeSelect>
+        {own && box}
+      </label>
+    );
+  };
+  // A line in the voice and model picked, from phone, played here: what a call sounds like, without one.
+  const hear = async () => {
+    setHearing(true);
+    setError("");
+    try {
+      const res = await api(`voice/sample?${new URLSearchParams({ model: voice.speak.model ?? "", voice: voice.speak.voice ?? "" })}`);
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+      const context = new AudioContext();
+      const source = context.createBufferSource();
+      source.buffer = await context.decodeAudioData(await res.arrayBuffer());
+      source.connect(context.destination);
+      source.onended = () => (setHearing(false), void context.close().catch(() => {}));
+      source.start();
+    } catch (e) {
+      setHearing(false);
+      setError(`The sample didn't play: ${e.message}`);
+    }
+  };
+  const [listenModel, setListenModel] = [voice.listen.model, (model, done) => (setVoice({ ...voice, listen: { ...voice.listen, model } }), done && save({ listenModel: model }))];
+  const [speakModel, setSpeakModel] = [voice.speak.model, (model, done) => (setVoice({ ...voice, speak: { ...voice.speak, model } }), done && save({ speakModel: model }))];
+  const hears = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  return (
+    <section className="grid gap-3" aria-label="Voice">
+      <h2 className="font-medium">Voice</h2>
+      <p className="text-muted-foreground">
+        How bots hear you and speak on an in-app call, from the phone at the top of a chat. Add voice providers in Settings › Providers: ElevenLabs and Deepgram, under For phone, or a
+        speech server on your machine. A Mistral, Groq, OpenAI, or Cloudflare login listens too.
+      </p>
+      <label className="grid gap-1">
+        <span>Listening</span>
+        <ui.NativeSelect aria-label="Listening" className="w-full" value={voice.listen.provider} onChange={(e) => save({ listenProvider: e.target.value, listenModel: "" })}>
+          {voice.listeners.map((p) => (
+            <ui.NativeSelectOption key={p.id} value={p.id}>
+              {p.name}
+              {p.streams ? "" : ", one stretch at a time"}
+            </ui.NativeSelectOption>
+          ))}
+          {/* Listening on the device needs the browser's speech recognition, which Firefox and an installed iPhone app lack. */}
+          {(hears || voice.listen.provider === "device") && (
+            <ui.NativeSelectOption value="device">{hears ? "This device: the browser's own" : "This device: not in this browser"}</ui.NativeSelectOption>
+          )}
+        </ui.NativeSelect>
+      </label>
+      {models(listener, listenModel, setListenModel, "Listening model")}
+      <label className="grid gap-1">
+        <span>Speaking</span>
+        <ui.NativeSelect aria-label="Speaking" className="w-full" value={voice.speak.provider} onChange={(e) => save({ speakProvider: e.target.value, speakModel: "", speakVoice: "" })}>
+          {voice.speakers.map((p) => (
+            <ui.NativeSelectOption key={p.id} value={p.id}>
+              {p.name}
+            </ui.NativeSelectOption>
+          ))}
+          <ui.NativeSelectOption value="device">This device: the browser's own</ui.NativeSelectOption>
+        </ui.NativeSelect>
+      </label>
+      {models(speaker, speakModel, setSpeakModel, "Speaking model")}
+      {speaker && voices.length > 0 && (
+        <label className="grid gap-1">
+          <span>Voice</span>
+          <ui.NativeSelect aria-label="Voice" className="w-full" value={voice.speak.voice} onChange={(e) => save({ speakVoice: e.target.value })}>
+            <ui.NativeSelectOption value="">{voices[0].label}, the first</ui.NativeSelectOption>
+            {grouped(voices).map(([group, list]) =>
+              group ? (
+                <ui.NativeSelectOptGroup key={group} label={group}>
+                  {list.map((v) => (
+                    <ui.NativeSelectOption key={v.value} value={v.value}>
+                      {v.label}
+                    </ui.NativeSelectOption>
+                  ))}
+                </ui.NativeSelectOptGroup>
+              ) : (
+                list.map((v) => (
+                  <ui.NativeSelectOption key={v.value} value={v.value}>
+                    {v.label}
+                  </ui.NativeSelectOption>
+                ))
+              ),
+            )}
+          </ui.NativeSelect>
+          <span className="text-xs text-muted-foreground">Each bot can have its own, in its Phone section. In a room, a bot with none gets one no other bot there has.</span>
+        </label>
+      )}
+      {speaker && (
+        <div>
+          <ui.Button variant="outline" size="sm" disabled={hearing} onClick={() => void hear()}>
+            {hearing ? "Playing…" : "Hear it"}
+          </ui.Button>
+        </div>
+      )}
+      {error && <p className="text-destructive">{error}</p>}
+    </section>
+  );
+}
+
 // A switch with its name beside it and what it does under both. A plugin's page gets only the classes the app uses.
 function Toggle({ checked, label, hint, onChange }) {
   return (
@@ -301,7 +492,7 @@ function BotSection({ bot }) {
   return (
     <section className="grid gap-3 text-sm" aria-label="Phone">
       <h2 className="font-medium">Phone</h2>
-      <Toggle checked={state.button} label="Call me" hint="The button beside the message box rings your phone." onChange={(button) => save({ button })} />
+      <Toggle checked={state.button} label="Call me" hint="In the phone at the top of the bot's chat: the bot rings your phone." onChange={(button) => save({ button })} />
       <Toggle checked={state.asked} label="Calls when you ask" hint={`${bot.name} calls when you ask it to, now or when something is done.`} onChange={(asked) => save({ asked })} />
       <Toggle
         checked={state.own}
@@ -326,7 +517,7 @@ function BotSection({ bot }) {
         <label className="grid gap-1">
           <span>Voice</span>
           <ui.NativeSelect aria-label="Its voice" className="w-full" value={state.voice ?? ""} onChange={(e) => save({ voice: e.target.value || null })}>
-            <ui.NativeSelectOption value="">The voice in {state.using.label}'s settings</ui.NativeSelectOption>
+            <ui.NativeSelectOption value="">The voice in phone's Voice section</ui.NativeSelectOption>
             {grouped(state.voices).map(([group, voices]) =>
               group ? (
                 <ui.NativeSelectOptGroup key={group} label={group}>
@@ -364,8 +555,12 @@ function BotSection({ bot }) {
 }
 
 export default function setup(app) {
-  app.composer(CallButton);
+  // The phone at the top of a chat, on fxbot 0.12.0 or newer.
+  app.header?.(CallMenu);
+  app.chat(TalkBar);
   app.chat(CallBar);
+  app.slot?.("chat-rooms.room-header", RoomCall);
+  app.slot?.("chat-rooms.room-box", RoomTalkBar);
   app.toolView("call", CallCard, { open: true });
   app.settings(Tab);
   app.botSettings(BotSection);

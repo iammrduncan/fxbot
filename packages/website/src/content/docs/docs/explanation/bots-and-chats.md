@@ -43,6 +43,8 @@ To end a turn instead, press **Stop**, where the send button is while the box is
 
 The sidebar lists your bots, with up to three pinned on top, larger. Drag a bot to move it, with a mouse, or with a finger after a moment's hold, so a swipe still scrolls. Pinned bots move among themselves, and a bot you pin or unpin goes to the end of its group. Right-click a bot, or hold it on a phone, for its menu: **Edit**, **Pin** or **Unpin**, **Default bot**, and **Delete**.
 
+On a computer, drag the edge between two panes to make one wider: the sidebar, the chat, and the bot panel or a page beside it. The edge shows a line when you rest on it. Drag the sidebar or the bot panel nearly shut to close it, and the sidebar's edge at the window's side out again to open it. A double-click puts an edge back, Escape during a drag undoes it, and the chat always keeps room to read. Each browser keeps its own widths. From the keyboard, Tab to an edge and use the arrow keys, with Shift for bigger steps.
+
 <img class="shot dark:sl-hidden" src="/shots/menu-desktop-light.png" width="1280" height="800" alt="A bot's menu in the sidebar: Edit, Pin, Default bot, and Delete" />
 <img class="shot light:sl-hidden" src="/shots/menu-desktop-dark.png" width="1280" height="800" alt="A bot's menu in the sidebar: Edit, Pin, Default bot, and Delete" />
 

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type ReactNode } from "react";
 import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, Maximize2Icon, MessageCircleDashedIcon, Minimize2Icon, PanelRightIcon, PaperclipIcon, PencilIcon, PinIcon, PinOffIcon, PlusIcon, PuzzleIcon, SettingsIcon, SquareIcon, StarIcon, Trash2Icon, XIcon } from "lucide-react";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -44,14 +44,16 @@ import { BotForm } from "./bot-form.tsx";
 import { LookDialog, type BotLook } from "./look-picker.tsx";
 import { Fold, type Folded } from "./fold.tsx";
 import { Onboarding } from "./onboarding.tsx";
+import { BesideHost, BesidePanel, useBeside } from "./beside.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
+import { SidebarGutter, sidebarWidth, useWidth } from "./resize.tsx";
 import { BotMemories } from "./memories.tsx";
 import { PluginsPage, BotPlugins } from "./plugins-page.tsx";
 import { LibraryPage } from "./library.tsx";
 import { Reply } from "./steps.tsx";
 import { follow, go } from "./nav.ts";
 import { Header } from "./header.tsx";
-import { BotsProvider, loadPlugins, MessageBox, Place, SaidText, useFold, usePluginNav, usePluginScreen } from "./plugins.tsx";
+import { BotsProvider, loadPlugins, MessageBox, Place, SaidText, useFold, usePluginNav, usePluginRoute } from "./plugins.tsx";
 import { ModelField } from "./providers.tsx";
 import { draftOf, keepDraft } from "./drafts.ts";
 import { reload, useNewVersion } from "./pwa.ts";
@@ -124,7 +126,8 @@ export function App() {
       () => setFirstRun(null),
     );
   }, []);
-  const pluginScreen = usePluginScreen(path);
+  const pluginRoute = usePluginRoute(path);
+  const [sidebarPx] = useWidth("sidebar");
 
   const [creating, setCreating] = useState(false);
   const created = (profile: Profile) => {
@@ -166,13 +169,13 @@ export function App() {
   else if (path === "/plugins" || path === "/addons") screen = <PluginsPage profiles={profiles} />;
   else if (top === "profiles" && id && sub === "edit") screen = <ProfileForm key={id} id={id} onSaved={refresh} />;
   else if (top === "profiles" && id && sub === undefined) screen = <Chat key={id} id={id} profiles={profiles} onChange={refresh} onShown={() => setChatShown(true)} />;
-  else if (pluginScreen) screen = pluginScreen;
+  else if (pluginRoute) screen = pluginRoute.beside ? <BesideHost>{pluginRoute.screen}</BesideHost> : pluginRoute.screen;
   else screen = <Header title="Not found" />;
 
   return (
     <BotsProvider value={profiles}>
       <TooltipProvider>
-        <SidebarProvider className={shown || whole ? undefined : hidden}>
+        <SidebarProvider className={shown || whole ? undefined : hidden} style={{ "--sidebar-width": sidebarWidth(sidebarPx) } as CSSProperties}>
           {!onboarding && <BotSidebar profiles={profiles} offline={offline} active={id} onNew={() => setCreating(true)} onChange={refresh} />}
           {/* An installed app draws under the notch and the home indicator (viewport-fit=cover), so each edge pads by its
               inset. The left one belongs to the sidebar while it is open beside the page. */}
@@ -430,6 +433,7 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
           </Tooltip>
         </div>
       </SidebarFooter>
+      <SidebarGutter />
     </Sidebar>
   );
 }
@@ -518,7 +522,8 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
   // Where the bot's chat lives now, so a move to another provider can warn first.
   const [chat, setChat] = useState<{ provider: string; sessionId: string | null }>({ provider: "", sessionId: null });
   useEffect(() => {
-    client.providers.list().then(setProviders, () => {});
+    // A voice service a plugin brought serves no chat model, so it's no bot's provider.
+    client.providers.list().then((list) => setProviders(list.filter((p) => p.chat !== false)), () => {});
     client.profiles.get(id).then(
       (profile) => {
         const { name, instructions, model, provider, effort, shape, color, mood, head, face, outfit, tint, sessionId } = profile;
@@ -715,6 +720,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
     if (view && view.scrollHeight <= view.clientHeight) more();
   });
   const panel = usePanel();
+  const beside = useBeside();
   // A provider switch starts a new chat. The earlier ones stay readable above the handoff, though the bot now sees only
   // their summary and its chat_history search.
   const [earlier, setEarlier] = useState<Turn[]>([]);
@@ -854,7 +860,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   const empty = turns.length === 0 && earlier.length === 0 && (ready || !profile?.sessionId);
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      <div data-chat className="relative flex min-w-0 flex-1 flex-col">
         {!settled && slow && profile && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center" aria-hidden="true">
             <Blob {...profile} size={72} busy />
@@ -862,9 +868,10 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
         )}
         {/* The sidebar already shows which bot this is, and whether it is busy, so the name stays only for screen readers. */}
         <Header title={<span className="sr-only">{profile?.name ?? "Chat"}</span>}>
+          {profile && <Place pick={(places) => places.header} props={{ bot: profile }} />}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Bot panel" aria-expanded={panel.open} onClick={() => panel.setOpen(!panel.open)}>
+              <Button variant="ghost" size="icon" aria-label="Bot panel" aria-expanded={panel.open && !beside.path} onClick={() => (beside.path ? (beside.close(), panel.setOpen(true)) : panel.setOpen(!panel.open))}>
                 <PanelRightIcon />
               </Button>
             </TooltipTrigger>
@@ -1004,7 +1011,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
           </div>
         </MessageScrollerProvider>
       </div>
-      {profile && <BotPanel profile={profile} profiles={profiles} panel={panel} version={finished} />}
+      {beside.path ? <BesidePanel path={beside.path} close={beside.close} /> : profile && <BotPanel profile={profile} profiles={profiles} panel={panel} version={finished} />}
     </div>
   );
 }

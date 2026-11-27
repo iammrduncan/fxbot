@@ -3,7 +3,7 @@
 A plugin for [fxbot](https://fxbot.sh): a bot writes something to keep, and you read it outside the chat, such as a report, a guide, a plan, or a summary of a project.
 
 - **In the chat,** a card with the page's title and **Open**, and a sentence from the bot.
-- **To read,** the page fills the screen at `/pages/<id>`, on a phone too, with **Copy**, **Print**, and **Delete**.
+- **To read,** the page opens beside the chat, so you keep talking to the bot while you read, and covers it on a phone. It fills the screen at `/pages/<id>`. Either way it has **Copy**, **Print**, and **Delete**.
 - **In the library,** under **Documents**, where **Open page** opens it. A bot finds pages with `library_search`, and reads them with `library_read`.
 - **Every version,** one for each turn. Pick one on the page, and **Restore** makes it the newest.
 - **Ticks that stay.** A task list has boxes you tick, and the bot sees them.
@@ -13,7 +13,7 @@ A plugin for [fxbot](https://fxbot.sh): a bot writes something to keep, and you 
 
 Its skill, `pages`, says when a page serves you better than a chat message, and how to write a good one. Its `references/html.md` has the rules for an HTML page, its `fxpage` API, and a page to start from. A line in each chat's instructions says to write long answers as pages, for a bot that reads no skill.
 
-Add it from **Plugins**, or with **Essentials**. It needs fxbot 0.7.0 or newer. It runs inside fxbot: read its code there before you add it. Removing it leaves each page in the library as a document, at its newest version, and its older versions go.
+Add it from **Plugins**, or with **Essentials**. It needs fxbot 0.12.0 or newer. It runs inside fxbot: read its code there before you add it. Removing it leaves each page in the library as a document, at its newest version, and its older versions go.
 
 ## A page
 

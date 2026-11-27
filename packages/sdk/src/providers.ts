@@ -171,6 +171,37 @@ export async function createProviders({ store, secretKey, durability, vercelClie
     return { apiKey: await bearerOf(record), fetch: entryFetch(fetch, models.entryOf(record), () => bearerOf(record)) };
   }
 
+  // What a plugin may reach of an added provider: its own addresses only, its base URL's, its key check's, and its
+  // entry's `hosts`, each with its WebSocket twin. A plan's sign-in has no API but its chat.
+  async function reach(id: string, url: string) {
+    const current = await record(id);
+    if (current.kind === "chatgpt" || current.kind === "grok") fail(400, "This sign-in has no API for that.");
+    const entry = models.entryOf(current);
+    if (typeof url !== "string" || !URL.canParse(url)) fail(400, "url must be an address");
+    const target = new URL(url);
+    const origins = new Set<string>();
+    const twins: Record<string, string> = { "https:": "wss:", "wss:": "https:", "http:": "ws:", "ws:": "http:" };
+    const add = (address: string | null | undefined) => {
+      if (!address || !URL.canParse(address)) return;
+      const u = new URL(address);
+      origins.add(`${u.protocol}//${u.host}`);
+      if (twins[u.protocol]) origins.add(`${twins[u.protocol]}//${u.host}`);
+    };
+    add(current.baseUrl);
+    if (current.kind === "gateway" || current.kind === "vercel") add("https://ai-gateway.vercel.sh");
+    const fields = current.fields ?? {};
+    for (const address of [entry.keyCheck, ...(entry.hosts ?? [])]) if (address) add(fill(address, entry, fields));
+    if (!origins.has(`${target.protocol}//${target.host}`)) fail(400, `${target.protocol}//${target.host} isn't one of ${current.name}'s addresses.`);
+    return { current, entry, target };
+  }
+  // The headers that carry a provider's key: its entry's, or a bearer.
+  function keyHeaders(entry: CatalogEntry, key: string | undefined) {
+    const headers: Record<string, string> = {};
+    for (const [name, value] of Object.entries(entry.headers ?? {})) if (key || !value.includes("{apiKey}")) headers[name] = value.replaceAll("{apiKey}", key ?? "");
+    if (key && !entry.headers) headers.authorization = `Bearer ${key}`;
+    return headers;
+  }
+
   // The libfx options that point an agent, or a throwaway engine, at a provider.
   async function options(record: ProviderRecord): Promise<Record<string, unknown>> {
     if (record.kind === "chatgpt" || record.kind === "grok")
@@ -201,6 +232,8 @@ export async function createProviders({ store, secretKey, durability, vercelClie
 
   async function start(record: ProviderRecord) {
     errors.delete(record.id);
+    // A provider that serves no chat model, such as a voice service a plugin brought, runs no agent.
+    if (models.entryOf(record).models === "none") return;
     try {
       const provider = await options(record);
       const agent = createFxAgent({
@@ -268,7 +301,10 @@ export async function createProviders({ store, secretKey, durability, vercelClie
         docs: entry.docs || null,
         hasKey: !device && held.has(r.id),
         signedIn: device && held.has(r.id),
-        error: errors.get(r.id) ?? null,
+        plugin: r.fields?.plugin ?? null,
+        chat: entry.models !== "none",
+        // A plugin's provider whose plugin isn't added says so.
+        error: errors.get(r.id) ?? (r.fields?.plugin && !catalog.get(r.kind) ? `The ${r.fields.plugin} plugin isn't added.` : null),
       };
     });
   }
@@ -352,6 +388,36 @@ export async function createProviders({ store, secretKey, durability, vercelClie
       return entry.agent;
     },
     has: (id: string) => agents.has(id),
+    // Whether a provider serves chat models: not a voice service a plugin brought.
+    servesChat: (record: ProviderRecord) => models.entryOf(record).models !== "none",
+    // A plugin's request to an added provider, through fx.providers: the key goes on here, and never to the plugin.
+    async request(id: string, url: string, init: RequestInit = {}) {
+      const { current, entry, target } = await reach(id, url);
+      const a = await access(current);
+      if (a.fetch && !("apiKey" in a)) return a.fetch(target.href, init);
+      const key = (a as { apiKey?: string }).apiKey;
+      const headers = new Headers(init.headers);
+      for (const [name, value] of Object.entries(keyHeaders(entry, key))) headers.set(name, value);
+      return withoutSecrets(await fetch(target.href, { ...init, headers }), [key]);
+    },
+    // A plugin's WebSocket to an added provider, opened with its key in the headers, once it's open.
+    async socket(id: string, url: string, protocols?: string | string[]) {
+      const { current, entry, target } = await reach(id, url);
+      if (target.protocol !== "wss:" && target.protocol !== "ws:") fail(400, "A socket's address starts with wss:.");
+      const key = ((await access(current)) as { apiKey?: string }).apiKey;
+      if (current.kind === "vercel") fail(400, "A Vercel sign-in opens no socket.");
+      const ws = new WebSocket(target.href, { protocols, headers: keyHeaders(entry, key) } as unknown as string[]);
+      ws.binaryType = "arraybuffer";
+      await new Promise<void>((resolve, reject) => {
+        ws.addEventListener("open", () => resolve(), { once: true });
+        ws.addEventListener("error", () => reject(Object.assign(new Error(`${current.name} didn't open a socket at ${target.host}${target.pathname}.`), { status: 502 })), { once: true });
+      });
+      return ws;
+    },
+    // The providers a plugin sees: no key, only what each is.
+    async forPlugins() {
+      return (await list()).map((p) => ({ id: p.id, kind: p.kind, name: p.name, label: p.label, baseUrl: p.baseUrl }));
+    },
     get: record,
     // A provider's name and its entry's, for words about it.
     async describe(id: string) {
@@ -392,7 +458,8 @@ export async function createProviders({ store, secretKey, durability, vercelClie
       const entry = await entryFor(input?.kind);
       const kind = entry.id;
       if (entry.connect === "device") fail(400, `${entry.name} is added by signing in`);
-      const fields = fieldsOf(entry, input.fields);
+      // A plugin's entry is remembered with the provider, so it stays a plugin's when the plugin is gone.
+      const fields: Record<string, string> = { ...fieldsOf(entry, input.fields), ...(entry.plugin ? { plugin: entry.plugin } : {}) };
       const modelIds = idsOf(input.modelIds);
       if (entry.models === "typed" && !modelIds.length) fail(400, `Type the name of at least one of your ${entry.name} models`);
       let baseUrl: string | null = null;

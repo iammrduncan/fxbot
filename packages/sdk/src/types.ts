@@ -142,7 +142,10 @@ export type Kind = keyof typeof kinds;
 // value is the provider's key. `keyCheck` is where a bad key is refused, when `/models` is public, and `badKey` the
 // statuses that mean one, 401 and 403 unless it says. `unchecked`: nothing refuses a bad key before a chat. `models`
 // says where its list comes from: its own `/models` (`own`, the default), models.dev's `modelsDev` lists (`catalog`), or
-// the ids the owner types (`typed`), less those `hide` matches, with `modelPrefix` before an id that has no vendor.
+// the ids the owner types (`typed`), less those `hide` matches, with `modelPrefix` before an id that has no vendor, or
+// none (`none`): a provider that serves no chat model, such as a voice service a plugin brings. `hosts` are other origins
+// of the same service, such as its WebSocket's, which a plugin's requests may reach. `plugin` is the plugin that brought
+// the entry, which fxbot sets: such an entry shows under its plugin while it's added.
 // `docs` is its page in fxbot's docs, `recommended` the model filled in after connecting, and `tested` the fxbot whose
 // release checks ran it with a real key.
 export type CatalogField = { name: string; label: string; options?: { value: string; label: string }[]; default?: string; hint?: string };
@@ -169,9 +172,11 @@ export type CatalogEntry = {
   optionalCheck?: boolean;
   unchecked?: boolean;
   modelsDev?: string | string[];
-  models?: "own" | "catalog" | "typed";
+  models?: "own" | "catalog" | "typed" | "none";
   modelPrefix?: string;
   hide?: string[];
+  hosts?: string[];
+  plugin?: string;
   headers?: Record<string, string>;
   docs: string;
   recommended?: string;
@@ -203,6 +208,10 @@ export type Provider = {
   hasKey: boolean;
   signedIn: boolean;
   error: string | null;
+  /** The plugin whose entry it was added from, or null for fxbot's own catalog's. Since 0.12.0. */
+  plugin: string | null;
+  /** Whether it serves chat models: false for a plugin's provider, such as a voice service. Since 0.12.0. */
+  chat: boolean;
 };
 // `fields` fill the entry's address. `serviceAccount` is a service account's JSON, for Vertex AI, sent once like a key.
 export type NewProvider = {

@@ -1,12 +1,12 @@
 {
   "name": "phone-signalwire",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "SignalWire for phone: a bot rings your phone through SignalWire, and you talk with it, hands-free. fxbot connects out to SignalWire for each call, and nothing reaches fxbot.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {
       "minFxbot": "0.9.0",
-      "needs": { "phone": { "line": 1 } },
+      "needs": { "phone": { "line": 2 } },
       "server": "./fxbot/server.ts",
       "migrations": "./fxbot/migrations",
       "settings": [

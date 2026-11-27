@@ -36,7 +36,8 @@ export function usable(e: CatalogEntry): boolean {
   if (e.optionalCheck !== undefined && typeof e.optionalCheck !== "boolean") return false;
   if (e.badKey !== undefined && !(Array.isArray(e.badKey) && e.badKey.every((n) => Number.isInteger(n) && n >= 400 && n < 500))) return false;
   if (e.hide !== undefined && !(Array.isArray(e.hide) && e.hide.every((h) => isText(h, 100)))) return false;
-  if (e.models !== undefined && !["own", "catalog", "typed"].includes(e.models)) return false;
+  if (e.models !== undefined && !["own", "catalog", "typed", "none"].includes(e.models)) return false;
+  if (e.hosts !== undefined && !(Array.isArray(e.hosts) && e.hosts.length <= 10 && e.hosts.every((h) => isText(h, 300) && /^(https|wss):\/\/[^/?#\s]+$|^(http|ws):\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(h)))) return false;
   if (e.modelsDev !== undefined && !(isText(e.modelsDev, 60) || (Array.isArray(e.modelsDev) && e.modelsDev.every((m) => isText(m, 60))))) return false;
   return true;
 }
@@ -61,6 +62,9 @@ export function fill(template: string, entry: Pick<CatalogEntry, "fields">, valu
 export function createCatalog({ url, fetch, sync = true }: { url?: string; fetch: Fetch; sync?: boolean }) {
   const ours = shipped();
   let entries = ours;
+  // The entries plugins bring, by plugin, while each is added: a voice service for phone, say. Each serves no chat model.
+  const brought = new Map<string, CatalogEntry[]>();
+  const fromPlugins = () => [...brought.values()].flat();
   async function refresh() {
     if (!url) return;
     const res = await fetch(url, { signal: AbortSignal.timeout(15_000) }).catch(() => null);
@@ -74,9 +78,27 @@ export function createCatalog({ url, fetch, sync = true }: { url?: string; fetch
   }
   return {
     refresh,
-    list: () => entries,
-    // A provider's entry, from the list as it is now, or as this release shipped it, for one the list has dropped.
-    get: (kind: string) => entries.find((e) => e.id === kind) ?? ours.find((e) => e.id === kind),
+    list: () => [...entries, ...fromPlugins()],
+    // A provider's entry, from the list as it is now, or as this release shipped it, for one the list has dropped, or
+    // from a plugin that's added.
+    get: (kind: string) => entries.find((e) => e.id === kind) ?? ours.find((e) => e.id === kind) ?? fromPlugins().find((e) => e.id === kind),
+    // A plugin's entries, in place of those it brought before: each one this fxbot can run, that serves no chat model,
+    // and whose id fxbot's catalog and other plugins don't use. Answers the ids it left out.
+    bring(plugin: string, offered: unknown[]): string[] {
+      const others = new Set([...entries, ...ours, ...[...brought].filter(([name]) => name !== plugin).flatMap(([, list]) => list)].map((e) => e.id));
+      const kept: CatalogEntry[] = [];
+      const left: string[] = [];
+      for (const raw of offered) {
+        const { plugin: _, ...e } = (raw ?? {}) as CatalogEntry;
+        if (usable(e as CatalogEntry) && e.models === "none" && e.connect !== "device" && e.connect !== "service-account" && !others.has(e.id) && !kept.some((k) => k.id === e.id))
+          kept.push({ ...(e as CatalogEntry), plugin });
+        else left.push(typeof e?.id === "string" ? e.id : "an entry");
+      }
+      if (kept.length) brought.set(plugin, kept);
+      else brought.delete(plugin);
+      return left;
+    },
+    drop: (plugin: string) => void brought.delete(plugin),
     // models.dev's other OpenAI-compatible hosts at a fixed HTTPS address, for search. Each is a key entry, named by its
     // models.dev id, which is the provider's kind once added.
     more(modelsDev: Record<string, any>): CatalogEntry[] {

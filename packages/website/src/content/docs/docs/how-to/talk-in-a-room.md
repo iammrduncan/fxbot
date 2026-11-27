@@ -26,6 +26,18 @@ Each room limits the bot replies to one message of yours: 10 unless you change i
 
 While bots answer, the room shows who's writing and who's next. **Stop** ends the reply being written and drops the rest. A message you send meanwhile drops the bots waiting their turn too.
 
+## By voice
+
+With the phone plugin, the phone at the top of a room, then **In-app call**, starts a call with its bots. Each bot speaks in its own voice, one at a time, and the room shows it all, with what you said marked **From your call**. It needs Phone 0.2.0 and chat rooms 0.6.0. To set up the voice, see [Talk with a bot on the phone](/docs/how-to/talk-with-a-bot-on-the-phone/#in-the-app).
+
+- **Name a bot** at the start or end of what you say, "Mr Robot, what's the GPU box doing?" or "…, Bob?", and it answers, as a tag would. "Everyone" asks them all. A name in the middle is left for the lead.
+- **Say no name,** and the room answers as it does in text: the lead, or everyone, by its setting.
+- **Bots hand it on** by tagging each other, as in text, and you hear the tag as the bot's name.
+- **Cut in whenever you like.** The bot speaking stops, the bots waiting are dropped, and the next to answer knows who you cut off, and where.
+- **Say "stop"** to stop the room, as **Stop** does.
+
+A bot with no voice of its own gets one of the speaker's voices that no other bot in the room has. Give one its own in its **Phone** section.
+
 ## Change a room
 
 **Edit**, at the top of a room, changes its name, its bots and their order, what a message that tags no one does, and the bot replies per message. **Delete room** deletes the room and what was said in it.

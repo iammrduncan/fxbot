@@ -109,8 +109,10 @@ export type PluginApi = {
      * that turn's id as `joined`, and its own turn takes messages the same way. One with an image waits instead. Since 0.6.0.
      * Since 0.9.0, `steer` works the same in a session of the plugin's own.
      * `asked` is the owner's own words this message carries on, which the plugin quotes from a chat of theirs, such as
-     * what they asked the bot that sent it. Hooks get it with the message and its turn. Since 0.7.0. */
-    send(bot: string, message: { text: string; shown?: string; label?: string; steer?: boolean; files?: Upload[]; session?: string; messageId?: string; asked?: string }): Promise<{ messageId: string; sessionId: string; joined?: string }>;
+     * what they asked the bot that sent it. Hooks get it with the message and its turn. Since 0.7.0.
+     * `effort` is the thinking level of the turn the message starts, such as `low`, in place of the session's or the
+     * bot's; a turn it joins keeps its own. Since 0.12.0. */
+    send(bot: string, message: { text: string; shown?: string; label?: string; steer?: boolean; files?: Upload[]; session?: string; messageId?: string; asked?: string; effort?: string }): Promise<{ messageId: string; sessionId: string; joined?: string }>;
     /** A session's lines as NDJSON, from `cursor` on, then each new one. */
     stream(bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
     /** The owner's newest messages in the bot's own chat, oldest first: no plugin's, and no other bot's. Since 0.6.0. */
@@ -123,6 +125,19 @@ export type PluginApi = {
     /** One tool-free request, on the bot's provider and model unless `provider` and `model` name others. It answers the
      * text, and throws on a failure or after `timeoutMs`, 60 seconds by default. Keys stay on the server. Since 0.6.0. */
     ask(bot: string, request: { instructions: string; text: string; provider?: string; model?: string; timeoutMs?: number }): Promise<string>;
+  };
+  /** The providers the owner added, and requests to them with their keys, which stay on the server. A plugin brings
+   * entries of its own to the Add provider page with `providers` in its plugin.json: catalog entries with
+   * `models: "none"`, such as a voice service. Since 0.12.0. */
+  providers: {
+    /** Each provider added, with no key: its id, the catalog entry it came from (`kind`), its name, the entry's, and the
+     * address it was added with, if it has one. */
+    list(): Promise<{ id: string; kind: string; name: string; label: string; baseUrl: string | null }[]>;
+    /** A request to one of the provider's own addresses (its base URL's, its key check's, or its entry's `hosts`), with
+     * its key or sign-in added as its entry says. A ChatGPT or Grok plan has no API for it. */
+    fetch(id: string, url: string, init?: RequestInit): Promise<Response>;
+    /** A WebSocket to one of the provider's own addresses, opened with its key in the headers, once it's open. */
+    socket(id: string, url: string, protocols?: string | string[]): Promise<WebSocket>;
   };
   /** The added plugins that need this one, each with its block for this one, and what it provides. */
   dependents(): Dependent[];

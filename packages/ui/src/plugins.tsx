@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as jsxRuntime from "react/jsx-runtime";
 import { Component, createContext, useContext, useMemo, useSyncExternalStore, type ComponentProps, type ComponentType, type ReactNode } from "react";
-import { Streamdown } from "streamdown";
+import { defaultComponents, Streamdown, type Components, type ExtraProps } from "streamdown";
 import { createPortal } from "react-dom";
 import * as attachment from "@/components/ui/attachment";
 import * as badge from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import * as input from "@/components/ui/input";
 import { InputGroupTextarea } from "@/components/ui/input-group";
 import * as message from "@/components/ui/message";
 import * as nativeSelect from "@/components/ui/native-select";
+import * as popover from "@/components/ui/popover";
 import * as scroller from "@/components/ui/message-scroller";
 import * as sidebar from "@/components/ui/sidebar";
 import * as switches from "@/components/ui/switch";
@@ -23,7 +24,7 @@ import { Blob } from "./blob.tsx";
 import { ModelField } from "./providers.tsx";
 import { client } from "./client.ts";
 import { Header } from "./header.tsx";
-import { go } from "./nav.ts";
+import { followBeside, go, openBeside } from "./nav.ts";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { useReorder } from "./reorder.ts";
 import { Reply } from "./steps.tsx";
@@ -51,7 +52,8 @@ type Nav = { label: string; path: string; icon?: ComponentType<{ className?: str
 export type MentionChoice = { key: string; name: string; link: string; title?: string; detail?: string };
 export type Mention = { search: (query: string, bot?: Profile) => MentionChoice[] | Promise<MentionChoice[]> };
 type Places = {
-  routes: { path: string; parts: string[]; Component: ComponentType<{ params: Record<string, string> }> }[];
+  // `beside`: a screen, such as a room, that shows other plugins' screens beside it, as a bot's chat does (beside.tsx).
+  routes: { path: string; parts: string[]; Component: ComponentType<{ params: Record<string, string> }>; beside: boolean }[];
   sidebar: ComponentType[];
   nav: Nav[];
   composer: ComponentType<ComposerProps>[];
@@ -61,6 +63,8 @@ type Places = {
   botPanel: ComponentType<{ bot: Profile }>[];
   libraryItem: ComponentType<{ item: LibraryItem }>[];
   chat: ComponentType<{ bot: Profile; reload: () => void }>[];
+  // In a bot chat's header, left of the bot panel's button, such as phone's calls.
+  header: ComponentType<{ bot: Profile }>[];
   box: ComponentType<any>[];
   fold: Fold[];
   said: { pattern: RegExp; Component: ComponentType<{ match: RegExpMatchArray }> }[];
@@ -72,7 +76,7 @@ type Places = {
 // `key` is the URLs it loaded from, which change with its files.
 type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places; pageError?: string };
 
-const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], libraryItem: [], chat: [], box: [], fold: [], said: [], mentions: [], codeBlocks: [], slots: new Map() });
+const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], libraryItem: [], chat: [], header: [], box: [], fold: [], said: [], mentions: [], codeBlocks: [], slots: new Map() });
 
 // The loaded plugins, by name. A change makes a new array, which the places read through usePlugins.
 let loaded: Loaded[] = [];
@@ -98,6 +102,7 @@ const ui = () => ({
   ...input,
   ...message,
   ...nativeSelect,
+  ...popover,
   ...scroller,
   ...sidebar,
   ...switches,
@@ -118,6 +123,9 @@ function appModule(name: string) {
     applyLine,
     api: (path: string, init?: RequestInit) => fetch(`/api/plugins/${name}/${path.replace(/^\//, "")}`, init),
     go,
+    // A path opened beside the chat when one is showing, such as a page from a card in a reply, so the chat stays.
+    // Anywhere else, or for a path that isn't a plugin's screen, it's go.
+    openBeside,
     useBots: useAppBots,
     // Every plugin's @ sources, with its name and icon, for a box that lists them.
     useMentions: () => usePlugins().flatMap(({ name, iconKey, places }) => places.mentions.map((source) => ({ ...source, plugin: name, iconKey }))),
@@ -148,7 +156,8 @@ async function run(name: string, version: string, url: string): Promise<Places> 
   setup({
     name,
     version,
-    route: (path: string, Component: Places["routes"][number]["Component"]) => places.routes.push({ path, parts: path.split("/").filter(Boolean), Component }),
+    route: (path: string, Component: Places["routes"][number]["Component"], options?: { beside?: boolean }) =>
+      places.routes.push({ path, parts: path.split("/").filter(Boolean), Component, beside: options?.beside === true }),
     sidebar: (Component: ComponentType) => places.sidebar.push(Component),
     nav: (nav: Nav) => places.nav.push(nav),
     composer: (Component: ComponentType<ComposerProps>) => places.composer.push(Component),
@@ -158,6 +167,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     botPanel: (Component: ComponentType<{ bot: Profile }>) => places.botPanel.push(Component),
     libraryItem: (Component: ComponentType<{ item: LibraryItem }>) => places.libraryItem.push(Component),
     chat: (Component: ComponentType<{ bot: Profile; reload: () => void }>) => places.chat.push(Component),
+    header: (Component: ComponentType<{ bot: Profile }>) => places.header.push(Component),
     box: (Component: ComponentType<any>) => places.box.push(Component),
     fold: (fold: Fold) => places.fold.push(fold),
     said: (pattern: RegExp, Component: ComponentType<{ match: RegExpMatchArray }>) => places.said.push({ pattern, Component }),
@@ -274,10 +284,19 @@ function useCodeBlocks() {
 
 // Markdown as the app draws it everywhere, and gives plugins as ui.Streamdown: Streamdown, with the code blocks plugins
 // draw. With none, it's Streamdown as it is.
-export function Markdown({ plugins, ...props }: ComponentProps<typeof Streamdown>) {
+export function Markdown({ plugins, components, ...props }: ComponentProps<typeof Streamdown>) {
   const blocks = useCodeBlocks();
   const merged = useMemo(() => (blocks.length ? { ...plugins, renderers: [...(plugins?.renderers ?? []), ...blocks] } : plugins), [plugins, blocks]);
-  return <Streamdown {...props} plugins={merged} />;
+  const links = useMemo<Components>(() => ({ a: AppLink, ...components }), [components]);
+  return <Streamdown {...props} components={links} plugins={merged} />;
+}
+
+// A link to a place in the app opens here: a plugin's screen, such as a page's /pages/<id>, beside the chat, and any
+// other in place. Any other link is Streamdown's, which asks before it opens another site in a new tab.
+function AppLink({ node, ...props }: ComponentProps<"a"> & ExtraProps) {
+  const href = props.href ?? "";
+  if (!/^\/(?!\/|api\/)/.test(href)) return <defaultComponents.a node={node} {...props} />;
+  return <a {...props} target={undefined} rel={undefined} className={`wrap-anywhere font-medium text-primary underline ${props.className ?? ""}`} data-streamdown="link" onClick={followBeside} />;
 }
 
 // What the owner or a plugin said, with each match of a plugin's `said` pattern drawn by its part.
@@ -334,7 +353,10 @@ export function usePluginSettings() {
 
 // The plugin screen for a path, `/<plugin>/…`, checked after the app's own.
 export function usePluginScreen(path: string): ReactNode | undefined {
-  const plugins = usePlugins();
+  return pluginRoute(usePlugins(), path)?.screen;
+}
+export const usePluginRoute = (path: string) => pluginRoute(usePlugins(), path);
+export function pluginRoute(plugins: Loaded[], path: string): { screen: ReactNode; beside: boolean } | undefined {
   const [, top, ...rest] = path.split("/");
   const plugin = plugins.find((p) => p.name === top);
   if (!plugin) return undefined;
@@ -342,11 +364,14 @@ export function usePluginScreen(path: string): ReactNode | undefined {
     if (route.parts.length !== rest.filter(Boolean).length) continue;
     const params: Record<string, string> = {};
     if (route.parts.every((part, i) => (part.startsWith(":") ? ((params[part.slice(1)] = decodeURIComponent(rest[i])), true) : part === rest[i])))
-      return (
-        <PluginPart key={path} plugin={plugin.name}>
-          <route.Component params={params} />
-        </PluginPart>
-      );
+      return {
+        beside: route.beside,
+        screen: (
+          <PluginPart key={path} plugin={plugin.name}>
+            <route.Component params={params} />
+          </PluginPart>
+        ),
+      };
   }
   return undefined;
 }

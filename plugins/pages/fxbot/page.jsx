@@ -1,7 +1,7 @@
 // How a page shows in a reply, the screen that reads it, and Open page in the library's preview. Built into page.js; see
 // the README.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { api, client, go, ui, useBots } from "@fxbot/app";
+import { api, client, go, openBeside, ui, useBots } from "@fxbot/app";
 
 async function call(path, method = "GET", body) {
   const res = await api(path, { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
@@ -31,7 +31,7 @@ function Card({ call: tool }) {
         <p className="truncate font-medium">{page?.title ?? JSON.parse(`"${found[1]}"`)}</p>
         <p className="text-muted-foreground">{page && page.versions[0].n > version ? "Updated since" : `Version ${version}`}</p>
       </div>
-      <ui.Button size="sm" variant="outline" onClick={() => go(`/pages/${id}`)}>Open</ui.Button>
+      <ui.Button size="sm" variant="outline" onClick={() => openBeside(`/pages/${id}`)}>Open</ui.Button>
     </div>
   );
 }
@@ -250,7 +250,8 @@ function Reader({ params: { id } }) {
           <Button size="sm" variant="outline" onClick={copy}>{copied ? "Copied" : "Copy"}</Button>
           {isHtml ? <Button size="sm" variant="outline" onClick={() => window.open(frameOf(id, n), "_blank", "noreferrer")}>Open in a tab</Button> : <Button size="sm" variant="outline" onClick={() => window.print()}>Print</Button>}
           <Button size="sm" variant="outline" onClick={remove}>Delete</Button>
-          {bot && <Button size="sm" variant="ghost" onClick={() => go(`/profiles/${bot.id}`)}>Open {bot.name}'s chat</Button>}
+          {/* Beside the bot's chat, the chat is already there. */}
+          {bot && location.pathname !== `/profiles/${bot.id}` && <Button size="sm" variant="ghost" onClick={() => go(`/profiles/${bot.id}`)}>Open {bot.name}'s chat</Button>}
         </div>
         {error && <p role="alert" className="text-destructive">{error}</p>}
       </div>
@@ -286,7 +287,7 @@ function OpenPage({ item }) {
   useEffect(() => {
     if (item.kind === "document") call(item.id).then(() => setPage(true), () => {});
   }, [item.id]);
-  return page ? <ui.Button variant="outline" onClick={() => go(`/pages/${item.id}`)}>Open page</ui.Button> : null;
+  return page ? <ui.Button variant="outline" onClick={() => openBeside(`/pages/${item.id}`)}>Open page</ui.Button> : null;
 }
 
 export default function setup(app) {

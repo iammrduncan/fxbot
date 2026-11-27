@@ -1,19 +1,75 @@
 {
   "name": "phone",
-  "version": "0.1.1",
-  "description": "Press Call me and a bot rings your phone, and you talk with it, hands-free. Its own model, memory, and tools answer. A provider plugin, such as phone-signalwire, carries the call.",
+  "version": "0.2.0",
+  "description": "Talk with a bot by voice, in the app or on your phone, and cut in whenever you like. It works in the background while you talk, and in a chat room, calls all its bots. Voice providers are logins: ElevenLabs, Deepgram, one you have, a speech server on your machine, or your browser's own speech.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {
-      "minFxbot": "0.9.0",
+      "minFxbot": "0.12.0",
       "server": "./fxbot/server.ts",
       "page": "./fxbot/page.js",
       "migrations": "./fxbot/migrations",
+      "needs": { "chat-rooms": { "optional": true } },
+      "providers": [
+        {
+          "id": "elevenlabs",
+          "name": "ElevenLabs",
+          "about": "Voices, and listening with Scribe",
+          "group": "key",
+          "order": 10,
+          "connect": "key",
+          "baseUrl": "https://api.elevenlabs.io/v1",
+          "headers": { "xi-api-key": "{apiKey}" },
+          "keyCheck": "https://api.elevenlabs.io/v1/voices",
+          "keyPage": "https://elevenlabs.io/app/settings/api-keys",
+          "steps": ["Choose Create API key, and give it Text to Speech, Speech to Text, and Voices read access."],
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/add-a-voice-provider/"
+        },
+        {
+          "id": "deepgram",
+          "name": "Deepgram",
+          "about": "Listening with Flux, and Aura voices",
+          "group": "key",
+          "order": 20,
+          "connect": "key",
+          "baseUrl": "https://api.deepgram.com/v1",
+          "headers": { "Authorization": "Token {apiKey}" },
+          "keyCheck": "https://api.deepgram.com/v1/projects",
+          "keyPage": "https://console.deepgram.com/",
+          "steps": ["Open API Keys, and choose Create a New API Key."],
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/add-a-voice-provider/"
+        },
+        {
+          "id": "speech-server",
+          "name": "Speech server",
+          "about": "Speaches, LocalAI, Kokoro-FastAPI, whisper.cpp, or any server with OpenAI's audio endpoints, on this machine",
+          "group": "local",
+          "order": 30,
+          "connect": "url",
+          "baseUrl": "http://localhost:8000/v1",
+          "hint": "In a container, localhost is fxbot's own: give the machine's address, as for Ollama.",
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/run-speech-on-your-machine/"
+        }
+      ],
       "settings": [
         { "name": "to", "description": "Your phone, the only number bots call, such as +15557654321" },
         { "name": "minutes", "description": "The longest call, 5 to 120 minutes", "default": "30" },
         { "name": "quiet", "description": "Hours a bot doesn't call on its own, in your time zone", "default": "22:00-07:00" },
-        { "name": "perDay", "description": "The most calls one bot makes on its own in a day, 1 to 20", "default": "3" }
+        { "name": "perDay", "description": "The most calls one bot makes on its own in a day, 1 to 20", "default": "3" },
+        { "name": "pause", "description": "How long you can go quiet on a call before the bot answers, so you can think or stumble mid-sentence, 1 to 5 seconds", "default": "2" },
+        { "name": "callThinking", "description": "How hard a bot thinks on a call, so it answers quickly: its subagents keep their own level", "default": "low", "options": [
+          { "value": "low", "label": "Low, to answer quickly" },
+          { "value": "medium", "label": "Medium" },
+          { "value": "high", "label": "High" },
+          { "value": "same", "label": "The bot's own level" }
+        ] },
+        { "name": "googleListening", "description": "Let Chrome send what you say to Google, when This device listens and Chrome has no language on the device", "default": "off", "options": [
+          { "value": "off", "label": "Off" },
+          { "value": "on", "label": "On" }
+        ] }
       ]
     }
   }

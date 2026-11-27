@@ -130,9 +130,13 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
   }
 
   // An entry for a kind the catalog doesn't name: one from models.dev's long tail, whose kind is its models.dev id, or
-  // one the catalog has since dropped. Either is a key at the address it was added with.
+  // one the catalog has since dropped. Either is a key at the address it was added with. One a plugin brought, whose
+  // plugin isn't added now, still serves no chat model.
   const entryOf = (record: ProviderRecord): CatalogEntry =>
-    catalog.get(record.kind) ?? { id: record.kind, name: record.name, about: "", group: "key", connect: "key", modelsDev: record.kind, docs: "" };
+    catalog.get(record.kind) ??
+    (record.fields?.plugin
+      ? { id: record.kind, name: record.name, about: "", group: "key", connect: "key", models: "none", plugin: record.fields.plugin, docs: "" }
+      : { id: record.kind, name: record.name, about: "", group: "key", connect: "key", modelsDev: record.kind, docs: "" });
 
   // AI Gateway's thinking levels for each model, from the catalog libfx checks a level against, at most once a day. libfx
   // lists the ids alone. Without it, the models offer none.
@@ -308,6 +312,8 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
     // the next look. A failed refresh keeps the old list. Only a provider never listed waits for its first fetch.
     // The provider's own context field wins over what its server reports.
     async list(record: ProviderRecord, access: Access) {
+      // A provider that serves no chat model, such as a voice service a plugin brought, lists none.
+      if (entryOf(record).models === "none") return [];
       let found = await kept(record.id);
       if (!found) found = await refresh(record, access);
       else if (Date.now() - found.at > cacheMs) refresh(record, access).catch(() => {});
@@ -321,12 +327,16 @@ export function createModels(sql: Sql, fetch: Fetch, catalog: ProviderCatalog) {
       await sql`delete from model_lists where provider_id = ${id}`;
     },
     // A key is checked where its entry says a bad one is refused, `keyCheck`, or at `/models`, where a 404 passes, since
-    // some servers serve no list there. AI Gateway and the local servers are checked by listing.
+    // some servers serve no list there. AI Gateway and the local servers are checked by listing. A key that goes in the
+    // entry's own headers goes only there: ElevenLabs refuses a request with a bearer too.
     async check(record: ProviderRecord, access: Access) {
       const entry = entryOf(record);
+      // A plugin's server with no key check, such as a speech server on this machine, has no list to try.
+      if (entry.models === "none" && !entry.keyCheck) return;
+      const own = Object.values(entry.headers ?? {}).some((value) => value.includes("{apiKey}"));
       try {
         if (["gateway", "ollama", "lmstudio"].includes(record.kind)) await fetchList(record, access);
-        else await getJson(access.fetch ?? fetch, entry.keyCheck ? fill(entry.keyCheck, entry, record.fields ?? {}) : `${record.baseUrl}/models`, { headers: bearer(access.apiKey) }, "The key check");
+        else await getJson(access.fetch ?? fetch, entry.keyCheck ? fill(entry.keyCheck, entry, record.fields ?? {}) : `${record.baseUrl}/models`, { headers: own ? {} : bearer(access.apiKey) }, "The key check");
       } catch (error) {
         const upstream = (error as { upstream?: number }).upstream;
         if (upstream === 404) return;
