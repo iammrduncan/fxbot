@@ -128,6 +128,19 @@ const ui = (pm: Kit | null) => ({
   ...(pm ? { FormatBar: pm.FormatBar, FormatButton: pm.FormatButton } : {}),
 });
 
+const formattingFor = ({ nodes, marks, plugins, toMarkdown, fromMarkdown, offsetOf, posOf, ownsKey, isEmpty }: Kit["formatting"]) => ({
+  nodes,
+  marks,
+  plugins,
+  toMarkdown,
+  fromMarkdown,
+  offsetOf,
+  posOf,
+  ownsKey,
+  isEmpty,
+  breaks,
+});
+
 // `@fxbot/app` for one plugin: the client, its own routes, the app's navigation and bots, the app's components, and
 // the formatting a message box does, for a plugin's own box.
 function appModule(name: string, pm: Kit | null) {
@@ -148,7 +161,8 @@ function appModule(name: string, pm: Kit | null) {
     // error boundary. One nobody fills draws nothing.
     Slot: ({ name, props }: { name: string; props?: Record<string, unknown> }) => <Place pick={(places) => places.slots.get(name) ?? []} props={props ?? {}} />,
     ui: ui(pm),
-    ...(pm ? { formatting: { ...pm.formatting, breaks } } : {}),
+    // What the plugin API lists of the box's formatting, and nothing more.
+    ...(pm ? { formatting: formattingFor(pm.formatting) } : {}),
   };
 }
 
@@ -324,7 +338,8 @@ function AppLink({ node, ...props }: ComponentProps<"a"> & ExtraProps) {
 
 // What the owner said, as Markdown, as a bot's reply is, with each line kept as they typed it (said.ts). Each match of
 // a plugin's `said` pattern outside code is a <said-part> tag first, drawn by that plugin's part, as a room draws its
-// mentions. Raw HTML stays out, as in replies.
+// mentions. Raw HTML stays out, as in replies, but what looks like a tag, as in Array<string>, is the owner's words, so
+// each < outside code is text, but an autolink's, such as <https://fxbot.sh>.
 export function SaidMarkdown({ text }: { text: string }) {
   const plugins = usePlugins();
   const parts: ReactNode[] = [];
@@ -332,6 +347,7 @@ export function SaidMarkdown({ text }: { text: string }) {
     .split(code)
     .map((piece, i) => {
       if (i % 2) return piece;
+      piece = piece.replace(/\\[\s\S]|<(?![a-z][a-z\d+.-]{1,31}:[^\s<>]*>|[^\s<>@]+@[^\s<>@]+>)/gi, (m) => (m === "<" ? "&lt;" : m));
       for (const { name, places } of plugins)
         for (const { pattern, Component } of places.said) {
           let out = "";
@@ -392,10 +408,7 @@ export function usePluginSettings() {
   return usePlugins().flatMap(({ name, iconKey, places }) => (places.settings.length ? [{ name, iconKey, parts: places.settings }] : []));
 }
 
-// The plugin screen for a path, `/<plugin>/…`, checked after the app's own.
-export function usePluginScreen(path: string): ReactNode | undefined {
-  return pluginRoute(usePlugins(), path)?.screen;
-}
+// The plugin screen for a path, `/<plugin>/…`, checked after the app's own, and whether it opens beside the chat.
 export const usePluginRoute = (path: string) => pluginRoute(usePlugins(), path);
 export function pluginRoute(plugins: Loaded[], path: string): { screen: ReactNode; beside: boolean } | undefined {
   const [, top, ...rest] = path.split("/");
