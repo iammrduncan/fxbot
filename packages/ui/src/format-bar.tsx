@@ -111,8 +111,12 @@ export function FormatBar({ view: given, within, className }: { view?: EditorVie
         <span className="flex min-w-48 flex-1 items-center gap-1 px-1">
           <input
             ref={field}
-            type="url"
+            // Text, with a phone's address keyboard: a half-typed address in a url field would stop the form from sending.
+            type="text"
             inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             aria-label="Link address"
             aria-invalid={wrong || undefined}
             placeholder="https://… or mailto:…"
