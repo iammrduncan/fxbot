@@ -58,8 +58,9 @@ The bar stays open, in this browser, until you choose **Aa** again.
 
 ## Paste
 
-- **Markdown you paste becomes formatting,** so `**this**` pasted shows bold, and sends as it was.
+- **Markdown you paste becomes formatting,** so `**this**` pasted shows bold, and sends as it was. That's only when the formatting sends exactly what you pasted. Anything else stays as you pasted it, as if you'd typed it, so a path such as `foo/__init__.py` never turns bold.
 - **To paste it as plain text,** press Cmd+Shift+V, or Ctrl+Shift+V. Its markers are kept as text.
+- **A link you paste** stays a link when it goes to a website, an email address, or a place in fxbot. Any other kind stays text.
 - **An address pasted over selected text** links it.
 - **In a code block,** a paste stays as it is.
 

@@ -32,9 +32,16 @@ export const nodes: Record<string, NodeSpec> = {
   list_item: { content: "paragraph block*", defining: true, parseDOM: [{ tag: "li" }], toDOM: () => ["li", 0] },
   text: { group: "inline" },
 };
+// A link the box keeps: to a site, a mail address, or a place in the app. Any other, such as javascript:, stays text.
+const linkable = (href: string) => /^(https?:\/\/|mailto:)/i.test(href) || /^\/(?!\/)/.test(href);
 // Underline is left out: Markdown has none.
 export const marks: Record<string, MarkSpec> = {
-  link: { attrs: { href: {} }, inclusive: false, parseDOM: [{ tag: "a[href]", getAttrs: (dom) => ({ href: (dom as HTMLElement).getAttribute("href") }) }], toDOM: (mark) => ["a", { href: mark.attrs.href, title: mark.attrs.href }, 0] },
+  link: {
+    attrs: { href: {} },
+    inclusive: false,
+    parseDOM: [{ tag: "a[href]", getAttrs: (dom) => (linkable((dom as HTMLElement).getAttribute("href") ?? "") ? { href: (dom as HTMLElement).getAttribute("href") } : false) }],
+    toDOM: (mark) => ["a", { href: mark.attrs.href, title: mark.attrs.href }, 0],
+  },
   strong: { parseDOM: [{ tag: "strong" }, { tag: "b" }], toDOM: () => ["strong", 0] },
   em: { parseDOM: [{ tag: "em" }, { tag: "i" }], toDOM: () => ["em", 0] },
   strike: { parseDOM: [{ tag: "s" }, { tag: "del" }], toDOM: () => ["s", 0] },
@@ -401,8 +408,8 @@ function readInline(text: string, schema: Schema, chips?: Chips): Node[] {
     }
     if (c === "[") {
       const link = /^\[((?:\\.|[^\\\]\n])*)\]\((<[^>\n]*>|[^\s)]+)\)/.exec(text.slice(i));
-      if (link && link[1]) {
-        const href = link[2].startsWith("<") ? link[2].slice(1, -1) : link[2];
+      const href = link ? (link[2].startsWith("<") ? link[2].slice(1, -1) : link[2]) : "";
+      if (link && link[1] && linkable(href)) {
         const mark = m.link.create({ href });
         tokens.push({ nodes: readInline(link[1], schema, chips).map((node) => (allows(node, m.link) ? node.mark(mark.addToSet(node.marks)) : node)) });
         i += link[0].length;
@@ -681,7 +688,11 @@ function paste(schema: Schema, chips?: Chips) {
           return true;
         }
         const lines = text.replace(/\r\n?/g, "\n").split("\n");
-        const doc = asIs ? schema.nodes.doc.create(null, lines.map((line) => schema.nodes.paragraph.create(null, line ? schema.text(line) : null))) : fromMarkdown(lines.join("\n"), schema, chips);
+        const plainly = () => schema.nodes.doc.create(null, lines.map((line) => schema.nodes.paragraph.create(null, line ? schema.text(line) : null)));
+        // Markdown becomes formatting only when it writes back as the very text pasted. Anything else, such as code with
+        // foo/__init__.py, which Markdown reads as bold, goes in as it is, as if typed.
+        const read = asIs ? null : fromMarkdown(lines.join("\n"), schema, chips);
+        const doc = read && toMarkdown(read, chips) === lines.join("\n") ? read : plainly();
         view.dispatch(state.tr.replaceSelection(Slice.maxOpen(doc.content)).scrollIntoView().setMeta("uiEvent", "paste"));
         return true;
       },
