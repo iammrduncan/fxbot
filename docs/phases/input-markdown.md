@@ -15,13 +15,12 @@ The message box formats what the owner types, as Slack's does, and what they sen
 - **Sending stays as it is.** Enter sends and Shift+Enter starts a line. In a list or a quote, Shift+Enter starts the next item. In a code block, Enter starts a line. On a phone, Return starts a line and the send button sends.
 - **What the bot gets is standard Markdown,** the text it reads today: `**bold**`, `_italic_`, `~~strike~~`, and so on. Bots, drafts, and the `$` skill list see text, as before.
 - **What the owner sent shows formatted,** in the bot's color, as a bot's reply does. In a room too.
-- **Every box,** the app's own, Messages' box with its bot chips, and a room's with its mentions, through one copy of ProseMirror that the app shares with plugins. An owner with Messages and chat rooms loads about 98 KB less than today.
+- **Every box,** the app's own, Messages' box with its bot chips, and a room's with its mentions, through one copy of ProseMirror that the app shares with plugins. An owner with Messages and chat rooms loads about 89 KB less than before, gzipped, and one with neither about 78 KB more.
 
-Status: planned on 2026-11-26 at the owner's word, not built.
+Status: **built on 2026-11-27** on `release/0.12.0`, the day after it was planned, and checked in Chromium on a disposable fxbot and on the owner's dev. Every checklist item is done but the iPhone's, which is the owner's ([What the build changed](#what-the-build-changed)).
 - **References:** each one in the [research directive](../research-directive.md) that has a repository was cloned and searched for its chat box on 2026-11-26.
 - **Slack and other apps:** Slack's help center, and Discord's, Element's, Telegram's, GitHub's, and Linear's boxes, were read on 2026-11-26.
 - **Editors:** ProseMirror, TipTap, Lexical, and CodeMirror were bundled and measured on 2026-11-26.
-- Nothing of it has run in a browser.
 
 ## What the owner asked
 
@@ -311,39 +310,39 @@ About 30 lines change:
 
 ## 4. Checklist
 
-- [ ] `formatting.ts`, with a Node check:
-  - [ ] Every rule and key's Markdown out.
-  - [ ] `2 * 3 * 4`, `snake_case_name`, and `~/path` stay as typed.
-  - [ ] Escapes.
-  - [ ] Text the box wrote reads back the same, over a list of cases with chips of both kinds.
-- [ ] The app's box, in Chromium on the disposable check fxbot, with its non-GET requests to its own API only:
-  - [ ] Each rule converts as typed, and Backspace after it undoes it.
-  - [ ] Each key.
-  - [ ] Enter sends.
-  - [ ] Shift+Enter in a list and a quote.
-  - [ ] Enter in a code block.
-  - [ ] Cmd+Enter sends from a code block.
-  - [ ] A pasted address over a selection becomes a link.
-  - [ ] The skill list still opens on `$` and inserts.
-  - [ ] A draft comes back formatted after a reload.
-  - [ ] A pasted file still attaches.
-- [ ] What the bot got is the Markdown the box wrote, read from the chat's stream.
-- [ ] The format bar on a computer and in the **+** row on a phone, each button, pressed states, and the link field.
-- [ ] `Said` draws Markdown:
-  - [ ] Messages' and herdr's tags still draw as chips, and one inside code doesn't.
-  - [ ] Line breaks are kept.
-  - [ ] Light and dark, in each bot color.
-- [ ] Messages' box, rebuilt with the app's ProseMirror:
-  - [ ] Its chips and `@` list work as before.
-  - [ ] Formatting works, with chips in a formatted line.
-  - [ ] Its `page.js` is about 8 KB gzipped.
-- [ ] A room's box and words:
-  - [ ] Mentions and `/fresh` work as before.
-  - [ ] Formatting works.
-  - [ ] What the owner sent shows formatted, with its chips.
-  - [ ] Its `page.js` is about 11 KB gzipped.
-- [ ] A plugin built with its own ProseMirror still loads and works: Messages' current `page.js`, against the new app.
-- [ ] The app's page weight measured before and after, with neither plugin, with Messages, and with both.
+- [x] `formatting.ts`, with a Node check:
+  - [x] Every rule and key's Markdown out.
+  - [x] `2 * 3 * 4`, `snake_case_name`, and `~/path` stay as typed.
+  - [x] Escapes.
+  - [x] Text the box wrote reads back the same, over a list of cases with chips of both kinds.
+- [x] The app's box, in Chromium on the disposable check fxbot, with its non-GET requests to its own API only:
+  - [x] Each rule converts as typed, and Backspace after it undoes it.
+  - [x] Each key.
+  - [x] Enter sends.
+  - [x] Shift+Enter in a list and a quote.
+  - [x] Enter in a code block.
+  - [x] Cmd+Enter sends from a code block.
+  - [x] A pasted address over a selection becomes a link.
+  - [x] The skill list still opens on `$` and inserts.
+  - [x] A draft comes back formatted after a reload.
+  - [x] A pasted file still attaches.
+- [x] What the bot got is the Markdown the box wrote, read from the chat's stream.
+- [x] The format bar on a computer and in the **+** row on a phone, each button, pressed states, and the link field.
+- [x] `Said` draws Markdown:
+  - [x] Messages' and herdr's tags still draw as chips, and one inside code doesn't.
+  - [x] Line breaks are kept.
+  - [x] Light and dark, in each bot color.
+- [x] Messages' box, rebuilt with the app's ProseMirror:
+  - [x] Its chips and `@` list work as before.
+  - [x] Formatting works, with chips in a formatted line.
+  - [x] Its `page.js` is about 8 KB gzipped.
+- [x] A room's box and words:
+  - [x] Mentions and `/fresh` work as before.
+  - [x] Formatting works.
+  - [x] What the owner sent shows formatted, with its chips.
+  - [x] Its `page.js` is about 11 KB gzipped.
+- [x] A plugin built with its own ProseMirror still loads and works: Messages' current `page.js`, against the new app.
+- [x] The app's page weight measured before and after, with neither plugin, with Messages, and with both.
 - [ ] **On the owner's iPhone,** through web pairing:
   - [ ] Typing with autocorrect and dictation.
   - [ ] The bar.
@@ -352,15 +351,77 @@ About 30 lines change:
   - [ ] A list's Backspace.
 
   This is the owner's to tick, as headless Chromium has no iPhone keyboard.
-- [ ] The docs listed above.
-- [ ] The repo checks:
-  - [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
-  - [ ] Both plugins' `page.js` rebuilt and committed, with their licenses.
-  - [ ] The app and each plugin committed on the open release branch, each on its own.
-- [ ] Dev updated: `npm run build` for web pairing's copy of the page, and each plugin's files landed in one write.
+- [x] The docs listed above.
+- [x] The repo checks:
+  - [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
+  - [x] Both plugins' `page.js` rebuilt and committed, with their licenses.
+  - [x] The app and each plugin committed on the open release branch, each on its own.
+- [x] Dev updated: `npm run build` for web pairing's copy of the page, and each plugin's files landed in one write.
 
 ## 5. Open questions
 
-- **Paste.** Slack keeps pasted text plain until Cmd+Shift+F. Should pasted Markdown become formatting instead, as Linear does? Since the box's text is Markdown, reading a paste as Markdown sends exactly what was pasted. Pasted as plain text, its markers would be escaped. Recommended: read it as Markdown, with Cmd+Shift+V pasting it plain.
-- **Enter in a code block.** Slack sends on Enter unless a setting says otherwise. Should Enter start a line inside a code block, with Cmd or Ctrl+Enter, or Enter on an empty last line, to finish? Recommended: yes, a line, so code can be typed in lines.
-- **The page's weight.** An owner with neither Messages nor chat rooms loads 68 KB more, gzipped, in return for formatting in the app's own box. Both plugins are in Essentials, so most owners load less than today. Is that trade right? The other way keeps the textarea, with Slack's keys only and the markers showing, unless one of the plugins is added. Recommended: the shared ProseMirror.
+Answered with the recommendations, at the owner's word on 2026-11-27 ("taking each doc's recommended answers to its open questions"):
+- **Paste:** pasted Markdown becomes formatting, and Cmd or Ctrl+Shift+V pastes it plain.
+- **Enter in a code block:** it starts a line. Enter on the block's empty last line leaves it, and Cmd or Ctrl+Enter sends.
+- **The page's weight:** the shared ProseMirror. Measured, the trade is a little steeper than planned: 78 KB more with neither plugin, and 89 KB less with both ([What the build changed](#what-the-build-changed)).
+
+## What the build changed
+
+Built on 2026-11-27 on `release/0.12.0` in the main tree, beside the web tooling build, and checked in Chromium on a disposable fxbot (its own database and port, the mock model) and, read-only, on the owner's dev.
+
+**As planned:**
+- **The app:** `formatting.ts`, the box (`editor.tsx`), the format bar (`format-bar.tsx`), `Said` drawing Markdown with `<said-part>` tags, and `require` and `@fxbot/app` handing plugins ProseMirror and `formatting` (`c012e15`).
+- **Messages 0.3.0** (`fd0988b`) and **Chat rooms** (`c915aa5`): their boxes on the app's ProseMirror and formatting, `minFxbot` 0.12.0, and nothing bundled.
+- **The answers to the open questions,** the recommended ones: pasted Markdown is formatting, Enter in a code block starts a line, and the box is the shared ProseMirror.
+
+**What changed from the plan, and why:**
+- **`formatting.ts` is 714 lines, not about 250.**
+  - **The reader** follows CommonMark's rules for emphasis, the delimiter runs and the rule of three, and GFM's for strikethrough. Simpler rules read back text the bubble drew differently.
+  - **The writer** checks each line it writes by reading it back. A mix of markers its careful escapes get wrong, such as a literal `*` beside a bold run, is written again with every marker escaped.
+  - **A mark that goes on stays open,** and the one that lasts longer opens first, so a mark never closes and reopens around a space.
+  - **The caret** is `offsetOf` and `posOf`, from where each place lands in the text, in place of `toMarkdown` with `{ caret }`.
+  - **The keys** are commands the format bar shares, `setLink` and `linkAt` serve the address field, and pasting is the formatting's own.
+- **The chunk is 77 KB gzipped, not 68.** With the bigger `formatting.ts`, the box, the bar, and newer ProseMirror (view 1.44). Measured against the page at `d560103`, gzipped as the server sends it:
+
+  | The owner has | Before | After | Change |
+  | --- | --- | --- | --- |
+  | Neither plugin | 399.6 KB | 477.9 KB | 78 KB more |
+  | Messages | 490.5 KB | 485.0 KB | 6 KB less |
+  | Messages and chat rooms | 584.6 KB | 495.6 KB | 89 KB less |
+
+  The main chunk and styles grew 1 KB for the bubble's Markdown. Messages' page is 7.0 KB gzipped (from 90.9), and a room's 10.7 KB (from 94.1).
+- **Two small files more.**
+  - **`formatting-kit.ts`** is the chunk's entry: ProseMirror's modules for `require`, the formatting, the box, and the bar, so it's one request.
+  - **`said.ts`** holds `breaks`, which keeps each line when what the owner typed is drawn, and the code pattern, so the main chunk needn't load ProseMirror to draw a bubble. Plugins get `breaks` in `formatting`.
+- **`ui.FormatButton`** came with `ui.FormatBar`, so a room's box has **Aa** too. The bar's open state is shared, kept in this browser.
+- **Nested lists are indented by their marker's width:** two spaces under `- `, three under `1. `. Two spaces under `1. ` doesn't nest in CommonMark.
+- **A line's `#` isn't escaped,** so a heading typed in Markdown is sent as one, as "Not in this phase" says. A quote or a list right before another block gets a blank line, since Markdown would read the next line as part of it.
+- **`@` lists nothing in a code block,** in Messages' box and a room's, and their chips take bold, italics, and strikethrough, never code or a link.
+- **No `page-licenses.txt`** for either plugin: their pages bundle nothing of anyone else's now.
+- **Streamdown's links are buttons** that ask before opening another site, in a bubble too. Its code blocks keep their header and copy button, on a lighter wash of the bot's color, with their highlighting off there.
+
+**Checks that ran:**
+- **The Node check,** `formatting.ts` alone: 186 cases.
+  - Each mark and block written as standard Markdown.
+  - Text that stays as typed, and escapes.
+  - Owner-typed Markdown read and written back the same, with Messages' tags and a room's tokens.
+  - Every caret place to an offset and back.
+  - Typing Slack's way through the rules, Backspace after one, each key, Enter and Shift+Enter in lists, quotes, and code, Tab, and `ownsKey`.
+- **Fuzzing the round trip:**
+  - **15,000 lines shaped like typing,** with marks on whole words: 1 wrote differently on a second round.
+  - **3,000 docs of the hardest characters, marks, and chips** in quotes and lists: 364 wrote differently on a second round, and none on a third. Each is a mark Markdown can't express, such as one ending on punctuation pressed against a letter. The box rebuilds its doc only when the app hands it new text, so this can't loop.
+- **Chromium, on the check fxbot, 108 checks,** desktop in light and a phone in dark:
+  - **The app's box,** with Messages off: each rule, and Backspace after each, each key, Undo, Shift+Enter in a list and a quote, Enter in a code block and out of it, and Ctrl+Enter sending from it. Also an address pasted over a selection, pasted Markdown, `$` and its pick, a pasted file, and a draft after a reload.
+  - **Sending:** the model's request held the box's Markdown exactly. That's stronger than the chat's stream, which shows what the model was sent.
+  - **The bar:** hidden at first, nine buttons each with its key, each button formatting and showing pressed, the address field (`https:` added, `javascript:` refused), Ctrl+Shift+U, and still open after a reload. On a phone: **Aa** in the **+** row, Return starting a line or the next item, and not sending.
+  - **Messages' box:** `@` and a chip, a chip in a bold line, nothing listed in a code block, sending, its tags as chips in the bubble with the one in code as text, and the bar working on it.
+  - **A room**, on both screens: chips, formatting, **Aa**, Enter sending Markdown, the owner's words formatted with their chip, and `/fresh` still listed.
+  - **herdr's tag,** with herdr added to the check fxbot: herdr's chip in a bold line, and the one in code as code.
+  - **The bubble in all 11 bot colors,** light and dark, looked at.
+- **Messages' `page.js` from `d560103`,** bundling its own ProseMirror, on the new app: its box loads, `@` tags, Enter sends, and the bar stays away from a box it can't format.
+- **The owner's dev,** read-only, with every non-GET request blocked: Messages 0.3.0's box loads with the formatting and formats as typed, past messages draw as Markdown, and the page has no errors.
+- `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check`.
+
+**Not checked, and why:**
+- **The owner's iPhone,** through web pairing: typing with autocorrect and dictation, the bar, Return, sending, and a list's Backspace. Headless Chromium has no iPhone keyboard.
+- **A real model:** the bots were the mock model. What a real model makes of the Markdown is what it already read, since the owner's words were Markdown before.

@@ -22,7 +22,8 @@ Everything in a chat is also kept in Postgres: what you and other bots said, the
 
 ## The message box
 
-- **Sending:** on a computer, Enter sends and Shift+Enter starts a new line. On a phone or tablet, Return starts a new line, so a long message can be written in lines, and the send button sends; so does Cmd or Ctrl+Enter from a keyboard. Since 0.11.1.
+- **Sending:** on a computer, Enter sends and Shift+Enter starts a new line. On a phone or tablet, Return starts a new line, so a long message can be written in lines, and the send button sends; so does Cmd or Ctrl+Enter from a keyboard. Since 0.11.1. In a code block, Enter starts a line, and Cmd or Ctrl+Enter sends. Since 0.12.0.
+- **Formatting:** the box formats as you type, as Slack's does: `*bold*`, `_italic_`, `~strike~`, `` `code` ``, a quote, a code block, and lists, with Slack's keys and a format bar behind **Aa**. What the bot gets is standard Markdown, and what you sent shows formatted in your bubble. See [Format a message](/docs/how-to/format-a-message/). Since 0.12.0.
 - **A long message:** once it's a few lines long, the box offers to grow tall, about half the screen on a phone, for reading and editing it, and scrolls the rest. Sending it, or emptying the box, makes the box small again.
 - **Its buttons,** such as attach and the ones plugins add, sit beside the text on a wide screen. On a phone they fold behind **+**, which opens them in a row above the text, so the text has the width.
 

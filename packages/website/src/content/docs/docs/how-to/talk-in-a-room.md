@@ -9,6 +9,8 @@ A room holds you and several of your bots. Tag a bot with `@` to ask it. A bot c
 2. In the sidebar, choose **+** beside **Rooms**. Name the room, and pick its bots. The first bot you pick is the room's lead.
 3. In the room, type `@` and pick a bot from the list. It becomes a chip with the bot's avatar. Write your message, and send it.
 
+The box formats as you type, as a bot's chat does, and **Aa** beside it opens the format bar: see [Format a message](/docs/how-to/format-a-message/).
+
 <img class="shot dark:sl-hidden" src="/shots/room-desktop-light.png" width="1280" height="800" alt="A room called Garden party: the owner tags Pixel and Sprout, and each answers" />
 <img class="shot light:sl-hidden" src="/shots/room-desktop-dark.png" width="1280" height="800" alt="A room called Garden party: the owner tags Pixel and Sprout, and each answers" />
 
