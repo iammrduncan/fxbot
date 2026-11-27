@@ -1,0 +1,220 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "description": "Search, read, and research the web, through the providers you add: Keiro (BrowserFoundry), Firecrawl, Tavily, Exa, Brave, Perplexity, Parallel, Jina, Linkup, or your own SearXNG. It searches with no key, reads pages itself, and with the computer, in each bot's own browser.",
+  "license": "Apache-2.0",
+  "extensions": {
+    "sh.fxbot": {
+      "minFxbot": "0.12.0",
+      "server": "./fxbot/server.ts",
+      "page": "./fxbot/page.js",
+      "migrations": "./fxbot/migrations",
+      "needs": {
+        "computer": {
+          "optional": true
+        }
+      },
+      "providers": [
+        {
+          "id": "keiro",
+          "name": "Keiro (BrowserFoundry)",
+          "about": "Search, read pages, answer, and research, on one key",
+          "group": "key",
+          "order": 10,
+          "connect": "key",
+          "baseUrl": "https://api.keirolabs.cloud/api/v2",
+          "keyPage": "https://platform.keirolabs.cloud/",
+          "steps": [
+            "Open API Keys, and create one. Keiro has no address to check a key with, so press Try it on the web plugin's tab after adding it."
+          ],
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/let-bots-search-the-web/"
+        },
+        {
+          "id": "firecrawl",
+          "name": "Firecrawl",
+          "about": "Search, and read any page as Markdown",
+          "group": "key",
+          "order": 20,
+          "connect": "key",
+          "baseUrl": "https://api.firecrawl.dev/v2",
+          "keyCheck": "https://api.firecrawl.dev/v2/team/credit-usage",
+          "keyPage": "https://www.firecrawl.dev/app/api-keys",
+          "steps": [
+            "Open API Keys, and copy your key, which starts with fc-."
+          ],
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/let-bots-search-the-web/"
+        },
+        {
+          "id": "firecrawl-local",
+          "name": "Firecrawl on your server",
+          "about": "Firecrawl you run yourself, with no key",
+          "group": "local",
+          "order": 25,
+          "connect": "url",
+          "baseUrl": "http://localhost:3002/v2",
+          "hint": "In a container, localhost is fxbot's own: give the machine's address, as for Ollama. Give the address with /v2.",
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/let-bots-search-the-web/"
+        },
+        {
+          "id": "tavily",
+          "name": "Tavily",
+          "about": "Search, read pages, and research",
+          "group": "key",
+          "order": 30,
+          "connect": "key",
+          "baseUrl": "https://api.tavily.com",
+          "keyCheck": "https://api.tavily.com/usage",
+          "keyPage": "https://app.tavily.com/home",
+          "steps": [
+            "Copy your API key, which starts with tvly-, from the overview."
+          ],
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/let-bots-search-the-web/"
+        },
+        {
+          "id": "exa",
+          "name": "Exa",
+          "about": "Search by meaning, read pages, and answer",
+          "group": "key",
+          "order": 40,
+          "connect": "key",
+          "baseUrl": "https://api.exa.ai",
+          "headers": {
+            "x-api-key": "{apiKey}"
+          },
+          "keyCheck": "https://api.exa.ai/agent/runs",
+          "keyPage": "https://dashboard.exa.ai/api-keys",
+          "steps": [
+            "Open API Keys, and create one."
+          ],
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/let-bots-search-the-web/"
+        },
+        {
+          "id": "brave",
+          "name": "Brave Search",
+          "about": "Search its own index of the web",
+          "group": "key",
+          "order": 50,
+          "connect": "key",
+          "baseUrl": "https://api.search.brave.com/res/v1",
+          "headers": {
+            "X-Subscription-Token": "{apiKey}"
+          },
+          "keyCheck": "https://api.search.brave.com/res/v1/web/search?q=fxbot",
+          "badKey": [
+            401,
+            403,
+            422
+          ],
+          "keyPage": "https://api-dashboard.search.brave.com/app/keys",
+          "steps": [
+            "Subscribe to a Search plan, then open API Keys and add one. Checking the key spends one search."
+          ],
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/let-bots-search-the-web/"
+        },
+        {
+          "id": "perplexity",
+          "name": "Perplexity",
+          "about": "Search with each page's text, and read pages",
+          "group": "key",
+          "order": 60,
+          "connect": "key",
+          "baseUrl": "https://api.perplexity.ai",
+          "keyCheck": "https://api.perplexity.ai/v1/models",
+          "keyPage": "https://www.perplexity.ai/account/api/keys",
+          "steps": [
+            "Add credit, then create a key, which starts with pplx-."
+          ],
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/let-bots-search-the-web/"
+        },
+        {
+          "id": "parallel",
+          "name": "Parallel",
+          "about": "Search, read pages, and research",
+          "group": "key",
+          "order": 70,
+          "connect": "key",
+          "baseUrl": "https://api.parallel.ai",
+          "headers": {
+            "x-api-key": "{apiKey}"
+          },
+          "keyPage": "https://platform.parallel.ai/",
+          "steps": [
+            "Open API Keys, and create one. Parallel has no address to check a key with, so press Try it on the web plugin's tab after adding it."
+          ],
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/let-bots-search-the-web/"
+        },
+        {
+          "id": "jina",
+          "name": "Jina",
+          "about": "Read any page as Markdown, and search",
+          "group": "key",
+          "order": 80,
+          "connect": "key",
+          "baseUrl": "https://r.jina.ai",
+          "hosts": [
+            "https://s.jina.ai"
+          ],
+          "keyPage": "https://jina.ai/api-dashboard/key-manager",
+          "steps": [
+            "Copy the key the page shows, which starts with jina_. Checking one would spend its tokens, so press Try it on the web plugin's tab after adding it."
+          ],
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/let-bots-search-the-web/"
+        },
+        {
+          "id": "linkup",
+          "name": "Linkup",
+          "about": "Search, read pages, and answer with sources",
+          "group": "key",
+          "order": 90,
+          "connect": "key",
+          "baseUrl": "https://api.linkup.so/v1",
+          "keyCheck": "https://api.linkup.so/v1/credits/balance",
+          "keyPage": "https://app.linkup.so/api-keys",
+          "steps": [
+            "Copy your API key from the dashboard."
+          ],
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/let-bots-search-the-web/"
+        },
+        {
+          "id": "searxng",
+          "name": "SearXNG on your server",
+          "about": "Search many engines at once, on your own server",
+          "group": "local",
+          "order": 100,
+          "connect": "url",
+          "baseUrl": "http://localhost:8888",
+          "hint": "Its settings.yml must list json under search: formats. In a container, localhost is fxbot's own: give the machine's address, as for Ollama.",
+          "models": "none",
+          "docs": "https://fxbot.sh/docs/how-to/let-bots-search-the-web/"
+        }
+      ],
+      "settings": [
+        {
+          "name": "freeSearch",
+          "description": "With no search provider added, search with Parallel's free search, which needs no key and gets each query",
+          "default": "on",
+          "options": [
+            {
+              "value": "on",
+              "label": "On"
+            },
+            {
+              "value": "off",
+              "label": "Off"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

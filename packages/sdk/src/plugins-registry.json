@@ -1,5 +1,5 @@
 {
-  "essentials": ["permissions", "routines", "messages", "subagents", "pages", "soul", "chat-rooms", "computer"],
+  "essentials": ["permissions", "routines", "messages", "subagents", "web", "pages", "soul", "chat-rooms", "computer"],
   "plugins": [
     {
       "name": "computer",
@@ -22,6 +22,13 @@
       "repo": "iammrduncan/fxbot",
       "path": "plugins/dreams",
       "docs": "/docs/how-to/let-bots-dream/"
+    },
+    {
+      "name": "web",
+      "description": "Search, read, and research the web, through the providers you add: Keiro (BrowserFoundry), Firecrawl, Tavily, Exa, Brave, Perplexity, Parallel, Jina, Linkup, or your own SearXNG. It searches with no key, reads pages itself, and with the computer, in each bot's own browser.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/web",
+      "docs": "/docs/how-to/let-bots-search-the-web/"
     },
     {
       "name": "routines",
