@@ -4,7 +4,7 @@ A carrier for fxbot's [phone](../phone/) plugin: **Call me** rings your phone th
 
 **Nothing reaches fxbot.** phone signs in to the account as a softphone, over TLS on port 5061, and calls your number from it, with the audio encrypted (SRTP). Every connection goes out, and SignalWire never connects to fxbot.
 
-Add **phone** first, then this, from **Plugins**. It needs phone 0.2.0, which needs fxbot 0.12.0 or newer. It runs inside fxbot: read its code there before you add it. See [Talk with a bot on the phone](https://fxbot.sh/docs/how-to/talk-with-a-bot-on-the-phone/).
+Add **phone** first, then this, from **Plugins**. It needs fxbot 0.12.0 or newer, and phone 0.2.0. It runs inside fxbot: read its code there before you add it. See [Talk with a bot on the phone](https://fxbot.sh/docs/how-to/talk-with-a-bot-on-the-phone/).
 
 ## Settings
 

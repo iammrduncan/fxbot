@@ -11,8 +11,12 @@ const number = /^\+[1-9]\d{6,14}$/;
 
 export default async function setup(fx: PluginApi) {
   const setting = (name: string) => (fx.settings[name] ?? "").trim();
-  // The space's name, from what the owner typed: a name, or its address.
-  const space = () => setting("space").replace(/^https?:\/\//, "").replace(/\.signalwire\.com.*$/, "");
+  // The space's name, from what the owner typed: a name, or its address. Only a name that can be one, letters, digits
+  // and dashes, so the project's token goes only to the owner's space.
+  const space = () => {
+    const name = setting("space").replace(/^https?:\/\//, "").replace(/\.signalwire\.com.*$/, "");
+    return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(name) ? name : "";
+  };
   function missing() {
     const out = ["space", "project", "token"].filter((name) => !(name === "space" ? space() : setting(name)));
     if (!number.test(setting("from"))) out.push("from");
