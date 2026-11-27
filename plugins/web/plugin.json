@@ -1,7 +1,7 @@
 {
   "name": "web",
   "version": "0.1.0",
-  "description": "Search, read, and research the web, through the providers you add: Keiro (BrowserFoundry), Firecrawl, Tavily, Exa, Brave, Perplexity, Parallel, Jina, Linkup, or your own SearXNG. It searches with no key, reads pages itself, and with the computer, in each bot's own browser.",
+  "description": "Search, read, and research the web, with Parallel's free search until you add a provider. It works with Keiro (BrowserFoundry), Firecrawl, Tavily, Exa, Brave, Perplexity, Parallel, Jina, Linkup, and your own SearXNG. Bots read pages themselves, and with the computer, in their own browser.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {
