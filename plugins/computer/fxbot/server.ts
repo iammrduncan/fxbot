@@ -661,25 +661,49 @@ export default async function setup(fx: PluginApi) {
       required: ["command"],
     },
     idempotent: false,
-    async execute(input: { command?: unknown; timeout?: unknown }, { bot, session, label, signal }) {
+    async execute(input: { command?: unknown; timeout?: unknown }, call) {
       const command = typeof input?.command === "string" ? input.command : "";
       if (!command.trim()) return "Give a command to run.";
       const seconds = Math.min(Math.max(Math.trunc(Number(input.timeout) || 120), 1), 600);
-      const { name, key } = await ready(bot, session);
-      const actor = actorOf(bot, session, label);
-      mark(key, actor, /\bagent-browser\b/.test(command) ? "browser" : /\bagent-desktop\b/.test(command) ? "desktop app" : "shell");
-      const id = randomUUID();
-      const stop = () => void exec(name, ["sh", "-c", `kill -s KILL -- -$(cat /tmp/fxbot/${id}.pid)`]).catch(() => {});
-      signal.addEventListener("abort", stop, { once: true });
-      busy.set(key, (busy.get(key) ?? 0) + 1);
-      try {
-        const { code, output } = await exec(name, ["fxbot-run", id, String(seconds), command], { timeout: (seconds + 60) * 1000, env: tabOf(actor) });
-        return signal.aborted ? "Stopped: the turn was cancelled." : `exit ${code}\n${output}`;
-      } finally {
-        signal.removeEventListener("abort", stop);
-        busy.set(key, busy.get(key)! - 1);
-        used(key);
-      }
+      const { code, output } = await run(call, command, seconds, call.signal);
+      return call.signal.aborted ? "Stopped: the turn was cancelled." : `exit ${code}\n${output}`;
+    },
+  });
+  // One command on the call's computer, as the shell tool runs it: the computer ready, the actor marked, the busy count,
+  // and the command killed when the turn is stopped. It answers the computer's name too, for a file the command left.
+  async function run({ bot, session, label }: { bot: string; session: string; label: string | null }, command: string, seconds: number, signal: AbortSignal) {
+    const { name, key } = await ready(bot, session);
+    const actor = actorOf(bot, session, label);
+    mark(key, actor, /\bagent-browser\b/.test(command) ? "browser" : /\bagent-desktop\b/.test(command) ? "desktop app" : "shell");
+    const id = randomUUID();
+    const stop = () => void exec(name, ["sh", "-c", `kill -s KILL -- -$(cat /tmp/fxbot/${id}.pid)`]).catch(() => {});
+    signal.addEventListener("abort", stop, { once: true });
+    busy.set(key, (busy.get(key) ?? 0) + 1);
+    try {
+      return { ...(await exec(name, ["fxbot-run", id, String(seconds), command], { timeout: (seconds + 60) * 1000, env: tabOf(actor) })), name };
+    } finally {
+      signal.removeEventListener("abort", stop);
+      busy.set(key, busy.get(key)! - 1);
+      used(key);
+    }
+  }
+  // For the web plugin's web_fetch with browser: true, a page read in the bot's own Chromium, in its or its subagent's
+  // own tab, with its sign-ins: agent-browser opens it, then reads it as Markdown, into a file, since a command's
+  // output is cut past 60 KiB (docs/phases/web-tooling.md, The computer's browser).
+  fx.provide({
+    on: (bot: string) => fx.bots.on(bot),
+    async read(call: { bot: string; session: string; label: string | null }, url: string, signal: AbortSignal) {
+      if (!fx.bots.on(call.bot)) return { error: "The computer is off for this bot." };
+      if (!/^https?:\/\/\S+$/i.test(url)) return { error: "Only an http or https page can be read." };
+      const file = `/tmp/fxbot/web-${randomUUID()}.md`;
+      const page = `'${url.replace(/'/g, `'\\''`)}'`;
+      const { code, output, name } = await run(call, `agent-browser open ${page} >/dev/null && agent-browser read > ${file} && agent-browser get title && agent-browser get url`, 90, signal);
+      if (signal.aborted) return { error: "Stopped: the turn was cancelled." };
+      if (code !== 0) return { error: output.trim().slice(-600) || `agent-browser stopped with exit ${code}.` };
+      const [title = "", at = url] = output.trim().split("\n").slice(-2).map((line) => line.trim());
+      const text = await fetchFile(name, file).then((bytes) => bytes.toString("utf8"), (error: Error) => error);
+      void exec(name, ["rm", "-f", file]).catch(() => {});
+      return text instanceof Error ? { error: text.message } : { title, url: /^https?:\/\//.test(at) ? at : url, text };
     },
   });
 

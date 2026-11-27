@@ -42,6 +42,22 @@ type ComputerProvider = {
 - Since 0.4.0, a session another plugin labelled, such as a [subagent](https://fxbot.sh/docs/how-to/hand-work-to-subagents/)'s, is an actor of its own on the bot's computer, named "<bot> · <label>": its own arrow, its own pinned browser tab through `AGENT_BROWSER_SESSION` and `AGENT_BROWSER_PIN_TAB`, and turns at the desktop and the terminal with the bot's other actors, held until 20 seconds after an actor's last call or its turn's end, and waited for up to a minute. The shell runs for every actor at once. On fxbot before 0.9.0, which has no labels, every call is the bot's, as in 0.3.
 - The page's routes are under `computers/<key>/`: `state`, `cursors`, `start`, `stop`, `reset`, and `takeover`.
 
+## A page in the bot's browser
+
+Since 0.6.0, it provides, with `fx.provide`, for a plugin that names `computer` under `needs`, as [web](../web/) does for `web_fetch` with `browser: true`:
+
+```ts
+type ComputerApi = {
+  /** Whether the computer is on for the bot. */
+  on(bot: string): boolean;
+  /** A page read in the calling bot's own Chromium, with its sign-ins, in its tab or its subagent's own: agent-browser
+   * opens it and reads it as Markdown. Up to 90 seconds. */
+  read(call: { bot: string; session: string; label: string | null }, url: string, signal: AbortSignal): Promise<{ title?: string; url?: string; text?: string; error?: string }>;
+};
+```
+
+The page's address is the caller's to give, and the computer reaches the internet only, as for its own browser.
+
 ## Set up the engine
 
 Computers run in a container engine started rootless for a user of its own: podman, where the distribution has 4.9 or newer, beside whichever engine fxbot itself runs on, or else the machine's own Docker, where its packages run it rootless (Docker's `docker-ce`, Debian's `docker.io`, Fedora's `moby-engine`, or openSUSE's `docker`). A user already on rootless Docker keeps it. When the plugin finds no engine, the machine sets it up by itself, with `host/setup.sh`:
