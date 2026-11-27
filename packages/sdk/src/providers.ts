@@ -194,11 +194,12 @@ export async function createProviders({ store, secretKey, durability, vercelClie
     if (!origins.has(`${target.protocol}//${target.host}`)) fail(400, `${target.protocol}//${target.host} isn't one of ${current.name}'s addresses.`);
     return { current, entry, target };
   }
-  // The headers that carry a provider's key: its entry's, or a bearer.
+  // The headers that carry a provider's key: its entry's, or a bearer when none of them holds it, as OpenRouter's,
+  // which only name fxbot.
   function keyHeaders(entry: CatalogEntry, key: string | undefined) {
     const headers: Record<string, string> = {};
     for (const [name, value] of Object.entries(entry.headers ?? {})) if (key || !value.includes("{apiKey}")) headers[name] = value.replaceAll("{apiKey}", key ?? "");
-    if (key && !entry.headers) headers.authorization = `Bearer ${key}`;
+    if (key && !Object.values(entry.headers ?? {}).some((value) => value.includes("{apiKey}"))) headers.authorization = `Bearer ${key}`;
     return headers;
   }
 
