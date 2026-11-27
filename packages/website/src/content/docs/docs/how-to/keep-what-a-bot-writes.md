@@ -5,7 +5,7 @@ description: "A page is something a bot writes for you to read and keep, outside
 
 A page is something a bot writes for you to read and keep, outside the chat, such as a report, a guide, or a plan. The library keeps it, with every version.
 
-1. Add **pages** from **Plugins**, on **Browse**, where fxbot's picks list it. **Essentials** has it too. It needs fxbot 0.7.0 or newer.
+1. Add **pages** from **Plugins**, on **Browse**, where fxbot's picks list it. **Essentials** has it too. It needs fxbot 0.12.0 or newer.
 2. Ask a bot for something to keep, in your own words: "write up our trip plan as a page", or "make a report on last week's sales".
 3. The bot writes it, and says in a sentence what it covers. A card in the chat has the page's title and **Open**.
 

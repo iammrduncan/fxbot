@@ -5,7 +5,7 @@ description: "Your bots can message each other in their own chats, so one can as
 
 Your bots can message each other in their own chats, so one can ask another for what it knows, or hand it a job, and you can watch the work happen.
 
-1. Add **messages** from **Plugins**, on **Browse**, where fxbot's picks list it. It needs fxbot 0.6.0 or newer, and at least two bots.
+1. Add **messages** from **Plugins**, on **Browse**, where fxbot's picks list it. It needs fxbot 0.12.0 or newer, and at least two bots.
 2. Optional: in each bot's settings, under **Messages**, say in a line what it does, such as "Runs the deploys". The others see that line, which helps them pick the right bot.
 3. Ask a bot for something another one knows or does: "ask Philly what broke staging".
 

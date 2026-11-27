@@ -25,7 +25,7 @@ It works over [web pairing](/docs/how-to/pair-another-device/) too. In a room, t
 4. In phone's **Voice**, pick a provider to listen and one to speak. **This device** works only in the app.
 5. Press the phone at the top of a bot's chat, or a room's, and choose **Call me**.
 
-fxbot reaches SignalWire on port 5061, and sends and takes the call's sound over UDP. A network that blocks outgoing port 5061 stops the call before it rings, and the call's bar says why.
+fxbot reaches SignalWire over TCP on port 5061, and sends and takes the call's sound over UDP, with a STUN request to `stun.cloudflare.com` on port 3478 to find its own address. A network that blocks outgoing port 5061 stops the call before it rings, and the call's bar says why. One that blocks outgoing UDP leaves the call silent.
 
 ### Set up SignalWire
 

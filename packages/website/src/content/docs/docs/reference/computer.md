@@ -69,6 +69,22 @@ Each computer is named for its bot, as its hostname, such as `bob-computer`, and
 - **Accessibility** is on for every app, so `agent-desktop` reads their trees.
 - **Fonts** are DejaVu and Noto, which cover most scripts, but not Chinese, Japanese, Korean, or color emoji.
 
+## A page in the bot's browser
+
+Since computer 0.6.0, it provides, with `fx.provide`, for a plugin that names `computer` under `needs`, as Web does for `web_fetch` with `browser: true`:
+
+```ts
+type ComputerApi = {
+  /** Whether the computer is on for the bot. */
+  on(bot: string): boolean;
+  /** A page read in the calling bot's own Chromium, with its sign-ins, in its tab or its subagent's own: agent-browser
+   * opens it and reads it as Markdown. Up to 90 seconds. */
+  read(call: { bot: string; session: string; label: string | null }, url: string, signal: AbortSignal): Promise<{ title?: string; url?: string; text?: string; error?: string }>;
+};
+```
+
+The page's address is the caller's to give, and the computer reaches the internet only, as for its own browser.
+
 ## A computer for another plugin
 
 Since computer 0.3.0, a plugin that needs the computer can name computers of its own, such as [a room's](/docs/how-to/give-bots-a-computer/#give-a-room-a-computer). Each is named by a key, a word, a dash, and more, such as `room-1a2b3c4d`, which a bot's id never is. The plugin provides, with `fx.provide`:

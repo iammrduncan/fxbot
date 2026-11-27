@@ -45,7 +45,7 @@ Any plugin can use the first two: an image plugin bringing fal.ai, a search plug
 
 **Fewer ways for a carrier, not more.** `phone-signalwire` 0.2.0 is SignalWire's SIP account and nothing else. Its RELAY way, `relay.ts` with its 419 lines, goes. So do phone's text lines, `{ "line": 1 }` and `2`, which only RELAY used. This release waits until SIP works well, so no owner is left without a way to call.
 
-**Not core, but needed:** web.fxbot.sh sends `permissions-policy: … microphone=()` on the shell and on every frame ([`relay/worker.ts`](../../packages/web-app/relay/worker.ts)). That blocks the microphone for fxbot's page over web pairing, though the shell's iframe asks for it with `allow="…microphone…"`. It changes, and web.fxbot.sh is deployed again.
+**Not core, but needed:** web.fxbot.sh sends `permissions-policy: … microphone=()` on the shell and on every frame ([`relay/worker.ts`](../../../packages/web-app/relay/worker.ts)). That blocks the microphone for fxbot's page over web pairing, though the shell's iframe asks for it with `allow="…microphone…"`. It changes, and web.fxbot.sh is deployed again.
 
 ## 1. Research
 

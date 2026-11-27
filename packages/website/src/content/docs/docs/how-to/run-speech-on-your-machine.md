@@ -1,6 +1,6 @@
 ---
 title: "Run speech on your machine"
-description: "Hear and speak on calls in the app with Speaches on your own machine: Whisper listens, Kokoro speaks, and nothing you say leaves the machine."
+description: "Hear and speak on calls with Speaches on your own machine: Whisper listens and Kokoro speaks there, with no voice service."
 ---
 
 The phone plugin's **Speech server** is any server with OpenAI's audio endpoints, `/v1/audio/transcriptions` and `/v1/audio/speech`, on your machine. [Speaches](https://speaches.ai) is one: Whisper models hear you, and Kokoro speaks. LocalAI, Kokoro-FastAPI, and whisper.cpp's server work too.
