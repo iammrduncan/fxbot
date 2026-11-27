@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as jsxRuntime from "react/jsx-runtime";
-import { Component, createContext, useContext, useMemo, useSyncExternalStore, type ComponentProps, type ComponentType, type ReactNode } from "react";
+import { Component, createContext, lazy, Suspense, useContext, useMemo, useSyncExternalStore, type ComponentProps, type ComponentType, type ReactNode } from "react";
 import { defaultComponents, Streamdown, type Components, type ExtraProps } from "streamdown";
 import { createPortal } from "react-dom";
 import * as attachment from "@/components/ui/attachment";
@@ -27,12 +27,13 @@ import { Header } from "./header.tsx";
 import { followBeside, go, openBeside } from "./nav.ts";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { useReorder } from "./reorder.ts";
+import { breaks, code } from "./said.ts";
 import { Reply } from "./steps.tsx";
 
 // Plugins' page code, loaded the way opencode loads it: the server serves each running plugin's prebuilt CommonJS
-// bundle, and the page runs it with a `require` that hands over the app's own React and `@fxbot/app`, so there is one
-// copy of React. Its default export is called with the app's API, scoped to it, and each part it adds sits in an error
-// boundary. With no plugins, nothing here fetches or runs any code.
+// bundle, and the page runs it with a `require` that hands over the app's own React, its ProseMirror, and
+// `@fxbot/app`, so there is one copy of each. Its default export is called with the app's API, scoped to it, and each
+// part it adds sits in an error boundary. With no plugins, nothing here fetches or runs any code.
 
 export type ToolCall = Extract<Part, { type: "tool" }>;
 // setDraft takes the new text, or a function from the draft to it, as React's setters do.
@@ -85,13 +86,23 @@ const publish = (next: Loaded[]) => ((loaded = next), listeners.forEach((listene
 const subscribe = (listener: () => void) => (listeners.add(listener), () => listeners.delete(listener));
 export const usePlugins = () => useSyncExternalStore(subscribe, () => loaded);
 
+// ProseMirror, the formatting, the app's box, and the format bar (formatting-kit.ts): a chunk of their own, fetched as
+// the page starts, beside the plugins' bundles, so it's there before a box or a plugin's code needs it.
+type Kit = typeof import("./formatting-kit.ts");
+let kit: Promise<Kit> | null = null;
+export const formattingKit = () => (kit ??= import("./formatting-kit.ts"));
+void formattingKit().catch(() => (kit = null));
+const Editor = lazy(() => formattingKit().then((loaded) => ({ default: loaded.Editor })));
+export const FormatBar = lazy(() => formattingKit().then((loaded) => ({ default: loaded.FormatBar })));
+export const FormatButton = lazy(() => formattingKit().then((loaded) => ({ default: loaded.FormatButton })));
+
 // The bots, for `useBots`: the app's own list.
 const BotsContext = createContext<Profile[] | null>(null);
 export const BotsProvider = BotsContext.Provider;
 export const useAppBots = () => useContext(BotsContext);
 
 // Built when a plugin loads, after every module of the page has.
-const ui = () => ({
+const ui = (pm: Kit | null) => ({
   ...attachment,
   ...badge,
   ...bubble,
@@ -114,10 +125,12 @@ const ui = () => ({
   Reply,
   ModelField,
   useReorder,
+  ...(pm ? { FormatBar: pm.FormatBar, FormatButton: pm.FormatButton } : {}),
 });
 
-// `@fxbot/app` for one plugin: the client, its own routes, the app's navigation and bots, and the app's components.
-function appModule(name: string) {
+// `@fxbot/app` for one plugin: the client, its own routes, the app's navigation and bots, the app's components, and
+// the formatting a message box does, for a plugin's own box.
+function appModule(name: string, pm: Kit | null) {
   return {
     client,
     applyLine,
@@ -134,23 +147,25 @@ function appModule(name: string) {
     // A place in this plugin's page that other plugins fill with app.slot(name, Component), each part in its own
     // error boundary. One nobody fills draws nothing.
     Slot: ({ name, props }: { name: string; props?: Record<string, unknown> }) => <Place pick={(places) => places.slots.get(name) ?? []} props={props ?? {}} />,
-    ui: ui(),
+    ui: ui(pm),
+    ...(pm ? { formatting: { ...pm.formatting, breaks } } : {}),
   };
 }
 
 // Runs one plugin's bundle, and keeps what its setup adds.
-async function run(name: string, version: string, url: string): Promise<Places> {
-  const code = await (await fetch(url)).text();
+async function run(name: string, version: string, url: string, pm: Kit | null): Promise<Places> {
+  const source = await (await fetch(url)).text();
   const places = emptyPlaces();
-  const app = appModule(name);
+  const app = appModule(name, pm);
   const require = (id: string) => {
     if (id === "react") return React;
     if (id === "react/jsx-runtime") return jsxRuntime;
     if (id === "@fxbot/app") return app;
+    if (pm && id in pm.modules) return pm.modules[id];
     throw new Error(`${name} asked for ${id}, which fxbot doesn't give plugins. Bundle it in.`);
   };
   const module: { exports: unknown } = { exports: {} };
-  new Function("require", "module", "exports", code)(require, module, module.exports);
+  new Function("require", "module", "exports", source)(require, module, module.exports);
   const setup = typeof module.exports === "function" ? module.exports : (module.exports as { default?: unknown }).default;
   if (typeof setup !== "function") throw new Error(`${name}'s page code exports no function.`);
   setup({
@@ -198,7 +213,7 @@ export function loadPlugins(): Promise<void> {
   return loading;
 }
 async function loadOnce() {
-  const list = await client.plugins.pages().catch(() => null);
+  const [list, pm] = await Promise.all([client.plugins.pages().catch(() => null), formattingKit().catch(() => ((kit = null), null))]);
   if (!list) return;
   // All at once, each into its own places, and kept in the list's order: one after another, a cold start over a slow
   // link waited for every page in turn.
@@ -214,7 +229,7 @@ async function loadOnce() {
         document.head.append(link);
       }
       let pageError: string | undefined;
-      const places = page ? await run(name, version, page).catch((error: Error) => (console.error(`Plugin ${name}:`, error), (pageError = error.message), emptyPlaces())) : emptyPlaces();
+      const places = page ? await run(name, version, page, pm).catch((error: Error) => (console.error(`Plugin ${name}:`, error), (pageError = error.message), emptyPlaces())) : emptyPlaces();
       return { name, iconKey, key, css: link, places, ...(pageError ? { pageError } : {}) };
     }),
   );
@@ -222,15 +237,23 @@ async function loadOnce() {
   publish(next);
 }
 
-// A chat's message box: the first plugin's, given a textarea's props and the bot, or the app's textarea. That takes over
-// if the plugin's throws, so a broken plugin can't take away the box.
+// A chat's message box: the first plugin's, given a textarea's props and the bot, or the app's own, which formats as the
+// owner types (editor.tsx). The app's takes over if the plugin's throws, so a broken plugin can't take away the box, and
+// the textarea, while the app's loads or if it can't.
 export function MessageBox({ bot, ...props }: ComponentProps<typeof InputGroupTextarea> & { bot?: Profile | null }) {
   const plugin = usePlugins().find((p) => p.places.box.length);
   const plain = <InputGroupTextarea {...props} />;
-  if (!plugin) return plain;
+  const own = (
+    <PluginPart plugin="fxbot" fallback={plain}>
+      <Suspense fallback={plain}>
+        <Editor {...props} />
+      </Suspense>
+    </PluginPart>
+  );
+  if (!plugin) return own;
   const Box = plugin.places.box[0];
   return (
-    <PluginPart plugin={plugin.name} fallback={plain}>
+    <PluginPart plugin={plugin.name} fallback={own}>
       <Box bot={bot} {...props} />
     </PluginPart>
   );
@@ -299,22 +322,40 @@ function AppLink({ node, ...props }: ComponentProps<"a"> & ExtraProps) {
   return <a {...props} target={undefined} rel={undefined} className={`wrap-anywhere font-medium text-primary underline ${props.className ?? ""}`} data-streamdown="link" onClick={followBeside} />;
 }
 
-// What the owner or a plugin said, with each match of a plugin's `said` pattern drawn by its part.
-export function SaidText({ text }: { text: string }) {
-  let pieces: ReactNode[] = [text];
-  for (const { name, places } of usePlugins())
-    for (const { pattern, Component } of places.said)
-      pieces = pieces.flatMap((piece) => {
-        if (typeof piece !== "string") return [piece];
-        const out: ReactNode[] = [];
-        let at = 0;
-        for (const match of piece.matchAll(pattern)) {
-          out.push(piece.slice(at, match.index), <PluginPart key={match.index} plugin={name}><Component match={match} /></PluginPart>);
-          at = match.index + match[0].length;
+// What the owner said, as Markdown, as a bot's reply is, with each line kept as they typed it (said.ts). Each match of
+// a plugin's `said` pattern outside code is a <said-part> tag first, drawn by that plugin's part, as a room draws its
+// mentions. Raw HTML stays out, as in replies.
+export function SaidMarkdown({ text }: { text: string }) {
+  const plugins = usePlugins();
+  const parts: ReactNode[] = [];
+  const tagged = text
+    .split(code)
+    .map((piece, i) => {
+      if (i % 2) return piece;
+      for (const { name, places } of plugins)
+        for (const { pattern, Component } of places.said) {
+          let out = "";
+          let at = 0;
+          for (const match of piece.matchAll(pattern)) {
+            out += `${piece.slice(at, match.index)}<said-part n="${parts.length}"></said-part>`;
+            parts.push(
+              <PluginPart key={parts.length} plugin={name}>
+                <Component match={match} />
+              </PluginPart>,
+            );
+            at = match.index + match[0].length;
+          }
+          piece = out + piece.slice(at);
         }
-        return [...out, piece.slice(at)];
-      });
-  return <>{pieces}</>;
+      return piece;
+    })
+    .join("");
+  const components = useMemo<Components>(() => ({ "said-part": ({ n }: { n?: string }) => parts[Number(n)] ?? null }) as Components, [text, plugins]);
+  return (
+    <Markdown mode="static" parseIncompleteMarkdown={false} allowedTags={{ "said-part": ["n"] }} components={components}>
+      {breaks(tagged)}
+    </Markdown>
+  );
 }
 
 // A plugin's part, kept from taking down the app: one that throws shows a short card in its place.

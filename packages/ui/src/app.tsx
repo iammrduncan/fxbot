@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type ReactNode } from "react";
+import { Fragment, Suspense, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type ReactNode } from "react";
 import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, Maximize2Icon, MessageCircleDashedIcon, Minimize2Icon, PanelRightIcon, PaperclipIcon, PencilIcon, PinIcon, PinOffIcon, PlusIcon, PuzzleIcon, SettingsIcon, SquareIcon, StarIcon, Trash2Icon, XIcon } from "lucide-react";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -53,7 +53,7 @@ import { LibraryPage } from "./library.tsx";
 import { Reply } from "./steps.tsx";
 import { follow, go } from "./nav.ts";
 import { Header } from "./header.tsx";
-import { BotsProvider, loadPlugins, MessageBox, Place, SaidText, useFold, usePluginNav, usePluginRoute } from "./plugins.tsx";
+import { BotsProvider, FormatBar, FormatButton, loadPlugins, MessageBox, Place, SaidMarkdown, useFold, usePluginNav, usePluginRoute } from "./plugins.tsx";
 import { ModelField } from "./providers.tsx";
 import { draftOf, keepDraft } from "./drafts.ts";
 import { reload, useNewVersion } from "./pwa.ts";
@@ -685,6 +685,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   const [attached, setAttached] = useState<Upload[]>([]);
   const [notice, setNotice] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
+  const form = useRef<HTMLFormElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const skills = useSkillPicker(id, box, draft, setDraft);
   const skillNames = new Set(skills.skills.filter((s) => !s.command).map((s) => s.name));
@@ -940,7 +941,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                 <Place pick={(places) => places.chat} props={{ bot: profile, reload: reread }} />
               </div>
             )}
-            <form onSubmit={submit} className="relative mx-auto w-full max-w-3xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <form ref={form} onSubmit={submit} className="relative mx-auto w-full max-w-3xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <SkillMenu picker={skills} />
               {notice && <p className="px-4 pb-2 text-sm text-destructive">{notice}</p>}
               {/* Wraps so the files take the first row and the text and buttons the second; the buttons stay at the bottom as the text grows. */}
@@ -951,12 +952,19 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                     {attached.length > 0 && <Files files={attached} remove={(i) => setAttached((all) => all.toSpliced(i, 1))} />}
                   </div>
                 )}
+                {/* The format bar, above the text, for the box in this form, the app's or a plugin's (format-bar.tsx). */}
+                <Suspense fallback={null}>
+                  <FormatBar within={form} className="order-first px-1 pt-1.5" />
+                </Suspense>
                 {/* The buttons, mounted once: beside the text on a wide screen, and on a narrow one a row above it, shown by +. */}
                 <InputGroupAddon align="inline-start" className={`pb-1.5 ${tools ? "max-sm:w-full max-sm:justify-start max-sm:pt-2 max-sm:pb-0" : "max-sm:hidden"}`}>
                   <input ref={picker} type="file" multiple hidden onChange={(e) => attach([...(e.target.files ?? [])]).then(() => (e.target.value = ""))} />
                   <InputGroupButton size="icon-sm" className="rounded-full" disabled={stuck} aria-label="Attach files" onClick={() => picker.current?.click()}>
                     <PaperclipIcon />
                   </InputGroupButton>
+                  <Suspense fallback={null}>
+                    <FormatButton />
+                  </Suspense>
                   {profile && <Place pick={(places) => places.composer} props={{ bot: profile, setDraft, attach: (files: File[]) => void attach(files) }} />}
                 </InputGroupAddon>
                 <InputGroupAddon align="inline-start" className="pb-1.5 sm:hidden">
@@ -1048,8 +1056,8 @@ function Said({ text, files, from, color, skills, folded }: { text: string; file
         {files?.length ? <Files className="flex-wrap justify-end" files={files} /> : null}
         {named.rest && (
           <Bubble align={folded ? "start" : "end"} variant="muted">
-            <BubbleContent className="whitespace-pre-wrap" style={color && !folded ? { background: bubbles[color], color: "#ffffff" } : undefined}>
-              <SaidText text={named.rest} />
+            <BubbleContent className="said-md" data-color={color && !folded ? "" : undefined} style={color && !folded ? { background: bubbles[color], color: "#ffffff" } : undefined}>
+              <SaidMarkdown text={named.rest} />
             </BubbleContent>
           </Bubble>
         )}
