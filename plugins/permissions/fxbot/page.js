@@ -404,7 +404,7 @@ function Reviewer() {
 	const [saved, setSaved] = (0, react.useState)(false);
 	(0, react.useEffect)(() => {
 		call("reviewer").then(setPicked, (e) => setError(e.message));
-		_fxbot_app.client.providers.list().then(setProviders, () => {});
+		_fxbot_app.client.providers.list().then((list) => setProviders(list.filter((p) => p.chat !== false)), () => {});
 	}, []);
 	if (!picked) return null;
 	const save = (next) => {

@@ -291,7 +291,8 @@ function Reviewer() {
   const [saved, setSaved] = useState(false);
   useEffect(() => {
     void call("reviewer").then(setPicked, (e) => setError(e.message));
-    void client.providers.list().then(setProviders, () => {});
+    // Chat models only: not a voice or web service a plugin brought, which fxbot 0.12.0 marks chat: false.
+    void client.providers.list().then((list) => setProviders(list.filter((p) => p.chat !== false)), () => {});
   }, []);
   if (!picked) return null;
   // A pick saves at once. Save settings below is for the plugin's text boxes.
