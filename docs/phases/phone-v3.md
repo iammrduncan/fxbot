@@ -402,3 +402,22 @@ c9's four failures are its voice expectations from phone 0.1. A bot's voice is p
 - Flash v2's line, by ear.
 - Subagents' own steered messages.
 - A phone-line call carried by SignalWire with a session of its own, past phone-v2's line checks.
+
+**After the owner's calls of 2026-11-27:** "in app call worked great with bob... chat room call.. not so much... phone call over phone line with bob didn't use the new sidekick mode."
+- **What the calls showed,** from dev's chats:
+  - **In the app** (call 22), Bob said "Yeah, let me take a look." before each tool.
+  - **On the line** (call 23), he ran `herdr_agents` with nothing said first, and talked only once it answered.
+  - **The instructions were the same:** both sessions had the call note, with the sidekick's. What differed was Bob's choice that turn.
+- **A phone-line call passed no thinking level:** `place()` left out `effort: callEffort()`, which an app call passes. For Bob's provider, OpenCode Go, fxbot passes no level anyway: only AI Gateway, Vercel, ChatGPT, and Grok take one. Now a line call passes it too, for a bot on one of those.
+- **The sidekick, in code:** when a turn on the owner's words starts a tool before anything is said since, the call says "Let me check." (or "One sec, let me look.", or "Let me take a look.") at once, in the app and on a line. The bot's own words come first when it says them. "One moment." stays the net after 3 seconds. A room call's events carry no tools, so a room keeps the 3 seconds.
+- **The room call** (call 24) was the first on dev: it ended 5 seconds after it began, with nothing heard or posted, and nothing in the log, as a call the page ended. On a disposable fxbot with the real page, Chromium's fake microphone, and the fake voices, a room call worked through:
+  - the greeting
+  - the owner's words posted to the call room
+  - Bob's answer said in his voice
+  - the summary when it ended
+
+  One difference from the bot's own call was found and fixed: a room's first bot without a voice of its own spoke in the speaker's first voice, not the one picked in phone's Voice section. Now it gets that one.
+- **Checked** on that fxbot (wiring only, the mock model, a test line on contract 2):
+  - **A line call and an app call:** a tool before a word gets the quick line before its answer, with no "One moment.". A plain answer gets none.
+  - **A room's lead** greets in the Voice section's voice.
+  - **A room call** through the page still works end to end.

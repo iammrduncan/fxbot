@@ -78,11 +78,12 @@ export const spoken = (text: string, names: Map<string, string>) =>
 export const roomNote =
   "The owner is on a voice call with this room, in its call room. Each reply is read out to them in its bot's own voice, one bot at a time. Hand on to another bot by tagging it, as in text, and it's said as its name.";
 
-/** Each bot's voice in a room: its own, or one of the speaker's that no other bot in the room has, in the room's order. */
+/** Each bot's voice in a room: its own, or one no other bot in the room has, in the room's order: first the Voice
+ * section's (fallback), the voice a bot without its own has on a call of its own, then the speaker's others. */
 export function voicesFor(members: string[], own: Map<string, string | null>, offered: string[], fallback: string) {
   const voices = new Map<string, string>();
   const taken = new Set(members.map((bot) => own.get(bot)).filter((v): v is string => Boolean(v)));
-  const free = offered.filter((v) => !taken.has(v));
+  const free = [...new Set([fallback, ...offered])].filter((v) => v && !taken.has(v));
   for (const bot of members) voices.set(bot, own.get(bot) || free.shift() || fallback);
   return voices;
 }

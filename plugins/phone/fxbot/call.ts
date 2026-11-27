@@ -12,6 +12,8 @@ type StreamLine = {
   type: string;
   messageId?: string;
   id?: string;
+  /** A tool's name, on tool_start. */
+  name?: string;
   delta?: string;
   sessionId?: string;
   input?: unknown;
@@ -204,6 +206,9 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   let muted = "";
   let cutAfter: string | null = null;
   let saidAt = Date.now();
+  // What's said when the bot starts a tool before a word of its own, in turn.
+  const onIt = ["Let me check.", "One sec, let me look.", "Let me take a look."];
+  let onItNext = 0;
   let heardAt = Date.now();
   let goodbyeAfter = "";
   let over = false;
@@ -429,6 +434,10 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     if (!turn) return;
     // A tool call, or a message joining the turn, ends what the bot was saying before it: its text after is new.
     if ((l.type === "tool_start" || l.type === "user_message") && muted !== turn) for (const text of speeches.get(turn)?.flush() ?? []) say(text, turn);
+    // The sidekick, in code: a tool the bot starts on the owner's words before saying anything since gets a few words
+    // first, at once, so the owner hears it's on it. The bot's own words come first when it says them; "One moment."
+    // stays the net for a slow start.
+    if (l.type === "tool_start" && muted !== turn && ours.has(turn) && saidAt <= heardAt && !/^phone_/.test(l.name ?? "")) say(onIt[onItNext++ % onIt.length], turn);
     if (l.type === "turn_start") {
       running.add(turn);
       if (sent.has(turn)) started.add(turn);

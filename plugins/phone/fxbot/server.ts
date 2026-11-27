@@ -527,6 +527,8 @@ export default async function setup(fx: PluginApi) {
       session,
       open: (events) => p.api.line(events),
       turns: p.line === 2,
+      // The call's thinking level, as an app call's, for a quick first word (phone-v3, the sidekick).
+      effort: callEffort(),
       onSpoken: (turn) => void spoken.add(turn),
       onEnd: afterCall(id, bot, session, () => call),
     });
