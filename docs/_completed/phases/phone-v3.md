@@ -423,3 +423,8 @@ c9's four failures are its voice expectations from phone 0.1. A bot's voice is p
   - **A line call and an app call:** a tool before a word gets the quick line before its answer, with no "One moment.". A plain answer gets none.
   - **A room's lead** greets in the Voice section's voice.
   - **A room call** through the page still works end to end.
+
+**Pill fixes from the 0.12.0 release review** (`36dca05`):
+- **An earlier chat's pills stay pills.** After a start-over, `earlier()` gave each call's pill back as phone's message with its whole summary. It reads the pill now, and the chat draws it as one. On dev, read-only, a bot's 7 earlier pills came back as pills.
+- **The owner's message that carried a pill stays the owner's.** It was counted as a plugin's, so any plugin could cancel its turn, and nothing could join it. Now it's only marked so the chat shows its own words.
+- **A pill after a message that joined a running turn keeps its place.** On reload it went to the bottom. `applyLine` now finds the turn the message joined: checked in node.
