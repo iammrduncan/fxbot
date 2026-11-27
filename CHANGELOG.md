@@ -2,7 +2,7 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
-## Unreleased
+## 0.12.0 (2026-11-27)
 
 **Before upgrading.** Migration `0020_pills` adds a table, `pills`, for the pills plugins put in a chat; every chat carries on as it is. Then update from **Plugins**: Phone to 0.2.0 and phone-signalwire to 0.2.0, both, Pages to 0.4.0, Chat rooms to 0.6.0, Messages to 0.3.0, Subagents to 0.3.0, and Permissions to 0.1.3. Phone 0.2.0, phone-signalwire 0.2.0, Messages 0.3.0, Chat rooms 0.6.0, Pages 0.4.0, and Web 0.1.0 need fxbot 0.12.0. Add Web from **Plugins**, one of the Essentials now, and update Computer to 0.6.0, for reading pages in a bot's own browser. For **Call me**, fill in phone-signalwire's new `space`, your SignalWire space's name, and pick a listener and a voice from a provider in Phone's **Voice**: a call on your phone speaks and listens with them now. fxbot reaches SignalWire over TCP on port 5061, and sends the call's sound over UDP, with a STUN request to `stun.cloudflare.com` on port 3478 to find its address: a firewall that limits outgoing connections has to allow them.
 
