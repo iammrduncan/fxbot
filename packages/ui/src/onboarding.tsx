@@ -168,6 +168,7 @@ function FirstProvider({ onNext }: { onNext: () => void }) {
       ) : (
         <AddProvider
           first
+          chatOnly
           done="Continue"
           words={{ signIn: "The quickest way: sign in with an account you already have.", key: "Or use a key from a provider you pay.", local: "Or run models on your own machine." }}
           onDefault={makeDefault}

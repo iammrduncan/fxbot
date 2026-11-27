@@ -41,8 +41,9 @@ const groups = [
 ] as const;
 
 // Add provider: sign-ins first, then keys, clouds, and the machine, with search over all of them and models.dev's long
-// tail. A tap opens the provider's card, and once it's connected, its model. Used in Settings and in first-run setup.
-export function AddProvider({ first, words, done = "Done", onDefault, onDone }: { first: boolean; words?: Words; done?: string; onDefault: (id: string) => void; onDone: (provider: Provider) => void }) {
+// tail. A tap opens the provider's card, and once it's connected, its model. Used in Settings and in first-run setup,
+// which with `chatOnly` leaves out what serves no chat model, such as a plugin's voice service.
+export function AddProvider({ first, words, done = "Done", chatOnly = false, onDefault, onDone }: { first: boolean; words?: Words; done?: string; chatOnly?: boolean; onDefault: (id: string) => void; onDone: (provider: Provider) => void }) {
   const { catalog, found, error, load } = useCatalog();
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<CatalogEntry | null>(null);
@@ -88,12 +89,12 @@ export function AddProvider({ first, words, done = "Done", onDefault, onDone }: 
 
   const shown = catalog.providers.filter((e) => e.order !== undefined && !e.plugin);
   // Each plugin's own entries, such as phone's voice services, under the plugin's name.
-  const brought = [...new Set(catalog.providers.flatMap((e) => (e.plugin ? [e.plugin] : [])))];
+  const brought = chatOnly ? [] : [...new Set(catalog.providers.flatMap((e) => (e.plugin ? [e.plugin] : [])))];
   const signIns = [...shown.filter((e) => e.group === "sign-in").sort(byOrder), ...shown.filter((e) => e.group !== "sign-in" && e.signIn).sort(byOrder)];
   const custom = catalog.providers.find((e) => e.group === "custom");
   const q = query.trim().toLowerCase();
   const matches = (e: CatalogEntry) => e.name.toLowerCase().includes(q) || e.id.includes(q) || e.about.toLowerCase().includes(q);
-  const results = q ? [...catalog.providers.filter(matches), ...catalog.more.filter(matches)] : [];
+  const results = q ? [...catalog.providers.filter((e) => matches(e) && !(chatOnly && e.models === "none")), ...catalog.more.filter(matches)] : [];
   const tile = (e: CatalogEntry) => <Tile key={`${e.group}-${e.id}`} entry={e} found={found.some((server) => server.kind === e.id)} onPick={() => setPicked(e)} />;
   return (
     <div className="grid gap-5">
