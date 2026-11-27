@@ -2,6 +2,7 @@ import http from "node:http";
 import https from "node:https";
 import dns from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
+import { addAbortSignal, pipeline } from "node:stream";
 import zlib from "node:zlib";
 
 // A page a bot asked for, fetched from fxbot's own process. The address comes from the model, which took it from
@@ -94,7 +95,10 @@ export async function get(input: string, { accept, maxBytes, signal, resolve }: 
         const encoding = String(response.headers["content-encoding"] ?? "identity").toLowerCase();
         const unpack = { gzip: zlib.createGunzip, "x-gzip": zlib.createGunzip, deflate: zlib.createInflate, br: zlib.createBrotliDecompress }[encoding];
         if (!unpack && encoding !== "identity") throw new Refused(`The page came encoded as ${encoding}, which fxbot can't read.`);
-        const body = unpack ? response.pipe(unpack()) : response;
+        // The body ends with the call, its deadline included, and the unpacking with the response, so a page that stops
+        // partway through can't keep the read waiting.
+        const body = unpack ? pipeline(response, unpack(), () => {}) : response;
+        addAbortSignal(stop, body);
         const chunks: Buffer[] = [];
         let size = 0;
         for await (const chunk of body) {
