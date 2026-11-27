@@ -7,6 +7,7 @@ Our reference implementations we glean inspiration from are the following:
 - https://eve.dev/ (https://github.com/vercel/eve)
 - https://fx.sh/ (https://github.com/vercel-labs/fx)
 - https://github.com/earendil-works/pi (Pi: a minimal core, extended by plugins that change it)
+- https://anoma.ly/hex/
 - https://docs.x.ai/grok-bot/overview
 - https://github.com/CopilotKit/openbot
 - https://github.com/CopilotKit/OpenDuet
