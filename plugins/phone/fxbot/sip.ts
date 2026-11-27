@@ -143,7 +143,8 @@ function stun(socket: dgram.Socket, host = "stun.cloudflare.com", port = 3478): 
       }
     };
     socket.on("message", on);
-    socket.send(request, port, host);
+    // A name that doesn't resolve, offline or with no DNS, fails here, not on the socket.
+    socket.send(request, port, host, (error) => error && (clearTimeout(timer), socket.off("message", on), reject(error)));
   });
 }
 
@@ -181,7 +182,7 @@ function parse(text: string): Message {
 }
 function connection(host: string) {
   let buffer = "";
-  const waiting = new Map<string, { provisional?: (m: Message) => void; resolve: (m: Message) => void }>();
+  const waiting = new Map<string, { provisional?: (m: Message) => void; resolve: (m: Message) => void; reject: (error: Error) => void }>();
   let onRequest: (m: Message) => void = () => {};
   const socket = tls.connect({ host, port: 5061, servername: host });
   socket.setEncoding("utf8");
@@ -212,6 +213,10 @@ function connection(host: string) {
     socket.once("error", (error) => (clearTimeout(timer), reject(error)));
   });
   socket.on("error", () => {});
+  // A request still waiting when the line closes, as when a call is ended while it signs in, fails at once.
+  socket.on("close", () => {
+    for (const [key, w] of waiting) (waiting.delete(key), w.reject(new Error("the line to the carrier closed")));
+  });
   const send = (text: string) => void (!socket.destroyed && socket.write(text));
   return {
     socket,
@@ -228,7 +233,7 @@ function connection(host: string) {
       const key = `${/^Call-ID: (.*)$/m.exec(text)![1]} ${/^CSeq: (.*)$/m.exec(text)![1]}`;
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => (waiting.delete(key), reject(new Error(`no answer to ${lines[0]}`))), ms);
-        waiting.set(key, { provisional, resolve: (m) => (clearTimeout(timer), resolve(m)) });
+        waiting.set(key, { provisional, resolve: (m) => (clearTimeout(timer), resolve(m)), reject: (error) => (clearTimeout(timer), reject(error)) });
         send([...lines, `Content-Length: ${Buffer.byteLength(body)}`, "", body].join("\r\n"));
       });
     },
@@ -345,12 +350,22 @@ export function sipCall(o: {
     const account = await o.account();
     const { domain, username: user, password } = account;
     const rtp = dgram.createSocket("udp4");
+    // An error on the call's audio, such as a send that fails, is logged: unheard, it would end fxbot.
+    rtp.on("error", (error) => o.log(`The SIP call's audio failed: ${error.message}`));
+    const closeRtp = () => {
+      try {
+        rtp.close();
+      } catch {}
+    };
     await new Promise<void>((resolve) => rtp.bind(0, resolve));
     const mapped = await stun(rtp).catch((error) => (o.log(`STUN didn't answer, so the call gives this machine's own address: ${error.message}`), null));
+    if (over) return (closeRtp(), { outcome: "failed", error: "The call was ended before it rang." });
     const sip = connection(domain);
     let registered = false;
     let timers: NodeJS.Timeout[] = [];
     let bye: (() => Promise<void>) | null = null;
+    // While the owner's phone rings, ending the call sends a CANCEL, and the call's answer to it ends the rest.
+    let ringing: (() => void) | null = null;
     const signIn = registrar(sip, account);
     const contact = signIn.contact;
     const register = async (expires: number) => {
@@ -358,20 +373,22 @@ export function sipCall(o: {
       registered = expires > 0;
     };
     teardown = async () => {
+      if (ringing) return ringing();
       timers.forEach((t) => clearInterval(t));
       timers = [];
       // What went out last plays on the phone before the call ends.
       if (bye) await new Promise((resolve) => setTimeout(resolve, 500)).then(() => bye?.()).catch(() => {});
       if (registered) await register(0).catch(() => {});
       sip.socket.end();
-      rtp.close();
+      closeRtp();
     };
     try {
       await sip.ready;
       await register(120);
       timers.push(setInterval(() => sip.send("\r\n\r\n"), 25_000));
       timers.push(setInterval(() => void register(120).catch((error) => o.log(`Signing in again failed: ${error.message}`)), 60_000));
-      if (over) return { outcome: "failed", error: "The call was ended before it rang." };
+      // Ended while it signed in: signed out again, and nothing left open.
+      if (over) return (await teardown(), { outcome: "failed", error: "The call was ended before it rang." });
 
       // The call, with our key in the offer, and the carrier's in its answer.
       const ourKey = crypto.randomBytes(30);
@@ -439,20 +456,20 @@ export function sipCall(o: {
         remote = { address: /^c=IN IP4 (\S+)/m.exec(m.body)?.[1] ?? "", port: Number(/^m=audio (\d+)/m.exec(m.body)?.[1]) };
         if (theirs && !receive) receive = srtp(Buffer.from(theirs, "base64"));
       };
-      // Rings until it's answered, or for ringSeconds, then the call is cancelled.
-      const cancel = setTimeout(
-        () =>
-          sip.send(
-            [`CANCEL ${target} SIP/2.0`, `Via: SIP/2.0/TLS ${sip.local};branch=${branch};rport`, "Max-Forwards: 70", `From: "fxbot" <sip:${user}@${domain}>;tag=${tag}`, `To: <${target}>`, `Call-ID: ${callId}`, `CSeq: ${cseq} CANCEL`, "Content-Length: 0", "", ""].join("\r\n"),
-          ),
-        ringSeconds * 1000,
-      );
+      // Rings until it's answered, or for ringSeconds, or until the call is ended, then the call is cancelled.
+      const stopRinging = () =>
+        sip.send(
+          [`CANCEL ${target} SIP/2.0`, `Via: SIP/2.0/TLS ${sip.local};branch=${branch};rport`, "Max-Forwards: 70", `From: "fxbot" <sip:${user}@${domain}>;tag=${tag}`, `To: <${target}>`, `Call-ID: ${callId}`, `CSeq: ${cseq} CANCEL`, "Content-Length: 0", "", ""].join("\r\n"),
+        );
+      const cancel = setTimeout(stopRinging, ringSeconds * 1000);
+      ringing = () => (clearTimeout(cancel), stopRinging());
       let res = await sip.request(invite(), sdp, answer, (ringSeconds + 20) * 1000);
-      if (res.status === 401 || res.status === 407) {
+      if ((res.status === 401 || res.status === 407) && !over) {
         ack(res);
         const challenge = pick(res.headers[res.status === 407 ? "proxy-authenticate" : "www-authenticate"] ?? []);
         res = await sip.request(invite(digest({ user, password, method: "INVITE", uri: target, challenge }), res.status === 401 ? "Authorization" : "Proxy-Authorization"), sdp, answer, (ringSeconds + 20) * 1000);
       }
+      ringing = null;
       clearTimeout(cancel);
       if (res.status >= 300) {
         ack(res);
@@ -467,6 +484,8 @@ export function sipCall(o: {
         bye = null;
         await sip.request([`BYE ${remoteTarget} SIP/2.0`, `Via: SIP/2.0/TLS ${sip.local};branch=z9hG4bK${rand(8)};rport`, "Max-Forwards: 70", `From: "fxbot" <sip:${user}@${domain}>;tag=${tag}`, `To: ${res.h("to")}`, `Call-ID: ${callId}`, `CSeq: ${++cseq} BYE`, ...routes.map((r) => `Route: ${r}`)], "", undefined, 5000);
       };
+      // Answered just as the call was ended: it hangs up at once.
+      if (over) return (await teardown(), { outcome: "failed", error: "The call was ended as it was answered." });
       const theirsEnded = (how: string) => {
         if (over) return;
         bye = null;

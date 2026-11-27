@@ -37,7 +37,7 @@ export type Conversation = {
   /** Whether the owner's latest words on the call said goodbye or asked to hang up. */
   saidBye(): boolean;
   /** Ends the call once this turn ends and its last words have played. */
-  hangUpAfter(turn: string): void;
+  hangUpAfter(turn: string, bot?: string): void;
   /** Ends the call at once. */
   end(): Promise<void>;
 };
@@ -111,9 +111,10 @@ const sidekick =
   "One quick look, a single tool call, you may do yourself. Anything more, such as reading what you found, digging, work on your computer, a herdr agent's task, or a second tool call, hand to a subagent with subagents_start, with all it needs, then come straight back to the owner and keep talking about anything they like. Never make them wait on it. " +
   "When a subagent tells you something or reports, say what matters, briefly. When the owner asks how it's going, check with subagents_list or herdr's agents, and don't guess. Without subagents, keep each turn short, and say so if a task will take a while.";
 /** A room call's instructions, for each bot's session in the call room, while it's on. */
-export const roomCallNote = `${roomNote} ${sidekick}`;
 const byeNote =
   "The call goes on until the owner says goodbye or asks you to hang up: then say goodbye and use phone_hang_up. A pause or a quiet moment isn't the end.";
+// A room's call has the same goodbye: the bot that answers it says goodbye and hangs up, once its words are said.
+export const roomCallNote = `${roomNote} ${sidekick} ${byeNote}`;
 /** The bot's instructions for a call's session, while it's on: the same in the app and on the owner's phone, but for who
  * started it. */
 export const callNote = (greeting: string, theirs: boolean) =>
@@ -221,6 +222,10 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   let onItNext = 0;
   let heardAt = Date.now();
   let goodbyeAfter = "";
+  // In a room's call: the bot that said goodbye, whose reply ends the call once it's said, and whether the room is
+  // working, a bot replying or waiting to, which counts as the call doing something.
+  let goodbyeBot = "";
+  let roomBusy = false;
   let ownerLast = "";
   let over = false;
   const timers: NodeJS.Timeout[] = [];
@@ -512,6 +517,8 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
   // The room's replies, said as they're written, each in its bot's voice, with tags said as names.
   function fromRoom(event: RoomEvent) {
     const room = o.room!;
+    if (event.type === "reply" || (event.type === "queue" && "bots" in event && (event as { bots: string[] }).bots.length)) roomBusy = true;
+    else if (event.type === "idle") roomBusy = false;
     if (event.type === "reply" && "bot" in event) {
       const { bot, text } = event as { bot: string; text: string };
       if (!room.names.has(bot)) return;
@@ -528,6 +535,8 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
       if (r && !quieted.has(bot)) for (const said of r.words.flush()) say(said, `room-${bot}`, room.voices.get(bot));
       saying.delete(bot);
       quieted.delete(bot);
+      // The bot that said goodbye: its reply is said, then the call ends.
+      if (bot === goodbyeBot) void line.hangUp();
     }
   }
 
@@ -555,8 +564,8 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
         setInterval(() => {
           const now = Date.now();
           if (line.speaking || over || talking()) return;
-          if (tools.size && now - saidAt > 20_000) return say("Still working on it.");
-          if (!running.size && now - Math.max(saidAt, heardAt) > 60_000) {
+          if ((tools.size || roomBusy) && now - saidAt > 20_000) return say("Still working on it.");
+          if (!running.size && !roomBusy && now - Math.max(saidAt, heardAt) > 60_000) {
             say("I'll let you go. Bye for now.");
             void line.hangUp();
           }
@@ -580,10 +589,11 @@ export function conversation(fx: PluginApi, o: Options): Conversation {
     },
     close: () => stopFollowing.abort(),
     saidBye: () => byeWords.test(ownerLast),
-    hangUpAfter(turn) {
+    hangUpAfter(turn, bot) {
       // The tool runs inside its turn, which the chat may not have shown yet: the call ends at that turn's end, or in a
-      // minute if the chat never says it ended.
+      // minute if the chat never says it ended. In a room, once that bot's reply is saved and said.
       goodbyeAfter = turn;
+      if (o.room && bot) goodbyeBot = bot;
       timers.push(setTimeout(() => void line.hangUp(), 60_000));
     },
     end: () => line.hangUp(true),

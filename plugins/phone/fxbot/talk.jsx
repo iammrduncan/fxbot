@@ -142,7 +142,9 @@ export async function talk(target, label) {
     sound?.stop();
     void lock?.release?.().catch(() => {});
     document.removeEventListener("visibilitychange", hidden);
-    if (socket.readyState === WebSocket.OPEN) (socket.send(JSON.stringify({ end: true, why: why || "End" })), socket.close());
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ end: true, why: why || "End" }));
+    // Still connecting too: a socket left open would keep the call on the server, and every other call waiting.
+    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) socket.close();
   };
   // A phone takes the microphone from an app in the background, so the call ends there.
   const hidden = () => document.visibilityState === "hidden" && end("The app went to the background.");

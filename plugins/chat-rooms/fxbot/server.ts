@@ -107,6 +107,9 @@ export default async function setup(fx: PluginApi) {
   // old session, such as a subagent's report, still finds its bot.
   const botOf = new Map<string, string>();
   const reached = new Set<string>();
+  // Call rooms whose call is on (phone 0.2.0 says when one ends). After it, or after a restart, what comes for a call
+  // room, such as a subagent's report, goes to the room the call was in.
+  const calling = new Set<number>();
   // Sessions the lead's skill went with, since this start: it goes with the lead's first untagged turn.
   const led = new Set<string>();
   // Rooms a /fresh is starting over: a message sent meanwhile waits for it. And for idle compaction, each room's newest
@@ -127,7 +130,12 @@ export default async function setup(fx: PluginApi) {
   // 0.6.0, for phone's calls and subagents: the owner's message from a call, Stop, the room's events, and a plugin's
   // message that wakes the bot whose session it is. fxbot 0.4 has no provide, and then the room works as before.
   fx.provide?.({
-    roomOf: async (session: string) => (roomOf.has(session) ? await room(roomOf.get(session)!) : null),
+    // A call room's session is its room's, for the room's computer and the rest, with `call` the call room's id.
+    roomOf: async (session: string) => {
+      const found = roomOf.has(session) ? await room(roomOf.get(session)!) : null;
+      const home = found?.call_of ? await room(found.call_of) : null;
+      return home ? { ...home, call: found!.id } : found;
+    },
     rooms: async () => (await Promise.all((await fx.sql<{ id: number }[]>`select id from rooms where call_of is null order by position nulls last, id`).map((r) => room(r.id)))).filter(Boolean),
     post: async (id: number, message: { text: string; label?: string; note?: string; effort?: string }) => {
       const found = (await room(Number(id))) ?? fail("No such room.");
@@ -154,8 +162,10 @@ export default async function setup(fx: PluginApi) {
       const [made] = await fx.sql<{ id: number }[]>`insert into rooms (name, untagged, replies, call_of)
         values (${`${found.name}, a call`.slice(0, 80)}, ${found.untagged}, ${found.replies}, ${found.id}) returning id`;
       for (const [position, bot] of found.members.entries()) await fx.sql`insert into members (room, bot, position) values (${made.id}, ${bot}, ${position})`;
+      calling.add(made.id);
       return room(made.id);
     },
+    callEnded: async (id: number) => void calling.delete(Number(id)),
     pill: async (id: number, pill: { label: string; text?: string; open?: string; inContext?: boolean }) => {
       const found = (await room(Number(id))) ?? fail("No such room.");
       if (typeof pill?.label !== "string" || !pill.label.trim() || pill.label.length > 80) fail("label must be 1 to 80 characters");
@@ -168,10 +178,15 @@ export default async function setup(fx: PluginApi) {
     },
     wake: async (session: string, message: { text: string; label?: string }) => {
       const id = roomOf.get(session) ?? fail("That session isn't a room's.");
-      const found = (await room(id)) ?? fail("No such room.");
+      let found = (await room(id)) ?? fail("No such room.");
       const [kept] = await fx.sql<{ bot: string }[]>`select bot from sessions where session = ${session}`;
       const bot = kept?.bot ?? botOf.get(session);
       if (!bot || !found.members.includes(bot)) fail("That bot isn't in the room any more.");
+      // Once a call room's call is over, the room the call was in gets it, where the bot answers it.
+      if (found.call_of && !calling.has(found.id)) {
+        const home = await room(found.call_of);
+        if (home?.members.includes(bot)) found = home;
+      }
       if (typeof message?.text !== "string" || !message.text.trim()) fail("text is required");
       const label = typeof message.label === "string" && message.label.trim() ? message.label.trim().slice(0, 80) : "A plugin";
       const said = await say(found.id, "plugin", message.text.trim(), null, { label });
@@ -220,9 +235,10 @@ export default async function setup(fx: PluginApi) {
         "answer only your own part, and never write a line for anyone else. Tag a bot with @Name only to hand it something; it then answers " +
         "after you. Your skill chat-room says how this room works.",
     );
-    const summary = await lastSummary(found.id);
+    // A call room has its room's summary, until it has one of its own, and its room's memories.
+    const summary = (await lastSummary(found.id)) ?? (found.call_of ? await lastSummary(found.call_of) : undefined);
     if (summary) event.instructions.push(`${summary.text}\n\nSearch earlier messages with chat_history.`);
-    const notes = await memorySection(found.id);
+    const notes = await memorySection(found.call_of ?? found.id);
     if (notes) event.instructions.push(notes);
   });
 
@@ -298,7 +314,7 @@ export default async function setup(fx: PluginApi) {
       const found = await callRoom(call.session);
       if (!found) return "This works only in a chat room.";
       try {
-        const { memory, existed, merged } = await remember(found.id, input.text, call.bot, input.replaces);
+        const { memory, existed, merged } = await remember(found.call_of ?? found.id, input.text, call.bot, input.replaces);
         if (merged) return `room-mem:${memory.id} already said that, so ${String(input.replaces).trim()} merged into it.`;
         return existed ? `Already saved as room-mem:${memory.id}.` : `Saved room-mem:${memory.id}.`;
       } catch (error) {
@@ -315,7 +331,7 @@ export default async function setup(fx: PluginApi) {
     async execute(input: { id?: unknown }, call) {
       const found = await callRoom(call.session);
       if (!found) return "This works only in a chat room.";
-      return (await forget(found.id, input.id)) ? `Forgot room-mem:${memoryRef(input.id)}.` : `This room has no memory ${String(input.id ?? "").trim() || "by that id"}.`;
+      return (await forget(found.call_of ?? found.id, input.id)) ? `Forgot room-mem:${memoryRef(input.id)}.` : `This room has no memory ${String(input.id ?? "").trim() || "by that id"}.`;
     },
   });
 

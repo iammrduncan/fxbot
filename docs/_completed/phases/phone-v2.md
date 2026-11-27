@@ -747,3 +747,22 @@ Built on 2026-11-27 on `release/0.12.0`, in dev, with the owner calling from the
 **Checked:** typecheck; a call in the app on dev, after the change, by its socket (greeting audio at 0.74 s, ended on hang-up, its chat kept); the owner's calls on their phone, up to 4 minutes, with audio both ways, cutting in, a subagent started from the call, and the summary; the filter's response to tones, across uneven chunks; the goodbye and listening words against their matchers.
 
 **Not checked here:** a call over 4 minutes or 30; SIP against a fake carrier, so no check runs without a real account; a room's Call me; a bot's own call reaching voicemail; the changes after the owner's last call (listening words, the owner going on, the stale partial, the filter, the chat link) on a real call; the release's container and a hotspot.
+
+### The release review's fixes
+
+Found by `/prep-release` for 0.12.0 and fixed on 2026-11-27, at the owner's word ("do all the other fixes you identified"):
+
+- **A DNS failure on a call ended fxbot.** The call's audio socket had no error listener, and its STUN request to `stun.cloudflare.com` fails there when the name doesn't resolve. The STUN request takes the error itself now, and the socket logs any other.
+- **End while the phone rang** let it ring: no CANCEL went out. It goes out now, and the call's answer to it, 487, ends the rest. End while fxbot signed in left the connection, its keep-alive, and its sign-in renewal open until fxbot restarted. Now it signs out and closes, and a request still waiting when the line closes fails at once, so the next call isn't held for 30 seconds.
+- **Two calls asked for at once** both passed the checks before either was live, and the second took the first's place, so End and hang up no longer reached the first. A call being made counts as one that's on, from its first check, and so does confirming a number, from the press.
+- **The page going while a call in the app was made,** before its socket had a listener, left the call on for 30 minutes, and every other call refused. The server notes the socket's close from the first moment, and the page closes a socket still connecting when the call ends.
+- **A listener that can't open,** with a key revoked or its quota used, left a call on the phone silent, its bar on "Ringing". The call ends now, saying why.
+- **A bot's voice from Phone 0.1.x** is a SignalWire voice name, such as `amazon.Joanna:neural:en-US`, which no provider in Voice knows, so that bot's calls failed at the first word. Migration `0004_old_voices` clears them, and those bots speak in the Voice section's voice.
+- **phone-signalwire 0.2.0 needs fxbot 0.12.0,** since Phone 0.1.1 on 0.11.2 knows only the old carrier contract. It takes a `space` only of letters, digits, and dashes, so the project's token goes only to the owner's space.
+- **The call's recap** read the bot's whole chat from its start, for up to 5 seconds before the greeting, and on a long chat stopped before the newest turns. It reads the chat's last 6,000 lines now, while the call rings and greets, and the bot's first turn waits for it.
+- **A room's call** ran in its call room, and so did what it touched: memories, the room's summary, `chat-rooms_remember`, the room's computer, and a subagent's report after the call. Chat rooms gives a call room's session as its room's now, with `call` the call room's id, so the computer uses the room's. The call room's bots read and save the room's memories, and get its summary. Phone says when the call ends, `callEnded`, and a report after it goes to the room.
+- **"Bye" on a room's call** left the line up for a minute: the room call's note had no goodbye line, and phone saw no turn end. The note says how to end a call, as a one-bot call's does, and the call ends once the bot that hung up has had its reply said. A room at work, a bot replying or waiting to, now counts as the call doing something: it says "Still working on it." after 20 seconds of quiet, and the idle goodbye waits for it.
+
+**Checked:** typecheck, and phone, phone-signalwire, and chat rooms loading on dev, with the migration. `sip.ts` against a fake carrier on this machine (TLS on 5061): End while ringing sends CANCEL, then ACK and a sign-out, and closes, with nothing left running; End while signing in returns in 0.7 s, with nothing left; a call answered, then ended, sends BYE and signs out.
+
+**Not checked here:** the call fixes on a real call, a room's call ending on "bye", and a room's computer or a report after a room's call.

@@ -164,8 +164,21 @@ export function voiceLine(o: { transport: Transport; ear: Ear; mouth: Mouth; voi
 
   const self: Line & { input: Input; ends: boolean; fail(why: string): void } = {
     async place(call: Place) {
-      // A call that only speaks, such as a number's code, opens no listener.
-      if (ear.way === "stream" && !call.quiet) listener = await ear.open(heard, (why) => failed(`Listening stopped: ${why}`));
+      // Ended before it began, as when the page went while the call was made: nothing opens.
+      if (over) return { outcome: "failed" as Outcome, error: why || "The call ended before it began." };
+      // A call that only speaks, such as a number's code, opens no listener. One that can't open, with a key revoked or
+      // its quota used, ends the call with why, rather than leave it silent.
+      if (ear.way === "stream" && !call.quiet) {
+        try {
+          const opened = await ear.open(heard, (why) => failed(`Listening stopped: ${why}`));
+          if (over) return (opened.close(), { outcome: "failed" as Outcome, error: why || "The call ended before it began." });
+          listener = opened;
+        } catch (error) {
+          const reason = `Listening didn't start: ${error instanceof Error ? error.message : error}`;
+          failed(reason);
+          return { outcome: "failed" as Outcome, error: reason };
+        }
+      }
       answered = true;
       transport.send({ state: "on" });
       if (call.greeting) self.say(call.greeting, call.voice);

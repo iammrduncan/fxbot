@@ -152,6 +152,9 @@ export default async function setup(fx: PluginApi) {
   type Loop = ReturnType<typeof voiceLine>;
   let live: { id: number; bot: string; conversation: Conversation; members: string[]; loop: () => Loop | null; shown: { who: string; muted: boolean } } | null = null;
   let confirming = false;
+  // A call being made, from its first check until it's live or isn't: a second one waits its turn, as one that's on.
+  let starting = false;
+  const busy = () => Boolean(live || confirming || starting);
 
   // A call's end. The owner or the bot hanging up, a voicemail left, and the call's length are how calls end; anything
   // else is kept as its error.
@@ -164,30 +167,44 @@ export default async function setup(fx: PluginApi) {
 
   // A call is a side conversation (docs/_completed/phases/phone-v3.md): a session of its own for the bot, kept on its row. While the
   // call is on, the bot's instructions there say how to talk on a call, and what's recent in its main chat.
-  const onCall = new Map<string, { id: number; bot: string; note: string; recap: string }>();
+  const onCall = new Map<string, { id: number; bot: string; note: string; recap: Promise<string> }>();
   // A room's call runs in its call room: each of its bots' sessions there gets the room call's note while it's on. The
   // room catches each bot up itself, with what the room said before the call.
   let onRoomCall: { room: number; rooms: Rooms } | null = null;
   fx.on("instructions", async (event) => {
     const call = onCall.get(event.session);
-    if (call) return void event.instructions.push(call.note, ...(call.recap ? [call.recap] : []));
+    if (call) {
+      const recap = await call.recap;
+      return void event.instructions.push(call.note, ...(recap ? [recap] : []));
+    }
     const on = onRoomCall;
-    if (on && (await on.rooms.roomOf?.(event.session).catch(() => null))?.id === on.room) event.instructions.push(roomCallNote);
+    const found = on ? await on.rooms.roomOf?.(event.session).catch(() => null) : null;
+    if (on && found && (found.call ?? found.id) === on.room) event.instructions.push(roomCallNote);
   });
-  // Its thinking level goes with each message, as phone-v2 sent it.
+  // Its thinking level goes with each message, as phone-v2 sent it. The recap is read while the call rings and the bot
+  // greets: its first turn, on the owner's first words, waits for it.
   async function callSession(id: number, bot: string, note: string) {
     const session = await fx.chats.newSession(bot, { label: `Call ${id}` });
-    const recap = await recapOf(bot).catch((error) => (fx.log(`Call ${id} has no recap of the main chat: ${error.message}`), ""));
+    const recap = recapOf(bot).catch((error) => (fx.log(`Call ${id} has no recap of the main chat: ${error.message}`), ""));
     onCall.set(session, { id, bot, note, recap });
     await fx.sql`update calls set session = ${session} where id = ${id}`;
     return session;
   }
   // The main chat's last turns and in-context pills, newest last, up to about 6,000 characters: the bot's own chat as
-  // the page reads it, up to its newest line when the call starts, with the pills that come once it has caught up.
+  // the page reads it, up to its newest line when the call starts, with the pills that come once it has caught up. It
+  // reads only the chat's last lines, so a long chat's newest turns are there, and quickly.
+  const recapLines = 6000;
   async function recapOf(bot: string) {
-    const res = await fetch(`${fx.localUrl}/api/profiles/${bot}/stream?cursor=0`);
+    const ask = (cursor: number) => fetch(`${fx.localUrl}/api/profiles/${bot}/stream?cursor=${cursor}`);
+    let res = await ask(0);
     if (!res.ok || !res.body) return "";
-    const end = Number(res.headers.get("x-fxbot-end") ?? 0);
+    let end = Number(res.headers.get("x-fxbot-end") ?? 0);
+    if (end > recapLines) {
+      await res.body.cancel().catch(() => {});
+      res = await ask(end - recapLines);
+      if (!res.ok || !res.body) return "";
+      end = Number(res.headers.get("x-fxbot-end") ?? end);
+    }
     const name = (await fx.bots.get(bot)).name;
     const said: { who: string; text: string }[] = [];
     const replies = new Map<string, { who: string; text: string }>();
@@ -204,8 +221,10 @@ export default async function setup(fx: PluginApi) {
           said.push(reply);
         } else if (l.type === "user_message") said.push({ who: l.from ? `From ${l.from}` : "The owner", text: l.text ?? "" });
         else if (l.type === "text_delta" && l.messageId) {
-          const reply = replies.get(l.messageId);
-          if (reply) reply.text += l.delta ?? "";
+          // A reply begun before the lines read starts here.
+          let reply = replies.get(l.messageId);
+          if (!reply) (replies.set(l.messageId, (reply = { who: name, text: "" })), said.push(reply));
+          reply.text += l.delta ?? "";
         } else if (l.type === "pill" && l.pill?.inContext) said.push({ who: `[From ${l.pill.from}, ${l.pill.label}]`, text: l.pill.text ?? "" });
         if (typeof l.cursor === "number" && l.cursor >= end) give();
       }
@@ -255,6 +274,7 @@ export default async function setup(fx: PluginApi) {
   type RoomCall = { id: number; rooms: Rooms; lead: string; parent?: number };
   async function roomWrapUp(id: number, room: RoomCall, call: Conversation) {
     if (onRoomCall?.room === room.id) onRoomCall = null;
+    await room.rooms.callEnded?.(room.id).catch(() => {});
     if (!call.said() || room.parent === undefined) return;
     let leave = () => {};
     const written = new Promise<string>((resolve) => {
@@ -411,7 +431,21 @@ export default async function setup(fx: PluginApi) {
   // for the owner or a bot. The owner starts one in the app ("talk") or with Call me ("button"); a bot rings them for
   // another reason, which its greeting says.
   async function start(target: Target, via: Via, why: Why | "talk", reason = ""): Promise<{ id: number; outcome: Outcome; error?: string }> {
+    // Two calls asked for at once: only the first is made. Until it's live, the checks before it await, so without this
+    // both passed them, and the second took the first's place: End and hang up no longer reached the first.
+    if (busy()) throw new Error("A call is on already, and there's one at a time.");
+    starting = true;
+    try {
+      return await begin(target, via, why, reason);
+    } finally {
+      starting = false;
+    }
+  }
+  async function begin(target: Target, via: Via, why: Why | "talk", reason: string): Promise<{ id: number; outcome: Outcome; error?: string }> {
     const page = "app" in via ? via.app : null;
+    // The page can go while the call is made, before its socket has a listener: that ends the call too.
+    let gone = false;
+    if (page) page.onclose = () => void (gone = true);
     const carrier = "phone" in via ? via.phone : null;
     const cfg = await voiceConfig();
     const problem = await blocked(via, cfg);
@@ -441,6 +475,7 @@ export default async function setup(fx: PluginApi) {
       name = (await fx.bots.get(bot)).name;
     }
     if (live || confirming) throw new Error("A call is on already, and there's one at a time.");
+    if (gone) throw new Error("The app closed the call.");
     const theirs = why === "talk" || why === "button";
     const greeting = theirs ? "Hey, what's up?" : `Hey, this is your fxbot ${name}. ${reason ? finished(reason.trim()) : ""}`.trim();
     const [{ id }] = await fx.sql<{ id: number }[]>`insert into calls (bot, why, reason, provider, status, answered_at, room, call_room)
@@ -477,6 +512,7 @@ export default async function setup(fx: PluginApi) {
     live = { id, bot, conversation: call, members: room ? [...room.names.keys()] : [bot], loop: () => loop, shown };
     if (page) {
       fromPage(page, () => loop?.input ?? null, () => void call.end(), (l) => fx.log(l));
+      if (gone) void call.end();
       // The page says what it can do with This device: listening, in its own browser, or not. And where the call's own
       // chat is, for the bar to open beside the chat while it's on (phone-v3).
       page.send(JSON.stringify({ state: "starting", listen: cfg.listen === "device" ? "device" : "server", speak: cfg.speak === "device" ? "device" : "server", google: setting("googleListening") === "on", open: `/phone/calls/${id}` }));
@@ -665,7 +701,7 @@ export default async function setup(fx: PluginApi) {
       if (!live || !(live.members ?? [live.bot]).includes(call.bot)) return "You're not on a call.";
       if (!live.conversation.saidBye())
         return "Not hung up: the owner hasn't said goodbye or asked you to hang up, so the call goes on. Don't say goodbye; keep talking with them, or wait for them.";
-      live.conversation.hangUpAfter(call.messageId);
+      live.conversation.hangUpAfter(call.messageId, call.bot);
       return "Hanging up after this reply.";
     },
   });
@@ -702,6 +738,7 @@ export default async function setup(fx: PluginApi) {
       if (!target.bot || !fx.bots.on(target.bot)) return json({ error: "Phone is off for this bot." }, 400);
       if (!(await features(target.bot)).button) return json({ error: "Call me is off for this bot." }, 400);
     }
+    if (busy()) return json({ error: "A call is on already, and there's one at a time." }, 409);
     const p = target.bot ? await providerOf(await features(target.bot)) : await chosen();
     const problem = await blocked({ phone: p }, await voiceConfig());
     if (problem) return json({ error: problem, missing: Boolean(unready(p)) || !(await confirmed()) }, live || confirming ? 409 : 400);
@@ -812,19 +849,22 @@ export default async function setup(fx: PluginApi) {
     const p = await chosen();
     const problem = unready(p);
     if (problem || !p) return json({ error: problem }, 400);
-    if (live || confirming) return json({ error: "A call is on already." }, 409);
-    const cfg = await voiceConfig();
-    if (cfg.speak === "device") return json({ error: "Confirming your number needs phone's Voice section to speak with a provider, not This device." }, 400);
-    const account = await p.api.sip().catch((error: Error) => error);
-    if (!account || account instanceof Error) return json({ error: account instanceof Error ? account.message : `${p.api.label} has no SIP account yet.` }, 502);
+    if (busy()) return json({ error: "A call is on already." }, 409);
+    // Held from here, as a call being made is, so a second press or a call can't start while this one gets ready.
     confirming = true;
-    const code = String(randomInt(1000, 10000));
-    await fx.secrets.set("code", JSON.stringify({ code, to: setting("to"), until: Date.now() + 10 * 60_000 }));
-    const spaced = code.split("").join(" ");
-    const [{ id }] = await fx.sql<{ id: number }[]>`insert into calls (bot, why, provider) values ('', 'confirm', ${p.name}) returning id::int as id`;
-    const voice = await voiceFor(cfg);
-    const confirm = onPhone(account, (t) => voiceLine({ transport: t, ear: { way: "device" }, mouth: mouthOf(cfg), voice, log: (l) => fx.log(l) }, { heard: () => {}, played: () => {}, ended: () => {} }));
+    const cfg = await voiceConfig().catch((error: Error) => error);
+    if (cfg instanceof Error) return (confirming = false), json({ error: cfg.message }, 500);
+    if (cfg.speak === "device") return (confirming = false), json({ error: "Confirming your number needs phone's Voice section to speak with a provider, not This device." }, 400);
+    const account = await p.api.sip().catch((error: Error) => error);
+    if (!account || account instanceof Error) return (confirming = false), json({ error: account instanceof Error ? account.message : `${p.api.label} has no SIP account yet.` }, 502);
+    // The rest in the background, which lets go of confirming however it ends.
     void (async () => {
+      const code = String(randomInt(1000, 10000));
+      await fx.secrets.set("code", JSON.stringify({ code, to: setting("to"), until: Date.now() + 10 * 60_000 }));
+      const spaced = code.split("").join(" ");
+      const [{ id }] = await fx.sql<{ id: number }[]>`insert into calls (bot, why, provider) values ('', 'confirm', ${p.name}) returning id::int as id`;
+      const voice = await voiceFor(cfg);
+      const confirm = onPhone(account, (t) => voiceLine({ transport: t, ear: { way: "device" }, mouth: mouthOf(cfg), voice, log: (l) => fx.log(l) }, { heard: () => {}, played: () => {}, ended: () => {} }));
       const result = await confirm.place({ to: setting("to"), greeting: `Your fxbot code is ${spaced}. Again: ${spaced}. Goodbye.`, quiet: true, voice });
       // Answered when it's answered, so the call's length is how long the code took to read.
       if (result.outcome === "answered") await fx.sql`update calls set status = 'on', answered_at = now() where id = ${id}`, await confirm.hangUp();

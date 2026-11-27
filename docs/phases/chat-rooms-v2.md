@@ -69,7 +69,7 @@ A room is drawn by chat-rooms' own page, close to a bot's chat but its own copy,
   - Pills are redrawn without their plugin's icon.
   - Everything loads at once, with no paging.
   - A message sent while a bot is answering replaces the queue rather than reaching the running turn.
-- **A room call's "bye"** didn't hang up, for three reasons, all in the plugins:
+- **A room call's "bye"** didn't hang up, for three reasons, all in the plugins. Since 0.12.0's release review, the note has the goodbye line and the call ends after that bot's reply, and the idle goodbye waits while the room works (phone-v2's build notes); the third remains:
   1. **The room call's note** (`plugins/phone/fxbot/call.ts`, `roomCallNote`) has no goodbye line, where a one-bot call's says "When they're done, say goodbye and use phone_hang_up".
   2. **The call can't see turns:** `phone_hang_up` hangs up once the turn that called it ends, which phone sees in the bot's session stream (`read()`). A room call follows the room's events instead, which carry no turns, so it waits for the 60-second fallback.
   3. **Phone may be off** for a member, which then gets no call note and can't hang up: `talk()` checks only a one-bot call's bot (`plugins/phone/fxbot/server.ts`).

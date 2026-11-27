@@ -15,10 +15,13 @@ export type Rooms = {
   post?(room: number, message: { text: string; label?: string; note?: string; effort?: string }): Promise<unknown>;
   stop?(room: number): Promise<void>;
   on?(room: number, listener: (event: RoomEvent) => void): () => void;
-  /** A session's room, for the call's instructions (phone-v3). */
-  roomOf?(session: string): Promise<Room | null>;
+  /** A session's room, for the call's instructions (phone-v3). A call room's session is its room's, with `call` the
+   * call room's id. */
+  roomOf?(session: string): Promise<(Room & { call?: number }) | null>;
   /** A call room for a room's call, left out of the list, and a pill in the middle of a room (phone-v3). */
   callRoom?(room: number): Promise<Room | null>;
+  /** The call room's call is over: what comes for it later goes to the room the call was in. */
+  callEnded?(room: number): Promise<void>;
   pill?(room: number, pill: { label: string; text?: string; open?: string; inContext?: boolean }): Promise<unknown>;
 };
 

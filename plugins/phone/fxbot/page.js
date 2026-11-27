@@ -152,7 +152,8 @@ async function talk(target, label) {
 		if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({
 			end: true,
 			why: why || "End"
-		})), socket.close();
+		}));
+		if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) socket.close();
 	};
 	const hidden = () => document.visibilityState === "hidden" && end("The app went to the background.");
 	document.addEventListener("visibilitychange", hidden);
