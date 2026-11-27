@@ -37,7 +37,7 @@ Two run on your own server, with no key, under **For web** too:
 - **Firecrawl on your server:** give its address with `/v2`, such as `http://192.168.1.20:3002/v2`.
 - **SearXNG on your server:** give its address, such as `http://192.168.1.20:8888`. Its `settings.yml` must list `json` under `search: formats`, or it refuses fxbot.
 
-fxbot in a container can't reach `localhost` on your machine: give the machine's address, as for Ollama. Only the plugin's requests to that provider reach it, never an address a bot gives.
+fxbot in a container can't reach `localhost` on your machine: give the machine's address, as for Ollama. Only the plugin's requests to that provider reach it, never an address a bot gives. Firecrawl on your server reads pages from your network, so fxbot sends it only a page on the public internet, checked as its own reads are, and none of a bot's `options`. A page's redirects, Firecrawl follows itself.
 
 Keiro is sold as BrowserFoundry too: one key, one entry. Nous Portal's web tools aren't here yet. Its search is Perplexity's and its reading is Firecrawl's, so adding those directly gives the same.
 

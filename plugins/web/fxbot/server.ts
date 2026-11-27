@@ -1,7 +1,7 @@
 import type { PluginApi } from "@fxbot/sdk";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { get, Refused } from "./fetch.ts";
+import { destination, get, Refused } from "./fetch.ts";
 import { textFrom, toMarkdown } from "./read.ts";
 import { adapterFor, adapters, freeSearch, ProviderError, type Added, type Depth, type Job, type Options, type Recency, type Result, type Searched } from "./providers/index.ts";
 
@@ -59,6 +59,18 @@ export default async function setup(fx: PluginApi) {
     return row ?? { search: null, read: null, research: null, blocked: null };
   }
   const free = () => (fx.settings.freeSearch ?? "on") !== "off";
+  // A provider on the owner's own network, such as Firecrawl on their server: its entry is in the plugin's local group,
+  // or it was added at an address there. One that reads pages reads them from that network, so a page it reads is
+  // checked first, as fxbot's own reads are, and a bot's options, which could name another page or steer its browser,
+  // don't go to it.
+  const manifest = JSON.parse(readFileSync(join(import.meta.dirname, "..", "plugin.json"), "utf8"));
+  const local = new Set<string>(manifest.extensions["sh.fxbot"].providers.filter((e: { group?: string }) => e.group === "local").map((e: { id: string }) => e.id));
+  const onOwnNetwork = async (p: Usable) => local.has(p.kind) || (p.baseUrl !== null && (await destination(p.baseUrl).then(() => false, () => true)));
+  async function guard(p: Usable, options: Options, url?: string) {
+    if (!(await onOwnNetwork(p))) return;
+    if (Object.keys(options).length && p.can.includes("read")) throw new Refused(`${p.name} reads pages on the owner's own network, so it takes no options from a bot.`);
+    if (url) await destination(url);
+  }
   const named = (list: Usable[]) => list.map((p) => `${p.name} (provider: "${p.name}")`).join(", ");
   // Who does a job: the provider a call asks for, the owner's pick, or the first added that can. For reading, no pick is
   // fxbot itself, and for search, none at all is Parallel's free search, while it's on.
@@ -174,6 +186,7 @@ export default async function setup(fx: PluginApi) {
       };
       const p = await who("search", input.provider);
       if (!p && !free()) throw new Refused("No search provider is added, so there's nothing to search with. The owner adds one in Settings › Providers, under For web.");
+      if (p) await guard(p, asked.options);
       const by = p ? p.name : "Parallel's free search";
       const found: Searched = await cached(`search\0${p?.id ?? "free"}\0${JSON.stringify(asked)}`, 5, () =>
         (p ? adapterFor(p.kind)!.search!(fx, p, asked, call.signal) : freeSearch(asked, call.signal)).catch((error) => failed(error, `${by}'s search`)),
@@ -239,6 +252,7 @@ export default async function setup(fx: PluginApi) {
       if (!p && !browser) throw new Refused(`${error.message}.${await elsewhere(url, call)}`);
       const by = p ? p.name : "your browser";
       try {
+        if (p) await guard(p, {}, url);
         const page = p ? { ...(await adapterFor(p.kind)!.read!(fx, p, { url, options: {} }, call.signal)), by: p.name } : await inBrowser(url, call);
         return { ...page, after: error.why };
       } catch (again) {
@@ -277,6 +291,7 @@ export default async function setup(fx: PluginApi) {
         page = await cached(`read\0browser\0${call.bot}\0${call.session}\0${url}`, 15, () => inBrowser(url, call));
       } else {
         const p = input.provider !== undefined && input.provider !== "" ? await who("read", input.provider) : await who("read", undefined);
+        if (p) await guard(p, options, url);
         const { blocked } = await picks();
         // fxbot's own read is kept for one chat, since a PDF it read is that chat's in the library, and by what reads a
         // page that blocks it.
@@ -326,6 +341,7 @@ export default async function setup(fx: PluginApi) {
       const p = await who("research", input.provider);
       if (!p) throw new Refused("No added provider researches now. Use web_search and web_fetch, or the owner adds one in Settings › Providers.");
       const asked = { question, depth: depthIn(input.depth), options: optionsIn(input.options) };
+      await guard(p, asked.options);
       const done = await cached(`research\0${p.id}\0${JSON.stringify(asked)}`, 15, () => adapterFor(p.kind)!.research!(fx, p, asked, call.signal).catch((error) => failed(error, `${p.name}'s research`)));
       await shown(input, call, { kind: "research", question, by: p.name, sources: done.sources.slice(0, 30) });
       const sources = done.sources.length ? `\n\nSources:\n${done.sources.slice(0, 30).map((s, i) => `${i + 1}. [${s.title || s.url}](${s.url})`).join("\n")}` : "";

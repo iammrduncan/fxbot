@@ -22,4 +22,6 @@ Firecrawl searches and scrapes pages to Markdown, in its cloud or on the owner's
 - `"formats": ["markdown", "links"]` adds the page's links.
 - `"actions": [{ "type": "click", "selector": "#more" }]` acts on the page before it's read.
 
+Firecrawl on the owner's own server takes none of these options, and reads only pages on the public internet.
+
 Firecrawl doesn't research here. For a whole site, read its `/sitemap.xml` with web_fetch.
