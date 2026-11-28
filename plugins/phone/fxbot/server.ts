@@ -277,14 +277,15 @@ export default async function setup(fx: PluginApi) {
     await room.rooms.callEnded?.(room.id).catch(() => {});
     if (!call.said() || room.parent === undefined) return;
     let leave = () => {};
+    let summaryChain: number | undefined;
     const written = new Promise<string>((resolve) => {
       const cap = setTimeout(() => resolve(""), 180_000);
       leave = room.rooms.on!(room.id, (event) => {
-        const message = (event as { type: string; message?: { author: string; text: string } }).message;
-        if (event.type === "message" && message?.author === room.lead) (clearTimeout(cap), resolve(message.text));
+        const message = "message" in event ? event.message : undefined;
+        if (event.type === "message" && message?.author === room.lead && message.chain === summaryChain) (clearTimeout(cap), resolve(message.text));
       });
     });
-    await room.rooms.post!(room.id, { text: `<@bot:${room.lead}> ${summaryAsk}`, label: "phone" });
+    summaryChain = (await room.rooms.post!(room.id, { text: `<@bot:${room.lead}> ${summaryAsk}`, label: "phone" })).id;
     const summary = (await written.finally(() => leave())).trim().slice(0, 6000);
     const [row] = await fx.sql<{ seconds: number | null }[]>`select seconds from calls where id = ${id}`;
     const minutes = Math.max(1, Math.round((row?.seconds ?? 0) / 60));
@@ -364,7 +365,8 @@ export default async function setup(fx: PluginApi) {
   // The voice a call speaks in: the bot's own, the Voice section's, or the speaker's first.
   async function voiceFor(cfg: VoiceConfig, bot?: string) {
     const [own] = bot ? await fx.sql<{ voice: string | null }[]>`select voice from bots where bot = ${bot}` : [];
-    return own?.voice || cfg.voice || (await voicesOf(cfg))[0]?.value || "";
+    const available = await voicesOf(cfg);
+    return own?.voice && available.some((v) => v.value === own.voice) ? own.voice : cfg.voice || available[0]?.value || "";
   }
   const earOf = (cfg: VoiceConfig, hints: string[]): Ear => {
     const p = cfg.listen;
@@ -465,8 +467,9 @@ export default async function setup(fx: PluginApi) {
       if (!made) throw new Error("The room's call didn't start.");
       const all = await fx.bots.list();
       const names = new Map(found.members.map((id) => [id, all.find((b) => b.id === id)?.name ?? "A bot"]));
-      const own = new Map((await fx.sql<{ bot: string; voice: string | null }[]>`select bot, voice from bots where bot in ${fx.sql(found.members)}`).map((r) => [r.bot, r.voice]));
-      const voices = voicesFor(found.members, own, (await voicesOf(cfg)).map((v) => v.value), await voiceFor(cfg));
+      const offered = (await voicesOf(cfg)).map((v) => v.value);
+      const own = new Map((await fx.sql<{ bot: string; voice: string | null }[]>`select bot, voice from bots where bot in ${fx.sql(found.members)}`).map((r) => [r.bot, r.voice && offered.includes(r.voice) ? r.voice : null]));
+      const voices = voicesFor(found.members, own, offered, await voiceFor(cfg));
       bot = found.members[0];
       name = names.get(bot)!;
       room = { id: made.id, rooms, names, voices, lead: bot, parent: found.id };

@@ -15,18 +15,21 @@ export const importPasskey = (spki: Uint8Array, alg: number) => {
 };
 
 type ClientData = { type: string; challenge: string; origin: string; crossOrigin?: boolean };
-function clientData(bytes: Bytes, type: string, origin: string): ClientData {
+function clientData(bytes: Bytes, type: string, origin?: string): ClientData {
   const c = JSON.parse(new TextDecoder().decode(bytes)) as ClientData;
   if (c.type !== type) throw new Error("Not a passkey answer of the right kind.");
-  if (c.origin !== origin || c.crossOrigin) throw new Error(`The passkey was used on ${c.origin}, not ${origin}.`);
+  const url = new URL(c.origin);
+  if (!["https:", "http:"].includes(url.protocol) || url.origin !== c.origin || c.crossOrigin) throw new Error("The passkey's origin isn't a valid web origin.");
+  if (origin !== undefined && c.origin !== origin) throw new Error(`The passkey was used on ${c.origin}, not ${origin}.`);
   return c;
 }
 
 // A new passkey, from a paired device, for a challenge fxbot gave it.
-export async function checkNew(m: { spki: string; alg: number; clientData: string }, challenge: string, origin: string) {
-  const c = clientData(fromB64u(m.clientData), "webauthn.create", origin);
+export async function checkNew(m: { spki: string; alg: number; clientData: string }, challenge: string) {
+  const c = clientData(fromB64u(m.clientData), "webauthn.create");
   if (c.challenge !== challenge) throw new Error("That passkey answered another challenge.");
   await importPasskey(fromB64u(m.spki), Number(m.alg));
+  return c.origin;
 }
 
 // ECDSA signatures come DER-encoded; Web Crypto takes r and s, 32 bytes each.
@@ -48,7 +51,7 @@ export async function checkAssertion(
   p: { passkey: { id: string; clientData: string; authData: string; sig: string }; time: number; nonce: string },
   D: Bytes,
   key: { spki: Buffer; alg: number },
-  origin: string,
+  origin: string | undefined,
   seen: Map<string, number>,
 ) {
   const now = Date.now();
@@ -61,7 +64,7 @@ export async function checkAssertion(
   const c = clientData(cd, "webauthn.get", origin);
   if (c.challenge !== b64u(await wire.passkeyChallenge(D, p.time, nonce))) throw new Error("That passkey answered for another key.");
   const auth = fromB64u(p.passkey.authData);
-  if (auth.length < 37 || b64u(auth.slice(0, 32)) !== b64u(await sha256(utf8(new URL(origin).hostname)))) throw new Error("That passkey is for another site.");
+  if (auth.length < 37 || b64u(auth.slice(0, 32)) !== b64u(await sha256(utf8(new URL(c.origin).hostname)))) throw new Error("That passkey is for another site.");
   if ((auth[32] & 0x05) !== 0x05) throw new Error("The passkey didn't check it was you.");
   let sig = fromB64u(p.passkey.sig);
   if (key.alg === -7) sig = derToRaw(sig);
@@ -69,4 +72,5 @@ export async function checkAssertion(
   const ok = await crypto.subtle.verify(algs[key.alg].verify, pub, sig, concat(auth, await sha256(cd)));
   if (!ok) throw new Error("The passkey's signature didn't check.");
   seen.set(p.nonce, now);
+  return c.origin;
 }

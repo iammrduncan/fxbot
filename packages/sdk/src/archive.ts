@@ -46,11 +46,16 @@ export function createArchives({ fetch, github = "https://github.com", codeload 
     files(repo: string, commit: string, fileLimit = limits.file) {
       if (!repoName.test(repo) || !/^[0-9a-f]{40}$/.test(commit)) return Promise.reject(new Error(`${repo} ${commit} isn't a GitHub commit.`));
       const key = `${repo}@${commit}:${fileLimit}`;
+      const now = Date.now();
+      for (const [key, entry] of read) if (now - entry.at >= cacheMs) read.delete(key);
       const hit = read.get(key);
-      if (hit && Date.now() - hit.at < cacheMs) return hit.files;
+      if (hit) return hit.files;
       const files = download(repo, commit, fileLimit);
-      read.set(key, { at: Date.now(), files });
-      files.catch(() => read.delete(key));
+      const entry = { at: now, files };
+      read.set(key, entry);
+      files.catch(() => {
+        if (read.get(key) === entry) read.delete(key);
+      });
       return files;
     },
   };

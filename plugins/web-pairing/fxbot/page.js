@@ -3046,6 +3046,8 @@ function Advanced({ state, refresh }) {
 				children: [
 					state.relay === state.defaultRelay ? "fxbot.sh's relay, which passes sealed handshakes and stores nothing." : "A relay of your own. Pairing links carry its address.",
 					" ",
+					"Connected devices learn a new relay automatically. A device offline during that change must be forgotten there and paired again.",
+					" ",
 					state.listening ? "Connected to it." : "Not connected to it: fxbot connects only while a pairing is open or a device is paired."
 				]
 			}),

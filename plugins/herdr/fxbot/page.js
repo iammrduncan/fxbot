@@ -1072,14 +1072,37 @@ function Tab() {
 function BotMachines({ bot }) {
 	const [data, setData] = (0, react.useState)(null);
 	const [error, setError] = (0, react.useState)("");
-	const load = () => call(`bots/${bot.id}`).then(setData, (e) => setError(e.message));
+	const desired = (0, react.useRef)(null);
+	const writes = (0, react.useRef)(Promise.resolve());
+	const revision = (0, react.useRef)(0);
+	const load = () => call(`bots/${bot.id}`).then((next) => (desired.current = next, setData(next)), (e) => setError(e.message));
 	(0, react.useEffect)(() => void load(), [bot.id]);
 	if (!data) return error ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 		className: "text-sm text-destructive",
 		children: error
 	}) : null;
-	const save = (body) => (setError(""), call(`bots/${bot.id}`, "PUT", body).then(load, (e) => setError(e.message)));
-	const toggle = (machine, on) => save({ machines: on ? [...data.machines, machine] : data.machines.filter((m) => m !== machine) });
+	const save = (body) => {
+		const at = ++revision.current;
+		const next = {
+			...desired.current,
+			all: body.all === true,
+			machines: body.machines ?? []
+		};
+		desired.current = next;
+		setData(next);
+		setError("");
+		writes.current = writes.current.then(async () => {
+			await call(`bots/${bot.id}`, "PUT", body);
+			const fresh = await call(`bots/${bot.id}`);
+			if (at === revision.current) desired.current = fresh, setData(fresh);
+		}).catch((e) => {
+			if (at === revision.current) setError(e.message);
+		});
+	};
+	const toggle = (machine, on) => {
+		const machines = desired.current.machines;
+		save({ machines: on ? [...machines, machine] : machines.filter((m) => m !== machine) });
+	};
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 		className: "grid gap-3 text-sm",
 		"aria-label": "herdr",
@@ -1100,7 +1123,7 @@ function BotMachines({ bot }) {
 				className: "flex items-center gap-2",
 				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Checkbox, {
 					checked: data.all,
-					onCheckedChange: (on) => save(on === true ? { all: true } : { machines: data.available })
+					onCheckedChange: (on) => save(on === true ? { all: true } : { machines: desired.current.available })
 				}), "Every machine, and any herdr adds later"]
 			}),
 			!data.all && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {

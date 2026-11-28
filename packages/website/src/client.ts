@@ -11,12 +11,22 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-theme-t
   button.addEventListener("click", () => {
     const shown = root.dataset.theme ?? (dark.matches ? "dark" : "light");
     const next = shown === "dark" ? "light" : "dark";
-    root.dataset.theme = next;
+    const automatic = next === (dark.matches ? "dark" : "light");
+    if (automatic) delete root.dataset.theme;
+    else root.dataset.theme = next;
     try {
-      localStorage.setItem("starlight-theme", next === (dark.matches ? "dark" : "light") ? "" : next);
+      localStorage.setItem("starlight-theme", automatic ? "" : next);
     } catch {}
   });
 }
+
+dark.addEventListener("change", () => {
+  try {
+    const theme = localStorage.getItem("starlight-theme");
+    if (theme === "light" || theme === "dark") return;
+  } catch {}
+  delete root.dataset.theme;
+});
 
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
   button.hidden = false;

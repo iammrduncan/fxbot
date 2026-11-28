@@ -14,7 +14,7 @@ import { Mapper, check, checkEntry, cloudflareStun, forWerift, freePort, globalV
 // passes each device's requests to fxbot's own API (docs/_completed/phases/web-pairing.md).
 
 type Config = { on: boolean; relay: string; ice: IceEntry[]; ports: [number, number]; mapping: boolean };
-type Passkey = { id: string; spki: Buffer; alg: number; added_by: string; added_at: Date; used_at: Date | null };
+type Passkey = { id: string; spki: Buffer; alg: number; origin: string | null; added_by: string; added_at: Date; used_at: Date | null };
 type Device = { id: string; name: string; platform: string; key: Buffer; paired_at: Date; paired_by: string; how: string; last_seen: Date | null; last_seq: string };
 type Line = { ws: WebSocket; calls: Map<string, Call>; plate?: number; ticket?: Ticket };
 type Call = {
@@ -118,11 +118,11 @@ export default async function webPairing(fx: PluginApi) {
   let sixHourly: ReturnType<typeof setInterval> | undefined;
   const openTickets = () => [...tickets.values()].some((t) => ["open", "pairing", "compare"].includes(t.state));
 
-  async function listenUrl() {
+  async function signedUrl(kind: "listen" | "plate") {
     const t = String(Date.now());
     const s = new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, keys.Lpriv, wire.listenProof(rid, t)));
     const q = new URLSearchParams({ l: b64u(keys.Lpub), i: b64u(keys.I.publicKey), t, s: b64u(s) });
-    return `${config.relay}/listen/${rid}?${q}`;
+    return `${config.relay}/${kind}/${rid}?${q}`;
   }
   function line(url: string, onOpen: (l: Line) => void, onClose: (l: Line, code: number) => void): Line {
     const l: Line = { ws: new WebSocket(url), calls: new Map() };
@@ -175,7 +175,7 @@ export default async function webPairing(fx: PluginApi) {
     if (!wanted || listener) return;
     let url: string;
     try {
-      url = await listenUrl();
+      url = await signedUrl("listen");
     } catch (error) {
       return fx.log(`Couldn't sign for the relay: ${error}`);
     }
@@ -258,10 +258,12 @@ export default async function webPairing(fx: PluginApi) {
         return stop(c, "failed");
       }
       if (c.stage === "confirm" && m?.confirm === true && c.ticket) {
+        const t = c.ticket;
+        if (Date.now() > t.expires) return expireTicket(t);
+        if (t.state !== "pairing") return stop(c, "expired");
         c.stage = "compare";
-        c.ticket.state = "compare";
-        c.ticket.sas = await wire.sixDigits(c.hash!);
-        c.ticket.call = c;
+        t.state = "compare";
+        t.sas = await wire.sixDigits(c.hash!);
         return;
       }
       if (c.stage === "rtc" && c.pc) {
@@ -311,6 +313,7 @@ export default async function webPairing(fx: PluginApi) {
     if (c.line.ticket && (!c.psk || c.line.ticket !== t)) return stop(c, "failed");
     t.state = "pairing";
     c.ticket = t;
+    t.call = c;
     const hs = await new Handshake({ pattern: "IKpsk2", initiator: false, prologue: wire.pairPrologue(rid, t.tid), s: keys.I, psk: c.psk ?? (await wire.pairPsk(t.S)) }).init();
     let hello: { name?: unknown; platform?: unknown };
     try {
@@ -349,6 +352,13 @@ export default async function webPairing(fx: PluginApi) {
     fx.log("Pairing is locked for 15 minutes after three wrong codes.");
     for (const o of tickets.values()) failTicket(o, "Pairing locked after three wrong codes.");
   }
+  function expireTicket(t: Ticket) {
+    if (!["open", "pairing", "compare"].includes(t.state)) return;
+    t.state = "expired";
+    t.why = "The code expired.";
+    if (t.call) stop(t.call, "expired");
+    finishTicket(t);
+  }
   function finishTicket(t: Ticket) {
     clearTimeout(t.timer);
     const l = t.line;
@@ -368,7 +378,7 @@ export default async function webPairing(fx: PluginApi) {
     do n = new DataView(random(4).buffer).getUint32(0);
     while (n >= 4_000_000_000);
     const t: Ticket = { tid: random(16), S: random(32), digits: String(n % 100_000_000).padStart(8, "0"), expires: Date.now() + TICKET_MS, by, state: "open", timer: setTimeout(() => {}, 0) };
-    t.timer = setTimeout(() => t.state === "open" && ((t.state = "expired"), (t.why = "The code expired."), finishTicket(t)), TICKET_MS);
+    t.timer = setTimeout(() => expireTicket(t), TICKET_MS);
     tickets.set(b64u(t.tid), t);
     settle();
     // A new pairing doesn't wait out a backoff: the owner is watching.
@@ -384,8 +394,10 @@ export default async function webPairing(fx: PluginApi) {
   // is gone with it, so an open ticket claims another, and the screen shows the new code.
   async function claimPlate(t: Ticket) {
     t.plate = undefined;
+    const url = await signedUrl("plate");
+    if (t.state !== "open") return;
     await new Promise<void>((resolve) => {
-      const l = line(`${config.relay}/plate`, () => {}, () => {
+      const l = line(url, () => {}, () => {
         resolve();
         if (t.line !== l) return;
         t.line = undefined;
@@ -414,6 +426,10 @@ export default async function webPairing(fx: PluginApi) {
     };
   };
   async function decide(t: Ticket, ok: boolean) {
+    if (Date.now() > t.expires) {
+      expireTicket(t);
+      throw new Error("This pairing expired.");
+    }
     if (t.state !== "compare" || !t.call || !t.pending) throw new Error("This pairing isn't waiting for approval.");
     const c = t.call;
     if (ok) {
@@ -461,7 +477,7 @@ export default async function webPairing(fx: PluginApi) {
     const servers = await iceServers(config.ice, fetch, fx.log);
     if (!reach || Date.now() - reachAt > SIX_HOURS) await checkNow().catch(() => null);
     // `reuse`: this fxbot takes one request after another on a channel, which the app then keeps (see bridge.ts).
-    send(c, wire.envelope("k2", await hs.write(utf8(JSON.stringify({ iceServers: servers, reach, device: device.id, name, reuse: true })))));
+    send(c, wire.envelope("k2", await hs.write(utf8(JSON.stringify({ iceServers: servers, reach, device: device.id, name, relay: config.relay, reuse: true })))));
     const { send: tx, recv: rx } = await hs.split();
     Object.assign(c, { tx, rx, hash: hs.hash, stage: "rtc" });
     // The ICE ports, so a forwarded or mapped port holds; any port when every one is taken, as the log says.
@@ -563,8 +579,8 @@ export default async function webPairing(fx: PluginApi) {
       p = JSON.parse(dec.decode(await hs.read(bytes)));
       const [key] = await fx.sql<Passkey[]>`select * from passkeys where id = ${String(p?.passkey?.id)}`;
       if (!key) throw new Error("No such passkey here: it was removed, or is for another fxbot.");
-      await checkAssertion(p, hs.rs!, key, wire.shellOf(config.relay), nonces);
-      await fx.sql`update passkeys set used_at = now() where id = ${key.id}`;
+      const checkedOrigin = await checkAssertion(p, hs.rs!, key, key.origin ?? undefined, nonces);
+      await fx.sql`update passkeys set used_at = now(), origin = ${checkedOrigin} where id = ${key.id}`;
     } catch (error) {
       // Not a wrong code: the lockout is for codes, which can be guessed.
       fx.log(`A passkey was refused: ${error instanceof Error ? error.message : error}`);
@@ -599,8 +615,8 @@ export default async function webPairing(fx: PluginApi) {
       const pending = challenges.get(from);
       challenges.delete(from);
       if (!pending || Date.now() - pending.at > 5 * 60_000) throw new Error("That took too long. Try again.");
-      await checkNew(m, pending.challenge, wire.shellOf(config.relay));
-      await fx.sql`insert into passkeys (id, spki, alg, added_by) values (${String(m.id)}, ${Buffer.from(fromB64u(m.spki))}, ${Number(m.alg)}, ${me.name}) on conflict (id) do nothing`;
+      const origin = await checkNew(m, pending.challenge);
+      await fx.sql`insert into passkeys (id, spki, alg, origin, added_by) values (${String(m.id)}, ${Buffer.from(fromB64u(m.spki))}, ${Number(m.alg)}, ${origin}, ${me.name}) on conflict (id) do nothing`;
       passkeyCount = (await passkeys()).length;
       fx.log(`${me.name} added a passkey.`);
       return true;
@@ -691,6 +707,7 @@ export default async function webPairing(fx: PluginApi) {
     const relayChanged = next.relay && next.relay !== config.relay;
     await saveConfig(next);
     if (relayChanged || next.on !== undefined) {
+      if (relayChanged) tell({ event: "relay", relay: config.relay });
       // The listener starts again on the new relay, or stops; connections close when access goes off.
       wanted = false;
       listener?.ws.close(1000);

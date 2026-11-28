@@ -57,13 +57,14 @@ export const openai: Adapter = {
       let running = false;
       let closed = false;
       let abort = new AbortController();
+      let signal: AbortSignal | undefined;
       async function next() {
         if (running || closed) return;
         running = true;
         try {
           while (waiting.length && !closed) {
             const { text, mark } = waiting.shift()!;
-            const signal = abort.signal;
+            signal = abort.signal;
             const res = await fx.providers.fetch(p.id, `${base(p)}/audio/speech`, {
               method: "POST",
               headers: { "content-type": "application/json" },
@@ -77,7 +78,7 @@ export const openai: Adapter = {
             o.mark(mark);
           }
         } catch (error) {
-          if (!abort.signal.aborted) o.failed(error instanceof Error ? error.message : String(error));
+          if (!signal?.aborted) o.failed(error instanceof Error ? error.message : String(error));
         } finally {
           running = false;
         }

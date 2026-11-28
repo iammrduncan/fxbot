@@ -97,11 +97,24 @@ export default async function setup(fx: PluginApi) {
       return new Promise<Said>((resolve) => {
         const chunks: Buffer[] = [];
         let size = 0;
+        let overflow = false;
         const socket = connect(path);
         socket.on("connect", () => socket.end(words.map((word) => `${word}\0`).join("")));
-        socket.on("data", (chunk: Buffer) => ((size += chunk.length) <= most.output ? chunks.push(chunk) : socket.destroy()));
+        socket.on("data", (chunk: Buffer) => {
+          size += chunk.length;
+          if (size > most.output) (overflow = true), socket.destroy();
+          else chunks.push(chunk);
+        });
         socket.on("close", () =>
-          resolve(stop.signal.aborted ? { ok: false, code: "no_answer", message: "herdr didn't answer in time." } : parse(Buffer.concat(chunks).toString("utf8"), false)),
+          resolve(
+            stop.signal.aborted
+              ? { ok: false, code: "no_answer", message: "herdr didn't answer in time." }
+              : overflow
+                ? { ok: false, code: "door", message: "herdr's door sent too much output." }
+                : size === 0
+                  ? { ok: false, code: "no_answer", message: "herdr's door closed without an answer." }
+                  : parse(Buffer.concat(chunks).toString("utf8"), false),
+          ),
         );
         socket.on("error", (error: NodeJS.ErrnoException) =>
           resolve({ ok: false, code: "door", message: error.code === "EACCES" ? `fxbot may not use herdr's door at ${path}.` : `herdr's door at ${path}: ${error.message}` }),
@@ -157,10 +170,9 @@ export default async function setup(fx: PluginApi) {
     if (!asked || asked.length > 64 || control.test(asked))
       throw new Error("Name an agent by its name, its pane id, its pane's label, or its session's name, as herdr_agents lists them.");
     const rows = (await agentsOn(machine)).filter(isAgent);
-    const exact = rows.filter((r) => r.target === asked || r.pane === asked);
     // A tag's name, herdr:patcher, is its name in the list, as tagNameOf gives it.
     const word = asked.replace(/^herdr:/i, "").toLowerCase();
-    const fits = exact.length ? exact : rows.filter((r) => r.session === asked || r.label.toLowerCase() === word || tagNameOf(r).toLowerCase() === word);
+    const fits = rows.filter((r) => r.target === asked || r.pane === asked || r.session === asked || r.label.toLowerCase() === word || tagNameOf(r).toLowerCase() === word);
     if (fits.length > 1)
       throw new Error(`${plural(fits.length, "agent")} on ${where(machine)} fit "${asked}": ${fits.map((r) => `${shown(r)}, as ${r.pane}`).join("; ")}. Ask the owner which one.`);
     if (fits.length) return fits[0];
@@ -294,14 +306,25 @@ export default async function setup(fx: PluginApi) {
   const answerOnly =
     "Tell the owner what it asks. Answer it with herdr_keys only when the owner told you what to answer; otherwise they answer it in herdr, or in its terminal under herdr in fxbot's sidebar.";
   const following = new Set<number>();
+  type Claim = { watch: Watch } | { busy: Watch } | { full: number };
+  async function claim(bot: string, machine: string, agent: string, shown: string | null, text: string, messageId: string): Promise<Claim> {
+    return fx.sql.begin(async (sql) => {
+      await sql`select pg_advisory_xact_lock(hashtext('plugin_herdr:watches'))`;
+      const [{ count }] = await sql<{ count: number }[]>`select count(*)::int from watches where state = 'working'`;
+      if (count >= limit("watches")) return { full: count };
+      const [busy] = await sql<Watch[]>`select * from watches where state = 'working' and machine = ${machine} and agent = ${agent}`;
+      if (busy) return { busy };
+      const asked = asks.get(messageId) ?? null;
+      const [watch] = await sql<Watch[]>`insert into watches (bot, machine, agent, shown, prompt, asked) values (${bot}, ${machine}, ${agent}, ${shown}, ${text}, ${asked}) returning *`;
+      return { watch };
+    });
+  }
   async function prompt(bot: string, machine: string, agent: string, text: string, messageId: string, started = false) {
-    const [{ count }] = await fx.sql<{ count: number }[]>`select count(*)::int from watches where state = 'working'`;
-    if (count >= limit("watches")) return `${plural(count, "agent is", "agents are")} working on your prompts already, the most at once. Wait for an answer first.`;
-    const [busy] = await fx.sql<Watch[]>`select * from watches where state = 'working' and machine = ${machine} and agent = ${agent}`;
-    if (busy) return `${agent} on ${where(machine)} is still on your last prompt. Its answer comes to you by itself.`;
-    const asked = asks.get(messageId) ?? null;
     const shown = await shownAs(machine, agent);
-    const [w] = await fx.sql<Watch[]>`insert into watches (bot, machine, agent, shown, prompt, asked) values (${bot}, ${machine}, ${agent}, ${shown}, ${text}, ${asked}) returning *`;
+    const claimed = await claim(bot, machine, agent, shown, text, messageId);
+    if ("full" in claimed) return `${plural(claimed.full, "agent is", "agents are")} working on your prompts already, the most at once. Wait for an answer first.`;
+    if ("busy" in claimed) return `${agent} on ${where(machine)} is still on your last prompt. Its answer comes to you by itself.`;
+    const w = claimed.watch;
     const first = herdr(on(machine, "agent", "prompt", agent, text, "--wait", "--timeout", String(waitMs)), waitMs + 30_000);
     const early = await Promise.race([first, sleep(6000).then(() => null)]);
     if (early && !early.ok) {
@@ -478,12 +501,10 @@ export default async function setup(fx: PluginApi) {
   }
   // An agent at work after keys is followed as a prompt is, so its answer comes back by itself.
   async function watchAfter(bot: string, machine: string, agent: Agent, did: string, messageId: string) {
-    const [{ count }] = await fx.sql<{ count: number }[]>`select count(*)::int from watches where state = 'working'`;
-    if (count >= limit("watches")) return " Its answer won't come by itself, since the most watches are working: read it later.";
-    const [busy] = await fx.sql<Watch[]>`select * from watches where state = 'working' and machine = ${machine} and agent = ${agent.target}`;
-    if (busy) return " Its answer comes to you by itself, as your last prompt's.";
-    const asked = asks.get(messageId) ?? null;
-    const [w] = await fx.sql<Watch[]>`insert into watches (bot, machine, agent, shown, prompt, asked) values (${bot}, ${machine}, ${agent.target}, ${shown(agent)}, ${did}, ${asked}) returning *`;
+    const claimed = await claim(bot, machine, agent.target, shown(agent), did, messageId);
+    if ("full" in claimed) return " Its answer won't come by itself, since the most watches are working: read it later.";
+    if ("busy" in claimed) return " Its answer comes to you by itself, as your last prompt's.";
+    const w = claimed.watch;
     void follow(w, herdr(on(machine, "agent", "wait", agent.target, "--timeout", String(waitMs)), waitMs + 30_000));
     return ` Its answer comes to you when it's done (w:${w.id}): don't wait or check.`;
   }

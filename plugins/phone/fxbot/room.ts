@@ -4,15 +4,16 @@
 
 /** What chat rooms 0.6.0 offers phone with fx.provide. */
 export type Room = { id: number; name: string; members: string[]; untagged: "lead" | "everyone"; replies: number; call_of?: number | null };
+type RoomMessage = { id: number; author: string; text: string; chain: number | null };
 export type RoomEvent =
   | { type: "reply"; bot: string; text: string }
-  | { type: "message"; message: { id: number; author: string; text: string } }
+  | { type: "message"; message: RoomMessage }
   | { type: "queue"; bots: string[] }
   | { type: "idle" }
   | { type: string };
 export type Rooms = {
   rooms(): Promise<Room[]>;
-  post?(room: number, message: { text: string; label?: string; note?: string; effort?: string }): Promise<unknown>;
+  post?(room: number, message: { text: string; label?: string; note?: string; effort?: string }): Promise<RoomMessage>;
   stop?(room: number): Promise<void>;
   on?(room: number, listener: (event: RoomEvent) => void): () => void;
   /** A session's room, for the call's instructions (phone-v3). A call room's session is its room's, with `call` the

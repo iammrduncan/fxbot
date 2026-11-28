@@ -272,9 +272,9 @@ export default async function setup(fx: PluginApi) {
   fx.route("GET", "/:id/data", async (request, { id }) => {
     const row = await version(id, new URL(request.url).searchParams.get("n") ?? "");
     if (!row) return gone();
-    const [page] = await fx.sql<{ data: unknown; data_at: Date | null; pending: unknown; granted: string | null }[]>`select data, data_at, pending, granted from pages where id = ${id}`;
+    const [page] = await fx.sql<{ data: unknown; data_at: Date | null; granted: string | null; hasPending: boolean; hasData: boolean }[]>`select data, data_at, granted, pending is not null as "hasPending", data is not null as "hasData" from pages where id = ${id}`;
     const allowed = page.granted === hashOf(row.text);
-    return Response.json({ data: allowed ? page.data : null, at: allowed ? page.data_at : null, waiting: !allowed && (page.pending !== null || page.data !== null) });
+    return Response.json({ data: allowed ? page.data : null, at: allowed ? page.data_at : null, waiting: !allowed && (page.hasPending || page.hasData) });
   });
 
   // What the owner approves is this text. New text asks again, and what was waiting arrives with nothing to run again.

@@ -97,6 +97,15 @@ die() {
   echo "fxbot: $*" >&2
   exit 1
 }
+status_root=${FXBOT_ROOT:-}/var/lib/fxbot-status
+publish() {
+  local name=$1 tmp
+  install -d -m 700 "$status_root"
+  tmp=$(mktemp "$status_root/$name.XXXXXXXX")
+  cat >"$tmp"
+  chmod 644 "$tmp"
+  mv -T "$tmp" "$control/$name"
+}
 
 # An update's steps, for Settings, in status.json. It's renamed into place, so the app never reads half of one.
 to=""
@@ -112,8 +121,7 @@ status() {
   local list=() step
   for step in "${steps[@]}"; do list+=("$(quote "$step")"); done
   local IFS=,
-  printf '{"to":%s,"state":%s,"steps":[%s]%s}\n' "$(quote "$to")" "$(quote "$1")" "${list[*]}" "${2:+,\"error\":$(quote "$2")}" >"$control/.status.json"
-  mv "$control/.status.json" "$control/status.json"
+  printf '{"to":%s,"state":%s,"steps":[%s]%s}\n' "$(quote "$to")" "$(quote "$1")" "${list[*]}" "${2:+,\"error\":$(quote "$2")}" | publish status.json
 }
 step() {
   steps+=("$1")
@@ -165,9 +173,12 @@ backup() {
   [[ $folder == /* ]] || folder=$from_here/$folder
   [ ! -e "$folder/database.dump" ] || die "$folder has a backup in it already"
   [ -z "$(compose ps -q --status running fxbot 2>/dev/null)" ] || running=1
-  compose stop fxbot >/dev/null 2>&1 || true
-  checked compose up -d --wait db >/dev/null 2>&1 || die "the database didn't start. See: fxbot logs db"
   install -d -m 700 "$folder"
+  compose stop fxbot >/dev/null 2>&1 || true
+  if ! checked compose up -d --wait db >/dev/null 2>&1; then
+    [ -z "$running" ] || [ -n "$stay" ] || checked compose up -d --wait fxbot >/dev/null 2>&1 || true
+    die "the database didn't start. See: fxbot logs db"
+  fi
   if ! compose exec -T db pg_dump -U fxbot -Fc fxbot </dev/null >"$folder/database.dump" || ! tar -czf "$folder/data.tar.gz" -C "$var/data" .; then
     rm -f "$folder/database.dump" "$folder/data.tar.gz"
     [ -z "$running" ] || [ -n "$stay" ] || checked compose up -d --wait fxbot >/dev/null 2>&1 || true
@@ -224,7 +235,7 @@ update() {
     curl -fsSL "$files/v$to/deploy/compose.gpu.${FXBOT_ENGINE:-podman}.yaml" -o "$next/compose.gpu.yaml" ||
     fail "Couldn't download $to's files from $files."
   if [ "${FXBOT_ENGINE:-podman}" = docker ]; then
-    curl -fsSL "$files/v$to/deploy/compose.docker.yaml" -o compose.docker.yaml || fail "Couldn't download $to's files from $files."
+    curl -fsSL "$files/v$to/deploy/compose.docker.yaml" -o "$next/compose.docker.yaml" || fail "Couldn't download $to's files from $files."
   fi
   # herdr's door, when it's here, comes with each release.
   if [ -f herdr-door ]; then
@@ -239,15 +250,17 @@ update() {
   cp -p .env .env.back && cp -p compose.yaml compose.yaml.back && cp -p fxbot fxbot.back
   [ ! -f herdr-door ] || cp -p herdr-door herdr-door.back
   cp -p "compose.gpu.${FXBOT_ENGINE:-podman}.yaml" compose.gpu.back 2>/dev/null || true
+  [ "${FXBOT_ENGINE:-podman}" != docker ] || [ ! -f compose.docker.yaml ] || cp -p compose.docker.yaml compose.docker.back
   sed -i "s/^FXBOT_VERSION=.*/FXBOT_VERSION=$to/" .env
   chmod 755 "$next/fxbot"
   # Renamed into place: this run keeps reading its own copy of the script.
   [ ! -f "$next/herdr-door" ] || { chmod 755 "$next/herdr-door" && mv "$next/herdr-door" herdr-door; }
+  [ "${FXBOT_ENGINE:-podman}" != docker ] || mv "$next/compose.docker.yaml" compose.docker.yaml
   mv "$next/compose.yaml" compose.yaml && mv "$next/compose.gpu.yaml" "compose.gpu.${FXBOT_ENGINE:-podman}.yaml" && mv "$next/fxbot" fxbot && rm -rf "$next"
   touch .update-started
   step "Starting $to"
   if FXBOT_VERSION=$to start >/dev/null 2>&1; then
-    rm -f .env.back compose.yaml.back fxbot.back compose.gpu.back herdr-door.back
+    rm -f .env.back compose.yaml.back fxbot.back compose.gpu.back compose.docker.back herdr-door.back
     # The old release's images, by name, now that nothing goes back to them.
     comm -23 <(printf '%s\n' "$old") <(FXBOT_VERSION=$to compose config --images 2>/dev/null | sort -u) |
       while read -r image; do [ -z "$image" ] || "${FXBOT_ENGINE:-podman}" rmi "$image" >/dev/null 2>&1 || true; done
@@ -259,14 +272,18 @@ update() {
   why=$(compose logs --no-color --tail 12 fxbot 2>&1 | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | tail -n 12)
   step "Going back to $from"
   compose stop fxbot >/dev/null 2>&1 || true
-  if [ "$(migrations)" != "$before" ]; then
-    backup=$(find "$var/backups" -mindepth 1 -maxdepth 1 -type d -newer .update-started | sort | tail -n 1)
-    [ -n "$backup" ] || fail "$to changed the database and didn't start, and there is no backup from before it. fxbot is stopped. See: fxbot logs fxbot"
+  backup=$(find "$var/backups" -mindepth 1 -maxdepth 1 -type d -newer .update-started | sort | tail -n 1)
+  if [ -n "$backup" ]; then
     restore "$backup" || fail "$to didn't start, and $backup didn't restore. fxbot is stopped. See: fxbot logs"
+  elif [ "$(migrations)" != "$before" ]; then
+    fail "$to changed the database and didn't start, and there is no backup from before it. fxbot is stopped. See: fxbot logs fxbot"
   fi
   mv .env.back .env && mv compose.yaml.back compose.yaml && mv fxbot.back fxbot
   [ ! -f compose.gpu.back ] || mv compose.gpu.back "compose.gpu.${FXBOT_ENGINE:-podman}.yaml"
   [ ! -f herdr-door.back ] || mv herdr-door.back herdr-door
+  if [ "${FXBOT_ENGINE:-podman}" = docker ]; then
+    if [ -f compose.docker.back ]; then mv compose.docker.back compose.docker.yaml; else rm -f compose.docker.yaml; fi
+  fi
   FXBOT_VERSION=$from start >/dev/null 2>&1 ||
     fail "$to didn't start, and neither did $from after going back. See: fxbot logs"
   status back "$to didn't start, so fxbot went back to $from.${why:+$'\n\n'$why}"
@@ -276,8 +293,7 @@ update() {
 # What the machine runs as its local embedder, in embedder-status.json for Settings: the state, the embedder now, and
 # the one asked for and why it failed, when there's one.
 embedder_status() {
-  printf '{"state":%s,"embedder":%s%s%s}\n' "$(quote "$1")" "$(quote "$2")" "${3:+,\"to\":$(quote "$3")}" "${4:+,\"error\":$(quote "$4")}" >"$control/.embedder-status.json"
-  mv "$control/.embedder-status.json" "$control/embedder-status.json"
+  printf '{"state":%s,"embedder":%s%s%s}\n' "$(quote "$1")" "$(quote "$2")" "${3:+,\"to\":$(quote "$3")}" "${4:+,\"error\":$(quote "$4")}" | publish embedder-status.json
 }
 cuda=ghcr.io/ggml-org/llama.cpp:server-cuda-b12033
 gpu_works() {
@@ -349,8 +365,7 @@ apply() {
 
 # What the computer's setup did, in computer-status.json for its plugin: the state, and why it failed.
 computer_status() {
-  printf '{"state":%s%s}\n' "$(quote "$1")" "${2:+,\"error\":$(quote "$2")}" >"$control/.computer-status.json"
-  mv "$control/.computer-status.json" "$control/computer-status.json"
+  printf '{"state":%s%s}\n' "$(quote "$1")" "${2:+,\"error\":$(quote "$2")}" | publish computer-status.json
 }
 
 # The computer plugin's engine, set up or taken away by the plugin's own setup script, from this release's files: never
@@ -421,6 +436,7 @@ herdr_door() {
     chmod 755 herdr-door.next && mv herdr-door.next herdr-door
   fi
   group=$(getent group "${FXBOT_GID:?}" | cut -d: -f1 || true)
+  systemctl stop fxbot-herdr.socket 'fxbot-herdr@*.service' >/dev/null 2>&1 || true
   printf '%s\n' "[Unit]" "Description=fxbot's door to herdr" "" "[Socket]" "ListenStream=$control/herdr.sock" "Accept=yes" \
     "SocketUser=root" "SocketGroup=${group:-$FXBOT_GID}" "SocketMode=0660" "MaxConnections=64" "" "[Install]" "WantedBy=sockets.target" >"$unit.socket"
   printf '%s\n' "[Unit]" "Description=fxbot's door to herdr" "" "[Service]" "User=$user" "Environment=HERDR_BIN=$bin" \
@@ -492,7 +508,8 @@ uninstall() {
   [ ! -f /etc/systemd/system/fxbot-herdr.socket ] || herdr_door off >/dev/null
   systemctl disable --now fxbot >/dev/null 2>&1 || true
   images=$(compose config --images 2>/dev/null || true)
-  compose down --volumes --rmi all --remove-orphans >/dev/null 2>&1 || echo "Compose couldn't take everything down: see fxbot compose ps -a"
+  compose down --rmi all --remove-orphans >/dev/null 2>&1 || echo "Compose couldn't take everything down: see fxbot compose ps -a"
+  for arg in "${COMPOSE_PROJECT_NAME:-fxbot}_pgdata" "${COMPOSE_PROJECT_NAME:-fxbot}_models"; do "$engine" volume rm "$arg" >/dev/null 2>&1 || true; done
   # fxbot's own images at every version, and the GPU trial's, by name; never a prune.
   images+=$'\n'$("$engine" images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${FXBOT_IMAGE:-ghcr.io/iammrduncan/fxbot}:" || true)$'\n'$cuda
   for arg in $(printf '%s\n' "$images" | sort -u); do "$engine" rmi "$arg" >/dev/null 2>&1 || true; done

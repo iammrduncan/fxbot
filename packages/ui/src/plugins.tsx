@@ -235,7 +235,7 @@ async function loadOnce() {
     list.map(async ({ name, iconKey, version, page, css }): Promise<Loaded> => {
       const now = loaded.find((p) => p.name === name);
       const key = `${page ?? ""} ${css ?? ""}`;
-      if (now && now.key === key) return { ...now, iconKey };
+      if (now && now.key === key && !now.pageError) return { ...now, iconKey };
       now?.css?.remove();
       let link: HTMLLinkElement | undefined;
       if (css) {

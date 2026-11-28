@@ -4,7 +4,7 @@
 //
 //   wss://<shell>/signal/listen/<rid>?l=&i=&t=&s=   an fxbot, proving its keys
 //   wss://<shell>/signal/call/<rid>                 a device calling it
-//   wss://<shell>/signal/plate                      an fxbot claiming a nameplate for a typed code
+//   wss://<shell>/signal/plate/<rid>?l=&i=&t=&s=     an fxbot claiming a nameplate for a typed code
 //   wss://<shell>/signal/call/plate/<n>             a device typing that code
 //
 // Each fxbot has a Durable Object of its own, holding its socket under the WebSocket Hibernation API, so it sleeps
@@ -63,7 +63,11 @@ export default {
         return env.RELAY.get(env.RELAY.idFromName(a)).fetch(request);
       }
       if (kind === "call" && base32.test(a ?? "")) return env.RELAY.get(env.RELAY.idFromName(a)).fetch(request);
-      if (kind === "plate" || (kind === "call" && a === "plate" && /^\d{1,3}$/.test(b ?? ""))) return env.PLATES.get(env.PLATES.idFromName("plates")).fetch(request);
+      if (kind === "plate" && base32.test(a ?? "")) {
+        if (!(await provesKeys(a, url.searchParams))) return new Response("That listener doesn't hold this address's keys.", { status: 403 });
+        return env.PLATES.get(env.PLATES.idFromName("plates")).fetch(request);
+      }
+      if (kind === "call" && a === "plate" && /^\d{1,3}$/.test(b ?? "")) return env.PLATES.get(env.PLATES.idFromName("plates")).fetch(request);
       return new Response("Not a relay route.", { status: 404 });
     }
     // The shell's files, on its host; a frame's few, on any other. A frame's origin is `<frame>.<base>`.
@@ -207,11 +211,16 @@ export class Plates {
       if (now - since > PLATE_LIFE_MS) ws.close(4001, "This code expired.");
     }
     if (parts[2] === "plate") {
-      const taken = new Set(this.state.getWebSockets("plate").flatMap((ws) => this.state.getTags(ws).filter((t) => t.startsWith("plate:")).map((t) => Number(t.slice(6)))));
+      const plates = this.state.getWebSockets("plate");
+      const rid = parts[3];
+      const source = request.headers.get("cf-connecting-ip") ?? "local";
+      if (plates.filter((ws) => this.state.getTags(ws).includes(`rid:${rid}`)).length >= 3) return new Response("This fxbot has three codes open already.", { status: 429 });
+      if (plates.filter((ws) => this.state.getTags(ws).includes(`source:${source}`)).length >= 3) return new Response("This network has three codes open already.", { status: 429 });
+      const taken = new Set(plates.flatMap((ws) => this.state.getTags(ws).filter((t) => t.startsWith("plate:")).map((t) => Number(t.slice(6)))));
       const free = Array.from({ length: 999 }, (_, i) => i + 1).filter((n) => !taken.has(n));
       if (!free.length) return new Response("Every code is in use. Try again in a few minutes.", { status: 503 });
       const n = free[crypto.getRandomValues(new Uint32Array(1))[0] % free.length];
-      this.state.acceptWebSocket(server, ["plate", `plate:${n}`, `since:${now}`]);
+      this.state.acceptWebSocket(server, ["plate", `plate:${n}`, `rid:${rid}`, `source:${source}`, `since:${now}`]);
       server.send(JSON.stringify({ plate: n }));
     } else {
       const n = parts[4];

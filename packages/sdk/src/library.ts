@@ -117,20 +117,28 @@ export function createLibrary(sql: Sql) {
   // bot holds too, since one item serves every bot that saved the same text.
   async function replace({ profileId, sessionId, id, name, type, bytes }: Omit<NewItem, "origin"> & { id: string }) {
     const { kind, type: kept, text } = await check({ name, type, bytes });
-    const [row] = isId(id) ? await sql<{ kind: string; origin: string; name: string; type: string; sha256: string; shared: boolean }[]>`
-      select kind, origin, name, type, sha256, exists (select 1 from library_tags t where t.item_id = l.id and t.profile_id <> ${profileId}) as shared
-      from library l where id = ${id} and exists (select 1 from library_tags t where t.item_id = l.id and t.profile_id = ${profileId})` : [];
-    if (!row) return fail(404, `This bot's library has no item library:${id}.`);
-    if (kind !== "document" || row.kind !== "document" || row.origin !== "generated") fail(400, `library:${id} isn't a document a bot made`);
-    if (row.shared) fail(400, `library:${id} is in another bot's library too, so it can't change in place`);
     const sha256 = createHash("sha256").update(bytes).digest("hex");
-    if (row.sha256 === sha256 && row.name === name.trim() && row.type === kept) return get(id);
-    const [other] = await sql<{ id: string }[]>`select id from library where sha256 = ${sha256} and id <> ${id}`;
-    if (other) fail(400, `the library already has this text as library:${other.id}`);
     try {
-      await sql`with item as (update library set sha256 = ${sha256}, name = ${name.trim()}, type = ${kept}, size = ${bytes.length}, data = ${bytes}, text = ${text} where id = ${id} returning id)
-        insert into library_tags (item_id, profile_id, session_id) select id, ${profileId}, ${sessionId} from item
-        on conflict (item_id, profile_id, session_id) do update set created_at = now()`;
+      await sql.begin(async (tx) => {
+        const t = tx as unknown as Sql;
+        const [locked] = isId(id) ? await t`select id from library where id = ${id} for update` : [];
+        if (!locked) fail(404, `This bot's library has no item library:${id}.`);
+        const [row] = await t<{ kind: string; origin: string; name: string; type: string; sha256: string; shared: boolean }[]>`
+          select kind, origin, name, type, sha256, exists (select 1 from library_tags t where t.item_id = l.id and t.profile_id <> ${profileId}) as shared
+          from library l where id = ${id} and exists (select 1 from library_tags t where t.item_id = l.id and t.profile_id = ${profileId})`;
+        if (!row) fail(404, `This bot's library has no item library:${id}.`);
+        if (kind !== "document" || row.kind !== "document" || row.origin !== "generated") fail(400, `library:${id} isn't a document a bot made`);
+        if (row.shared) fail(400, `library:${id} is in another bot's library too, so it can't change in place`);
+        if (row.sha256 === sha256 && row.name === name.trim() && row.type === kept) return;
+        const [other] = await t<{ id: string }[]>`select id from library where sha256 = ${sha256} and id <> ${id}`;
+        if (other) fail(400, `the library already has this text as library:${other.id}`);
+        const changed = await t`with item as (update library l set sha256 = ${sha256}, name = ${name.trim()}, type = ${kept}, size = ${bytes.length}, data = ${bytes}, text = ${text}
+            where id = ${id} and exists (select 1 from library_tags t where t.item_id = l.id and t.profile_id = ${profileId})
+              and not exists (select 1 from library_tags t where t.item_id = l.id and t.profile_id <> ${profileId}) returning id)
+          insert into library_tags (item_id, profile_id, session_id) select id, ${profileId}, ${sessionId} from item
+          on conflict (item_id, profile_id, session_id) do update set created_at = now() returning item_id`;
+        if (!changed.length) fail(400, `library:${id} is in another bot's library too, so it can't change in place`);
+      });
     } catch (error) {
       // The same text saved meanwhile, between the check above and this.
       if ((error as { code?: string }).code === "23505") fail(400, "the library already has this text");

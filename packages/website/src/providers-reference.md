@@ -1,4 +1,5 @@
 ---
+editUrl: false
 title: "Providers"
 description: "Every provider on Add provider, in Settings › Providers: how each connects, its address, where its models come from, and where its key is checked. Each bot runs on one provider."
 ---

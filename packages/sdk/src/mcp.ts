@@ -18,10 +18,12 @@ import {
 } from "@modelcontextprotocol/client";
 import type { FxAgentHostTool } from "libfx";
 import { createMcpAdapter } from "libfx/mcp";
+import { Agent } from "undici";
 import { createHash, randomBytes } from "node:crypto";
 import { infoOf, type Entry } from "./registry.ts";
+import { lookup as lookupCallback } from "node:dns";
 import { lookup } from "node:dns/promises";
-import { BlockList, isIP } from "node:net";
+import { BlockList, isIP, type LookupFunction } from "node:net";
 import { createSecrets } from "./secrets.ts";
 import { newId, type PluginRecord, type Store } from "./store.ts";
 import type { RegistryFrom, McpPreview, PluginRef, PluginSecrets, McpPlugin as Plugin, OAuthAttempt, OAuthStatus, RepoRef, SkillRef, Transport } from "./types.ts";
@@ -86,6 +88,17 @@ const isLocal = (address: string) => {
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address)?.[1];
   return mapped ? local.check(mapped, "ipv4") : local.check(address, isIP(address) === 6 ? "ipv6" : "ipv4");
 };
+function connectorLookup(allowLocal: boolean): LookupFunction {
+  return (hostname, options, callback) => {
+    lookupCallback(hostname, { ...options, all: true }, (error, addresses) => {
+      if (error) return callback(error, []);
+      if (!allowLocal && addresses.some((a) => isLocal(a.address)))
+        return callback(Object.assign(new Error(`${hostname} is a local address. Allow local addresses for this server to use it.`), { status: 400 }), []);
+      if (options.all) return callback(null, addresses);
+      callback(null, addresses[0].address, addresses[0].family);
+    });
+  };
+}
 
 // HTTPS only, and no local address unless allowed, checked again on the addresses the name resolves to. A local
 // address the person allowed may use plain HTTP.
@@ -106,19 +119,25 @@ async function checkUrl(value: string | URL, allowLocal: boolean) {
   return url;
 }
 
-// fetch that checks every address it reaches, redirects included.
-function guarded(base: typeof fetch, allowLocal: boolean): FetchLike {
-  return async (input, init) => {
+// Every redirect resolves through a connector that checks and pins its answers; TLS still uses the original hostname.
+type Guarded = FetchLike & { close: () => Promise<void> };
+function guarded(base: typeof fetch, allowLocal: boolean, credentialsOrigin?: string): Guarded {
+  const dispatcher = new Agent({ connect: { lookup: connectorLookup(allowLocal) } });
+  const fetchFn: FetchLike = async (input, init) => {
     let [url, request] = [String(input), init];
+    const credentialed = credentialsOrigin !== undefined && new URL(url).origin === credentialsOrigin;
     for (let hops = 0; ; hops++) {
       await checkUrl(url, allowLocal);
-      const res = await base(url, { ...request, redirect: "manual" });
+      const res = await base(url, { ...request, redirect: "manual", dispatcher } as RequestInit);
       const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
       if (!location || hops === 5) return res;
-      url = new URL(location, url).href;
+      const next = new URL(location, url);
+      if (credentialed && next.origin !== credentialsOrigin) fail(502, "The MCP server redirected credentials to another origin.");
+      url = next.href;
       if (res.status !== 307 && res.status !== 308) request = { ...request, method: "GET", body: undefined };
     }
   };
+  return Object.assign(fetchFn, { close: () => dispatcher.close() });
 }
 
 function transportFor(url: string, transport: Transport, fetch: FetchLike) {
@@ -160,6 +179,7 @@ const headerName = (name: unknown) => (typeof name === "string" && /^[A-Za-z0-9!
 export async function createMcp({ store, secretKey, fetch, localUrl, clientMetadataUrl, findEntry, onChange, reserved = () => [] }: McpOptions) {
   const secrets = createSecrets(store.sql, secretKey, "plugin_secrets");
   const records = new Map((await store.plugins.list()).filter((r) => r.kind === "mcp").map((r) => [r.id, r as McpRecord] as [string, McpRecord]));
+  const pendingPrefixes = new Set<string>();
   const on = new Map<string, Set<string>>();
   for (const { profileId, pluginId } of await store.plugins.on()) on.set(pluginId, (on.get(pluginId) ?? new Set()).add(profileId));
   // The tools bots get: the ones the person picked, or else the read-only ones.
@@ -198,6 +218,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       const secret = await read(id);
       if (secret.tokens && secret.tokens.access_token !== stale) return secret.tokens.access_token;
       const { tokens, session } = secret;
+      const fetchFn = guarded(fetch, get(id).config.allowLocal);
       try {
         if (!tokens?.refresh_token || !session) throw new Error("its token cannot be renewed");
         const fresh = await refreshAuthorization(session.authorizationServerUrl, {
@@ -205,7 +226,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
           clientInformation: session.client,
           refreshToken: tokens.refresh_token,
           resource: session.resource ? new URL(session.resource) : undefined,
-          fetchFn: guarded(fetch, get(id).config.allowLocal),
+          fetchFn,
         });
         await secrets.put(id, { ...secret, tokens: stamp(fresh, tokens.refresh_token) });
         return fresh.access_token;
@@ -214,16 +235,18 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
         if (tokens?.refresh_token && session && !refused) return fail(502, `Cannot renew the token: ${(error as Error).message}`);
         await secrets.put(id, { ...secret, tokens: undefined });
         return fail(401, `Sign in again: ${(error as Error).message}`);
+      } finally {
+        await fetchFn.close().catch(() => {});
       }
     });
   }
 
   // Requests to a plugin's own server carry its header values and its token. Nothing goes to another origin.
-  function authed(record: McpRecord): FetchLike {
+  function authed(record: McpRecord): Guarded {
     const { id, config } = record;
-    const plain = guarded(fetch, config.allowLocal);
     const origin = new URL(config.url).origin;
-    return async (url, init) => {
+    const plain = guarded(fetch, config.allowLocal, origin);
+    const fetchFn: FetchLike = async (url, init) => {
       if (new URL(url).origin !== origin) return plain(url, init);
       const send = async (token?: string) => {
         const headers = new Headers(init?.headers);
@@ -238,6 +261,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       await res.body?.cancel();
       return send(await renew(id, token));
     };
+    return Object.assign(fetchFn, { close: plain.close });
   }
 
   // What a plugin still needs from the person before it can connect.
@@ -250,7 +274,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
 
   // One client per enabled server. A dropped one retries after 1, 2, 4… up to 60 seconds, unless it needs a sign-in
   // or header values first.
-  const live = new Map<string, { client?: Client; error?: string; timer?: NodeJS.Timeout; delay: number }>();
+  const live = new Map<string, { client?: Client; guard?: Guarded; error?: string; timer?: NodeJS.Timeout; delay: number }>();
   let closed = false;
   const entryOf = (id: string) => live.get(id) ?? live.set(id, { delay: 1000 }).get(id)!;
   async function disconnect(id: string) {
@@ -258,7 +282,10 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     clearTimeout(entry.timer);
     const client = entry.client;
     entry.client = undefined;
+    const guard = entry.guard;
+    entry.guard = undefined;
     await client?.close().catch(() => {});
+    await guard?.close().catch(() => {});
   }
   async function start(record: McpRecord) {
     await disconnect(record.id);
@@ -272,11 +299,14 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     if (!record?.enabled) return;
     const entry = entryOf(id);
     const client = newClient();
+    const guard = authed(record);
+    let installed = false;
     try {
-      await client.connect(transportFor(record.config.url, record.config.transport, authed(record)));
+      await client.connect(transportFor(record.config.url, record.config.transport, guard));
       const tools = await listTools(client);
       if (closed || records.get(id)?.enabled !== true || entry.client) return void (await client.close());
-      Object.assign(entry, { client, error: undefined, delay: 1000 });
+      Object.assign(entry, { client, guard, error: undefined, delay: 1000 });
+      installed = true;
       client.onclose = () => void (entry.client === client && drop(id, "The connection closed."));
       const changed = JSON.stringify(tools) !== JSON.stringify(records.get(id)!.config.tools);
       await save(id, { status: "Connected", ...(changed ? { config: { ...records.get(id)!.config, tools } } : {}) });
@@ -284,6 +314,8 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     } catch (error) {
       await client.close().catch(() => {});
       await drop(id, (error as Error).message);
+    } finally {
+      if (!installed) await guard.close().catch(() => {});
     }
   }
   async function drop(id: string, reason: string) {
@@ -292,7 +324,10 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     const entry = entryOf(id);
     const client = entry.client;
     entry.client = undefined;
+    const guard = entry.guard;
+    entry.guard = undefined;
     void client?.close().catch(() => {});
+    void guard?.close().catch(() => {});
     const waiting = await waitsFor(record);
     entry.error = waiting ?? reason;
     await save(id, { status: waiting ?? `Unreachable: ${reason}` });
@@ -436,6 +471,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       return { name, auth: (found?.authorizationServerMetadata && !headers.length ? "oauth" : "headers") as Plugin["auth"], tools: null };
     } finally {
       await client.close().catch(() => {});
+      await plain.close().catch(() => {});
     }
   }
 
@@ -456,7 +492,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
   }
 
   function prefixFor(name: string) {
-    const taken = new Set([...records.values()].map((r) => r.config.prefix).concat("chat", "library", ...reserved()));
+    const taken = new Set([...records.values()].map((r) => r.config.prefix).concat("chat", "library", ...reserved(), ...pendingPrefixes));
     const base = slug(name);
     let prefix = base;
     for (let n = 2; taken.has(prefix); n++) prefix = `${base}_${n}`;
@@ -516,39 +552,43 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     const callback = typeof origin === "string" && URL.canParse(origin) && new URL(origin).origin === origin && origin.startsWith("https://") ? `${origin}/api/oauth/callback` : undefined;
     if (record.config.auth !== "oauth") fail(400, `${record.name} does not sign in with OAuth.`);
     const fetchFn = guarded(fetch, record.config.allowLocal);
-    const info = await discoverOAuthServerInfo(record.config.url, { fetchFn }).catch((error: Error) => fail(502, `Cannot read how ${record.name} signs in: ${error.message}`));
-    const metadata = info.authorizationServerMetadata ?? fail(502, `${record.name} names no authorization server.`);
-    if (!metadata.code_challenge_methods_supported?.includes("S256")) fail(502, `${record.name}'s sign-in does not offer PKCE with S256, which MCP requires.`);
-    const { own } = await read(id);
-    const loopback = `${localUrl}/callback`;
-    const choice: Pick<Attempt, "redirectUrl" | "clientMetadataUrl" | "applicationType"> = own
-      ? { redirectUrl: callback || loopback }
-      : callback && metadata.registration_endpoint
-        ? { redirectUrl: callback, applicationType: "web" }
-        : clientMetadataUrl && metadata.client_id_metadata_document_supported
-          ? { redirectUrl: loopback, clientMetadataUrl }
-          : metadata.registration_endpoint
-            ? { redirectUrl: loopback, applicationType: "native" }
-            : fail(400, `${record.name} registers no apps itself. Register an OAuth app with it, with ${callback || loopback} as its redirect URI, and enter its client id.`);
-    for (const [key, other] of attempts) {
-      if (other.pluginId === id && other.status.status === "waiting") other.status = { status: "failed", error: "A newer sign-in replaced this one." };
-      if (other.expiresAt < Date.now() - 60 * 60 * 1000) attempts.delete(key);
+    try {
+      const info = await discoverOAuthServerInfo(record.config.url, { fetchFn }).catch((error: Error) => fail(502, `Cannot read how ${record.name} signs in: ${error.message}`));
+      const metadata = info.authorizationServerMetadata ?? fail(502, `${record.name} names no authorization server.`);
+      if (!metadata.code_challenge_methods_supported?.includes("S256")) fail(502, `${record.name}'s sign-in does not offer PKCE with S256, which MCP requires.`);
+      const { own } = await read(id);
+      const loopback = `${localUrl}/callback`;
+      const choice: Pick<Attempt, "redirectUrl" | "clientMetadataUrl" | "applicationType"> = own
+        ? { redirectUrl: callback || loopback }
+        : callback && metadata.registration_endpoint
+          ? { redirectUrl: callback, applicationType: "web" }
+          : clientMetadataUrl && metadata.client_id_metadata_document_supported
+            ? { redirectUrl: loopback, clientMetadataUrl }
+            : metadata.registration_endpoint
+              ? { redirectUrl: loopback, applicationType: "native" }
+              : fail(400, `${record.name} registers no apps itself. Register an OAuth app with it, with ${callback || loopback} as its redirect URI, and enter its client id.`);
+      for (const [key, other] of attempts) {
+        if (other.pluginId === id && other.status.status === "waiting") other.status = { status: "failed", error: "A newer sign-in replaced this one." };
+        if (other.expiresAt < Date.now() - 60 * 60 * 1000) attempts.delete(key);
+      }
+      const attempt: Attempt = {
+        id: newId(),
+        url: "",
+        mode: choice.redirectUrl === callback ? "redirect" : "paste",
+        expiresAt: Date.now() + 10 * 60 * 1000,
+        pluginId: id,
+        state: randomBytes(24).toString("base64url"),
+        ...choice,
+        discovery: { authorizationServerUrl: info.authorizationServerUrl, resourceMetadata: info.resourceMetadata, authorizationServerMetadata: metadata },
+        status: { status: "waiting" },
+        used: false,
+      };
+      await auth(provider(attempt, own), { serverUrl: record.config.url, fetchFn }).catch((error: Error) => fail(502, `Cannot start signing in to ${record.name}: ${error.message}`));
+      attempts.set(attempt.id, attempt);
+      return { id: attempt.id, url: attempt.url, mode: attempt.mode, expiresAt: attempt.expiresAt };
+    } finally {
+      await fetchFn.close().catch(() => {});
     }
-    const attempt: Attempt = {
-      id: newId(),
-      url: "",
-      mode: choice.redirectUrl === callback ? "redirect" : "paste",
-      expiresAt: Date.now() + 10 * 60 * 1000,
-      pluginId: id,
-      state: randomBytes(24).toString("base64url"),
-      ...choice,
-      discovery: { authorizationServerUrl: info.authorizationServerUrl, resourceMetadata: info.resourceMetadata, authorizationServerMetadata: metadata },
-      status: { status: "waiting" },
-      used: false,
-    };
-    await auth(provider(attempt, own), { serverUrl: record.config.url, fetchFn }).catch((error: Error) => fail(502, `Cannot start signing in to ${record.name}: ${error.message}`));
-    attempts.set(attempt.id, attempt);
-    return { id: attempt.id, url: attempt.url, mode: attempt.mode, expiresAt: attempt.expiresAt };
   }
 
   // The redirect back carries `state`, which must name a waiting, unexpired attempt; the SDK then checks `iss` and
@@ -570,7 +610,12 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       if (query.get("error")) throw new Error(query.get("error_description") || query.get("error")!);
       const code = query.get("code") || fail(400, "The address has no code.");
       const { own } = await read(attempt.pluginId);
-      await auth(provider(attempt, own), { serverUrl: record.config.url, authorizationCode: code, iss: query.get("iss") ?? undefined, fetchFn: guarded(fetch, record.config.allowLocal) });
+      const fetchFn = guarded(fetch, record.config.allowLocal);
+      try {
+        await auth(provider(attempt, own), { serverUrl: record.config.url, authorizationCode: code, iss: query.get("iss") ?? undefined, fetchFn });
+      } finally {
+        await fetchFn.close().catch(() => {});
+      }
       attempt.status = { status: "done" };
       await start(records.get(attempt.pluginId)!);
     } catch (error) {
@@ -593,20 +638,26 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       const { page, definition, found } = await preview(ref);
       if (page.local) fail(400, `${page.name} runs on this machine, which comes with plugins.`);
       if (hash !== page.hash) fail(409, "This server changed since its page was shown. Look at it again before adding it.");
+      const prefix = prefixFor(page.name);
+      pendingPrefixes.add(prefix);
       const record: McpRecord = {
         id: newId(),
         kind: "mcp",
         name: page.name,
         source: definition.source,
-        config: { url: page.url, transport: page.transport, headers: page.headers.map((h) => h.name), auth: found.auth, allowLocal: page.allowLocal, prefix: prefixFor(page.name), tools: found.tools ?? [] },
+        config: { url: page.url, transport: page.transport, headers: page.headers.map((h) => h.name), auth: found.auth, allowLocal: page.allowLocal, prefix, tools: found.tools ?? [] },
         approvedHash: page.hash,
         enabled: true,
         bots: "all",
         allowed: null,
         status: null,
       };
-      await store.plugins.create(record);
-      records.set(record.id, record);
+      try {
+        await store.plugins.create(record);
+        records.set(record.id, record);
+      } finally {
+        pendingPrefixes.delete(prefix);
+      }
       await start(record);
       if (record.config.tools.length) onChange();
       return view(records.get(record.id)!);

@@ -22,6 +22,12 @@ function keyHeader(key: string): [string, string] {
   const named = /^([A-Za-z][A-Za-z0-9-]*):\s+(\S.*)$/.exec(key.trim());
   return named ? [named[1], named[2]] : ["Authorization", bearer(key)];
 }
+function checkedHeaders(headers: Record<string, string>) {
+  for (const [name, value] of Object.entries(headers)) {
+    if (value.length > 8192) throw new Error(`${name} needs a value of one line, up to 8 KiB.`);
+  }
+  return headers;
+}
 const compact = (n: number) => new Intl.NumberFormat("en", { notation: "compact" }).format(n);
 // Where an entry comes from: fxbot's own list stands out, and a registry is named.
 const fromLabel: Record<RegistryFrom, string> = { fxbot: "fxbot", github: "GitHub registry", official: "Official registry" };
@@ -191,7 +197,7 @@ export function InstalledServer({ addon, onSettings, onClose }: { addon: McpPlug
 
 // A registry entry's page, and the consent to add it. It looks at the server first; nothing is saved before Add, and
 // an entry that changed since is shown again.
-export function EntryDialog({ card, onAdded, onClose }: { card: McpCard; onAdded: (addon: Plugin) => void; onClose: () => void }) {
+export function EntryDialog({ card, onAdded, onClose }: { card: McpCard; onAdded: (addon: Plugin, error?: string) => void; onClose: () => void }) {
   const [allowLocal, setAllowLocal] = useState(false);
   const [page, setPage] = useState<McpPreview | null>(null);
   const [error, setError] = useState("");
@@ -206,10 +212,14 @@ export function EntryDialog({ card, onAdded, onClose }: { card: McpCard; onAdded
     setBusy(true);
     setError("");
     try {
-      let addon = await client.plugins.add(ref, page!.hash);
-      const filled = Object.entries(values).filter(([, value]) => value.trim());
-      if (filled.length) addon = await client.plugins.setSecrets(addon.id, { headers: Object.fromEntries(filled.map(([name, value]) => [name, name === "Authorization" ? bearer(value) : value.trim()])) });
-      onAdded(addon);
+      const headers = checkedHeaders(Object.fromEntries(Object.entries(values).filter(([, value]) => value.trim()).map(([name, value]) => [name, name === "Authorization" ? bearer(value) : value.trim()])));
+      const addon = await client.plugins.add(ref, page!.hash);
+      try {
+        onAdded(Object.keys(headers).length ? await client.plugins.setSecrets(addon.id, { headers }) : addon);
+      } catch (e) {
+        onAdded(addon, (e as Error).message);
+        throw e;
+      }
     } catch (e) {
       setError((e as Error).message);
       // The entry changed since its page was shown: show the page again.
@@ -297,7 +307,7 @@ export function EntryDialog({ card, onAdded, onClose }: { card: McpCard; onAdded
 // For a server no registry lists: the address, then what is there, its name and how it signs in. A server that takes
 // a key gets one field, and one that signs in with OAuth can take a key instead. A key names a header, which the add
 // approves.
-export function AddressDialog({ onAdded, onClose }: { onAdded: (addon: Plugin) => void; onClose: () => void }) {
+export function AddressDialog({ onAdded, onClose }: { onAdded: (addon: Plugin, error?: string) => void; onClose: () => void }) {
   const [url, setUrl] = useState("");
   const [allowLocal, setAllowLocal] = useState(false);
   const [page, setPage] = useState<McpPreview | null>(null);
@@ -321,9 +331,15 @@ export function AddressDialog({ onAdded, onClose }: { onAdded: (addon: Plugin) =
     run(async () => {
       if (!keyed) return onAdded(await client.plugins.add({ url, allowLocal }, page!.hash));
       const [name, value] = keyHeader(key);
+      const headers = checkedHeaders({ [name]: value });
       const ref = { url, allowLocal, headers: [name] };
       const addon = await client.plugins.add(ref, (await client.plugins.preview(ref)).hash);
-      onAdded(await client.plugins.setSecrets(addon.id, { headers: { [name]: value } }));
+      try {
+        onAdded(await client.plugins.setSecrets(addon.id, { headers }));
+      } catch (e) {
+        onAdded(addon, (e as Error).message);
+        throw e;
+      }
     });
 
   return (

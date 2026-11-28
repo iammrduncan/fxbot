@@ -98,7 +98,8 @@ export function atTime(text: string, zone: string) {
     const t = clock(new Date(at), zone);
     at += wanted - Date.UTC(t.year, t.month - 1, t.day, t.hour, t.minute);
   }
-  return new Date(at);
+  const t = clock(new Date(at), zone);
+  return t.year === year && t.month === month && t.day === day && t.hour === hour && t.minute === min ? new Date(at) : null;
 }
 
 /** An instant as its local minute, such as 2026-11-06 09:00. A routine's firing is unique by this. */

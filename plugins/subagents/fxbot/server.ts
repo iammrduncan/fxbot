@@ -130,7 +130,7 @@ export default async function setup(fx: PluginApi) {
   const ownChat = async ({ bot, session }: { bot: string; session: string }) => (await fx.bots.get(bot)).sessionId === session;
   // Chat rooms, when it's added: a bot in a room starts subagents there too, and their tells and report come back into
   // the room, waking that bot (chat rooms 0.6.0).
-  type Rooms = { roomOf(session: string): Promise<unknown | null>; wake?(session: string, message: { text: string; label?: string }): Promise<unknown> };
+  type Rooms = { roomOf(session: string): Promise<unknown | null>; wake?(session: string, message: { text: string; label?: string; messageId?: string }): Promise<unknown> };
   const rooms = () => fx.need<Rooms>("chat-rooms");
   const inRoom = async (session: string) => Boolean(rooms()?.wake && (await rooms()!.roomOf(session).catch(() => null)));
   // Phone, when it's added: a call is a session of its own, and a subagent started on one reports into the call while it's
@@ -143,7 +143,7 @@ export default async function setup(fx: PluginApi) {
     const call = r.call_session ? calls() : null;
     if (r.call_session && call?.wake) return void (await call.wake(r.call_session, message));
     const room = r.room_session ? rooms() : null;
-    if (r.room_session && room?.wake) return void (await room.wake(r.room_session, { text: message.text, label: message.label }));
+    if (r.room_session && room?.wake) return void (await room.wake(r.room_session, message));
     await fx.chats.send(r.bot, { ...message, steer: true });
   }
   // One of the bot's subagents, by its name or its id: the newest of that name.

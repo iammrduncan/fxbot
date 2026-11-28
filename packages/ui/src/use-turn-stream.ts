@@ -18,7 +18,7 @@ export function useVisible() {
 // `ready` is false until the chat's lines so far have arrived. When the chat starts over, its stream ends with a moved
 // line, which calls `onMoved`; the page reads the bot again, and its new session is read from the start, with the
 // finished turns left to the earlier chat.
-export function useTurnStream(profileId: string, session: string | null, onMoved: () => void) {
+export function useTurnStream(profileId: string, session: string | null, onMoved: (sessionId?: string) => void) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [connected, setConnected] = useState(true);
   // Why the last connection dropped: the server's error, what answered in its place, or that nothing did.
@@ -36,6 +36,7 @@ export function useTurnStream(profileId: string, session: string | null, onMoved
       if (following.current) setTurns((turns) => turns.filter((turn) => !turn.done));
       following.current = session;
       cursor.current = 0;
+      setReady(false);
     }
     const abort = new AbortController();
     // The lines each connection replays are held, and shown together once it has caught up, so the chat opens at its
@@ -59,7 +60,7 @@ export function useTurnStream(profileId: string, session: string | null, onMoved
     };
     (async () => {
       for await (const line of client.stream(profileId, { cursor: cursor.current, session, signal: abort.signal, onConnection: connection, onCaughtUp: caughtUp })) {
-        if (line.type === "moved") moved.current();
+        if (line.type === "moved") moved.current(line.sessionId);
         else if (holding) held.push(line);
         else show([line]);
       }

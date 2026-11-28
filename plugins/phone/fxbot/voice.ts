@@ -61,6 +61,7 @@ export function voiceLine(o: { transport: Transport; ear: Ear; mouth: Mouth; voi
   const sense = detector();
   let batch: Int16Array[] = [];
   let before: Int16Array[] = [];
+  let transcribing = Promise.resolve();
   const done = new Set<() => void>();
   // Why the call ends, when the loop ends it itself: the call's row keeps it.
   let why = "";
@@ -141,8 +142,10 @@ export function voiceLine(o: { transport: Transport; ear: Ear; mouth: Mouth; voi
         let at = 0;
         for (const p of stretch) (all.set(p, at), (at += p.length));
         if (sensed.stretchMs < 250) return;
-        void ear.run(all).then(
-          (text) => text && heard({ type: "final", text }),
+        transcribing = transcribing.then(() => ear.run(all)).then(
+          (text) => {
+            if (text) heard({ type: "final", text });
+          },
           (error) => o.log(`Listening failed for a stretch: ${error instanceof Error ? error.message : error}`),
         );
       }
