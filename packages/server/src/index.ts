@@ -5,7 +5,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { delimiter, extname, join, normalize } from "node:path";
 import { PassThrough, Readable, type Duplex } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import type { ReadableStream } from "node:stream/web";
+import { ReadableStream } from "node:stream/web";
 import { constants, createGzip, gzipSync } from "node:zlib";
 import { WebSocketServer, type WebSocket } from "ws";
 import { canUpdate, lastUpdate, localEmbedder, machine, repository, requestEmbedder, requestUpdate, version, waiting } from "./control.ts";
@@ -63,8 +63,17 @@ const types: Record<string, string> = {
 // what names their content. A phone on a slow link waited for megabytes of script that compress to a quarter.
 const zipped = new Map<string, Buffer>();
 const compressible = /^(text\/|application\/(json|manifest\+json)|image\/svg)/;
+function acceptsGzip(req: IncomingMessage) {
+  return String(req.headers["accept-encoding"] ?? "").split(",").some((one) => {
+    const [encoding, ...parameters] = one.split(";");
+    return encoding.trim().toLowerCase() === "gzip" && !parameters.some((parameter) => {
+      const [name, value] = parameter.split("=");
+      return name.trim().toLowerCase() === "q" && Number(value) === 0;
+    });
+  });
+}
 function sendFile(req: IncomingMessage, res: ServerResponse, type: string, data: Buffer, cache: string, key?: string) {
-  const gzip = compressible.test(type) && data.length > 1024 && /\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""));
+  const gzip = compressible.test(type) && data.length > 1024 && acceptsGzip(req);
   let body = data;
   if (gzip) {
     body = (key && zipped.get(key)) || gzipSync(data, { level: 6 });
@@ -92,7 +101,7 @@ function sendJson(req: IncomingMessage, res: ServerResponse, status: number, dat
     Object.assign(out, { etag: tag, "cache-control": "no-cache" });
     if (String(req.headers["if-none-match"] ?? "").split(",").some((one) => one.trim() === tag)) return void res.writeHead(304, { etag: tag, "cache-control": "no-cache" }).end();
   }
-  const gzip = data.length > 1024 && /\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""));
+  const gzip = data.length > 1024 && acceptsGzip(req);
   if (data.length > 1024) out.vary = "accept-encoding";
   if (gzip) out["content-encoding"] = "gzip";
   res.writeHead(status, out).end(gzip ? gzipSync(data, { level: 6 }) : data);
@@ -123,11 +132,15 @@ async function body<T>(req: IncomingMessage, limit = 1 << 20): Promise<T> {
   if (Number(req.headers["content-length"]) > limit) fail(413, over);
   const chunks: Buffer[] = [];
   let size = 0;
-  for await (const chunk of req) {
+  let oversized = false;
+  for await (const chunk of req.iterator({ destroyOnReturn: false })) {
     size += chunk.length;
-    if (size > limit) fail(413, over);
-    chunks.push(chunk);
+    if (size > limit) {
+      oversized = true;
+      chunks.length = 0;
+    } else if (!oversized) chunks.push(chunk);
   }
+  if (oversized) fail(413, over);
   let value: unknown;
   try {
     value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
@@ -159,17 +172,43 @@ const signedIn = (res: ServerResponse, query: URLSearchParams) => cameBack(res, 
 // request's signal and cancels the response's body.
 async function pluginRoute(req: IncomingMessage, res: ServerResponse, url: URL, name: string) {
   const method = req.method ?? "GET";
-  if (Number(req.headers["content-length"]) > 12 << 20) fail(413, "body is over 12 MiB");
+  const limit = 12 << 20;
+  if (Number(req.headers["content-length"]) > limit) fail(413, "body is over 12 MiB");
   const closed = new AbortController();
   res.once("close", () => closed.abort());
   const headers = Object.entries(req.headers).flatMap(([key, value]) => (value === undefined ? [] : [value].flat().map((one) => [key, one] as [string, string])));
+  const chunks = req.iterator({ destroyOnReturn: false });
+  let size = 0;
+  let oversized = false;
+  const input = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { done, value } = await chunks.next();
+      if (done) return controller.close();
+      size += value.length;
+      if (size > limit) {
+        oversized = true;
+        return controller.error(new Error("body is over 12 MiB"));
+      }
+      controller.enqueue(value);
+    },
+    cancel() {
+      req.destroy();
+    },
+  });
   const request = new Request(new URL(url.pathname + url.search, "http://localhost"), {
     method,
     headers,
     signal: closed.signal,
-    ...(method === "GET" || method === "HEAD" ? {} : { body: Readable.toWeb(req) as unknown as BodyInit, duplex: "half" }),
+    ...(method === "GET" || method === "HEAD" ? {} : { body: input as unknown as BodyInit, duplex: "half" }),
   } as RequestInit);
   const response = await fxbot.plugins.handle(name, request, url.pathname.split("/").slice(4).join("/"));
+  while (true) {
+    const { done, value } = await chunks.next();
+    if (done) break;
+    size += value.length;
+    if (size > limit) oversized = true;
+  }
+  if (oversized) fail(413, "body is over 12 MiB");
   // A plugin's JSON goes as the app's does, unless the plugin encoded it itself.
   if (/^application\/json\b/i.test(response.headers.get("content-type") ?? "") && !response.headers.has("content-encoding") && response.body && method !== "HEAD")
     return sendJson(req, res, response.status, Buffer.from(await response.arrayBuffer()), Object.fromEntries(response.headers));
@@ -238,11 +277,12 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     if (method === "PATCH") {
       // `local` asks the machine to run its local embedder on the CPU or a GPU, or not at all (control.ts).
       const { local, ...fields } = await body<Partial<Settings> & { local?: LocalEmbedder }>(req);
-      const settings = await fxbot.settings.update(fields);
       if (local !== undefined) {
         if (!canUpdate) fail(400, "Only an install made by setup.sh switches its local embedder.");
-        requestEmbedder(["cpu", "gpu", "off"].includes(local) ? local : fail(400, "local must be cpu, gpu, or off"));
+        if (!["cpu", "gpu", "off"].includes(local)) fail(400, "local must be cpu, gpu, or off");
       }
+      const settings = await fxbot.settings.update(fields);
+      if (local !== undefined) requestEmbedder(local);
       return json(res, 200, settings);
     }
     return fail(405, "method not allowed");
@@ -350,7 +390,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     const lines = Readable.fromWeb((await fxbot.stream(id, Number(url.searchParams.get("cursor") ?? 0), url.searchParams.get("session") ?? undefined)) as ReadableStream<Uint8Array>);
     // A long chat's replay is mostly repeated JSON, which gzip makes many times smaller for a phone. Each write is
     // flushed, so a new line still arrives at once.
-    const gzip = /\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""));
+    const gzip = acceptsGzip(req);
     res.writeHead(200, {
       "content-type": "application/x-ndjson",
       "cache-control": "no-store",
@@ -415,7 +455,12 @@ const server = createServer(async (req, res) => {
 const sockets = new WebSocketServer({ noServer: true, maxPayload: 16 << 20 });
 server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
   const refuse = (status: string) => socket.end(`HTTP/1.1 ${status}\r\nconnection: close\r\ncontent-length: 0\r\n\r\n`);
-  const url = new URL(req.url ?? "/", "http://localhost");
+  let url: URL;
+  try {
+    url = new URL(req.url ?? "/", "http://localhost");
+  } catch {
+    return refuse("400 Bad Request");
+  }
   const [, root, resource, name, ...rest] = url.pathname.split("/");
   if (root !== "api" || resource !== "plugins" || !name) return refuse("404 Not Found");
   const origin = req.headers.origin;

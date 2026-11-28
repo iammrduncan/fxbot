@@ -38,8 +38,10 @@ sock=$run/engine.sock
 store=$home/.local/share/containers
 table=${name//-/_}
 rules=/etc/fxbot/$name.nft
+refresh=/etc/fxbot/$name-firewall.sh
+monitor=/etc/fxbot/$name-firewall-monitor.sh
 unit=$name-firewall.service
-compose=$install/compose.computer.yaml
+watch=$name-firewall-watch.service
 override=$install/compose.override.yaml
 marker="# Written by the computer plugin's setup.sh for $name."
 # A release install, unless --user names a checkout's login.
@@ -53,12 +55,13 @@ as() { runuser -u "$name" -- env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_B
 # takes its own lines out, and the file goes when nothing else is left. It says whether it changed anything.
 untangle() {
   grep -qxF "$marker" "$override" 2>/dev/null || return 1
-  grep -vxF "$marker" "$override" | grep -v '/run/fxbot-computer' | grep -v 'group_add:' >"$override.new" || true
+  grep -vxF "$marker" "$override" | grep -vxF "    volumes: [ \"$run:/run/fxbot-computer\" ]" | grep -vxF "    group_add: [ \"${gid:-}\" ]" >"$override.new" || true
   if grep -qvE '^(services:|  fxbot:|[[:space:]]*)$' "$override.new"; then mv "$override.new" "$override"; else rm -f "$override.new" "$override"; fi
 }
 
 if [ -n "$remove" ]; then
   if uid=$(id -u "$name" 2>/dev/null); then
+    gid=$(id -g "$name")
     as systemctl --user disable --now podman.socket podman.service docker.service >/dev/null 2>&1 || true
     loginctl disable-linger "$name" || true
     systemctl stop "user@$uid.service" 2>/dev/null || true
@@ -74,9 +77,9 @@ if [ -n "$remove" ]; then
     rmdir "/etc/systemd/system/user@$uid.service.d" 2>/dev/null || true
   fi
   [ -z "$selinux" ] || semanage fcontext -d -e /var/lib/containers "$store" 2>/dev/null || true
-  systemctl disable --now "$unit" >/dev/null 2>&1 || true
+  systemctl disable --now "$watch" "$unit" >/dev/null 2>&1 || true
   nft delete table inet "$table" 2>/dev/null || true
-  rm -f "/etc/systemd/system/$unit" "$rules"
+  rm -f "/etc/systemd/system/$unit" "/etc/systemd/system/$watch" "$rules" "$refresh" "$monitor"
   systemctl daemon-reload
   removed=""
   if [ -n "$release" ]; then
@@ -283,19 +286,26 @@ chown -R "$name:$name" "$config"
 # The firewall: its connections reach the internet and DNS, and nothing on this machine, its tailnet, or its networks.
 # DNS goes to the machine's resolvers, and, as rootless Docker's containers ask them, systemd-resolved's upstream ones.
 # The second file is there only where systemd-resolved runs, so awk's complaint about the other is no stop.
+mkdir -p /etc/fxbot
+{
+  printf '%s\n' '#!/bin/bash' 'set -euo pipefail' "table=$table" "uid=$uid" "rules=$rules"
+  cat <<'SCRIPT'
 servers=$(awk '/^nameserver/ { print $2 }' /etc/resolv.conf /run/systemd/resolve/resolv.conf 2>/dev/null | sort -u) || true
 dns4=$(grep -v : <<<"$servers" | paste -sd, - || true)
 dns6=$(grep : <<<"$servers" | paste -sd, - || true)
-accept4="" accept6=""
+lan4=$(ip -4 -o route show scope link 2>/dev/null | awk '$1 ~ /^([0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]+$/ { print $1 }' | sort -u | paste -sd, -) || true
+lan6=$(ip -6 -o route show scope link 2>/dev/null | awk '$1 ~ /^[0-9a-fA-F:]+\/[0-9]+$/ { print $1 }' | sort -u | paste -sd, -) || true
+accept4="" accept6="" refuse4="" refuse6=""
 [ -z "$dns4" ] || accept4="ip daddr { $dns4 } meta l4proto { tcp, udp } th dport 53 accept"
 [ -z "$dns6" ] || accept6="ip6 daddr { $dns6 } meta l4proto { tcp, udp } th dport 53 accept"
-mkdir -p /etc/fxbot
-cat >"$rules" <<EOF
-# Written by the computer plugin's setup.sh: the user $name's connections reach the internet only.
+[ -z "$lan4" ] || refuse4="ip daddr { $lan4 } jump refuse"
+[ -z "$lan6" ] || refuse6="ip6 daddr { $lan6 } jump refuse"
+next=$(mktemp "$rules.XXXXXX")
+trap 'rm -f "$next"' EXIT
+cat >"$next" <<EOF
 table inet $table
 delete table inet $table
 table inet $table {
-  # Only the user's own packets: a reset or an ICMP error the kernel sends has no socket, and passes.
   chain output {
     type filter hook output priority 0; policy accept;
     meta skuid $uid jump computers
@@ -304,15 +314,28 @@ table inet $table {
     $accept4
     $accept6
     fib daddr type local jump refuse
+    $refuse4
+    $refuse6
     ip daddr { 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16, 224.0.0.0/3 } jump refuse
     ip6 daddr { ::1, fc00::/7, fe80::/10, ff00::/8 } jump refuse
   }
-  # A refused connection fails at once, instead of waiting out its timeout.
   chain refuse {
     meta l4proto tcp reject with tcp reset
     reject with icmpx admin-prohibited
   }
 }
+EOF
+mv "$next" "$rules"
+/usr/sbin/nft -f "$rules"
+SCRIPT
+} >"$refresh"
+cat >"$monitor" <<EOF
+#!/bin/bash
+set -euo pipefail
+ip monitor address route link | while read -r _; do
+  sleep 1
+  systemctl restart --no-block "$unit"
+done
 EOF
 cat >"/etc/systemd/system/$unit" <<EOF
 [Unit]
@@ -323,15 +346,31 @@ Wants=network-pre.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/sbin/nft -f $rules
+ExecStart=/bin/bash $refresh
 ExecStop=/usr/sbin/nft delete table inet $table
 
 [Install]
 WantedBy=multi-user.target
 EOF
+cat >"/etc/systemd/system/$watch" <<EOF
+[Unit]
+Description=Connected-route updates for $name's firewall
+After=$unit
+BindsTo=$unit
+
+[Service]
+ExecStartPre=/bin/bash $refresh
+ExecStart=/bin/bash $monitor
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
 systemctl daemon-reload
-systemctl enable "$unit" >/dev/null 2>&1
+systemctl enable "$unit" "$watch" >/dev/null 2>&1
 systemctl restart "$unit"
+systemctl restart "$watch"
 
 # Who reaches the socket: the app's container through compose.computer.yaml, which the fxbot command adds, or a
 # checkout's login. On SELinux, a confined container can't connect to an engine's socket, and this container holds the

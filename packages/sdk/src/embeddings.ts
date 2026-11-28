@@ -165,8 +165,8 @@ export function createEmbeddings({ sql, fetch, localUrl, target }: { sql: Sql; f
           return count;
         });
         lastError = null;
-        // Every row changed while it was embedded: the next nudge comes with the change.
-        if (!saved) break;
+        // A zero-save batch was invalidated or deleted, so select again rather than dropping its nudge.
+        if (!saved) continue;
       }
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);

@@ -200,10 +200,12 @@ export default async function setup(fx: PluginApi) {
       dreams.delete(session);
     }
   }
-  const start = (bot: string, night: string, scheduled: boolean) =>
-    (running = dream(bot, night, scheduled)
+  function start(bot: string, night: string, scheduled: boolean) {
+    if (running) return null;
+    return (running = dream(bot, night, scheduled)
       .catch((error) => fx.log(`${bot}'s dream failed: ${error.message}`))
       .finally(() => (running = null)));
+  }
 
   // Each tick: prune, then, within the 4 hours from the hour, dream each bot with enough waiting turns, one at a time.
   async function tick() {
@@ -223,7 +225,9 @@ export default async function setup(fx: PluginApi) {
     for (const { bot } of due) {
       if ((await fx.sql`select 1 from nights where bot = ${bot} and night = ${night} and scheduled`).length) continue;
       if ((await fx.bots.get(bot).catch(() => null))?.busy !== false) continue;
-      await start(bot, night, true);
+      const started = start(bot, night, true);
+      if (!started) return;
+      await started;
     }
   }
   const first = setTimeout(() => void tick().catch((error) => fx.log(`A tick failed: ${error.message}`)), 60_000);
@@ -367,13 +371,18 @@ export default async function setup(fx: PluginApi) {
     if (c.undoneAt) return [409, "Already undone."] as const;
     const since = "Changed since. Edit or delete it in Memories.";
     if (c.kind === "memory") {
-      if (c.mergedInto) await fx.memories.save(c.bot, { text: c.before.text });
-      else {
-        const now = await fx.memories.get(c.bot, c.target);
-        if (now && now.text !== c.after.text) return [409, since] as const;
-        if (!c.before && now) await fx.memories.remove(c.bot, c.target);
-        if (c.before) await fx.memories.save(c.bot, now ? { text: c.before.text, replaces: c.target } : { text: c.before.text });
+      if (c.mergedInto) {
+        const { memory } = await fx.memories.save(c.bot, { text: c.before.text });
+        await fx.sql.begin(async (tx) => {
+          await tx`update changes set target = ${`mem:${memory.id}`} where target = ${c.target} and id < ${c.id} and undone_at is null`;
+          await tx`update changes set undone_at = now() where id = ${c.id}`;
+        });
+        return [200, "Undone."] as const;
       }
+      const now = await fx.memories.get(c.bot, c.target);
+      if (now && now.text !== c.after.text) return [409, since] as const;
+      if (!c.before && now) await fx.memories.remove(c.bot, c.target);
+      if (c.before) await fx.memories.save(c.bot, now ? { text: c.before.text, replaces: c.target } : { text: c.before.text });
     } else {
       const [now] = await fx.sql<{ description: string; instructions: string }[]>`select description, instructions from skills where bot = ${c.bot} and name = ${c.target}`;
       if (!now || now.description !== c.after.description || now.instructions !== c.after.instructions) return [409, "Changed since."] as const;
@@ -412,10 +421,9 @@ export default async function setup(fx: PluginApi) {
   // Dream now: at any hour, past minTurns.
   fx.route("POST", "/bots/:bot/dream", async (_request, { bot }) => {
     if (!(await known(bot))) return json({ error: "No such bot." }, 404);
-    if (running) return json({ error: "A dream is running. Try again when it ends." }, 409);
     const [{ waiting }] = await fx.sql<{ waiting: number }[]>`select count(*)::int as waiting from turns where bot = ${bot} and night is null`;
     if (!waiting) return json({ error: "Nothing since the last dream." }, 400);
-    void start(bot, dateIn(new Date(), settings().timeZone), false);
+    if (!start(bot, dateIn(new Date(), settings().timeZone), false)) return json({ error: "A dream is running. Try again when it ends." }, 409);
     return json({ ok: true }, 202);
   });
   fx.route("POST", "/changes/:id/undo", async (_request, { id }) => {

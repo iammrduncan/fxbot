@@ -150,7 +150,11 @@ export class Link {
   // What fxbot tells every connected device: that a device was added, and that the list changed.
   onEvent = (m: any) => {
     if (m.event === "added") announce(`${this.p.name}: ${m.name ?? "A device"}${m.platform ? ` (${m.platform})` : ""} was paired${m.how === "passkey" ? " with a passkey" : ""}. If that wasn't you, remove it under Devices.`);
-    if (devicesState.rid === this.p.rid && (m.event === "added" || m.event === "devices")) void loadDevices(this);
+    if (m.event === "relay" && typeof m.relay === "string" && m.relay !== this.p.relay) {
+      this.p.relay = m.relay;
+      void savePairing(this.p);
+      announce(`${this.p.name}'s relay changed. This device will use the new relay when it reconnects.`);
+    }
   };
   p: Pairing;
   constructor(p: Pairing) {
@@ -198,12 +202,17 @@ export class Link {
       const hs = await new Handshake({ pattern: "IK", initiator: true, prologue: wire.connectPrologue(this.p.rid), s: this.p.key, rs: fromB64u(this.p.I) }).init();
       via.send(wire.envelope("k1", await hs.write(utf8(JSON.stringify({ seq, v: wire.VERSION })))));
       const k2 = await via.next(15_000);
-      const info = JSON.parse(dec.decode(await hs.read(k2.bytes))) as { iceServers: wire.IceServer[]; reach: wire.Reach | null; name: string; reuse?: boolean };
+      const info = JSON.parse(dec.decode(await hs.read(k2.bytes))) as { iceServers: wire.IceServer[]; reach: wire.Reach | null; name: string; relay?: string; reuse?: boolean };
       if (stale()) throw new Error("A newer attempt took over.");
       this.reach = info.reach;
       this.reuse = info.reuse === true;
       this.idle = [];
-      if (info.name && info.name !== this.p.name) await savePairing({ ...this.p, name: (this.p.name = info.name) });
+      const relay = typeof info.relay === "string" && info.relay ? info.relay : this.p.relay;
+      if ((info.name && info.name !== this.p.name) || relay !== this.p.relay) {
+        if (info.name) this.p.name = info.name;
+        this.p.relay = relay;
+        await savePairing(this.p);
+      }
       const { send: tx, recv: rx } = await hs.split();
       const hash = hs.hash;
       // Sealing keeps a counter, so messages go out one at a time, in order.
@@ -670,23 +679,30 @@ function pairScreen() {
 }
 async function scanQr() {
   const video = document.getElementById("camera") as HTMLVideoElement;
-  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-  video.srcObject = stream;
-  video.classList.add("on");
-  await video.play();
-  const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
-  const stopAll = () => stream.getTracks().forEach((t) => t.stop());
-  for (let i = 0; i < 600 && video.isConnected; i++) {
-    const [found] = await detector.detect(video).catch(() => []);
-    const text: string | undefined = found?.rawValue;
-    if (text) {
-      const url = new URL(text);
-      stopAll();
-      if (url.pathname === "/pair" && url.hash) return void pairByLink(url.hash);
+  let stream: MediaStream | null = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    video.srcObject = stream;
+    video.classList.add("on");
+    await video.play();
+    const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
+    for (let i = 0; i < 600 && video.isConnected; i++) {
+      const [found] = await detector.detect(video).catch(() => []);
+      const text: string | undefined = found?.rawValue;
+      if (text) {
+        const url = new URL(text);
+        if (url.pathname !== "/pair" || !url.hash) throw new Error("That QR code isn't an fxbot pairing link.");
+        return void pairByLink(url.hash);
+      }
+      await new Promise((r) => setTimeout(r, 200));
     }
-    await new Promise((r) => setTimeout(r, 200));
+  } catch (error) {
+    setProgress({ step: "failed", text: error instanceof Error ? error.message : String(error) });
+  } finally {
+    stream?.getTracks().forEach((t) => t.stop());
+    video.srcObject = null;
+    video.classList.remove("on");
   }
-  stopAll();
 }
 
 function pairingScreen(p: Progress) {
@@ -756,8 +772,8 @@ function devicesScreen(link: Link) {
   return h("section", { class: "screen" },
     h("header", {}, h("button", { class: "back", onclick: () => history.back() }, "‹ Back"), h("h1", {}, link.p.name)),
     h("p", { class: "muted small" }, dot(link.status), " ", link.status === "connected" ? "Connected, peer to peer." : link.why || "Connecting…"),
+    link.status === "failed" && h("p", { class: "note warn" }, "If the relay changed while this device was offline, choose Forget on this device below, then pair again with a new code."),
     link.notice && noticePanel(link),
-    s.error && h("p", { class: "note bad" }, s.error),
     h("h2", {}, "Devices"),
     s.list ? h("ul", { class: "list" }, s.list.map((d) => h("li", { class: "row" },
       h("div", { class: "grow" },

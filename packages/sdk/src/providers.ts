@@ -322,7 +322,7 @@ export async function createProviders({ store, secretKey, durability, vercelClie
   async function signedIn(kind: string, provider: string | undefined, credentials: object) {
     if (provider) {
       const existing = await record(provider);
-      await secrets.put(provider, credentials);
+      await locked(provider, () => secrets.put(provider, credentials));
       await models.forget(provider);
       await restart(existing);
       return provider;
@@ -520,6 +520,7 @@ export async function createProviders({ store, secretKey, durability, vercelClie
       if (entry.models === "typed" && !next.modelIds?.length) fail(400, `Type the name of at least one of your ${entry.name} models`);
       const apiKey = input.apiKey === undefined ? undefined : text(input.apiKey, "apiKey", 4096);
       if (apiKey === "" && entry.connect === "key") fail(400, "apiKey is required");
+      const credentialsChanged = apiKey !== undefined || input.serviceAccount !== undefined;
       let held: Held | undefined = apiKey ? { apiKey } : undefined;
       if (input.serviceAccount !== undefined) {
         const serviceAccount = vertex.readServiceAccount(input.serviceAccount);
@@ -532,14 +533,19 @@ export async function createProviders({ store, secretKey, durability, vercelClie
       }
       // An agent reads a custom provider's key at each request, once it has one, so a new key needs no new agent. Closing
       // the old one would wait for its turns, which may be stuck on the key this replaces.
-      const keyed = current.kind !== "gateway" && Boolean(await secrets.get(id));
-      await store.sql.begin(async (tx) => {
-        await store.providers.save(next, tx as unknown as Sql);
-        if (held) await secrets.put(id, held, tx as unknown as Sql);
+      const keyed = await locked(id, async () => {
+        const hadKey = current.kind !== "gateway" && Boolean(await secrets.get(id));
+        await store.sql.begin(async (tx) => {
+          if (!(await store.providers.update(next, tx as unknown as Sql))) fail(404, "provider not found");
+          if (held) await secrets.put(id, held, tx as unknown as Sql);
+          else if (apiKey === "") await secrets.remove(id, tx as unknown as Sql);
+        });
+        if (apiKey === "") secrets.forget(id);
+        return hadKey;
       });
-      const listChanged = held !== undefined || next.baseUrl !== current.baseUrl || next.teamId !== current.teamId || String(next.modelIds) !== String(current.modelIds);
+      const listChanged = credentialsChanged || next.baseUrl !== current.baseUrl || next.teamId !== current.teamId || String(next.modelIds) !== String(current.modelIds);
       if (listChanged) await models.forget(id);
-      if ((held !== undefined && !keyed) || next.baseUrl !== current.baseUrl || next.teamId !== current.teamId || next.contextWindow !== current.contextWindow) await restart(next);
+      if ((credentialsChanged && Boolean(held) !== keyed) || next.baseUrl !== current.baseUrl || next.teamId !== current.teamId || next.contextWindow !== current.contextWindow) await restart(next);
       return listed(id);
     },
 
@@ -556,7 +562,7 @@ export async function createProviders({ store, secretKey, durability, vercelClie
       await store.providers.remove(id);
       secrets.forget(id);
       await models.forget(id);
-      if ((await store.settings.get()).defaultProvider === id) await store.settings.save({ defaultProvider: "" });
+      await store.settings.clearDefaultProvider(id);
     },
 
     async models(id: string) {

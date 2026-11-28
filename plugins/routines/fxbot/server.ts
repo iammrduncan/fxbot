@@ -58,7 +58,8 @@ export default async function setup(fx: PluginApi) {
   // The runs going, by id from the moment they start, and by session once they have one.
   const going = new Map<number, Going>();
   const sessions = new Map<string, Going>();
-  const running = (routine: number) => [...going.values()].some((run) => run.routine === routine);
+  const pending = new Set<number>();
+  const running = (routine: number) => pending.has(routine) || [...going.values()].some((run) => run.routine === routine);
 
   fx.on("instructions", (event) => {
     if (sessions.has(event.session)) event.instructions.push(rules);
@@ -166,8 +167,14 @@ export default async function setup(fx: PluginApi) {
       await trim(r.id).catch(() => {});
     }
   }
-  // Counted before anything waits, so a tick can't start more than atOnce.
+  function reserve(routine: number) {
+    if (running(routine) || going.size + pending.size >= limit("atOnce")) return false;
+    pending.add(routine);
+    return true;
+  }
+  // Reserved before anything waits, so manual and scheduled runs share one admission check.
   function start(r: Routine, id: number, due: string) {
+    pending.delete(r.id);
     const one: Going = { id, routine: r.id, bot: r.bot, calls: 0 };
     going.set(id, one);
     void run(r, one, due).catch((error) => fx.log(`A run of ${r.name} failed: ${error.message}`));
@@ -197,7 +204,7 @@ export default async function setup(fx: PluginApi) {
       await fx.sql`delete from routines r where cron is null and next_at is null and created_at < now() - interval '30 days'
         and not exists (select 1 from runs where routine = r.id and started_at > now() - interval '30 days')`;
       for (const r of await fx.sql<Routine[]>`select * from routines where not paused and next_at <= now() order by next_at`) {
-        if (going.size >= limit("atOnce")) break;
+        if (going.size + pending.size >= limit("atOnce")) break;
         const due = r.next_at!;
         const later = r.cron ? next(parse(r.cron), now, zone()) : null;
         const move = () => fx.sql`update routines set next_at = ${later} where id = ${r.id}`;
@@ -216,9 +223,17 @@ export default async function setup(fx: PluginApi) {
           continue;
         }
         // One statement, so a firing and the clock move together. No row: it ran, or the clocks went back over it.
-        const [made] = await fx.sql<{ id: number }[]>`with made as (insert into runs (routine, slot) values (${r.id}, ${stamp(due)}) on conflict do nothing returning id),
-          moved as (update routines set next_at = ${later} where id = ${r.id}) select id from made`;
+        if (!reserve(r.id)) break;
+        let made: { id: number } | undefined;
+        try {
+          [made] = await fx.sql<{ id: number }[]>`with made as (insert into runs (routine, slot) values (${r.id}, ${stamp(due)}) on conflict do nothing returning id),
+            moved as (update routines set next_at = ${later} where id = ${r.id}) select id from made`;
+        } catch (error) {
+          pending.delete(r.id);
+          throw error;
+        }
         if (made) start(r, made.id, stamp(due));
+        else pending.delete(r.id);
       }
     } finally {
       ticking = false;
@@ -407,8 +422,15 @@ export default async function setup(fx: PluginApi) {
     if (!r) return json({ error: "No such routine." }, 404);
     if (running(r.id)) return json({ error: "It's running." }, 409);
     if (!fx.bots.on(r.bot)) return json({ error: "routines is off for this bot." }, 409);
-    const [made] = await fx.sql<{ id: number }[]>`insert into runs (routine, slot) values (${r.id}, ${`now-${randomUUID()}`}) returning id`;
-    start(r, made.id, stamp());
+    if (!reserve(r.id)) return json({ error: "It's running, or the run limit is full." }, 409);
+    let made: { id: number } | undefined;
+    try {
+      [made] = await fx.sql<{ id: number }[]>`insert into runs (routine, slot) values (${r.id}, ${`now-${randomUUID()}`}) returning id`;
+    } catch (error) {
+      pending.delete(r.id);
+      throw error;
+    }
+    start(r, made!.id, stamp());
     return json({ ok: true }, 202);
   });
   fx.route("POST", "/runs/:id/stop", (_request, { id }) => {

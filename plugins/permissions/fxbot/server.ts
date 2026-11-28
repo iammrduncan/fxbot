@@ -128,7 +128,7 @@ export default async function setup(fx: PluginApi) {
   // The reviewer's evidence is what the owner said, and the action. Tool results and other bots' words never reach it,
   // so what attacked the bot can't attack this too. What the owner said to another bot counts, when fxbot quotes it.
   async function reviewNow(event: Event, input: unknown, turn: Turn) {
-    const action = JSON.stringify({ tool: event.tool, description: event.description, input });
+    const action = JSON.stringify({ tool: event.tool, input });
     if (action.length > reviewable) return { allow: false, reason: "This action is too long to review." };
     try {
       const [owner, bot, [picked]] = await Promise.all([fx.chats.ownerSaid(event.bot, 10), fx.bots.get(event.bot), fx.sql<{ provider: string; model: string }[]>`select provider, model from reviewer`]);

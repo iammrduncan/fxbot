@@ -24,8 +24,20 @@ export function aboutModel(m: Model) {
 export function useModels(provider: string, version = "") {
   const [models, setModels] = useState<Model[] | null>(null);
   const [error, setError] = useState("");
+  const request = useRef(0);
   const load = () => {
-    if (provider) client.providers.models(provider).then((list) => (setModels(list), setError("")), (e: Error) => setError(e.message));
+    const current = ++request.current;
+    if (provider) client.providers.models(provider).then(
+      (list) => {
+        if (current === request.current) {
+          setModels(list);
+          setError("");
+        }
+      },
+      (e: Error) => {
+        if (current === request.current) setError(e.message);
+      },
+    );
   };
   useEffect(() => {
     setModels(null);

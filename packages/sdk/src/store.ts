@@ -121,6 +121,7 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
         };
         await sql`insert into settings ${sql({ id: 1, ...values })} on conflict (id) do update set ${sql(values)}`;
       },
+      clearDefaultProvider: async (id: string) => void (await sql`update settings set default_provider = null where default_provider = ${id}`),
     },
     providers: {
       list: async () => sql<ProviderRecord[]>`select id, kind, name, base_url, model, context_window, team_id, fields, model_ids from providers order by created_at, id`,
@@ -132,6 +133,9 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
           context_window = excluded.context_window, team_id = excluded.team_id, fields = excluded.fields, model_ids = excluded.model_ids`;
         return record;
       },
+      update: async (record: ProviderRecord, tx: Sql = sql) =>
+        (await tx`update providers set kind = ${record.kind}, name = ${record.name}, base_url = ${record.baseUrl}, model = ${record.model}, context_window = ${record.contextWindow}, team_id = ${record.teamId},
+          fields = ${tx.json(record.fields ?? {})}, model_ids = ${record.modelIds?.length ? tx.array(record.modelIds) : null} where id = ${record.id} returning id`).length > 0,
       remove: async (id: string) => void (await sql`delete from providers where id = ${id}`),
     },
     plugins: {

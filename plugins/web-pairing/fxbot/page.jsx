@@ -252,6 +252,7 @@ function Advanced({ state, refresh }) {
       </form>
       <p className="text-xs text-muted-foreground">
         {state.relay === state.defaultRelay ? "fxbot.sh's relay, which passes sealed handshakes and stores nothing." : "A relay of your own. Pairing links carry its address."}{" "}
+        Connected devices learn a new relay automatically. A device offline during that change must be forgotten there and paired again.{" "}
         {state.listening ? "Connected to it." : "Not connected to it: fxbot connects only while a pairing is open or a device is paired."}
       </p>
       <form className="flex items-center gap-2" onSubmit={(e) => (e.preventDefault(), save({ ports: ports.split(/\D+/).map(Number) }))}>

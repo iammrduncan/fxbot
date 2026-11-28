@@ -61,6 +61,10 @@ export function createSecrets(sql: Sql, key: Buffer, table: keyof typeof tables 
         on conflict (${sql(column)}) do update set sealed = excluded.sealed, updated_at = now()`;
       cache.set(id, value);
     },
+    async remove(id: string, tx: Sql = sql) {
+      await tx`delete from ${sql(table)} where ${sql(column)} = ${id}`;
+      cache.delete(id);
+    },
     // Rows go with their provider or plugin, by cascade.
     forget: (id: string) => cache.delete(id),
     has: async () => new Set((await sql<{ id: string }[]>`select ${sql(column)} as id from ${sql(table)}`).map((row) => row.id)),

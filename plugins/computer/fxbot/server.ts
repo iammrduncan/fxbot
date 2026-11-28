@@ -376,6 +376,7 @@ export default async function setup(fx: PluginApi) {
   const last = new Map<string, number>();
   const busy = new Map<string, number>();
   const starting = new Map<string, Promise<string>>();
+  const stopping = new Map<string, Promise<unknown>>();
   let timer: NodeJS.Timeout | undefined;
   const limits = () => ({ Memory: Math.round(mib * (Number(fx.settings.memoryMiB) || 2048)), NanoCpus: Math.round(1e9 * (Number(fx.settings.cpus) || 2)) });
   // The screen's size: the setting, when it's a width and height Xvnc takes.
@@ -462,7 +463,9 @@ export default async function setup(fx: PluginApi) {
       if (Date.now() - at < idle || busy.get(key) || starting.has(key)) continue;
       last.delete(key);
       marks.delete(key);
-      await call("POST", `/containers/${nameOf(key)}/stop?t=5`, { timeout: 30_000 });
+      const pending = call("POST", `/containers/${nameOf(key)}/stop?t=5`, { timeout: 30_000 }).finally(() => stopping.delete(key));
+      stopping.set(key, pending);
+      await pending;
       stopped = true;
     }
     if (stopped) await forget();
@@ -512,7 +515,8 @@ export default async function setup(fx: PluginApi) {
   // name changed. Its home stays. Calls at once share one start.
   function open(computer: Computer) {
     const { key } = computer;
-    if (!starting.has(key)) starting.set(key, start(computer).then((name) => (used(key), name)).finally(() => starting.delete(key)));
+    if (!starting.has(key))
+      starting.set(key, (stopping.get(key) ?? Promise.resolve()).catch(() => {}).then(() => start(computer)).then((name) => (used(key), name)).finally(() => starting.delete(key)));
     return starting.get(key)!;
   }
   async function start({ key, name: title, by }: Computer) {
@@ -625,6 +629,7 @@ export default async function setup(fx: PluginApi) {
   async function take(key: string, part: "desktop" | "terminal", actor: Actor, turn: string, signal: AbortSignal) {
     const id = `${key}:${part}`;
     for (const end = Date.now() + 60_000; ; await new Promise((r) => setTimeout(r, 500))) {
+      signal.throwIfAborted();
       const held = holds.get(id);
       // Taken with no wait between the look and the hold, so two calls arriving together can't both take it.
       if (!held || held.actor.id === actor.id || held.until < Date.now()) {
@@ -673,6 +678,7 @@ export default async function setup(fx: PluginApi) {
   // and the command killed when the turn is stopped. It answers the computer's name too, for a file the command left.
   async function run({ bot, session, label }: { bot: string; session: string; label: string | null }, command: string, seconds: number, signal: AbortSignal) {
     const { name, key } = await ready(bot, session);
+    signal.throwIfAborted();
     const actor = actorOf(bot, session, label);
     mark(key, actor, /\bagent-browser\b/.test(command) ? "browser" : /\bagent-desktop\b/.test(command) ? "desktop app" : "shell");
     const id = randomUUID();
@@ -848,11 +854,16 @@ export default async function setup(fx: PluginApi) {
       const keys = (Array.isArray(input?.keys) ? input.keys : []).filter((k): k is string => typeof k === "string" && /^[\w-]{1,20}$/.test(k)).map((k) => tmuxKeys[k.toLowerCase()] ?? k);
       const seconds = Math.min(Math.max(Number(input?.wait ?? 1) || 0, 0), 30);
       const { name, key } = await ready(bot, session);
+      signal.throwIfAborted();
       const busyWith = taken(key);
       if (busyWith) return busyWith;
       const actor = actorOf(bot, session, label);
       const waited = await take(key, "terminal", actor, messageId, signal);
       if (waited) return waited;
+      if (signal.aborted) {
+        holds.delete(`${key}:terminal`);
+        signal.throwIfAborted();
+      }
       mark(key, actor, "terminal");
       busy.set(key, (busy.get(key) ?? 0) + 1);
       try {
@@ -933,11 +944,16 @@ export default async function setup(fx: PluginApi) {
     async execute(input: Record<string, any>, { bot, session, label, messageId, signal }) {
       if (!actions.includes(input?.action)) return `action must be one of ${actions.join(", ")}.`;
       const { name, key, shared } = await ready(bot, session);
+      signal.throwIfAborted();
       const busyWith = taken(key);
       if (busyWith) return busyWith;
       const actor = actorOf(bot, session, label);
       const waited = await take(key, "desktop", actor, messageId, signal);
       if (waited) return waited;
+      if (signal.aborted) {
+        holds.delete(`${key}:desktop`);
+        signal.throwIfAborted();
+      }
       busy.set(key, (busy.get(key) ?? 0) + 1);
       try {
         const { output } = await exec(name, ["fxbot-screen", JSON.stringify(input)], { timeout: 90_000 });

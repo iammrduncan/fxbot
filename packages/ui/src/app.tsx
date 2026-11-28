@@ -679,10 +679,16 @@ function useSettled(element: { current: HTMLElement | null }, ready: boolean) {
 function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profile[] | null; onChange: () => void; onShown: () => void }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState("");
+  const [profileVersion, setProfileVersion] = useState(0);
   // Its unsent message, kept until it's sent (drafts.ts).
   const [draft, setDraft] = useState(() => draftOf(id));
   useEffect(() => keepDraft(id, draft), [id, draft]);
   const [attached, setAttached] = useState<Upload[]>([]);
+  const attachedNow = useRef(attached);
+  const updateAttached = (files: Upload[]) => {
+    attachedNow.current = files;
+    setAttached(files);
+  };
   const [notice, setNotice] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
   const form = useRef<HTMLFormElement>(null);
@@ -690,13 +696,18 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   const skills = useSkillPicker(id, box, draft, setDraft);
   const skillNames = new Set(skills.skills.filter((s) => !s.command).map((s) => s.name));
   // A chat that started over, here or on another page, is read again: its new session, and its handoff.
-  const reread = () => void client.profiles.get(id).then(setProfile, () => {});
-  const { turns, setTurns, connected, lost, ready } = useTurnStream(id, profile?.sessionId ?? null, reread);
+  const reread = () => setProfileVersion((version) => version + 1);
+  const moved = (sessionId?: string) => {
+    if (sessionId) setProfile((current) => current && { ...current, sessionId });
+    reread();
+  };
+  const session = profile?.sessionId ?? null;
+  const { turns, setTurns, connected, lost, ready } = useTurnStream(id, session, moved);
   // The turns there when the chat caught up, which aren't scroll anchors: see Thread.
   const replayed = useRef<Set<string> | null>(null);
   if (ready && !replayed.current) replayed.current = new Set(turns.map((turn) => turn.messageId));
-  const following = useRef(profile?.sessionId);
-  following.current = profile?.sessionId;
+  const following = useRef(session);
+  following.current = session;
   // A long chat shows its newest turns, and more each time it's scrolled near its top, or while they all fit. Turns
   // that arrive later are added below, so `from` holds still.
   const viewport = useRef<HTMLDivElement>(null);
@@ -720,6 +731,11 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
     const view = viewport.current;
     if (view && view.scrollHeight <= view.clientHeight) more();
   });
+  useEffect(() => {
+    replayed.current = null;
+    setFrom(null);
+    setEarlierFrom(null);
+  }, [session]);
   const panel = usePanel();
   const beside = useBeside();
   // A provider switch starts a new chat. The earlier ones stay readable above the handoff, though the bot now sees only
@@ -775,7 +791,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
     return () => {
       stopped = true;
     };
-  }, [id]);
+  }, [id, profileVersion]);
 
   // The sidebar shows each bot's latest reply and whether it is busy, so the list is read again once the server has
   // taken a message, and as replies finish.
@@ -798,7 +814,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
       const { sessionId, handled } = await client.send(id, { text, messageId, files: files.map(({ name, type, data }) => ({ name, type, data })) });
       if (handled) setTurns((all) => all.map((t) => (t.messageId === messageId ? { ...t, done: true, handled } : t)));
       // A message that started the chat over answers from the new session.
-      if (following.current && following.current !== sessionId) reread();
+      if (following.current && following.current !== sessionId) moved(sessionId);
       else setProfile((current) => current && { ...current, sessionId });
       onChange();
     } catch (e) {
@@ -813,7 +829,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
     if ((!draft.trim() && !attached.length && !skills.picked.length) || stuck) return;
     send([...skills.picked.map((name) => `$${name}`), draft].filter((part) => part.trim()).join(" "), newMessageId(), attached);
     setDraft("");
-    setAttached([]);
+    updateAttached([]);
     skills.setPicked([]);
     skills.close();
     setNotice("");
@@ -826,7 +842,8 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
     const read = await Promise.allSettled(files.map(readFile));
     const problems = read.flatMap((result) => (result.status === "rejected" ? [(result.reason as Error).message] : []));
     // What fits beside what's attached already, in the order they came.
-    let total = attached.reduce((sum, file) => sum + sizeOf(file), 0);
+    const current = attachedNow.current;
+    let total = current.reduce((sum, file) => sum + sizeOf(file), 0);
     const left: string[] = [];
     const added = read.flatMap((result) => {
       if (result.status !== "fulfilled") return [];
@@ -836,8 +853,8 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
     });
     if (left.length)
       problems.push(`A message's files can be at most 8.5 MiB together, so ${left.join(", ")} ${left.length === 1 ? "wasn't added. Send it" : "weren't added. Send them"} in another message.`);
-    if (attached.length + added.length > maxFiles) problems.push(`A message takes at most ${maxFiles} files.`);
-    setAttached((all) => [...all, ...added].slice(0, maxFiles));
+    if (current.length + added.length > maxFiles) problems.push(`A message takes at most ${maxFiles} files.`);
+    updateAttached([...current, ...added].slice(0, maxFiles));
     setNotice(problems.join(" "));
   }
 
@@ -949,7 +966,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                 {(attached.length > 0 || skills.picked.length > 0) && (
                   <div className="order-first flex w-full flex-wrap gap-2 px-2 pt-2">
                     {skills.picked.length > 0 && <SkillChips names={skills.picked} remove={(name) => skills.setPicked((all) => all.filter((n) => n !== name))} />}
-                    {attached.length > 0 && <Files files={attached} remove={(i) => setAttached((all) => all.toSpliced(i, 1))} />}
+                    {attached.length > 0 && <Files files={attached} remove={(i) => updateAttached(attachedNow.current.toSpliced(i, 1))} />}
                   </div>
                 )}
                 {/* The format bar, above the text, for the box in this form, the app's or a plugin's (format-bar.tsx). */}

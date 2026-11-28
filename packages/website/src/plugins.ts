@@ -2,7 +2,7 @@ import { Marked } from "marked";
 import pluginsList from "../../sdk/src/plugins-registry.json?raw";
 import serversList from "../../sdk/src/mcp-registry.json?raw";
 import skillsList from "../../sdk/src/skills-registry.json?raw";
-import { repo } from "./site.ts";
+import { href, origin, repo } from "./site.ts";
 
 // fxbot's vetted plugins, as the directory at /plugins/ shows them: the packages, servers, and skills on its three
 // lists, which installs read too, so the directory can't disagree with Browse. A package in this repository also
@@ -42,7 +42,16 @@ const inFolder = (folder: string, path: string) => files[`../../../${folder}/${p
 const ownRepo = repo.replace("https://github.com/", "");
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 // A README under the page's own README heading: its title dropped, and each heading a level down.
-const markdown = new Marked({ walkTokens: (token) => void (token.type === "heading" && (token.depth = Math.min(6, token.depth + 1))) });
+const markdown = new Marked({
+  walkTokens: (token) => {
+    if (token.type === "heading") token.depth = Math.min(6, token.depth + 1);
+    if (token.type === "link" || token.type === "image") {
+      const url = token.href.startsWith(`${origin}/`) ? token.href.slice(origin.length) : token.href;
+      if (url.startsWith("/") && !url.startsWith("//")) token.href = href(url);
+    }
+    if (token.type === "html") token.text = token.text.replace(/<(?:bot|label|plugin)>/g, (tag: string) => `&lt;${tag.slice(1)}`);
+  },
+});
 const frontMatter = (text: string, field: string) => text.match(new RegExp(`^---[\\s\\S]*?^${field}:\\s*(.+)$`, "m"))?.[1].trim().replace(/^["']|["']$/g, "") ?? "";
 
 function packageOf(entry: PluginEntry): Listed {

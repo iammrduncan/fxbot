@@ -248,7 +248,7 @@ export default async function setup(fx: PluginApi) {
     const text = `You haven't answered ${from}'s message m:${id}, below. Answer it now.\n\n${frame({ id, from, words: row.text, reply: "yes", joining: false, named: [], asked: asked.frame })}`;
     const messageId = `messages-again-${id}-${row.from_bot}`;
     await fx.sql`update messages set turn = ${messageId}, state = 'waiting', ended_at = null where id = ${id}`;
-    const { joined } = await fx.chats.send(row.to_bot, { messageId, text, shown: `You haven't answered ${from}'s message m:${id}.`, label: "Messages", steer: true, ...(asked.words ? { asked: asked.words } : {}) });
+    const { joined } = await fx.chats.send(row.to_bot, { messageId, text, shown: `You haven't answered ${from}'s message m:${id}.`, label: "Messages", ...(asked.words ? { asked: asked.words } : {}) });
     if (joined) await fx.sql`update messages set turn = ${joined}, state = 'working' where id = ${id}`;
   }
 

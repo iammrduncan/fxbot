@@ -32,7 +32,7 @@ function repositoryFiles() {
     const about = changelog.split("\n\n")[0].replace(/\s+/g, " ");
     write(
       "src/content/docs/docs/reference/changelog.md",
-      `---\ntitle: Changelog\ndescription: ${JSON.stringify(about)}\n---\n\n${changelog.trim()}\n\nEach release is also on [GitHub Releases](${repo}/releases), with a short version of its section here.\n`,
+      `---\ntitle: Changelog\neditUrl: false\ndescription: ${JSON.stringify(about)}\n---\n\n${changelog.trim()}\n\nEach release is also on [GitHub Releases](${repo}/releases), with a short version of its section here.\n`,
     );
     write("src/content/docs/docs/reference/providers.md", readFileSync(new URL("src/providers-reference.md", here), "utf8").replace("<!-- providers -->", providersTable()));
     mkdirSync(new URL("public", here), { recursive: true });
@@ -88,14 +88,33 @@ const links = {
   link: (node, ctx) => ctx.setProperty(node, "url", linkTo(node.url)),
   definition: (node, ctx) => ctx.setProperty(node, "url", linkTo(node.url)),
 };
+/** @type {import("satteri").HastPluginDefinition} */
+const assets = {
+  name: "fxbot-assets",
+  element: {
+    filter: ["a", "audio", "embed", "iframe", "img", "input", "link", "object", "script", "source", "track", "video"],
+    visit: (node, ctx) => {
+      for (const property of ["href", "src"]) {
+        const url = node.properties?.[property];
+        if (typeof url === "string" && url.startsWith("/") && !url.startsWith("//") && !url.startsWith(base)) ctx.setProperty(node, property, base + url.slice(1));
+      }
+    },
+  },
+  raw: (node, ctx) =>
+    ctx.setProperty(
+      node,
+      "value",
+      node.value.replace(/(\s(?:href|src)=["'])(\/(?!\/)[^"']*)/g, (_, start, url) => start + (url.startsWith(base) ? url : base + url.slice(1))),
+    ),
+};
 
 export default defineConfig({
   site,
   base,
   trailingSlash: "always",
   outDir: "../../out",
+  markdown: { processor: satteri({ mdastPlugins: [links], hastPlugins: [assets] }) },
   devToolbar: { enabled: false },
-  markdown: { processor: satteri({ mdastPlugins: [links] }) },
   // Loopback only; `tailscale serve` can show it on the tailnet, whose names end in .ts.net.
   server: { host: "127.0.0.1", port: 4173 },
   vite: { plugins: [tailwindcss()], preview: { allowedHosts: [".ts.net"] }, server: { allowedHosts: [".ts.net"] } },
@@ -139,7 +158,7 @@ export default defineConfig({
               { label: "Overview", slug: topic.id },
               ...topic.groups.map((group) => ({ label: group.title, items: group.pages.map((page) => ({ label: page.label, slug: `${topic.id}/${page.slug}` })) })),
             ],
-          })).concat([{ label: "Plugins", link: "/plugins/", icon: "puzzle" }]),
+          })).concat([{ label: "Plugins", link: `${base}plugins/`, icon: "puzzle" }]),
         ),
         // Copy page as Markdown, and open it in ChatGPT or Claude. components/PageTitle.astro adds Copy all docs.
         starlightPageActions({ actions: { chatgpt: true, claude: true, markdown: true } }),

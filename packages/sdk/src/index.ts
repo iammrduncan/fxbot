@@ -274,8 +274,8 @@ export async function createFxbot(options: FxbotOptions) {
             const running = profile.sessionId ? working.get(profile.sessionId)?.[0] : undefined;
             const messageId = running?.messageId ?? resumed.get(profile.sessionId!)?.messageId;
             if (!messageId) return;
-            // A turn resumed after a restart knows only that a plugin started it.
-            if ((running?.sent.from ?? (byPlugin.has(`${bot}:${messageId}`) ? plugin : "")) !== plugin) fail(409, "That turn isn't this plugin's.");
+            const sender = running?.sent.from ?? senders.get(`${bot}:${messageId}`);
+            if (sender !== plugin) fail(409, "That turn isn't this plugin's.");
           }
           await (await open(profile, session ?? profile.sessionId!)).cancel();
         },
@@ -403,16 +403,30 @@ export async function createFxbot(options: FxbotOptions) {
     const agent = await providers.agentFor(profile.provider, model);
     const window = await providers.contextWindow(profile.provider, model).catch(() => undefined);
     const share = (part: number) => (window ? Math.floor(window * part * 4) : 8000);
-    const catalog = skills.catalog(profile.id, share(0.01));
-    const room = 64 * 1024 - 1024 - Buffer.byteLength([...instructionsFor(profile, sessionId), catalog].join("\n\n"));
-    const memory = await memories.section(profile.id, Math.min(share(0.02), room));
-    const team = await memories.teamSection(Math.min(window ? share(0.01) : 4000, room - Buffer.byteLength(memory)));
-    let instructions = [...instructionsFor(profile, sessionId), sentNote, memory, team, catalog].filter(Boolean);
+    let instructions = instructionsFor(profile, sessionId);
+    let room = 64 * 1024 - Buffer.byteLength(instructions.join("\n\n"));
+    let catalog = skills.catalog(profile.id, share(0.01));
+    const size = (text: string) => Buffer.byteLength(text) + (instructions.length ? 2 : 0);
+    if (size(sentNote) <= room) {
+      instructions.push(sentNote);
+      room -= Buffer.byteLength(sentNote) + 2;
+    }
+    if (!catalog || size(catalog) > room) catalog = "";
+    else room -= size(catalog);
+    let memory = await memories.section(profile.id, Math.max(0, Math.min(share(0.02), room - 2)));
+    if (memory && size(memory) > room) memory = "";
+    if (memory) room -= size(memory);
+    let team = await memories.teamSection(Math.max(0, Math.min(window ? share(0.01) : 4000, room - 2)));
+    if (team && size(team) > room) team = "";
+    if (memory) instructions.push(memory);
+    if (team) instructions.push(team);
+    if (catalog) instructions.push(catalog);
     if (packages.hooked("instructions")) {
       const event = { bot: profile.id, session: sessionId, instructions };
       await packages.run("instructions", event);
       instructions = (Array.isArray(event.instructions) ? event.instructions : []).filter((entry) => typeof entry === "string" && entry);
     }
+    if (Buffer.byteLength(instructions.join("\n\n")) > 64 * 1024) fail(400, "instructions are over 64 KiB");
     const session = await sessionOf(sessionId);
     const effort = await effortOf(profile, model, level ?? session.effort ?? profile.effort);
     return agent.session(sessionId, { model: effort ? { id: model, effort } : model || undefined, instructions, context: { bot: profile.id, messageId, label: session.label } });
@@ -438,7 +452,7 @@ export async function createFxbot(options: FxbotOptions) {
   // bot and its chat. The record is saved before the prompt, so the stream finds it when the turn starts.
   // A message with files or named skills is blocks: its text, each skill's instructions, then each file. What it sent
   // is kept, since libfx's stream shows only a plain-text prompt.
-  async function attach(profile: StoredProfile, sessionId: string, text: string, messageId: string, files: Upload[], skilled: ReturnType<typeof skills.invoked>, from?: string, shown?: string): Promise<FxSessionPromptInput> {
+  async function attach(profile: StoredProfile, sessionId: string, text: string, messageId: string, files: Upload[], skilled: ReturnType<typeof skills.invoked>, plugin?: string, shown?: string, sender?: string): Promise<FxSessionPromptInput> {
     const checked = await Promise.all(
       files.map(async ({ name, type, data }) => {
         if (typeof name !== "string" || typeof type !== "string" || typeof data !== "string") return fail(400, "each file needs a name, a type, and base64 data");
@@ -456,15 +470,30 @@ export async function createFxbot(options: FxbotOptions) {
       blocks.push(kind === "image" ? { type: "image", mimeType: type, data: bytes.toString("base64"), sourceRef: `library:${item.id}` } : { type: "text", text: type === pdf ? pdfBlock(name, content, item.id) : `File: ${name}\n${content}` });
       sent.push({ name, type, url: item.url });
     }
-    await store.sent.save(profile.id, messageId, { input: shown ?? text, files: sent, plugin: from });
+    await saveSent(profile.id, messageId, { input: shown ?? text, files: sent, plugin }, sender);
     return blocks;
   }
 
   // Each turn's reply is saved after the turn ends, and close waits for the saves.
   const saving = new Set<Promise<void>>();
   type Sent = { text: string; from?: string; steer?: boolean; asked?: string };
+  const senders = new Map<string, string>(
+    (await store.sql<{ profileId: string; messageId: string; sender: string }[]>`select profile_id, message_id, sender from sent where sender is not null`).map(
+      (row) => [`${row.profileId}:${row.messageId}`, row.sender] as const,
+    ),
+  );
+  async function saveSent(id: string, messageId: string, sent: { input: string; files: Upload[]; plugin?: string | null }, sender?: string) {
+    await store.sent.save(id, messageId, sent);
+    if (sent.plugin) byPlugin.add(`${id}:${messageId}`);
+    if (!sender) return;
+    const [saved] = await store.sql<{ sender: string }[]>`update sent set sender = coalesce(sender, ${sender}) where profile_id = ${id} and message_id = ${messageId} returning sender`;
+    if (saved?.sender) senders.set(`${id}:${messageId}`, saved.sender);
+  }
   type Stoppable = { cancel(): Promise<void> };
   function finish({ id, provider }: { id: string; provider: string }, chat: Stoppable, sessionId: string, turn: FxTurn | FxResumeTurn, sent: Sent = { text: "" }, reader?: "own" | "next") {
+    const key = turn.messageId ? turnKey(sessionId, turn.messageId) : undefined;
+    if (key && readers.has(key)) return;
+    if (key) readers.set(key, turn);
     // After turn.end, so a plugin hears a turn end before the one behind it starts.
     const done = saveReply(id, provider, chat, sessionId, turn, sent, reader)
       .catch((error) => console.error("Could not save a reply:", error))
@@ -473,13 +502,18 @@ export async function createFxbot(options: FxbotOptions) {
         if (next) begun(id, sessionId, next);
       });
     saving.add(done);
-    void done.finally(() => saving.delete(done));
+    void done.finally(() => {
+      if (key && readers.get(key) === turn) readers.delete(key);
+      saving.delete(done);
+    });
   }
 
   // The turns of each bot's own chat, by session, the running one first: whose each is, and whether a message may join
   // it. A plugin's turn takes messages only when it asked to: routines' told turn, with its tools off, mustn't.
   type Working = { messageId: string; sent: Sent; steerable: boolean; started?: boolean };
   const working = new Map<string, Working[]>();
+  const readers = new Map<string, FxTurn | FxResumeTurn>();
+  const turnKey = (sessionId: string, messageId: string) => `${sessionId}:${messageId}`;
   const workingOn = (id: string, messageId: string, sent: Sent): Working => ({ messageId, sent, steerable: sent.from ? Boolean(sent.steer) : !byPlugin.has(`${id}:${messageId}`) });
   function drop(sessionId: string, messageId: string | null) {
     const rest = (working.get(sessionId) ?? []).filter((t) => t.messageId !== messageId);
@@ -586,6 +620,7 @@ export async function createFxbot(options: FxbotOptions) {
       const said = /\b40[13]\b/.exec(keyRefused.test(failed ?? "") ? failed! : "")?.[0];
       if (turn.messageId && (status === 401 || status === 403 || said)) refusedKey.set(turn.messageId, (failed = await keyWords(provider, status ?? Number(said))));
     } catch (error) {
+      if (mine && turn.messageId && readers.has(turnKey(sessionId, turn.messageId)) && readers.get(turnKey(sessionId, turn.messageId)) !== turn) return;
       if (mine && turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...heard(sent), reply, error: (error as Error).message });
       return;
     } finally {
@@ -600,6 +635,7 @@ export async function createFxbot(options: FxbotOptions) {
         if ([...steers.values()].some((steer) => steer.session === sessionId)) void readNext(id, sessionId).catch((error) => console.error("Could not read a steered turn:", error));
       }
     }
+    if (turn.messageId && readers.has(turnKey(sessionId, turn.messageId)) && readers.get(turnKey(sessionId, turn.messageId)) !== turn) return;
     if (turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...heard(sent), reply, ...(failed ? { error: failed } : {}), ...(cancelled ? { cancelled } : {}) });
     if (!reply.trim() || !turn.messageId) return;
     await history.record(id, sessionId, turn.messageId, "assistant", reply);
@@ -748,10 +784,24 @@ export async function createFxbot(options: FxbotOptions) {
   // One start-over of a bot's own chat at a time. A send to that chat, and a provider switch, wait for the one running;
   // a start-over a message asked for holds it until that message is in the new chat, so one sent meanwhile lands after.
   const moving = new Map<string, Promise<void>>();
+  const deliveries = new Map<string, Set<Promise<void>>>();
+  async function admit(id: string) {
+    while (moving.has(id)) await moving.get(id);
+    let resolve!: () => void;
+    const promise = new Promise<void>((done) => (resolve = done));
+    const all = deliveries.get(id) ?? deliveries.set(id, new Set()).get(id)!;
+    all.add(promise);
+    return () => {
+      all.delete(promise);
+      if (!all.size) deliveries.delete(id);
+      resolve();
+    };
+  }
   async function hold(id: string) {
     while (moving.has(id)) await moving.get(id);
     let release!: () => void;
     moving.set(id, new Promise<void>((done) => (release = done)));
+    await Promise.all(deliveries.get(id) ?? []);
     return () => (moving.delete(id), release());
   }
 
@@ -798,10 +848,10 @@ export async function createFxbot(options: FxbotOptions) {
   async function restart(profile: StoredProfile, provider: string, model: string, handoff: string) {
     // In-context pills the old chat never gave the model go with its handoff.
     const left = profile.sessionId ? await pending(profile.id, profile.sessionId) : [];
-    if (left.length) {
-      handoff = `${handoff}\n\n${pillText(left)}`;
-      await store.sql`update pills set given_with = 'handoff' where id in ${store.sql(left.map((r) => r.id))}`;
-    }
+    if (left.length) handoff = `${handoff}\n\n${pillText(left)}`;
+    if (Buffer.byteLength([profile.instructions, `${handoff}\n\nSearch earlier messages with chat_history.`].filter(Boolean).join("\n\n")) > 64 * 1024)
+      fail(400, "The bot's instructions and handoff are over 64 KiB.");
+    if (left.length) await store.sql`update pills set given_with = 'handoff' where id in ${store.sql(left.map((r) => r.id))}`;
     const sessionId = await (await providers.agentFor(provider, "")).newSessionId();
     const saved = (await store.profiles.update(profile.id, { provider, model, sessionId, handoff })) ?? fail(404, "profile not found");
     for (const stream of following.get(profile.id) ?? []) stream.move(sessionId);
@@ -1019,8 +1069,12 @@ export async function createFxbot(options: FxbotOptions) {
         done();
         throw error;
       }
-    }
+    } else if (!session) done = await admit(id);
     try {
+      if (!session && startOverAsk === undefined) {
+        profile = await get(id);
+        sessionId = profile.sessionId!;
+      }
       return await prompt();
     } finally {
       done?.();
@@ -1030,9 +1084,8 @@ export async function createFxbot(options: FxbotOptions) {
     if (!text.trim() && !files.length) return { messageId, sessionId, handled: true as const };
     // A skill named as $name, or /name at the start, goes with the message, so the bot has it without asking.
     const skilled = skills.invoked(id, text);
-    const input = files.length || skilled.length ? await attach(profile, sessionId, text, messageId, files, skilled, label ?? from, shown) : text;
-    if (from && input === text) await store.sent.save(id, messageId, { input: shown ?? text, files: [], plugin: label ?? from });
-    if (from) byPlugin.add(`${id}:${messageId}`);
+    const input = files.length || skilled.length ? await attach(profile, sessionId, text, messageId, files, skilled, label ?? from, shown, from) : text;
+    if (from && input === text) await saveSent(id, messageId, { input: shown ?? text, files: [], plugin: label ?? from }, from);
     const names = files.length ? `\n[files: ${files.map((f) => f.name).join(", ")}]` : "";
     const sent: Sent = { text, ...by, steer };
     // What the bot reads starts with when it was sent. History, hooks, and the page keep the message as it was.
@@ -1064,7 +1117,7 @@ export async function createFxbot(options: FxbotOptions) {
       }
       // A plugin's session is followed as the bot's own chat is when the plugin steers in it, so a later steer finds its turn.
       const own = session && !steer ? undefined : workingOn(id, messageId, sent);
-      if (own && !working.get(sessionId)?.some((t) => t.messageId === messageId)) working.set(sessionId, [...(working.get(sessionId) ?? []), own]);
+      if (own && !readers.has(turnKey(sessionId, messageId)) && !working.get(sessionId)?.some((t) => t.messageId === messageId)) working.set(sessionId, [...(working.get(sessionId) ?? []), own]);
       // A messageId the session already accepted runs nothing new and resolves to the same ids. A message's own thinking
       // level is its turn's.
       const chat = await open(profile, sessionId, messageId, effort?.trim());
@@ -1074,12 +1127,18 @@ export async function createFxbot(options: FxbotOptions) {
       const block = carried.length ? `${pillText(carried)}\n\n` : "";
       const turn = chat.prompt(block ? (typeof read === "string" ? `${block}${read}` : [{ type: "text" as const, text: block }, ...read]) : read, { messageId });
       const accepted = await turn.accepted;
+      const settled = await Promise.race([turn.result, Promise.resolve(null)]);
+      if (settled?.repeated) {
+        if (own) drop(sessionId, messageId);
+        return accepted;
+      }
       if (carried.length) {
         await store.sql`update pills set given_with = ${messageId} where id in ${store.sql(carried.map((r) => r.id))} and given_with is null`;
         if (!from && input === text) await store.sent.save(id, messageId, { input: shown ?? text, files: [] });
         carriedPills.add(`${id}:${messageId}`);
       }
       await history.record(id, accepted.sessionId, messageId, "user", text + names);
+      if (readers.has(turnKey(accepted.sessionId, messageId)) || working.get(sessionId)?.some((entry) => entry.messageId === messageId && entry !== own)) return accepted;
       // A turn behind another starts when that one ends.
       const first = own ? working.get(sessionId)?.[0] : workingOn(id, messageId, sent);
       if (first?.messageId === messageId) begun(id, accepted.sessionId, first);

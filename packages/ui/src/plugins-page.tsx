@@ -132,12 +132,13 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
   const picks = listed.filter((pick) => !pick.added);
   const publicServers = { ...search, result: search.result && { ...search.result, cards: search.result.cards.filter((c) => c.from !== "fxbot") } };
   const publicSkills = { ...skillSearch, result: skillSearch.result && { ...skillSearch.result, cards: skillSearch.result.cards.filter((c) => c.from !== "fxbot") } };
-  const onAdded = (addon: Plugin) => {
+  const onAdded = (addon: Plugin, error = "") => {
     setEntry(null);
     setSkill(null);
     setPlugin(null);
     setByAddress(false);
     setAddons((all) => [...(all ?? []), addon]);
+    setError(error);
     setQuery("");
     setChosen("installed");
     if (addon.kind === "mcp" && addon.auth === "oauth") setSigningIn(addon);
@@ -344,10 +345,15 @@ function ServerSettings({
   const change = (fields: Pick<Partial<McpPlugin>, "bots" | "allowed">) => (onChange({ ...addon, ...fields }), saved(client.plugins.change(addon.id, fields)));
   const allow = (name: string, on: boolean) => change({ allowed: on ? [...addon.allowed, name] : addon.allowed.filter((n) => n !== name) });
   const allowed = addon.tools.filter((t) => addon.allowed.includes(t.name)).length;
-  const saveKeys = (event: FormEvent) => (
-    event.preventDefault(),
-    saved(client.plugins.setSecrets(addon.id, { headers: Object.fromEntries(Object.entries(keys!).filter(([, v]) => v.trim()).map(([n, v]) => [n, n === "Authorization" ? bearer(v) : v.trim()])) })).then(() => setKeys(null))
-  );
+  const saveKeys = (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    const headers = Object.fromEntries(Object.entries(keys!).filter(([, v]) => v.trim()).map(([n, v]) => [n, n === "Authorization" ? bearer(v) : v.trim()]));
+    client.plugins.setSecrets(addon.id, { headers }).then((next) => {
+      onChange(next);
+      setKeys(null);
+    }, (e: Error) => setError(e.message));
+  };
   async function remove() {
     if (!confirm(`Remove ${addon.name}? Its tools leave every bot.`)) return;
     await client.plugins.remove(addon.id).then(onRemoved, (e: Error) => setError(e.message));
